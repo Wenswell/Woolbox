@@ -1,0 +1,15 @@
+.gradle/
+.idea/
+.kotlin/
+node_modules/
+build/
+local.properties
+captures/
+externalNativeBuild/
+cxx/
+*.iml
+app/build/
+logs/
+references/
+/tmp
+.DS_Store
