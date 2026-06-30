@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -17,16 +18,23 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,8 +54,13 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +80,14 @@ object TemplateStyle {
     val spacing = TemplateSpacing()
     val cardShape = RoundedCornerShape(16.dp)
     val chipShape = CircleShape
+    val menuShape = RoundedCornerShape(16.dp)
 }
+
+data class TemplatePageAction(
+    val text: String,
+    @param:DrawableRes val iconRes: Int,
+    val onClick: () -> Unit,
+)
 
 @Composable
 fun TemplatePage(
@@ -103,10 +123,28 @@ fun TemplateRouteScaffold(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    mainAction: TemplatePageAction? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    var actionExpanded by remember { androidx.compose.runtime.mutableStateOf(true) }
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput) {
+                    when {
+                        available.y < -1f -> actionExpanded = false
+                        available.y > 1f -> actionExpanded = true
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
@@ -133,13 +171,29 @@ fun TemplateRouteScaffold(
                 ),
             )
         },
+        floatingActionButton = {
+            mainAction?.let { action ->
+                Box(
+                    modifier = Modifier
+                        .imePadding()
+                        .navigationBarsPadding(),
+                ) {
+                    TemplatePageFab(
+                        text = action.text,
+                        iconRes = action.iconRes,
+                        expanded = actionExpanded,
+                        onClick = action.onClick,
+                    )
+                }
+            }
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
+                .padding(bottom = TemplateStyle.spacing.pageBottom),
         ) {
             Spacer(Modifier.height(12.dp))
             content()
@@ -267,10 +321,13 @@ fun TemplateListItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val rowModifier = if (onClick == null) {
-        modifier.fillMaxWidth()
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
     } else {
         modifier
             .fillMaxWidth()
+            .heightIn(min = 56.dp)
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.material3.ripple(),
@@ -315,7 +372,7 @@ fun TemplateListItem(
 fun TemplateDivider() {
     HorizontalDivider(
         color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(start = TemplateStyle.spacing.pageHorizontal),
     )
 }
 
@@ -433,6 +490,51 @@ fun TemplateOutlineCard(
 }
 
 @Composable
+fun TemplatePageFab(
+    text: String,
+    @DrawableRes iconRes: Int,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    ExtendedFloatingActionButton(
+        text = { Text(text) },
+        icon = {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = text,
+            )
+        },
+        onClick = onClick,
+        expanded = expanded,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    )
+}
+
+@Composable
+fun TemplateInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    supportingText: String? = null,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        supportingText = supportingText?.let { text ->
+            { Text(text) }
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
+        singleLine = true,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun <T> TemplateSingleChoiceDialog(
     title: String,
     options: List<T>,
@@ -441,46 +543,81 @@ fun <T> TemplateSingleChoiceDialog(
     onSelected: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectableGroup(),
-            ) {
-                options.forEach { option ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = option == selected,
-                                role = Role.RadioButton,
-                                onClick = { onSelected(option) },
-                            )
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        RadioButton(
-                            selected = option == selected,
-                            onClick = null,
-                        )
-                        Text(
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 560.dp),
+            shape = TemplateStyle.menuShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 8.dp),
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
+                ) {
+                    options.forEach { option ->
+                        TemplateSingleChoiceRow(
                             text = label(option),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyLarge,
+                            selected = option == selected,
+                            onClick = {
+                                onSelected(option)
+                                onDismiss()
+                            },
                         )
                     }
                 }
+                Spacer(Modifier.height(16.dp))
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Done")
-            }
-        },
-    )
+        }
+    }
+}
+
+@Composable
+private fun TemplateSingleChoiceRow(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+        )
+        Spacer(Modifier.width(16.dp))
+        Text(
+            text = text,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
 }
 
 @Composable

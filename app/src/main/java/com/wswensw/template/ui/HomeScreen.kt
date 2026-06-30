@@ -10,6 +10,7 @@ import com.wswensw.template.R
 @Composable
 fun HomeScreen(
     onOpenComponents: () -> Unit,
+    onOpenAction: () -> Unit,
     onOpenRules: () -> Unit,
     onOpenExtension: () -> Unit,
     modifier: Modifier = Modifier,
@@ -43,10 +44,10 @@ fun HomeScreen(
             )
             TemplateDivider()
             TemplateListItem(
-                title = "Dynamic color",
-                subtitle = "Material 3 color follows the device palette when available.",
-                iconRes = R.drawable.ic_color_lens_24,
-                onClick = onOpenComponents,
+                title = "Floating action",
+                subtitle = "Open a child page with input fields and adaptive primary action.",
+                iconRes = R.drawable.ic_edit_24,
+                onClick = onOpenAction,
             )
         }
 

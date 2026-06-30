@@ -3,12 +3,20 @@ package com.wswensw.template.ui
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 
 @Composable
-fun ComponentsRoute(onBack: () -> Unit) {
+fun ComponentsRoute(
+    onBack: () -> Unit,
+    onOpenAction: () -> Unit,
+) {
     TemplateRouteScaffold(
         title = "Components",
         onBack = onBack,
@@ -46,6 +54,79 @@ fun ComponentsRoute(onBack: () -> Unit) {
                 title = "Information",
                 subtitle = "Use for version, about, and static reference details.",
                 iconRes = R.drawable.ic_info_24,
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        TemplateSection(title = "Actions") {
+            TemplateListItem(
+                title = "Adaptive primary action",
+                subtitle = "Test the right-bottom action with scrolling content and input fields.",
+                iconRes = R.drawable.ic_edit_24,
+                onClick = onOpenAction,
+            )
+        }
+    }
+}
+
+@Composable
+fun ActionRoute(onBack: () -> Unit) {
+    var title by rememberSaveable { mutableStateOf("Template action") }
+    var note by rememberSaveable { mutableStateOf("Input stays usable while the action avoids the keyboard area.") }
+    var clickCount by rememberSaveable { mutableIntStateOf(0) }
+
+    TemplateRouteScaffold(
+        title = "Primary Action",
+        onBack = onBack,
+        mainAction = TemplatePageAction(
+            text = if (clickCount == 0) "Apply" else "Applied $clickCount",
+            iconRes = R.drawable.ic_check_24,
+            onClick = {
+                val nextCount = clickCount + 1
+                clickCount = nextCount
+                note = "Applied $nextCount time${if (nextCount == 1) "" else "s"}."
+            },
+        ),
+    ) {
+        TemplateCard(
+            title = "Adaptive action",
+            body = "At page top the button shows icon and text. After scrolling it keeps the same action as a compact icon button.",
+            iconRes = R.drawable.ic_edit_24,
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        TemplateSection(title = "Input") {
+            Spacer(Modifier.height(14.dp))
+            TemplateInputField(
+                value = title,
+                onValueChange = { title = it },
+                label = "Action title",
+                supportingText = "Use the keyboard to verify the bottom action keeps clear of input.",
+            )
+            Spacer(Modifier.height(12.dp))
+            TemplateInputField(
+                value = note,
+                onValueChange = { note = it },
+                label = "Action note",
+            )
+            Spacer(Modifier.height(14.dp))
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        TemplateSection(title = "State") {
+            TemplateMetricRow(label = "Button clicks", value = clickCount.toString())
+            TemplateDivider()
+            TemplateMetricRow(label = "Title length", value = title.length.toString())
+        }
+
+        repeat(6) { index ->
+            Spacer(Modifier.height(12.dp))
+            TemplateOutlineCard(
+                title = "Scrollable block ${index + 1}",
+                body = "Additional content keeps the page scrollable so the primary action can collapse from text plus icon into icon-only form.",
             )
         }
     }

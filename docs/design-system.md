@@ -23,6 +23,7 @@ TemplateTheme
       └─ TemplateRouteScaffold
          ├─ TopAppBar
          ├─ Back action
+         ├─ Optional primary action
          └─ TemplateSection / TemplateCard / TemplateOutlineCard
 ```
 
@@ -40,6 +41,7 @@ TemplateTheme
 - 设置分组使用 `surfaceContainerLow`，强调卡片使用 `primaryContainer`。
 - 列表行使用图标、单行标题、最多两行副标题和可选尾部控件。
 - 有动作的设置行和列表行保持整行点击。
+- 列表行最小高度为 `56dp`。
 - 开关设置行由整行处理状态切换，尾部 `Switch` 只展示当前状态。
 - 图标使用本地 Material vector，避免引入大型图标依赖。
 
@@ -47,7 +49,6 @@ TemplateTheme
 
 当前沉淀首页、设置页和示例子页面需要的基础组件。后续新增以下组件时，应先放入组件层：
 
-- 页面级主按钮
 - 空状态
 - notice/alert 信息块
 - 确认弹窗
@@ -60,6 +61,18 @@ TemplateTheme
 | `Theme` | 整行点击打开单选弹窗 | `TemplateSingleChoiceDialog` |
 | `Template options` | 整行点击打开短文本弹窗 | `TemplateTextInputDialog` |
 | `Initial version` | 整行点击打开信息弹窗 | `TemplateInfoDialog` |
+
+单选弹窗采用以下样式：
+
+- 外壳使用 `BasicAlertDialog` + `Surface`。
+- 最大宽度 `560dp`，圆角 `16dp`。
+- 背景使用 `surfaceContainerHigh`。
+- 阴影使用 `tonalElevation = 6dp`、`shadowElevation = 12dp`。
+- 标题使用 `headlineSmall`，边距为 `24dp / 24dp / 24dp / 8dp`。
+- 选项行最小高度 `56dp`，水平边距 `24dp`。
+- 选项行使用整行 `selectable`，点击后立即保存并关闭弹窗。
+- 选中项文本使用 `onSurface` 和 `FontWeight.Medium`。
+- 未选中项文本使用 `onSurfaceVariant` 和 `FontWeight.Normal`。
 
 ## Tab 规则
 
@@ -77,4 +90,7 @@ TemplateTheme
 - 子页面使用 `TemplateRouteScaffold`。
 - 根页面保留底栏，子页面使用顶部栏和返回按钮。
 - 子页面之间使用横向滑动动画，进入向左，返回向右，时长 `220ms`。
-- 示例子页面当前包括 `Components`、`Template Rules`、`Extension` 和 `Settings Pattern`。
+- 右下角主按钮使用 `TemplatePageAction` 传入子页面。
+- 主按钮在页面顶部显示图标和文字，向下滚动后显示纯图标。
+- 主按钮容器使用 `imePadding()` 和 `navigationBarsPadding()`，保证输入框获取焦点时仍保持可点击位置。
+- 示例子页面当前包括 `Components`、`Primary Action`、`Template Rules`、`Extension` 和 `Settings Pattern`。

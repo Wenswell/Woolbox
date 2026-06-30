@@ -21,7 +21,7 @@
 | 包名 | `com.wswensw.template` |
 | 技术栈 | Kotlin + Jetpack Compose + Material 3 |
 | 底栏 | `Home`、`Setting` |
-| 子页面 | `Components`、`Template Rules`、`Extension`、`Settings Pattern` |
+| 子页面 | `Components`、`Primary Action`、`Template Rules`、`Extension`、`Settings Pattern` |
 | 导航 | Navigation Compose string routes + horizontal slide transition |
 | 系统栏 | edge-to-edge + 应用内主题同步图标样式 |
 | AGP | `9.2.1` |
@@ -42,11 +42,13 @@
 - `TemplateSurface`：应用级 `Scaffold`，承载底栏和主内容。
 - `TemplatePage`：可滚动页面外壳，包含标题、副标题和页面间距。
 - `TemplateRouteScaffold`：子页面外壳，包含顶部栏、返回按钮、安全区和滚动内容。
+- `TemplatePageAction` / `TemplatePageFab`：右下角主按钮，支持滚动前扩展态和滚动后纯图标态。
 - `TemplateSection`：设置页风格分组标题和低色调卡片。
 - `TemplateCard`：页面主状态卡片。
 - `TemplateListItem`：图标、标题、副标题、可选尾部控件和可选整行点击。
 - `TemplateMetricRow`：左右对齐的简洁指标行。
 - `TemplateOutlineCard`：用于说明或扩展入口的描边卡片。
+- `TemplateInputField`：页面内单行输入框，使用统一水平间距。
 - `TemplateSingleChoiceDialog`：小型互斥选项弹窗。
 - `TemplateTextInputDialog`：短文本编辑弹窗。
 - `TemplateInfoDialog`：静态信息展示弹窗。
@@ -75,6 +77,6 @@ ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio
 
 ## 后续方向
 
-- 增加更多模板组件：空状态、确认弹窗、操作菜单、主按钮。
+- 增加更多模板组件：空状态、确认弹窗、操作菜单。
 - 为核心组件补 Compose Preview。
 - 在有明确需求后再引入持久化和业务依赖。

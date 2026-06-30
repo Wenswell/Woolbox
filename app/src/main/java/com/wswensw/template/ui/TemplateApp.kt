@@ -77,6 +77,7 @@ fun TemplateApp() {
                                 .fillMaxSize()
                                 .padding(innerPadding),
                             onOpenComponents = { navController.navigate(TemplateRoutes.COMPONENTS) },
+                            onOpenAction = { navController.navigate(TemplateRoutes.ACTION) },
                             onOpenRules = { navController.navigate(TemplateRoutes.RULES) },
                             onOpenExtension = { navController.navigate(TemplateRoutes.EXTENSION) },
                         )
@@ -95,7 +96,13 @@ fun TemplateApp() {
                 }
             }
             composable(TemplateRoutes.COMPONENTS) {
-                ComponentsRoute(onBack = { navController.popBackStack() })
+                ComponentsRoute(
+                    onBack = { navController.popBackStack() },
+                    onOpenAction = { navController.navigate(TemplateRoutes.ACTION) },
+                )
+            }
+            composable(TemplateRoutes.ACTION) {
+                ActionRoute(onBack = { navController.popBackStack() })
             }
             composable(TemplateRoutes.RULES) {
                 RulesRoute(onBack = { navController.popBackStack() })
@@ -156,6 +163,7 @@ private fun BottomNavigationBar(
 private object TemplateRoutes {
     const val ROOT = "root"
     const val COMPONENTS = "components"
+    const val ACTION = "action"
     const val RULES = "rules"
     const val EXTENSION = "extension"
     const val SETTINGS_GUIDE = "settings-guide"
