@@ -43,6 +43,7 @@ ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio
 - `MainActivity` 开启 edge-to-edge。
 - 页面外壳统一处理安全区。
 - 状态栏和导航栏图标样式跟随应用内 `Theme` 设置。
+- 子页面标题栏颜色保持固定，滚动离开顶部 8px 后只显示底部分隔线。
 
 ## 输入框与主按钮规则
 

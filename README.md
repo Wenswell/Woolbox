@@ -41,7 +41,7 @@
 - `TemplateTheme`：Material 3 主题，优先使用动态色，提供固定色作为基础配置。
 - `TemplateSurface`：应用级 `Scaffold`，承载底栏和主内容。
 - `TemplatePage`：可滚动页面外壳，包含标题、副标题和页面间距。
-- `TemplateRouteScaffold`：子页面外壳，包含顶部栏、返回按钮、安全区和滚动内容。
+- `TemplateRouteScaffold`：子页面外壳，包含顶部栏、滚动分隔线、返回按钮、安全区和滚动内容。
 - `TemplatePageAction` / `TemplatePageFab`：右下角主按钮，使用 Material 标准扩展按钮。
 - `TemplateSection`：设置页风格分组标题和低色调卡片。
 - `TemplateCard`：页面主状态卡片。
