@@ -42,7 +42,7 @@
 - `TemplateSurface`：应用级 `Scaffold`，承载底栏和主内容。
 - `TemplatePage`：可滚动页面外壳，包含标题、副标题和页面间距。
 - `TemplateRouteScaffold`：子页面外壳，包含顶部栏、返回按钮、安全区和滚动内容。
-- `TemplatePageAction` / `TemplatePageFab`：右下角主按钮，支持滚动前扩展态和滚动后纯图标态。
+- `TemplatePageAction` / `TemplatePageFab`：右下角主按钮，支持页面顶部扩展态和非顶部纯图标态。
 - `TemplateSection`：设置页风格分组标题和低色调卡片。
 - `TemplateCard`：页面主状态卡片。
 - `TemplateListItem`：图标、标题、副标题、可选尾部控件和可选整行点击。

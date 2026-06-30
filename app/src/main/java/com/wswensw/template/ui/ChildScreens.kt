@@ -9,7 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
 import com.wswensw.template.R
 
 @Composable
@@ -75,23 +77,27 @@ fun ActionRoute(onBack: () -> Unit) {
     var title by rememberSaveable { mutableStateOf("Template action") }
     var note by rememberSaveable { mutableStateOf("Input stays usable while the action avoids the keyboard area.") }
     var clickCount by rememberSaveable { mutableIntStateOf(0) }
+    val showErrorState = clickCount % 2 == 1
 
     TemplateRouteScaffold(
         title = "Primary Action",
         onBack = onBack,
         mainAction = TemplatePageAction(
-            text = if (clickCount == 0) "Apply" else "Applied $clickCount",
-            iconRes = R.drawable.ic_check_24,
+            text = if (showErrorState) "Error $clickCount" else "Apply $clickCount",
+            iconRes = if (showErrorState) R.drawable.ic_error_24 else R.drawable.ic_check_24,
+            containerColor = if (showErrorState) MaterialTheme.colorScheme.error else Color(0xFF0B57D0),
+            contentColor = if (showErrorState) MaterialTheme.colorScheme.onError else Color.White,
             onClick = {
                 val nextCount = clickCount + 1
                 clickCount = nextCount
-                note = "Applied $nextCount time${if (nextCount == 1) "" else "s"}."
+                val nextState = if (nextCount % 2 == 1) "Error" else "Ready"
+                note = "$nextState state after $nextCount click${if (nextCount == 1) "" else "s"}."
             },
         ),
     ) {
         TemplateCard(
             title = "Adaptive action",
-            body = "At page top the button shows icon and text. After scrolling it keeps the same action as a compact icon button.",
+            body = "At the page top the button shows icon and text. Away from the top it keeps the same action as a compact icon button.",
             iconRes = R.drawable.ic_edit_24,
         )
 
@@ -126,7 +132,7 @@ fun ActionRoute(onBack: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             TemplateOutlineCard(
                 title = "Scrollable block ${index + 1}",
-                body = "Additional content keeps the page scrollable so the primary action can collapse from text plus icon into icon-only form.",
+                body = "Additional content keeps the page scrollable so the primary action can switch between top and non-top forms.",
             )
         }
     }

@@ -51,16 +51,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +83,8 @@ object TemplateStyle {
 data class TemplatePageAction(
     val text: String,
     @param:DrawableRes val iconRes: Int,
+    val containerColor: Color = Color.Unspecified,
+    val contentColor: Color = Color.Unspecified,
     val onClick: () -> Unit,
 )
 
@@ -126,27 +125,15 @@ fun TemplateRouteScaffold(
     mainAction: TemplatePageAction? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    var actionExpanded by remember { androidx.compose.runtime.mutableStateOf(true) }
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput) {
-                    when {
-                        available.y < -1f -> actionExpanded = false
-                        available.y > 1f -> actionExpanded = true
-                    }
-                }
-                return Offset.Zero
-            }
-        }
+    val contentScrollState = rememberScrollState()
+    val actionExpanded by remember {
+        derivedStateOf { contentScrollState.value == 0 }
     }
 
     Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .nestedScroll(nestedScrollConnection),
+        modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
-        contentWindowInsets = WindowInsets.safeDrawing,
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = {
@@ -181,6 +168,8 @@ fun TemplateRouteScaffold(
                     TemplatePageFab(
                         text = action.text,
                         iconRes = action.iconRes,
+                        containerColor = action.containerColor,
+                        contentColor = action.contentColor,
                         expanded = actionExpanded,
                         onClick = action.onClick,
                     )
@@ -192,7 +181,7 @@ fun TemplateRouteScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(contentScrollState)
                 .padding(bottom = TemplateStyle.spacing.pageBottom),
         ) {
             Spacer(Modifier.height(12.dp))
@@ -493,9 +482,22 @@ fun TemplateOutlineCard(
 fun TemplatePageFab(
     text: String,
     @DrawableRes iconRes: Int,
+    containerColor: Color,
+    contentColor: Color,
     expanded: Boolean,
     onClick: () -> Unit,
 ) {
+    val resolvedContainerColor = if (containerColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        containerColor
+    }
+    val resolvedContentColor = if (contentColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        contentColor
+    }
+
     ExtendedFloatingActionButton(
         text = { Text(text) },
         icon = {
@@ -506,8 +508,8 @@ fun TemplatePageFab(
         },
         onClick = onClick,
         expanded = expanded,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        containerColor = resolvedContainerColor,
+        contentColor = resolvedContentColor,
     )
 }
 

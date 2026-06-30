@@ -32,7 +32,8 @@ TemplateTheme
 - 使用 Material 3 和动态色。
 - `Theme` 设置提供 `Follow system`、`Light`、`Dark` 三种模式。
 - 状态栏和导航栏图标样式跟随应用内主题模式。
-- 页面安全区交给 `Scaffold(contentWindowInsets = WindowInsets.safeDrawing)` 处理。
+- 页面安全区由页面外壳统一处理。
+- 右下角主按钮跟随输入法和导航栏保持可点击位置。
 - 页面背景使用 `surface`。
 - 页面水平间距统一为 `16dp`。
 - 页面顶部间距统一为 `16dp`。
@@ -62,17 +63,7 @@ TemplateTheme
 | `Template options` | 整行点击打开短文本弹窗 | `TemplateTextInputDialog` |
 | `Initial version` | 整行点击打开信息弹窗 | `TemplateInfoDialog` |
 
-单选弹窗采用以下样式：
-
-- 外壳使用 `BasicAlertDialog` + `Surface`。
-- 最大宽度 `560dp`，圆角 `16dp`。
-- 背景使用 `surfaceContainerHigh`。
-- 阴影使用 `tonalElevation = 6dp`、`shadowElevation = 12dp`。
-- 标题使用 `headlineSmall`，边距为 `24dp / 24dp / 24dp / 8dp`。
-- 选项行最小高度 `56dp`，水平边距 `24dp`。
-- 选项行使用整行 `selectable`，点击后立即保存并关闭弹窗。
-- 选中项文本使用 `onSurface` 和 `FontWeight.Medium`。
-- 未选中项文本使用 `onSurfaceVariant` 和 `FontWeight.Normal`。
+单选弹窗使用 `BasicAlertDialog` + `Surface`，圆角 `16dp`，最大宽度 `560dp`。选项行最小高度 `56dp`，水平边距 `24dp`，点击选项后立即保存并关闭。
 
 ## Tab 规则
 
@@ -91,6 +82,6 @@ TemplateTheme
 - 根页面保留底栏，子页面使用顶部栏和返回按钮。
 - 子页面之间使用横向滑动动画，进入向左，返回向右，时长 `220ms`。
 - 右下角主按钮使用 `TemplatePageAction` 传入子页面。
-- 主按钮在页面顶部显示图标和文字，向下滚动后显示纯图标。
-- 主按钮容器使用 `imePadding()` 和 `navigationBarsPadding()`，保证输入框获取焦点时仍保持可点击位置。
+- 主按钮在页面顶部显示图标和文字，页面离开顶部后显示纯图标。
+- 主按钮示例页使用蓝底对钩和红底错误两种状态交替。
 - 示例子页面当前包括 `Components`、`Primary Action`、`Template Rules`、`Extension` 和 `Settings Pattern`。
