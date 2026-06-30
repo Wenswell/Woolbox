@@ -60,7 +60,7 @@ TemplateTheme
 | 设置项 | 交互 | 组件 |
 | --- | --- | --- |
 | `Theme` | 整行点击打开单选弹窗 | `TemplateSingleChoiceDialog` |
-| `Template options` | 整行点击打开短文本弹窗 | `TemplateTextInputDialog` |
+| `Template options` | 整行点击打开输入框弹窗 | `TemplateTextInputDialog` |
 | `Initial version` | 整行点击打开信息弹窗 | `TemplateInfoDialog` |
 
 单选弹窗使用 `BasicAlertDialog` + `Surface`，圆角 `16dp`，最大宽度 `560dp`。选项行最小高度 `56dp`，水平边距 `24dp`，点击选项后立即保存并关闭。
@@ -82,6 +82,6 @@ TemplateTheme
 - 根页面保留底栏，子页面使用顶部栏和返回按钮。
 - 子页面之间使用横向滑动动画，进入向左，返回向右，时长 `220ms`。
 - 右下角主按钮使用 `TemplatePageAction` 传入子页面。
-- 主按钮在页面顶部显示图标和文字，页面离开顶部后显示纯图标。
+- 主按钮右锚定，页面接近顶部时显示图标和文字，离开顶部后显示纯图标。
 - 主按钮示例页使用蓝底对钩和红底错误两种状态交替。
 - 示例子页面当前包括 `Components`、`Primary Action`、`Template Rules`、`Extension` 和 `Settings Pattern`。

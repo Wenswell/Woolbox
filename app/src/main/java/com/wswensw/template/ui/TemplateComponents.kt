@@ -1,6 +1,7 @@
 package com.wswensw.template.ui
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -34,7 +36,6 @@ import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,6 +81,11 @@ object TemplateStyle {
     val chipShape = CircleShape
     val menuShape = RoundedCornerShape(16.dp)
 }
+
+private const val RouteTopTolerancePx = 8
+private val FabHeight = 56.dp
+private val FabExpandedWidth = 144.dp
+private val FabIconSlot = 56.dp
 
 data class TemplatePageAction(
     val text: String,
@@ -127,7 +134,7 @@ fun TemplateRouteScaffold(
 ) {
     val contentScrollState = rememberScrollState()
     val actionExpanded by remember {
-        derivedStateOf { contentScrollState.value == 0 }
+        derivedStateOf { contentScrollState.value <= RouteTopTolerancePx }
     }
 
     Scaffold(
@@ -497,20 +504,47 @@ fun TemplatePageFab(
     } else {
         contentColor
     }
-
-    ExtendedFloatingActionButton(
-        text = { Text(text) },
-        icon = {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = text,
-            )
-        },
-        onClick = onClick,
-        expanded = expanded,
-        containerColor = resolvedContainerColor,
-        contentColor = resolvedContentColor,
-    )
+    Box(
+        modifier = Modifier
+            .width(FabExpandedWidth)
+            .height(FabHeight),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Surface(
+            modifier = Modifier
+                .width(if (expanded) FabExpandedWidth else FabHeight)
+                .height(FabHeight)
+                .clickable(onClick = onClick),
+            shape = CircleShape,
+            color = resolvedContainerColor,
+            contentColor = resolvedContentColor,
+            tonalElevation = 6.dp,
+            shadowElevation = 6.dp,
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (expanded) {
+                    Text(
+                        text = text,
+                        color = resolvedContentColor,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 20.dp, end = FabIconSlot),
+                    )
+                }
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = text,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(FabIconSlot)
+                        .padding(16.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -622,40 +656,130 @@ private fun TemplateSingleChoiceRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplateTextInputDialog(
     title: String,
-    value: String,
-    label: String,
+    mainFields: List<TemplateDialogInputField>,
+    extraFields: List<TemplateDialogInputField> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
+    onConfirm: (List<String>, List<String>) -> Unit,
 ) {
-    var draft by remember(value) { androidx.compose.runtime.mutableStateOf(value) }
+    var expanded by remember { mutableStateOf(false) }
+    val mainDrafts = remember(mainFields) {
+        mainFields.map { mutableStateOf(it.value) }
+    }
+    val extraDrafts = remember(extraFields) {
+        extraFields.map { mutableStateOf(it.value) }
+    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                label = { Text(label) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(draft.trim()) }) {
-                Text("Save")
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 560.dp),
+            shape = TemplateStyle.menuShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+            ) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Spacer(Modifier.height(16.dp))
+                mainFields.forEachIndexed { index, field ->
+                    if (index > 0) {
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    TemplateDialogTextField(
+                        value = mainDrafts[index].value,
+                        onValueChange = { mainDrafts[index].value = it },
+                        label = field.label,
+                    )
+                }
+                AnimatedVisibility(visible = expanded && extraFields.isNotEmpty()) {
+                    Column {
+                        extraFields.forEachIndexed { index, field ->
+                            Spacer(Modifier.height(12.dp))
+                            TemplateDialogTextField(
+                                value = extraDrafts[index].value,
+                                onValueChange = { extraDrafts[index].value = it },
+                                label = field.label,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (extraFields.isNotEmpty()) {
+                        Surface(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clickable { expanded = !expanded },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_unfold_more_24),
+                                    contentDescription = if (expanded) "Collapse fields" else "Expand fields",
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    TextButton(
+                        onClick = {
+                            onConfirm(
+                                mainDrafts.map { it.value.trim() },
+                                extraDrafts.map { it.value.trim() },
+                            )
+                        },
+                    ) {
+                        Text("Save")
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
+        }
+    }
+}
+
+@Composable
+private fun TemplateDialogTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
     )
 }
+
+data class TemplateDialogInputField(
+    val label: String,
+    val value: String,
+)
 
 @Composable
 fun TemplateInfoDialog(

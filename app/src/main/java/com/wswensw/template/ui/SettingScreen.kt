@@ -112,11 +112,29 @@ fun SettingScreen(
     if (showTemplateOptionsDialog) {
         TemplateTextInputDialog(
             title = "Template options",
-            value = templateOption,
-            label = "Option label",
+            mainFields = listOf(
+                TemplateDialogInputField(
+                    label = "Option label",
+                    value = templateOption,
+                ),
+            ),
+            extraFields = listOf(
+                TemplateDialogInputField(
+                    label = "Secondary label",
+                    value = "Secondary option",
+                ),
+                TemplateDialogInputField(
+                    label = "Group name",
+                    value = "Template group",
+                ),
+                TemplateDialogInputField(
+                    label = "Notes",
+                    value = "Optional note",
+                ),
+            ),
             onDismiss = { showTemplateOptionsDialog = false },
-            onConfirm = {
-                onTemplateOptionChange(it)
+            onConfirm = { mainValues, _ ->
+                onTemplateOptionChange(mainValues[0])
                 showTemplateOptionsDialog = false
             },
         )
