@@ -42,7 +42,7 @@
 - `TemplateSurface`：应用级 `Scaffold`，承载底栏和主内容。
 - `TemplatePage`：可滚动页面外壳，包含标题、副标题和页面间距。
 - `TemplateRouteScaffold`：子页面外壳，包含顶部栏、返回按钮、安全区和滚动内容。
-- `TemplatePageAction` / `TemplatePageFab`：右下角主按钮，右锚定切换扩展态和纯图标态。
+- `TemplatePageAction` / `TemplatePageFab`：右下角主按钮，使用 Material 标准扩展按钮。
 - `TemplateSection`：设置页风格分组标题和低色调卡片。
 - `TemplateCard`：页面主状态卡片。
 - `TemplateListItem`：图标、标题、副标题、可选尾部控件和可选整行点击。
@@ -50,7 +50,7 @@
 - `TemplateOutlineCard`：用于说明或扩展入口的描边卡片。
 - `TemplateInputField`：页面内单行输入框，使用统一水平间距。
 - `TemplateSingleChoiceDialog`：小型互斥选项弹窗。
-- `TemplateTextInputDialog`：短文本编辑弹窗，支持主输入框和可展开输入框。
+- `TemplateTextInputDialog`：短文本编辑弹窗，支持主输入框和即时展开输入框。
 - `TemplateInfoDialog`：静态信息展示弹窗。
 
 组件规范详见 [docs/design-system.md](docs/design-system.md)。

@@ -1,7 +1,6 @@
 package com.wswensw.template.ui
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -36,6 +35,7 @@ import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,11 +81,6 @@ object TemplateStyle {
     val chipShape = CircleShape
     val menuShape = RoundedCornerShape(16.dp)
 }
-
-private const val RouteTopTolerancePx = 8
-private val FabHeight = 56.dp
-private val FabExpandedWidth = 144.dp
-private val FabIconSlot = 56.dp
 
 data class TemplatePageAction(
     val text: String,
@@ -134,7 +129,7 @@ fun TemplateRouteScaffold(
 ) {
     val contentScrollState = rememberScrollState()
     val actionExpanded by remember {
-        derivedStateOf { contentScrollState.value <= RouteTopTolerancePx }
+        derivedStateOf { contentScrollState.value == 0 }
     }
 
     Scaffold(
@@ -504,47 +499,19 @@ fun TemplatePageFab(
     } else {
         contentColor
     }
-    Box(
-        modifier = Modifier
-            .width(FabExpandedWidth)
-            .height(FabHeight),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Surface(
-            modifier = Modifier
-                .width(if (expanded) FabExpandedWidth else FabHeight)
-                .height(FabHeight)
-                .clickable(onClick = onClick),
-            shape = CircleShape,
-            color = resolvedContainerColor,
-            contentColor = resolvedContentColor,
-            tonalElevation = 6.dp,
-            shadowElevation = 6.dp,
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (expanded) {
-                    Text(
-                        text = text,
-                        color = resolvedContentColor,
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 20.dp, end = FabIconSlot),
-                    )
-                }
-                Icon(
-                    painter = painterResource(iconRes),
-                    contentDescription = text,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(FabIconSlot)
-                        .padding(16.dp),
-                )
-            }
-        }
-    }
+    ExtendedFloatingActionButton(
+        text = { Text(text) },
+        icon = {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = text,
+            )
+        },
+        onClick = onClick,
+        expanded = expanded,
+        containerColor = resolvedContainerColor,
+        contentColor = resolvedContentColor,
+    )
 }
 
 @Composable
@@ -704,7 +671,7 @@ fun TemplateTextInputDialog(
                         label = field.label,
                     )
                 }
-                AnimatedVisibility(visible = expanded && extraFields.isNotEmpty()) {
+                if (expanded && extraFields.isNotEmpty()) {
                     Column {
                         extraFields.forEachIndexed { index, field ->
                             Spacer(Modifier.height(12.dp))
@@ -723,9 +690,9 @@ fun TemplateTextInputDialog(
                 ) {
                     if (extraFields.isNotEmpty()) {
                         Surface(
+                            onClick = { expanded = !expanded },
                             modifier = Modifier
-                                .size(40.dp)
-                                .clickable { expanded = !expanded },
+                                .size(40.dp),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
