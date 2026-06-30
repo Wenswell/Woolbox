@@ -26,12 +26,13 @@ ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio
 - 开关类设置由整行切换状态，尾部 `Switch` 展示当前状态。
 - 小型互斥选项使用单选弹窗。
 - 单选弹窗沿用 app0603 的 `BasicAlertDialog + Surface` 结构，点击选项后立即保存并关闭。
-- 短文本配置使用输入框弹窗，弹窗支持主输入框和即时展开输入框。
+- 短文本配置使用输入框弹窗，弹窗支持主输入框和即时展开输入框，展开按钮使用上/下箭头表达当前动作。
 - 版本、包名和只读说明使用信息弹窗。
 
 ## 导航规则
 
 - 根页面保留 `Home` 和 `Setting` 两个底栏入口。
+- 底栏 Tab 内容切换使用横向滑动动画。
 - 示例详情和规则说明使用子页面承载。
 - 子页面使用 Navigation Compose string route，避免为模板示例引入序列化依赖。
 - 页面切换动画使用横向滑动，进入向左，返回向右。
@@ -46,5 +47,5 @@ ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio
 ## 输入框与主按钮规则
 
 - 页面内输入框使用 `TemplateInputField`，保持 `16dp` 水平页面间距。
-- 主按钮使用 Material 标准扩展按钮，页面顶部显示图标和文字，离开顶部后显示纯图标。
+- 主按钮使用 Material 标准扩展按钮，页面顶部 8px 内显示图标和文字，离开该范围后显示纯图标。
 - 主按钮状态示例使用蓝底对钩和红底错误两种状态交替。

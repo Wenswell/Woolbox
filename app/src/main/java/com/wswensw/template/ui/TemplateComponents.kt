@@ -82,6 +82,8 @@ object TemplateStyle {
     val menuShape = RoundedCornerShape(16.dp)
 }
 
+private const val RouteTopTolerancePx = 8
+
 data class TemplatePageAction(
     val text: String,
     @param:DrawableRes val iconRes: Int,
@@ -129,7 +131,7 @@ fun TemplateRouteScaffold(
 ) {
     val contentScrollState = rememberScrollState()
     val actionExpanded by remember {
-        derivedStateOf { contentScrollState.value == 0 }
+        derivedStateOf { contentScrollState.value <= RouteTopTolerancePx }
     }
 
     Scaffold(
@@ -702,7 +704,13 @@ fun TemplateTextInputDialog(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_unfold_more_24),
+                                    painter = painterResource(
+                                        if (expanded) {
+                                            R.drawable.ic_expand_less_24
+                                        } else {
+                                            R.drawable.ic_expand_more_24
+                                        },
+                                    ),
                                     contentDescription = if (expanded) "Collapse fields" else "Expand fields",
                                 )
                             }

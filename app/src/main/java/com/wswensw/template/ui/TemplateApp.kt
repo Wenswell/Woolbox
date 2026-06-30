@@ -3,10 +3,12 @@ package com.wswensw.template.ui
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -71,27 +73,32 @@ fun TemplateApp() {
                         )
                     },
                 ) { innerPadding: PaddingValues ->
-                    when (selectedTab) {
-                        MainTab.HOME -> HomeScreen(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding),
-                            onOpenComponents = { navController.navigate(TemplateRoutes.COMPONENTS) },
-                            onOpenAction = { navController.navigate(TemplateRoutes.ACTION) },
-                            onOpenRules = { navController.navigate(TemplateRoutes.RULES) },
-                            onOpenExtension = { navController.navigate(TemplateRoutes.EXTENSION) },
-                        )
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        transitionSpec = { tabContentTransition() },
+                        label = "MainTabContent",
+                    ) { tab ->
+                        when (tab) {
+                            MainTab.HOME -> HomeScreen(
+                                modifier = Modifier.fillMaxSize(),
+                                onOpenComponents = { navController.navigate(TemplateRoutes.COMPONENTS) },
+                                onOpenAction = { navController.navigate(TemplateRoutes.ACTION) },
+                                onOpenRules = { navController.navigate(TemplateRoutes.RULES) },
+                                onOpenExtension = { navController.navigate(TemplateRoutes.EXTENSION) },
+                            )
 
-                        MainTab.SETTING -> SettingScreen(
-                            themeMode = themeMode,
-                            onThemeModeChange = { themeMode = it },
-                            templateOption = templateOption,
-                            onTemplateOptionChange = { templateOption = it },
-                            onOpenSettingsGuide = { navController.navigate(TemplateRoutes.SETTINGS_GUIDE) },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(innerPadding),
-                        )
+                            MainTab.SETTING -> SettingScreen(
+                                themeMode = themeMode,
+                                onThemeModeChange = { themeMode = it },
+                                templateOption = templateOption,
+                                onTemplateOptionChange = { templateOption = it },
+                                onOpenSettingsGuide = { navController.navigate(TemplateRoutes.SETTINGS_GUIDE) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
@@ -170,6 +177,26 @@ private object TemplateRoutes {
 }
 
 private const val PageTransitionMillis = 220
+private const val TabTransitionMillis = 220
+
+private fun AnimatedContentTransitionScope<MainTab>.tabContentTransition() =
+    if (targetState.ordinal > initialState.ordinal) {
+        slideIntoContainer(
+            towards = AnimatedContentTransitionScope.SlideDirection.Left,
+            animationSpec = tween(TabTransitionMillis),
+        ) togetherWith slideOutOfContainer(
+            towards = AnimatedContentTransitionScope.SlideDirection.Left,
+            animationSpec = tween(TabTransitionMillis),
+        )
+    } else {
+        slideIntoContainer(
+            towards = AnimatedContentTransitionScope.SlideDirection.Right,
+            animationSpec = tween(TabTransitionMillis),
+        ) togetherWith slideOutOfContainer(
+            towards = AnimatedContentTransitionScope.SlideDirection.Right,
+            animationSpec = tween(TabTransitionMillis),
+        )
+    }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.pageEnterTransition(): EnterTransition =
     slideIntoContainer(

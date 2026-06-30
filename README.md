@@ -22,7 +22,7 @@
 | 技术栈 | Kotlin + Jetpack Compose + Material 3 |
 | 底栏 | `Home`、`Setting` |
 | 子页面 | `Components`、`Primary Action`、`Template Rules`、`Extension`、`Settings Pattern` |
-| 导航 | Navigation Compose string routes + horizontal slide transition |
+| 导航 | Bottom tabs + child routes horizontal slide transition |
 | 系统栏 | edge-to-edge + 应用内主题同步图标样式 |
 | AGP | `9.2.1` |
 | Gradle | `9.4.1` |
