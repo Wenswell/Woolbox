@@ -8,7 +8,12 @@ import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    onOpenComponents: () -> Unit,
+    onOpenRules: () -> Unit,
+    onOpenExtension: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     TemplatePage(
         title = "Template",
         subtitle = "A compact Compose starter for preferred page shells, cards, and rows.",
@@ -27,18 +32,21 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 title = "Grouped list row",
                 subtitle = "Icon, title, subtitle, and a stable full-width row surface.",
                 iconRes = R.drawable.ic_view_quilt_24,
+                onClick = onOpenComponents,
             )
             TemplateDivider()
             TemplateListItem(
                 title = "Tonal hero card",
                 subtitle = "A single highlighted card for the page's primary state.",
                 iconRes = R.drawable.ic_lightbulb_24,
+                onClick = onOpenComponents,
             )
             TemplateDivider()
             TemplateListItem(
                 title = "Dynamic color",
                 subtitle = "Material 3 color follows the device palette when available.",
                 iconRes = R.drawable.ic_color_lens_24,
+                onClick = onOpenComponents,
             )
         }
 
@@ -57,6 +65,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         TemplateOutlineCard(
             title = "Extension point",
             body = "Add real features by replacing this content area while preserving the page shell and settings section pattern.",
+            onClick = onOpenExtension,
         )
 
         Spacer(Modifier.height(12.dp))
@@ -66,6 +75,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 title = "Initial template complete",
                 subtitle = "The app has a clean shell, two bottom tabs, and reusable style primitives.",
                 iconRes = R.drawable.ic_check_24,
+                onClick = onOpenRules,
             )
         }
     }

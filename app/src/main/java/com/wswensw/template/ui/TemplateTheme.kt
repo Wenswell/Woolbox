@@ -10,6 +10,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+enum class TemplateThemeMode(
+    val label: String,
+) {
+    SYSTEM("Follow system"),
+    LIGHT("Light"),
+    DARK("Dark"),
+}
+
+fun TemplateThemeMode.resolvedDarkTheme(systemDarkTheme: Boolean): Boolean = when (this) {
+    TemplateThemeMode.SYSTEM -> systemDarkTheme
+    TemplateThemeMode.LIGHT -> false
+    TemplateThemeMode.DARK -> true
+}
+
 private val LightColors = lightColorScheme(
     primary = Color(0xFF3E6A57),
     onPrimary = Color.White,
@@ -56,15 +70,16 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun TemplateTheme(
+    themeMode: TemplateThemeMode = TemplateThemeMode.SYSTEM,
+    darkTheme: Boolean = themeMode.resolvedDarkTheme(isSystemInDarkTheme()),
     useDynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val dark = isSystemInDarkTheme()
     val colorScheme = when {
-        useDynamicColor && dark -> dynamicDarkColorScheme(context)
+        useDynamicColor && darkTheme -> dynamicDarkColorScheme(context)
         useDynamicColor -> dynamicLightColorScheme(context)
-        dark -> DarkColors
+        darkTheme -> DarkColors
         else -> LightColors
     }
 
