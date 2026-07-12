@@ -32,7 +32,7 @@
 - OLED 遮罩：显示、隐藏、长按控制面板、透明度/宽度/高度调整、面板位置调整、按包名保存和应用配置。
 - `Home` 下的 `Global Copy` 与 `OLED shield` 子页面。
 - 共享的无障碍前置条件组件和持续状态展示。
-- Quick Settings Tile，用于在目标应用前台进入或退出 Global Copy。
+- 两个专用 Quick Settings Tile，分别用于在目标应用前台切换 Global Copy 和 OLED 遮罩。
 - 领域规则和配置归一化的单元测试。
 
 ### 后续阶段
@@ -58,7 +58,9 @@ TemplateApp
    └─ oled-shield
 ```
 
-`Global Copy` 页面承担服务状态、授权入口和进入/退出复制会话动作。`OLED shield` 页面承担服务状态、当前目标应用状态和显示/隐藏遮罩动作。页面不直接访问无障碍服务实例或 SharedPreferences。
+`Global Copy` 页面承担服务状态、授权入口、添加 Tile 入口和功能说明。`OLED shield` 页面承担服务状态、添加 Tile 入口、默认参数和按应用配置管理。页面不直接启动依赖外部前台上下文的覆盖层，也不直接访问无障碍服务实例或 SharedPreferences。
+
+跨应用动作从应用页面触发时，前台窗口已经变为本应用。系统无法可靠恢复目标应用的原页面，因此两个功能均使用专用 Quick Settings Tile 触发。用户展开快捷设置时，目标应用仍保留为无障碍服务识别的最近外部应用；服务关闭快捷设置面板后执行对应动作。
 
 ## 架构
 
@@ -82,7 +84,8 @@ GlobalCopyAccessibilityService
         ├─ Copy session overlay
         └─ OLED shield and control panel
 
-Quick Settings Tile ──> CopySessionController
+Global Copy Tile ──> CopySessionController
+OLED shield Tile ──> OledShieldController
 ```
 
 ### 状态职责
@@ -118,18 +121,20 @@ Quick Settings Tile ──> CopySessionController
 - 下一次对同一应用显示遮罩时加载已保存配置。
 - 服务断开时关闭遮罩和控制面板。
 
-### Quick Settings Tile
+### Quick Settings Tiles
 
-- 服务连接时切换 Global Copy 会话。
-- 服务未连接时打开应用的 `Home` 页面，用户在页面中完成授权。
-- Tile 状态反映服务连接和复制会话状态。
+- `Global Copy` Tile 在服务连接时切换复制会话。
+- `OLED shield` Tile 在服务连接时切换当前目标应用的遮罩。
+- 服务未连接时，任一 Tile 打开应用的 `Home` 页面，用户在页面中完成授权。
+- 两个 Tile 分别反映服务连接和对应功能的活动状态。
+- 应用页面提供系统添加 Tile 请求入口；已添加时系统保持现有 Tile，不创建重复项。
 
 ## 实施步骤
 
 1. 建立领域模型、服务状态、配置存储和无障碍服务声明。
 2. 迁入并精简前台窗口选择、文本快照和文本排序规则。
 3. 实现 Compose 覆盖层宿主、复制会话覆盖层和 OLED 遮罩控制面板。
-4. 建立 Controller、ViewModel、系统设置跳转和 Quick Settings Tile。
+4. 建立 Controller、ViewModel、系统设置跳转和两个专用 Quick Settings Tile。
 5. 重建 `Home`、Global Copy 页面、OLED 页面和共享前置条件组件。
 6. 删除模板示例页面和示例设置项，更新 README、设计系统和开发记录。
 7. 编写领域单元测试，执行构建、空白检查和设备验收。
@@ -137,10 +142,11 @@ Quick Settings Tile ──> CopySessionController
 ## 验收
 
 - 无障碍服务启用后，Global Copy 和 OLED 页面显示已连接状态。
-- 从 Quick Settings Tile 进入复制会话时，当前目标应用的文本块可选择和复制。
+- 从 `Global Copy` Tile 进入复制会话时，当前目标应用的文本块可选择和复制。
 - 捕获顺序与阅读顺序复制符合领域单元测试。
 - 编辑后的文本可写入系统剪贴板。
 - OLED 遮罩显示在当前目标应用上，长按可显示控制面板。
+- 从 `OLED shield` Tile 可直接显示或关闭当前目标应用的遮罩。
 - OLED 参数和面板位置保存后，对同一目标应用再次显示时恢复。
 - 服务断开后，复制会话、遮罩和控制面板均关闭。
 - 日间、夜间和紧凑宽度下，应用页无重叠，覆盖层操作可访问。
@@ -148,6 +154,7 @@ Quick Settings Tile ──> CopySessionController
 
 ## 当前确认
 
-- 首轮包含基础复制、OLED 全流程和 Quick Settings Tile。
+- 首轮包含基础复制、OLED 全流程和两个专用 Quick Settings Tile。
 - `Scroll capture`、历史、日志、上传和永久通知进入后续阶段。
 - 旧页面 UI 不迁移；当前模板的 Compose 组件和页面规范作为 UI 实现依据。
+- 跨应用动作不从应用页面直接启动；页面负责授权、添加 Tile、状态与配置，Tile 负责目标应用前台动作。
