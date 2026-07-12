@@ -2,4 +2,8 @@
     <string name="app_name">Template</string>
     <string name="tab_home">Home</string>
     <string name="tab_setting">Setting</string>
+    <string name="accessibility_service_label">Template tools</string>
+    <string name="accessibility_service_description">Provides Global Copy and OLED shield controls for the current app.</string>
+    <string name="global_copy_tile_label">Global Copy</string>
+    <string name="oled_shield_tile_label">OLED shield</string>
 </resources>

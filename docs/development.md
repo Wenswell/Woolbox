@@ -1,52 +1,53 @@
 # 开发记录
 
-## 初版决策
+## 当前架构规则
 
-- 使用全新空仓库实现模板应用，避免从旧应用复制业务包袱。
-- 沿用旧应用的页面壳、底栏、分组卡片、整行列表项和 Material 3 动态色。
-- 只实现 `Home` 和 `Setting` 两个底栏 Tab。
-- 设置页里的开关使用中性示例文案，避免表达具体业务能力。
-- 图标使用本地 vector 资源，保持模板依赖轻量。
+- `ToolAccessibilityService` 是 Global Copy 与 OLED shield 的系统能力入口。
+- `ToolServiceStateStore` 只发布页面和 Tile 需要的持续状态。
+- `ToolServiceController` 使用单一服务弱引用分发 Tile 命令。
+- `ForegroundWindowResolver` 只选择外部 `TYPE_APPLICATION` 窗口，并将 System UI 与本应用排除在目标范围外。
+- 两个 Tile 使用同一待执行命令状态机：收起 Quick Settings 面板，解析目标窗口，执行工具动作。
+- 待执行命令保存触发前的目标包名，避免系统面板收起过程中选择其他可见应用窗口；准备状态再次点击会取消命令。
+- `TYPE_WINDOWS_CHANGED` 即使没有事件包名也会触发目标窗口复核。
+- `ComposeOverlayWindow` 为每个系统覆盖层建立 `LifecycleOwner` 与 `SavedStateRegistryOwner`，并在窗口移除时销毁 composition。
+- 服务在 `onUnbind` 与 `onDestroy` 通过同一幂等清理释放覆盖层、弱引用和全局状态。
+- OLED 配置使用类型化 `SharedPreferences` 键，默认配置与按包名配置独立保存。
 
-## 依赖规则
+## 业务规则
 
-AGP 9 已内置 Kotlin Android 支持。模块只应用 `com.android.application` 和 `org.jetbrains.kotlin.plugin.compose`，不再单独应用 `org.jetbrains.kotlin.android`。
+- Global Copy 文本块从可见、非密码、具有屏幕边界的无障碍节点生成。
+- 文本候选按 `text`、`contentDescription`、`hint`、`stateDescription`、`error`、`tooltip`、`paneTitle`、`containerTitle` 的优先级选择。
+- 捕获顺序使用快照稳定顺序；阅读顺序按视觉行和从左至右顺序生成。
+- 复制前使用 NFKC 和空白归一化进行重复文本判断。
+- OLED 默认值为 `100%` 不透明、`100%` 宽、`15%` 高。
+- OLED 控制面板位置使用显示区域比例保存，屏幕尺寸变化后保持相对位置。
+- 屏幕配置变化时重新计算 OLED 遮罩尺寸和控制面板位置；遮罩窗口接收触摸并保持非焦点窗口。
+
+## 版本与依赖规则
+
+- `minSdk` 为 `34`，系统 Tile 交互直接使用 Android 14 API。
+- 依赖保持在 Compose、Navigation、Core KTX、Lifecycle 和 JUnit 范围内。
+- 覆盖层使用 Android 平台 `TYPE_ACCESSIBILITY_OVERLAY`，无需悬浮窗权限。
+- 当前产品定位为通用工具，无障碍服务声明不使用 `isAccessibilityTool`。
+- 图标使用本地 vector 资源。
 
 ## 验证规则
 
-新仓库没有 `local.properties` 时，命令显式设置 Android SDK：
-
 ```bash
-ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
+ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:testDebugUnitTest :app:assembleDebug
+git diff --check
 ```
 
-## 设置页交互规则
+设备验收覆盖以下场景：
 
-- 设置项存在动作时，整行作为点击目标。
-- 开关类设置由整行切换状态，尾部 `Switch` 展示当前状态。
-- 小型互斥选项使用单选弹窗。
-- 单选弹窗沿用 app0603 的 `BasicAlertDialog + Surface` 结构，点击选项后立即保存并关闭。
-- 短文本配置使用输入框弹窗，弹窗支持主输入框和即时展开输入框，展开按钮使用上/下箭头表达当前动作。
-- 版本、包名和只读说明使用信息弹窗。
+1. 启用无障碍服务后，两个工具页面显示 `Connected`。
+2. 从目标应用打开 Quick Settings，分别添加并触发两个 Tile。
+3. Global Copy 选择、两种顺序复制、编辑复制和关闭会话。
+4. OLED 遮罩长按、滑块、面板拖动、保存、关闭和按应用恢复。
+5. 从目标应用切换到另一应用时，活动覆盖层关闭。
 
-## 导航规则
+## 文档规则
 
-- 根页面保留 `Home` 和 `Setting` 两个底栏入口。
-- 底栏 Tab 内容切换使用横向滑动动画。
-- 示例详情和规则说明使用子页面承载。
-- 子页面使用 Navigation Compose string route，避免为模板示例引入序列化依赖。
-- 页面切换动画使用横向滑动，进入向左，返回向右。
-- 需要右下角主按钮的子页面使用 `TemplatePageAction`。
-
-## 系统栏规则
-
-- `MainActivity` 开启 edge-to-edge。
-- 页面外壳统一处理安全区。
-- 状态栏和导航栏图标样式跟随应用内 `Theme` 设置。
-- 子页面标题栏颜色保持固定，滚动离开顶部 8px 后只显示底部分隔线。
-
-## 输入框与主按钮规则
-
-- 页面内输入框使用 `TemplateInputField`，保持 `16dp` 水平页面间距。
-- 主按钮使用 Material 标准扩展按钮，页面顶部 8px 内显示图标和文字，离开该范围后显示纯图标。
-- 主按钮状态示例使用蓝底对钩和红底错误两种状态交替。
+- 新功能先在 `docs/` 写明范围、交互和验收标准。
+- 业务规则、用户流程和开发规则按主题拆分。
+- 每轮可验证修改完成后更新文档并创建本地 commit。

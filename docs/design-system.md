@@ -1,92 +1,66 @@
 # 设计系统
 
-## 来源
-
-本模板参考 `/Users/wswensw/Documents/repos/playground/app0603` 的 Compose 主界面风格，保留通用 UI 结构，移除旧应用业务功能。
-
 ## 页面结构
-
-页面使用三层结构：
 
 ```text
 TemplateTheme
 └─ NavHost
    ├─ root
    │  └─ TemplateSurface
-   │     ├─ BottomNavigationBar
-   │     └─ TemplatePage
-   │        ├─ TemplatePageHeader
-   │        ├─ TemplateCard
-   │        ├─ TemplateSection
-   │        └─ TemplateOutlineCard
-   └─ child routes
-      └─ TemplateRouteScaffold
-         ├─ TopAppBar
-         ├─ Back action
-         ├─ Optional primary action
-         └─ TemplateSection / TemplateCard / TemplateOutlineCard
+   │     ├─ Home
+   │     │  ├─ Global Copy entry
+   │     │  ├─ OLED shield entry
+   │     │  └─ Accessibility service state
+   │     └─ Setting
+   ├─ Global Copy
+   └─ OLED shield
 ```
+
+根页面保留底栏。工具详情页使用 `TemplateRouteScaffold` 的顶部栏、返回动作和滚动内容。路由切换使用 `220ms` 水平动画。
+
+## 组件职责
+
+| 组件 | 职责 |
+| --- | --- |
+| `TemplateTheme` | Material 3 主题、动态色与固定基础色。 |
+| `TemplateSurface` | 根页面 `Scaffold`、安全区与底栏。 |
+| `TemplatePage` | 根页面标题、状态和可滚动内容。 |
+| `TemplateRouteScaffold` | 工具详情页顶部栏、返回动作和内容安全区。 |
+| `TemplateSection` | 设置式分组与分组内容容器。 |
+| `TemplateListItem` | 图标、标题、副标题、尾部控制和整行动作。 |
+| `ToolScreens` | Global Copy、OLED shield 的页面级组合与状态呈现。 |
+| `tool/overlay` | 系统覆盖层专用 Compose UI 与会话控制。 |
 
 ## 样式规则
 
 - 使用 Material 3 和动态色。
 - `Theme` 设置提供 `Follow system`、`Light`、`Dark` 三种模式。
-- 状态栏和导航栏图标样式跟随应用内主题模式。
-- 页面安全区由页面外壳统一处理。
-- 存在标题栏的页面离开顶部 8px 后，标题栏底部显示浅分隔线，标题栏和状态栏颜色保持固定。
-- 右下角主按钮使用 Material 标准扩展按钮，并跟随输入法和导航栏保持可点击位置。
-- 页面背景使用 `surface`。
-- 页面水平间距统一为 `16dp`。
-- 页面顶部间距统一为 `16dp`。
-- 页面底部预留 `96dp`，避免内容贴近底栏。
-- 卡片圆角统一为 `16dp`。
-- 设置分组使用 `surfaceContainerLow`，强调卡片使用 `primaryContainer`。
-- 列表行使用图标、单行标题、最多两行副标题和可选尾部控件。
-- 有动作的设置行和列表行保持整行点击。
-- 列表行最小高度为 `56dp`。
-- 开关设置行由整行处理状态切换，尾部 `Switch` 只展示当前状态。
-- 图标使用本地 Material vector，避免引入大型图标依赖。
+- 根页面背景使用 `surface`，页面水平间距为 `16dp`。
+- 页面顶部间距为 `16dp`，底部预留 `96dp`。
+- 设置分组使用 `surfaceContainerLow`，单个状态块使用 `primaryContainer`。
+- 卡片圆角为 `16dp`；工具控制面板圆角为 `12dp`。
+- 列表行使用图标、单行标题、最多两行副标题和稳定的整行点击区域。
+- 状态使用简短文本：`Not enabled`、`Waiting for service`、`Connected`、`Preparing`、`Active`、`Ready`。
+- 系统 Tile 添加请求由详情页中的 `Add` 控制触发。
+- OLED 默认参数使用滑块；遮罩运行时参数由覆盖层控制面板使用滑块。
 
-## 当前组件边界
+## 跨应用交互
 
-当前沉淀首页、设置页和示例子页面需要的基础组件。后续新增以下组件时，应先放入组件层：
+```text
+目标应用前台
+      │
+      ▼
+Quick Settings Tile
+      │  收起系统面板
+      ▼
+AccessibilityService 解析目标窗口
+      │
+      ├─ Global Copy session overlay
+      └─ OLED shield overlay
+```
 
-- 空状态
-- notice/alert 信息块
-- 确认弹窗
-- 操作菜单
+应用页面承载设置和状态。系统 Tile 承载需要目标应用前台上下文的动作。复制会话、OLED 遮罩和 OLED 控制面板各自使用独立的 `TYPE_ACCESSIBILITY_OVERLAY` 窗口。
 
-## 设置弹窗规则
+## 组件扩展
 
-| 设置项 | 交互 | 组件 |
-| --- | --- | --- |
-| `Theme` | 整行点击打开单选弹窗 | `TemplateSingleChoiceDialog` |
-| `Template options` | 整行点击打开输入框弹窗 | `TemplateTextInputDialog` |
-| `Initial version` | 整行点击打开信息弹窗 | `TemplateInfoDialog` |
-
-单选弹窗使用 `BasicAlertDialog` + `Surface`，圆角 `16dp`，最大宽度 `560dp`。选项行最小高度 `56dp`，水平边距 `24dp`，点击选项后立即保存并关闭。
-
-输入框弹窗支持主输入框和可展开输入框。展开按钮保持圆形交互，展开时显示上箭头，收起时显示下箭头，展开收起使用即时显示隐藏。
-
-## Tab 规则
-
-当前底栏只有两个入口：
-
-| Tab | 规则 |
-| --- | --- |
-| `Home` | 默认入口，用于展示模板和组件样式 |
-| `Setting` | 设置入口，用于展示分组设置列表 |
-
-新增 Tab 前先确认它是长期模板入口。临时示例优先放在 `Home` 内容区。
-
-底栏 Tab 内容切换使用横向滑动动画，按 Tab 顺序决定滑动方向。
-
-## 子页面规则
-
-- 子页面使用 `TemplateRouteScaffold`。
-- 根页面保留底栏，子页面使用顶部栏和返回按钮。
-- 子页面之间使用横向滑动动画，进入向左，返回向右，时长 `220ms`。
-- 右下角主按钮使用 `TemplatePageAction` 传入子页面。
-- 主按钮使用 Material 标准扩展按钮，页面顶部 8px 内显示图标和文字，离开该范围后显示纯图标。
-- 主按钮示例页使用蓝底对钩和红底错误两种状态交替。
-- 示例子页面当前包括 `Components`、`Primary Action`、`Template Rules`、`Extension` 和 `Settings Pattern`。
+新增页面级 UI 优先复用 `TemplatePage`、`TemplateRouteScaffold`、`TemplateSection` 和 `TemplateListItem`。跨应用工具优先使用独立的系统入口，并在服务层维护目标窗口和覆盖层生命周期。
