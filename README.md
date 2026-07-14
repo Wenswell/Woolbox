@@ -31,6 +31,7 @@ Android 14 作为最低版本，使应用可以直接使用系统 Tile 添加请
 ## 文档
 
 - [Global Copy 与 OLED 迁移计划](docs/global-copy-oled-migration.md)：范围、架构、状态和验收。
+- [Global Copy 与 OLED 覆盖层触发修复计划](docs/global-copy-oled-overlay-fix-plan.md)：Quick Settings 收起后的目标窗口解析与验收。
 - [Global Copy 与 OLED 使用指南](docs/global-copy-oled-usage.md)：授权、Tile、复制、遮罩和配置操作。
 - [设计系统](docs/design-system.md)：页面结构、组件职责和交互规则。
 - [开发记录](docs/development.md)：系统能力边界、依赖和验证规则。
