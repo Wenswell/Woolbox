@@ -7,7 +7,7 @@
 - `ToolServiceController` 使用单一服务弱引用分发 Tile 命令。
 - `ForegroundWindowResolver` 只选择外部 `TYPE_APPLICATION` 窗口，并将 System UI 与本应用排除在目标范围外。
 - 两个 Tile 使用同一待执行命令状态机：收起 Quick Settings 面板，解析目标窗口，执行工具动作。
-- 待执行命令保存触发前的目标包名，避免系统面板收起过程中选择其他可见应用窗口；准备状态再次点击会取消命令。
+- 待执行命令只保存工具类型和截止时间；系统面板收起后轮询外部应用窗口，准备状态再次点击会取消命令。
 - `TYPE_WINDOWS_CHANGED` 即使没有事件包名也会触发目标窗口复核。
 - `ComposeOverlayWindow` 为每个系统覆盖层建立 `LifecycleOwner` 与 `SavedStateRegistryOwner`，并在窗口移除时销毁 composition。
 - 服务在 `onUnbind` 与 `onDestroy` 通过同一幂等清理释放覆盖层、弱引用和全局状态。

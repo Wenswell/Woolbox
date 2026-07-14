@@ -10,7 +10,7 @@
 ## Global Copy
 
 1. 保持目标应用在前台。
-2. 展开 Quick Settings，选择 `Global Copy` Tile。
+2. 展开 Quick Settings，选择 `Global Copy` Tile；面板收起后服务保持 `Preparing`，待外部应用窗口恢复后创建复制会话。
 3. 在复制会话中选择文本块。
 4. 选择 `Copy capture`、`Copy reading`，或 `Edit before copy`。
 
@@ -20,7 +20,7 @@
 
 1. 在 `OLED shield` 页面设置默认的透明度、宽度和高度，选择 `Save default`。
 2. 保持目标应用在前台。
-3. 展开 Quick Settings，选择 `OLED shield` Tile。
+3. 展开 Quick Settings，选择 `OLED shield` Tile；面板收起后服务保持 `Preparing`，待外部应用窗口恢复后显示遮罩。
 4. 长按黑色遮罩，打开控制面板。
 5. 调整透明度、宽度、高度和控制面板位置，选择 `Save`。
 
@@ -33,6 +33,6 @@
 | `Not enabled` | 系统无障碍服务等待授权。 |
 | `Waiting for service` | 系统设置已经启用，服务正在连接。 |
 | `Connected` | 服务已连接。 |
-| `Preparing` | Tile 正在收起系统面板并解析目标窗口。 |
+| `Preparing` | Tile 正在收起系统面板，随后轮询外部应用窗口。 |
 | `Active` | 对应工具正在运行。 |
 | `Ready` | 对应 Tile 已准备执行。 |
