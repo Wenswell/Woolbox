@@ -1,6 +1,7 @@
 package com.wswensw.template.tool.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ForegroundTargetSelectorTest {
@@ -49,6 +50,11 @@ class ForegroundTargetSelectorTest {
         )
 
         assertEquals("active", selected)
+    }
+
+    @Test
+    fun noApplicationCandidateReturnsNoTarget() {
+        assertNull(ForegroundTargetSelector.select(emptyList()))
     }
 
     private fun candidate(
