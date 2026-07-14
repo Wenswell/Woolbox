@@ -59,11 +59,7 @@ class ForegroundWindowResolver(
         ?.let(::ForegroundTarget)
 
     fun isSystemUiForeground(): Boolean =
-        service.rootInActiveWindow?.packageName?.toString() == SYSTEM_UI_PACKAGE ||
-            service.windows.any { window ->
-                val packageName = window.root?.packageName?.toString()
-                packageName == SYSTEM_UI_PACKAGE && (window.isActive || window.isFocused)
-            }
+        service.rootInActiveWindow?.packageName?.toString() == SYSTEM_UI_PACKAGE
 
     fun isOwnApplicationForeground(): Boolean = service.windows.any { window ->
         window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&

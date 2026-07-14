@@ -111,15 +111,12 @@ class ToolAccessibilityService : AccessibilityService() {
                 return@post
             }
 
-            val targetPackageName = windowResolver.resolve()?.packageName
             cancelPendingCommand()
             closeAllTools()
-            if (targetPackageName == null) return@post
 
             pendingCommand = PendingExternalCommand(
                 command = command,
                 deadlineAtMillis = SystemClock.uptimeMillis() + COMMAND_TIMEOUT_MILLIS,
-                targetPackageName = targetPackageName,
             )
             ToolServiceStateStore.update {
                 it.copy(
@@ -145,11 +142,6 @@ class ToolAccessibilityService : AccessibilityService() {
             schedulePendingResolution(pending)
             return
         }
-        if (target.packageName != pending.targetPackageName) {
-            schedulePendingResolution(pending)
-            return
-        }
-
         pendingCommand = null
         ToolServiceStateStore.update { it.copy(targetPackageName = target.packageName) }
         when (pending.command) {
@@ -270,7 +262,6 @@ class ToolAccessibilityService : AccessibilityService() {
     private data class PendingExternalCommand(
         val command: ExternalToolCommand,
         val deadlineAtMillis: Long,
-        val targetPackageName: String,
     )
 
     private fun ToolActivity.matches(command: ExternalToolCommand): Boolean = when (command) {
