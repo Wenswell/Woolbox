@@ -1,63 +1,89 @@
-# Template Android App
+# Template
 
-## 目标
+Android Compose 工具应用，用 `Global Copy` 与 `OLED shield` 两个真实场景沉淀页面结构、通用组件和无障碍覆盖层能力。
 
-这是一个 Android Compose 工具应用，用真实系统场景沉淀页面布局、底栏结构和通用组件。首轮提供两项无障碍服务能力：
+## 当前能力
 
-| 工具 | 用途 | 外部入口 |
+| 工具 | 用途 | 启动方式 |
 | --- | --- | --- |
-| `Global Copy` | 选择当前应用中的可访问文本，以捕获顺序、阅读顺序或编辑后的文本复制到剪贴板 | `Global Copy` Quick Settings Tile |
-| `OLED shield` | 在当前应用上显示黑色触摸遮罩，调整并保存尺寸、透明度与控制面板位置 | `OLED shield` Quick Settings Tile |
+| `Global Copy` | 读取目标应用当前窗口中的可访问文本，选择后按捕获顺序、阅读顺序或编辑结果复制。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
+| `OLED shield` | 在目标应用上方显示可触摸黑色遮罩，并按应用保存尺寸、透明度和面板位置。 | 详情页 `Show shield`；Quick Settings Tile。 |
 
-工具页面负责授权、状态、默认配置与系统 Tile 添加请求。跨应用动作由 Quick Settings Tile 发起，目标应用保持在前台上下文中。
+两项工具共用 `Template tools` 无障碍服务。页面入口会先把 Template 移到后台，再对恢复的应用执行工具；Tile 用于在目标应用内快速启动。
 
-## 当前状态
+## 使用前提
+
+- Android `14` 或更高版本。
+- 在系统无障碍设置中启用 `Template tools`。
+- Global Copy 只能读取目标应用通过无障碍节点公开的文本。
+- 两项工具使用 `TYPE_ACCESSIBILITY_OVERLAY`，无需悬浮窗权限。
+
+## 快速使用
+
+1. 打开 Template，在首页选择 `Accessibility service` 并启用服务。
+2. 进入 `Global Copy` 或 `OLED shield` 详情页。
+3. 直接选择页面顶部的主操作；Template 进入后台后，工具作用于恢复的应用。
+4. 如需快捷入口，在详情页选择 Tile 的 `Add`，以后可从目标应用的 Quick Settings 启动。
+
+完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
+
+## 工程基线
 
 | 项目 | 当前值 |
 | --- | --- |
 | App 名 | `Template` |
 | 包名 | `com.wswensw.template` |
-| 技术栈 | Kotlin + Jetpack Compose + Material 3 |
-| 底栏 | `Home`、`Setting` |
-| 子页面 | `Global Copy`、`OLED shield` |
-| 系统能力 | AccessibilityService、`TYPE_ACCESSIBILITY_OVERLAY`、Quick Settings Tile |
-| `compileSdk` | `release(36) + minorApiLevel = 1` |
-| `minSdk` | `release(34)` |
-| `targetSdk` | `release(36)` |
-| `versionName` | `0.1.0` |
+| 技术栈 | Kotlin、Jetpack Compose、Material 3 |
+| 导航 | `Home`、`Setting` 底栏；两个工具详情页 |
+| 系统能力 | `AccessibilityService`、`TYPE_ACCESSIBILITY_OVERLAY`、Quick Settings Tile |
+| `compileSdk` | Android `36.1` |
+| `minSdk` | Android `34` |
+| `targetSdk` | Android `36` |
+| JVM | Java `17` |
+| 版本 | `0.1.0` (`versionCode 1`) |
 
-Android 14 作为最低版本，使应用可以直接使用系统 Tile 添加请求和 `PendingIntent` Tile 跳转 API。
+## 目录
 
-## 文档
+```text
+app/src/main/java/com/wswensw/template/
+├─ ui/                 应用页面、主题和模板组件
+└─ tool/
+   ├─ model/           文本与 OLED 领域模型
+   ├─ overlay/         Compose 无障碍覆盖层
+   ├─ service/         无障碍服务、目标解析和状态
+   ├─ storage/         OLED 配置持久化
+   ├─ trigger/         Quick Settings Tile 与添加请求
+   └─ ui/              工具页面 ViewModel
+```
 
-- [Global Copy 与 OLED 迁移计划](docs/global-copy-oled-migration.md)：范围、架构、状态和验收。
-- [Global Copy 与 OLED 覆盖层触发修复计划](docs/global-copy-oled-overlay-fix-plan.md)：Quick Settings 收起后的目标窗口解析与验收。
-- [Global Copy 与 OLED 使用指南](docs/global-copy-oled-usage.md)：授权、Tile、复制、遮罩和配置操作。
-- [设计系统](docs/design-system.md)：页面结构、组件职责和交互规则。
-- [开发记录](docs/development.md)：系统能力边界、依赖和验证规则。
+模块协作、窗口选择和覆盖层 Context 约束见 [系统架构](docs/architecture.md)。
 
 ## 开发
 
-构建 debug APK：
-
 ```bash
-ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug
-```
+ANDROID_HOME="$HOME/Library/Android/sdk" \
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+./gradlew :app:testDebugUnitTest :app:assembleDebug
 
-执行领域单元测试：
-
-```bash
-ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:testDebugUnitTest
-```
-
-检查 diff 空白：
-
-```bash
 git diff --check
 ```
 
 安装到已连接设备：
 
 ```bash
-ANDROID_HOME="$HOME/Library/Android/sdk" JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:installDebug
+ANDROID_HOME="$HOME/Library/Android/sdk" \
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+./gradlew :app:installDebug
 ```
+
+环境、源码地图、设备验收和故障定位见 [开发指南](docs/development.md)。
+
+## 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [产品说明](docs/product.md) | 当前范围、功能规则、用户流程、状态和验收。 |
+| [系统架构](docs/architecture.md) | 命令状态机、目标窗口、覆盖层、数据与存储契约。 |
+| [设计系统](docs/design-system.md) | 页面结构、组件职责、视觉和交互规则。 |
+| [开发指南](docs/development.md) | 环境、源码路径、验证、设备验收和排障。 |
+| [文档维护](docs/documentation.md) | 文档分工、同步触发条件和质量标准。 |
