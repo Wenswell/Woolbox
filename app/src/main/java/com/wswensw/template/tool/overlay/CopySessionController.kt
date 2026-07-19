@@ -3,7 +3,6 @@ package com.wswensw.template.tool.overlay
 import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.WindowManager
@@ -18,20 +17,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,33 +45,64 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.wswensw.template.R
 import com.wswensw.template.tool.model.CopyTextBlock
 import com.wswensw.template.tool.model.CopyTextOrder
 import com.wswensw.template.tool.model.CopyTextSelection
 import com.wswensw.template.tool.model.TextSnapshot
 import com.wswensw.template.ui.TemplateTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-private enum class CopySessionMode {
-    SELECTING,
-    EDITING,
+internal enum class CopySessionScreen {
+    EDITOR,
+    TEXT_SELECTION,
 }
 
-private data class CopySessionUiState(
+internal data class CopySessionUiState(
     val packageName: String = "",
     val blocks: List<CopyTextBlock> = emptyList(),
     val selectedIds: Set<String> = emptySet(),
-    val mode: CopySessionMode = CopySessionMode.SELECTING,
-    val draftText: String = "",
+    val screen: CopySessionScreen = CopySessionScreen.EDITOR,
     val captureDraftText: String = "",
     val reorderedDraftText: String = "",
-    val useReadingOrder: Boolean = false,
-)
+    val useReadingOrder: Boolean = true,
+) {
+    val currentDraftText: String
+        get() = if (useReadingOrder) reorderedDraftText else captureDraftText
+
+    fun updateCurrentDraft(text: String): CopySessionUiState = if (useReadingOrder) {
+        copy(reorderedDraftText = text)
+    } else {
+        copy(captureDraftText = text)
+    }
+}
+
+internal fun TextSnapshot.initialCopySessionUiState(): CopySessionUiState {
+    val selectedIds = blocks.mapTo(linkedSetOf(), CopyTextBlock::id)
+    return CopySessionUiState(
+        packageName = packageName,
+        blocks = blocks,
+        selectedIds = selectedIds,
+        captureDraftText = CopyTextSelection.selected(
+            blocks = blocks,
+            selectedIds = selectedIds,
+            order = CopyTextOrder.CAPTURE,
+        ),
+        reorderedDraftText = CopyTextSelection.selected(
+            blocks = blocks,
+            selectedIds = selectedIds,
+            order = CopyTextOrder.READING,
+        ),
+    )
+}
 
 class CopySessionController(
     private val service: AccessibilityService,
@@ -79,11 +114,7 @@ class CopySessionController(
 
     fun show(snapshot: TextSnapshot) {
         dismissOverlay(notify = false)
-        mutableUiState.value = CopySessionUiState(
-            packageName = snapshot.packageName,
-            blocks = snapshot.blocks,
-            selectedIds = snapshot.blocks.mapTo(linkedSetOf(), CopyTextBlock::id),
-        )
+        mutableUiState.value = snapshot.initialCopySessionUiState()
 
         val host = ComposeOverlayWindow(service)
         overlayWindow = host
@@ -94,10 +125,11 @@ class CopySessionController(
                     onToggle = ::toggle,
                     onToggleAll = ::toggleAll,
                     onCopy = ::copy,
-                    onEdit = ::edit,
+                    onOpenTextSelection = ::openTextSelection,
                     onDraftChange = ::updateDraft,
                     onReadingOrderChange = ::setReadingOrder,
-                    onBack = ::back,
+                    onBack = ::backToEditor,
+                    onClose = ::close,
                 )
             }
         }
@@ -120,8 +152,8 @@ class CopySessionController(
 
     private fun toggle(id: String) {
         mutableUiState.update { state ->
-            state.copy(
-                selectedIds = state.selectedIds.toMutableSet().also { selected ->
+            state.withSelection(
+                state.selectedIds.toMutableSet().also { selected ->
                     if (!selected.add(id)) selected.remove(id)
                 },
             )
@@ -131,21 +163,42 @@ class CopySessionController(
     private fun toggleAll() {
         mutableUiState.update { state ->
             val allIds = state.blocks.mapTo(linkedSetOf(), CopyTextBlock::id)
-            state.copy(selectedIds = if (state.selectedIds.size == allIds.size) emptySet() else allIds)
+            state.withSelection(if (state.selectedIds.size == allIds.size) emptySet() else allIds)
         }
     }
 
-    private fun copy(order: CopyTextOrder) {
-        val state = mutableUiState.value
-        val text = when (state.mode) {
-            CopySessionMode.SELECTING -> CopyTextSelection.selected(
-                blocks = state.blocks,
-                selectedIds = state.selectedIds,
-                order = order,
-            )
+    private fun CopySessionUiState.withSelection(selectedIds: Set<String>): CopySessionUiState = copy(
+        selectedIds = selectedIds,
+        captureDraftText = CopyTextSelection.selected(
+            blocks = blocks,
+            selectedIds = selectedIds,
+            order = CopyTextOrder.CAPTURE,
+        ),
+        reorderedDraftText = CopyTextSelection.selected(
+            blocks = blocks,
+            selectedIds = selectedIds,
+            order = CopyTextOrder.READING,
+        ),
+    )
 
-            CopySessionMode.EDITING -> state.draftText.trim()
-        }
+    private fun openTextSelection() {
+        mutableUiState.update { it.copy(screen = CopySessionScreen.TEXT_SELECTION) }
+    }
+
+    private fun backToEditor() {
+        mutableUiState.update { it.copy(screen = CopySessionScreen.EDITOR) }
+    }
+
+    private fun updateDraft(text: String) {
+        mutableUiState.update { it.updateCurrentDraft(text) }
+    }
+
+    private fun setReadingOrder(enabled: Boolean) {
+        mutableUiState.update { it.copy(useReadingOrder = enabled) }
+    }
+
+    private fun copy() {
+        val text = mutableUiState.value.currentDraftText.trim()
         if (text.isBlank()) return
 
         val clipboard = service.getSystemService(ClipboardManager::class.java)
@@ -156,50 +209,6 @@ class CopySessionController(
             Toast.LENGTH_SHORT,
         ).show()
         close()
-    }
-
-    private fun edit() {
-        mutableUiState.update { state ->
-            val captureText = CopyTextSelection.selected(
-                blocks = state.blocks,
-                selectedIds = state.selectedIds,
-                order = CopyTextOrder.CAPTURE,
-            )
-            val reorderedText = CopyTextSelection.selected(
-                blocks = state.blocks,
-                selectedIds = state.selectedIds,
-                order = CopyTextOrder.READING,
-            )
-            state.copy(
-                mode = CopySessionMode.EDITING,
-                draftText = captureText,
-                captureDraftText = captureText,
-                reorderedDraftText = reorderedText,
-                useReadingOrder = false,
-            )
-        }
-    }
-
-    private fun updateDraft(text: String) {
-        mutableUiState.update { it.copy(draftText = text) }
-    }
-
-    private fun setReadingOrder(enabled: Boolean) {
-        mutableUiState.update { state ->
-            state.copy(
-                draftText = if (enabled) state.reorderedDraftText else state.captureDraftText,
-                useReadingOrder = enabled,
-            )
-        }
-    }
-
-    private fun back() {
-        val state = mutableUiState.value
-        if (state.mode == CopySessionMode.EDITING) {
-            mutableUiState.update { it.copy(mode = CopySessionMode.SELECTING) }
-        } else {
-            close()
-        }
     }
 
     @Suppress("DEPRECATION")
@@ -218,23 +227,25 @@ class CopySessionController(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CopySessionOverlay(
-    state: kotlinx.coroutines.flow.StateFlow<CopySessionUiState>,
+    state: StateFlow<CopySessionUiState>,
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
-    onCopy: (CopyTextOrder) -> Unit,
-    onEdit: () -> Unit,
+    onCopy: () -> Unit,
+    onOpenTextSelection: () -> Unit,
     onDraftChange: (String) -> Unit,
     onReadingOrderChange: (Boolean) -> Unit,
     onBack: () -> Unit,
+    onClose: () -> Unit,
 ) {
     val uiState by state.collectAsState()
     val selectedCount = uiState.selectedIds.size
-    val isEditing = uiState.mode == CopySessionMode.EDITING
+    val isSelectingText = uiState.screen == CopySessionScreen.TEXT_SELECTION
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(OverlayScrim)
+            .imePadding()
             .padding(horizontal = 12.dp, vertical = 32.dp),
     ) {
         Surface(
@@ -247,144 +258,174 @@ private fun CopySessionOverlay(
                     TopAppBar(
                         title = {
                             Text(
-                                text = if (isEditing) "Edit copy" else "Global Copy",
+                                text = if (isSelectingText) "Select text" else "Global Copy",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         },
                         navigationIcon = {
-                            TextButton(onClick = onBack) {
-                                Text(if (isEditing) "Back" else "Close")
+                            IconButton(onClick = if (isSelectingText) onBack else onClose) {
+                                Icon(
+                                    painter = painterResource(
+                                        if (isSelectingText) {
+                                            R.drawable.ic_arrow_back_24
+                                        } else {
+                                            R.drawable.ic_close_24
+                                        },
+                                    ),
+                                    contentDescription = if (isSelectingText) "Back" else "Close",
+                                )
                             }
                         },
                         actions = {
-                            if (!isEditing) {
+                            if (isSelectingText) {
                                 TextButton(onClick = onToggleAll) {
-                                    Text(
-                                        if (selectedCount == uiState.blocks.size) "Clear" else "Select all",
-                                    )
+                                    Text(if (selectedCount == uiState.blocks.size) "Clear" else "Select all")
                                 }
                             }
                         },
                     )
                 },
                 bottomBar = {
-                    Surface(shadowElevation = 4.dp) {
-                        if (isEditing) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.End,
-                            ) {
-                                Button(onClick = { onCopy(CopyTextOrder.CAPTURE) }) {
-                                    Text("Copy")
-                                }
-                            }
-                        } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(
-                                    text = "$selectedCount selected",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.labelLarge,
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    Button(
-                                        modifier = Modifier.weight(1f),
-                                        enabled = selectedCount > 0,
-                                        onClick = { onCopy(CopyTextOrder.CAPTURE) },
-                                    ) {
-                                        Text("Copy capture")
-                                    }
-                                    FilledTonalButton(
-                                        modifier = Modifier.weight(1f),
-                                        enabled = selectedCount > 0,
-                                        onClick = { onCopy(CopyTextOrder.READING) },
-                                    ) {
-                                        Text("Copy reordered")
-                                    }
-                                }
-                                TextButton(
-                                    modifier = Modifier.align(Alignment.End),
-                                    enabled = selectedCount > 0,
-                                    onClick = onEdit,
-                                ) {
-                                    Text("Edit before copy")
-                                }
-                            }
-                        }
+                    if (!isSelectingText) {
+                        CopyBottomBar(
+                            enabled = uiState.currentDraftText.isNotBlank(),
+                            onCopy = onCopy,
+                        )
                     }
                 },
             ) { innerPadding ->
-                if (isEditing) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onReadingOrderChange(!uiState.useReadingOrder)
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = uiState.useReadingOrder,
-                                onCheckedChange = onReadingOrderChange,
-                            )
-                            Text("Reading order")
-                        }
-                        OutlinedTextField(
-                            value = uiState.draftText,
-                            onValueChange = onDraftChange,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            label = { Text("Text") },
-                        )
-                    }
-                } else {
-                    LazyColumn(
+                if (isSelectingText) {
+                    CopyTextSelectionList(
+                        blocks = uiState.blocks,
+                        selectedIds = uiState.selectedIds,
+                        onToggle = onToggle,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding),
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                    ) {
-                        if (uiState.blocks.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillParentMaxSize()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text("No accessible text in this window.")
-                                }
-                            }
-                        } else {
-                            items(uiState.blocks, key = CopyTextBlock::id) { block ->
-                                CopyTextRow(
-                                    block = block,
-                                    selected = block.id in uiState.selectedIds,
-                                    onToggle = { onToggle(block.id) },
-                                )
-                                HorizontalDivider()
-                            }
-                        }
-                    }
+                    )
+                } else {
+                    CopyTextEditor(
+                        draftText = uiState.currentDraftText,
+                        selectedCount = selectedCount,
+                        useReadingOrder = uiState.useReadingOrder,
+                        onDraftChange = onDraftChange,
+                        onReadingOrderChange = onReadingOrderChange,
+                        onOpenTextSelection = onOpenTextSelection,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CopyBottomBar(
+    enabled: Boolean,
+    onCopy: () -> Unit,
+) {
+    Surface(shadowElevation = 4.dp) {
+        Button(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            enabled = enabled,
+            onClick = onCopy,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_content_copy_24),
+                contentDescription = null,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Copy")
+        }
+    }
+}
+
+@Composable
+private fun CopyTextEditor(
+    draftText: String,
+    selectedCount: Int,
+    useReadingOrder: Boolean,
+    onDraftChange: (String) -> Unit,
+    onReadingOrderChange: (Boolean) -> Unit,
+    onOpenTextSelection: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = useReadingOrder,
+                    role = Role.Switch,
+                    onValueChange = onReadingOrderChange,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Reading order",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Switch(
+                checked = useReadingOrder,
+                onCheckedChange = null,
+            )
+        }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onOpenTextSelection,
+        ) {
+            Text("Select text ($selectedCount)")
+        }
+        OutlinedTextField(
+            value = draftText,
+            onValueChange = onDraftChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            label = { Text("Text") },
+        )
+    }
+}
+
+@Composable
+private fun CopyTextSelectionList(
+    blocks: List<CopyTextBlock>,
+    selectedIds: Set<String>,
+    onToggle: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = 4.dp),
+    ) {
+        if (blocks.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillParentMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("No accessible text in this window.")
+                }
+            }
+        } else {
+            items(blocks, key = CopyTextBlock::id) { block ->
+                CopyTextRow(
+                    block = block,
+                    selected = block.id in selectedIds,
+                    onToggle = { onToggle(block.id) },
+                )
+                HorizontalDivider()
             }
         }
     }

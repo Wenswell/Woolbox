@@ -33,7 +33,7 @@ Quick Settings Tiles ───────────────────�
 | `ToolAccessibilityService` | 管理连接、命令状态机、目标变化、控制器生命周期和 Tile 刷新。 |
 | `ForegroundWindowResolver` | 从无障碍窗口中选择当前外部 `TYPE_APPLICATION` 目标。 |
 | `WindowSnapshotBuilder` | 遍历目标应用节点并生成稳定的文本快照。 |
-| `CopySessionController` | 管理文本选择、编辑、剪贴板写入和复制会话窗口。 |
+| `CopySessionController` | 管理文本选择、草稿、剪贴板写入和复制会话窗口。 |
 | `OledShieldController` | 管理遮罩、控制面板、实时配置和按应用保存。 |
 | `ComposeOverlayWindow` | 把 Compose 内容挂载为 `TYPE_ACCESSIBILITY_OVERLAY` 并管理生命周期。 |
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
@@ -98,7 +98,7 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 - `show` 在 `addView` 前统一添加 `FLAG_HARDWARE_ACCELERATED`，保证直接由服务创建的 Compose 窗口使用硬件渲染。
 - 添加成功后生命周期进入 `RESUMED`。
 - `dismiss` 使用 `removeViewImmediate`，随后进入 `DESTROYED` 并清空引用。
-- Copy 会话使用可聚焦全屏透明窗口，以支持同一窗口内编辑输入；窗口内的实体面板水平内缩 `12dp`、垂直内缩 `32dp`，外层 scrim 透出目标应用。
+- Copy 会话使用可聚焦全屏透明窗口，以支持同一窗口内编辑输入；窗口使用 `SOFT_INPUT_ADJUST_RESIZE`，根布局消费 IME Insets，使面板和底部操作保持在输入法上方。窗口内的实体面板水平内缩 `12dp`、垂直内缩 `32dp`，外层 scrim 透出目标应用。
 - OLED 遮罩和面板保持非焦点窗口。
 
 ## Global Copy 数据管线
@@ -109,7 +109,9 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 4. 按窗口、来源、NFKC/空白归一化文本和边界去重。
 5. 按 `top`、`left`、`bottom`、`right`、归一化文本排序，生成稳定 `captureOrder`。
 
-复制阶段按“来源 + 归一化文本”再次去重。捕获顺序逐块换行；阅读顺序先按几何位置分视觉行，行内从左到右用空格连接。编辑模式同时生成两种草稿，`Reading order` 在原始草稿之间切换。
+复制阶段按“来源 + 归一化文本”再次去重。捕获顺序逐块换行；阅读顺序先按几何位置分视觉行，行内从左到右用空格连接。`CopySessionController.show()` 默认全选文本块，同时生成两种可独立编辑的草稿，并以开启 `Reading order` 的编辑页作为首屏。
+
+文本选择变化时立即重新生成两种草稿。顺序切换只改变当前显示的草稿，不覆盖任一草稿中的编辑；复制只读取当前顺序的非空草稿。
 
 `ClipboardManager.setPrimaryClip()` 写入后显示成功 Toast，再通过统一的 `close()` 销毁会话窗口并发布非活动状态。
 

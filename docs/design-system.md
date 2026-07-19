@@ -102,11 +102,13 @@ Tile 行的 `Add` 使用 tonal button，整行与按钮执行同一个系统添�
 
 ## 覆盖层交互
 
-Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四周必须能辨认目标应用。面板顶部提供 `Close`/`Back` 与全选切换，底部提供 `Copy capture`、`Copy reordered` 和编辑入口。
+Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四周必须能辨认目标应用。会话默认进入编辑页并开启 `Reading order`；顶部使用 `Close` 图标按钮，底部使用带复制图标和 `Copy` 文案的全宽主按钮，空白草稿时禁用。
 
-文本块行使用 `48dp` 复选框与整行点击。正文以 `captureOrder` 显示从 `0` 开始的序号并允许四行；副文本紧接正文，仅显示 `source · left,top-right,bottom`，不显示字段名。编辑模式提供 `Reading order` 复选框和占满剩余空间的文本框。
+编辑页使用整行可点击的 `Reading order` Switch、明确的 `Select text` 次级操作和占满剩余空间的文本框。选择页使用 `Back` 图标按钮与 `Clear`/`Select all` 文字动作；文本块行使用 `48dp` 复选框与整行点击，正文以 `captureOrder` 显示从 `0` 开始的序号并允许四行，副文本只显示 `source · left,top-right,bottom`。
 
-任一复制动作写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
+`Close` 与 `Back` 图标按钮保持至少 `48dp` 触控区域，并分别提供 `Close`、`Back` 无障碍说明。文本选择即时更新草稿；两种顺序草稿的编辑结果分别保留。
+
+`Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具，`Save` 保存当前应用配置。
 

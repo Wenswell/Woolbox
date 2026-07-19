@@ -77,9 +77,9 @@ adb shell am start -n com.wswensw.template/.MainActivity
 
 1. 启用 `Template tools`，确认两个详情页为 `Connected`，主操作可用。
 2. 从一个包含可访问文本的目标应用进入 Template，点击 `Start Global Copy`；确认目标应用恢复、会话显示且服务未断开。
-3. 确认主面板左右 `12dp`、上下 `32dp` 留白，四周可辨认目标应用；文本行包含序号、正文和元数据且没有空副行。
-4. 验证选择、`Copy capture`、`Copy reordered` 和剪贴板结果；两种直接复制均显示 `Copied to clipboard.`，随后关闭主面板。
-5. 重新启动会话并进入编辑模式，切换 `Reading order` 并核对草稿；复制后确认提示成功并关闭会话。
+3. 确认主面板左右 `12dp`、上下 `32dp` 留白；首屏为编辑页，`Reading order` 默认开启且草稿符合视觉阅读顺序。
+4. 编辑两种顺序草稿并往返切换，确认修改分别保留；进入 `Select text` 验证逐项选择、全选、清空和返回后的草稿。
+5. 确认 `Close`/`Back` 图标语义、输入法缩放和空白时禁用 `Copy`；复制后核对剪贴板、成功提示和会话关闭。
 6. 返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开。
 7. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield` 和按应用恢复。
 8. 分别从 Quick Settings 触发两个 Tile，确认 System UI 收起后工具作用于原目标。
@@ -87,7 +87,7 @@ adb shell am start -n com.wswensw.template/.MainActivity
 10. 依次快速触发两个不同 Tile，确认前一个工具关闭，最终只显示后触发的工具。
 11. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 12. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
-13. 旋转屏幕或改变显示尺寸，确认 OLED 遮罩和面板按比例重算。
+13. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
 
 ## 设备诊断
 

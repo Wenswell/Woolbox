@@ -6,7 +6,7 @@ Android Compose 工具应用，用 `Global Copy` 与 `OLED shield` 两个真实�
 
 | 工具 | 用途 | 启动方式 |
 | --- | --- | --- |
-| `Global Copy` | 读取目标应用当前窗口中的可访问文本，选择后按捕获顺序、视觉阅读顺序重排或编辑结果复制。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
+| `Global Copy` | 读取目标应用当前窗口中的可访问文本，默认生成可编辑的视觉阅读顺序草稿，也可调整文本选择或切换为捕获顺序。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
 | `OLED shield` | 在目标应用上方显示可触摸黑色遮罩，并按应用保存尺寸、透明度和面板位置。 | 详情页 `Show shield`；Quick Settings Tile。 |
 
 两项工具共用 `Template tools` 无障碍服务。页面入口会先把 Template 移到后台，再对恢复的应用执行工具；Tile 用于在目标应用内快速启动。
