@@ -6,7 +6,7 @@
 
 ## 项目定位
 
-本仓库是 Android Compose 工具应用，用 `Global Copy` 与 `OLED shield` 沉淀页面样式、底栏结构、通用组件和无障碍覆盖层能力。底栏固定为 `Home` 与 `Setting`。
+本仓库是 Android Compose 工具应用，用 `Global Copy`、`OLED shield` 与 `Records` 沉淀页面样式、底栏结构、通用组件、持久化和无障碍覆盖层能力。底栏固定为 `Home`、`Records` 与 `Setting`。
 
 ## 开始前
 
@@ -26,6 +26,7 @@
 - 默认使用 Kotlin、Jetpack Compose 和 Material 3。
 - 保持工程轻量；新增依赖前先确认 Compose、AndroidX 或本地 vector 无法满足需求。
 - 应用页面通用组件归属 `app/src/main/java/com/wswensw/template/ui/TemplateComponents.kt`。
+- 量化记录的领域规则、Room 数据层和页面归属 `app/src/main/java/com/wswensw/template/record/`。
 - 无障碍覆盖层及其 Compose UI 归属 `app/src/main/java/com/wswensw/template/tool/overlay/`。
 - 页面通过稳定组件组合，不在页面内重复样式细节。
 - 卡片只用于单个内容块或设置分组；页面 section 保持全宽布局。

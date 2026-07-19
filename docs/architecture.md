@@ -3,7 +3,7 @@
 ## 总览
 
 ```text
-Compose pages ──> MainActivity ───────────────┐
+Tool pages ─────> MainActivity ───────────────┐
 Quick Settings Tiles ─────────────────────────┤
                                               ▼
                                     ToolServiceController
@@ -20,9 +20,11 @@ Quick Settings Tiles ───────────────────�
                                    │
                                    ▼
                         ComposeOverlayWindow
+
+Records pages ──> RecordsViewModel ──> RecordRepository ──> records.db
 ```
 
-一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。应用页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。
+一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。工具页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。Records 走独立的应用内 Room 数据流，不提交工具命令。
 
 ## 模块职责
 
@@ -39,6 +41,7 @@ Quick Settings Tiles ───────────────────�
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
+| `RecordsViewModel` / `RecordRepository` | 组合记录项与今天流水，并通过独立 Room 数据库执行校验和事务写入。 |
 
 ## 命令状态机
 
@@ -117,6 +120,20 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 `ClipboardManager.setPrimaryClip()` 写入后显示成功 Toast，再通过统一的 `close()` 销毁会话窗口并发布非活动状态。
 
 非空快照先写入 `copy_history.db`，成功后才显示会话。`copy_history_entries` 保存包名、捕获时间、两种草稿和当前顺序，`copy_history_blocks` 保存完整文本块与选择状态并随父记录级联删除。列表只查询最多 `240` 个字符的摘要；打开记录时才加载文本块。跨应用会话与应用内历史 Dialog 共用 `CopySessionUiState` 和编辑面板，窗口宿主分别由服务与 Activity 管理。
+
+## Records 数据
+
+`RecordDatabase` 使用应用 Context 创建独立的 `records.db`，当前 schema `version = 1`：
+
+| 表 | 关键字段与约束 |
+| --- | --- |
+| `record_items` | 名称使用 `NOCASE` 唯一索引；保存计量类型、默认值、步进、单位、目标、优先级、归档状态和时间戳。 |
+| `record_windows` | 保存记录项推荐区间的起止分钟；`itemId` 建索引并随父项级联删除。 |
+| `record_entries` | 保存发生时刻、固化本地日期/分钟和正数值；索引 `itemId` 与 `(localDate, localMinute)`，并随父项级联删除。 |
+
+`RecordRepository.saveItem()` 在事务内校验并写入记录项及完整时间段集合。名称在活跃和归档项中忽略大小写唯一；已有流水后，计量类型和单位必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。
+
+新增流水以 epoch milliseconds 保存发生时刻，并按写入时的系统时区固化 ISO 本地日期与日内分钟。日期查询和今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、单位和类型联表展示。
 
 ## OLED 配置
 

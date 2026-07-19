@@ -9,7 +9,7 @@
 | Compose BOM | `2026.05.01` |
 | Java | Android Studio JBR `17` |
 | Android SDK | `compileSdk 36.1`、`minSdk 34`、`targetSdk 36` |
-| 单元测试 | JUnit `4.13.2` |
+| 数据与测试 | Room `2.8.4`、KSP `2.3.10`、JUnit `4.13.2` |
 
 项目使用 Gradle Wrapper。标准 macOS 环境变量：
 
@@ -23,9 +23,10 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | 路径 | 修改入口 |
 | --- | --- |
 | `MainActivity.kt` | 普通入口退到后台、指定应用启动和 `onStop` 命令提交。 |
-| `ui/TemplateApp.kt` | 导航、工具页面、历史与配置操作接线。 |
+| `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records FAB/Snackbar 及页面接线。 |
 | `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
+| `record/{model,data,ui}/` | 记录规则、`records.db`、Repository、ViewModel、今天流水、记录 Sheet 和记录项表单。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
 | `tool/service/WindowSnapshotBuilder.kt` | Global Copy 节点遍历和文本快照。 |
@@ -71,8 +72,9 @@ adb shell am start -n com.wswensw.template/.MainActivity
 | `OledShieldConfigRepositoryTest` | OLED profile upsert、时间、排序、保存和删除。 |
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
+| `RecordRulesTest` | 记录项规范化与正数校验、推荐排序、跨午夜时间段和十进制步进。 |
 
-这些是纯 JVM 领域测试，不能验证 Android 窗口恢复、应用图标解析、目标应用启动、无障碍服务绑定、`WindowManager.addView`、输入法、Tile 收起或厂商系统行为。
+这些是纯 JVM 领域测试，不能验证 Room 查询与持久化，也不能验证 Android 窗口恢复、应用图标解析、目标应用启动、无障碍服务绑定、`WindowManager.addView`、输入法、Tile 收起或厂商系统行为。
 
 ## 真机验收
 
@@ -91,6 +93,7 @@ adb shell am start -n com.wswensw.template/.MainActivity
 11. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 12. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
 13. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
+14. 在 Records 创建记录项并记录正数值，确认今天流水即时更新、Undo 只删除该条记录，重启后记录项和未撤销流水仍存在。
 
 ## 设备诊断
 
@@ -144,7 +147,4 @@ adb exec-out uiautomator dump /dev/tty
 
 ## 收尾
 
-- 按 [文档维护](documentation.md) 同步唯一事实来源，删除已失效过程文档。
-- 执行与风险匹配的定向验证，再执行一次提交前验证。
-- 检查 `git diff` 和工作区，只提交本轮相关文件。
-- 创建本地 commit，不自动 push。
+按 [文档维护](documentation.md) 同步唯一事实来源并删除失效过程文档；执行定向验证和一次提交前验证；检查差异后创建本地 commit，不自动 push。
