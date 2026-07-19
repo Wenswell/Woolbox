@@ -26,6 +26,7 @@ import kotlin.math.roundToInt
 fun GlobalCopyRoute(
     state: ToolServiceState,
     onBack: () -> Unit,
+    onLaunchTool: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onRequestTile: () -> Unit,
 ) {
@@ -33,6 +34,13 @@ fun GlobalCopyRoute(
         title = "Global Copy",
         onBack = onBack,
     ) {
+        TemplatePrimaryAction(
+            label = "Start Global Copy",
+            iconRes = R.drawable.ic_content_copy_24,
+            enabled = state.isServiceConnected,
+            onClick = onLaunchTool,
+        )
+
         TemplateSection(title = "Access") {
             TemplateListItem(
                 title = "Accessibility service",
@@ -65,6 +73,7 @@ fun OledShieldRoute(
     state: ToolServiceState,
     defaultConfig: OledShieldConfig,
     onBack: () -> Unit,
+    onLaunchTool: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onRequestTile: () -> Unit,
     onConfigChange: ((OledShieldConfig) -> OledShieldConfig) -> Unit,
@@ -74,6 +83,13 @@ fun OledShieldRoute(
         title = "OLED shield",
         onBack = onBack,
     ) {
+        TemplatePrimaryAction(
+            label = "Show shield",
+            iconRes = R.drawable.ic_oled_shield_24,
+            enabled = state.isServiceConnected,
+            onClick = onLaunchTool,
+        )
+
         TemplateSection(title = "Access") {
             TemplateListItem(
                 title = "Accessibility service",

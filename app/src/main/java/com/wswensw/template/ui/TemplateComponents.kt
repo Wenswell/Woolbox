@@ -27,6 +27,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -283,6 +284,29 @@ fun TemplateListItem(
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     )
+}
+
+@Composable
+fun TemplatePrimaryAction(
+    label: String,
+    @DrawableRes iconRes: Int,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(label)
+    }
 }
 
 @Composable

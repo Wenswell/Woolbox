@@ -2,7 +2,6 @@ package com.wswensw.template.tool.overlay
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
-import android.graphics.Rect
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
@@ -23,12 +22,9 @@ data class OverlayDisplaySize(
 class ComposeOverlayWindow(
     service: AccessibilityService,
 ) {
-    private val windowContext: Context = service.createWindowContext(
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        null,
-    )
+    private val windowContext: Context = service
     private val windowManager: WindowManager = requireNotNull(
-        windowContext.getSystemService(WindowManager::class.java),
+        service.getSystemService(WindowManager::class.java),
     )
     private var composeView: ComposeView? = null
     private var lifecycleOwner: OverlayLifecycleOwner? = null
@@ -73,8 +69,8 @@ class ComposeOverlayWindow(
     }
 
     fun displaySize(): OverlayDisplaySize {
-        val bounds: Rect = windowManager.currentWindowMetrics.bounds
-        return OverlayDisplaySize(bounds.width(), bounds.height())
+        val metrics = windowContext.resources.displayMetrics
+        return OverlayDisplaySize(metrics.widthPixels, metrics.heightPixels)
     }
 
     fun density(): Float = windowContext.resources.displayMetrics.density

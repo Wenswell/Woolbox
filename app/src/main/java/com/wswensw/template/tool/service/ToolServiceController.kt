@@ -23,6 +23,6 @@ object ToolServiceController {
     fun isConnected(): Boolean = serviceReference?.get() != null
 
     fun execute(command: ExternalToolCommand) {
-        serviceReference?.get()?.executeQuickSettingsCommand(command)
+        serviceReference?.get()?.executeCommand(command)
     }
 }

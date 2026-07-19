@@ -101,7 +101,7 @@ class ToolAccessibilityService : AccessibilityService() {
         refreshTiles()
     }
 
-    fun executeQuickSettingsCommand(command: ExternalToolCommand) {
+    fun executeCommand(command: ExternalToolCommand) {
         mainHandler.post {
             val activeTool = ToolServiceStateStore.state.value.activeTool
             if (activeTool.matches(command)) {

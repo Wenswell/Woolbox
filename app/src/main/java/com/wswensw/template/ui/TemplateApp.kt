@@ -40,6 +40,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.wswensw.template.R
+import com.wswensw.template.tool.service.ExternalToolCommand
 import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
 import com.wswensw.template.tool.trigger.ToolTile
@@ -54,7 +55,7 @@ private enum class MainTab(
 }
 
 @Composable
-fun TemplateApp() {
+fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
     val toolState by toolViewModel.serviceState.collectAsStateWithLifecycle()
@@ -128,6 +129,7 @@ fun TemplateApp() {
                 GlobalCopyRoute(
                     state = toolState,
                     onBack = { navController.popBackStack() },
+                    onLaunchTool = { onLaunchTool(ExternalToolCommand.GLOBAL_COPY) },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     onRequestTile = {
                         TileRequestManager.request(
@@ -145,6 +147,7 @@ fun TemplateApp() {
                     state = toolState,
                     defaultConfig = defaultOledConfig,
                     onBack = { navController.popBackStack() },
+                    onLaunchTool = { onLaunchTool(ExternalToolCommand.OLED_SHIELD) },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     onRequestTile = {
                         TileRequestManager.request(
