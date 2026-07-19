@@ -322,12 +322,16 @@ fun TemplateDivider() {
 @Composable
 fun TemplateSurface(
     bottomBar: @Composable () -> Unit,
+    floatingActionButton: @Composable () -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets.safeDrawing,
         bottomBar = bottomBar,
+        floatingActionButton = floatingActionButton,
+        snackbarHost = snackbarHost,
         content = content,
     )
 }

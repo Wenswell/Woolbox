@@ -3,6 +3,7 @@ package com.wswensw.template.record.model
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordRulesTest {
@@ -45,6 +46,29 @@ class RecordRulesTest {
         }
     }
 
+    @Test
+    fun suggestionsPreferTextThenCurrentWindow() {
+        val current = item(1, "Read", "books", 21 * 60, 22 * 60)
+        val later = item(2, "Reading notes", "write", 8 * 60, 9 * 60)
+
+        val textResults = getRecordSuggestions(listOf(later, current), "read", 21 * 60)
+        val timeResults = getRecordSuggestions(listOf(later, current), "", 21 * 60)
+
+        assertEquals(listOf("Read", "Reading notes"), textResults.map { it.item.name })
+        assertEquals("Read", timeResults.first().item.name)
+    }
+
+    @Test
+    fun matchesSuggestedWindowAcrossMidnight() {
+        assertTrue(isMinuteInWindow(30, 23 * 60, 2 * 60))
+    }
+
+    @Test
+    fun stepsDecimalValuesWithoutFloatingPointNoise() {
+        assertEquals("0.6", stepRecordValue("0.4", 0.2, 1))
+        assertEquals("0.2", stepRecordValue("0.2", 0.2, -1))
+    }
+
     private fun draft(
         name: String = "Water",
         description: String = "",
@@ -67,5 +91,22 @@ class RecordRulesTest {
         goalPeriod = goalPeriod,
         priority = priority,
         windows = windows,
+    )
+
+    private fun item(id: Long, name: String, description: String, start: Int, end: Int) = RecordItem(
+        id = id,
+        name = name,
+        description = description,
+        valueType = RecordValueType.NUMBER,
+        defaultValue = 1.0,
+        stepValue = 1.0,
+        unit = "次",
+        goalValue = null,
+        goalPeriod = null,
+        priority = 1,
+        archived = false,
+        windows = listOf(RecordWindow(startMinute = start, endMinute = end)),
+        createdAt = 0,
+        updatedAt = 0,
     )
 }

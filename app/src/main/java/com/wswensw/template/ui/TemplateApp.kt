@@ -14,14 +14,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -51,6 +58,7 @@ import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
 import com.wswensw.template.tool.trigger.ToolTile
 import com.wswensw.template.tool.ui.ToolViewModel
+import kotlinx.coroutines.launch
 
 private enum class MainTab(
     val labelRes: Int,
@@ -73,6 +81,9 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
+    var showRecordSheet by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -105,9 +116,29 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                     bottomBar = {
                         BottomNavigationBar(
                             selectedTab = selectedTab,
-                            onSelectTab = { selectedTab = it },
+                            onSelectTab = { tab ->
+                                selectedTab = tab
+                                if (tab != MainTab.RECORDS) {
+                                    showRecordSheet = false
+                                }
+                            },
                         )
                     },
+                    floatingActionButton = {
+                        if (selectedTab == MainTab.RECORDS && recordsState.activeItems.isNotEmpty()) {
+                            ExtendedFloatingActionButton(
+                                onClick = { showRecordSheet = true },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_add_24),
+                                        contentDescription = null,
+                                    )
+                                },
+                                text = { Text("Record") },
+                            )
+                        }
+                    },
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
                 ) { innerPadding: PaddingValues ->
                     AnimatedContent(
                         targetState = selectedTab,
@@ -128,8 +159,34 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
 
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
-                                onManage = { navController.navigate(TemplateRoutes.MANAGE_RECORDS) },
-                                onCreateItem = { navController.navigate(TemplateRoutes.RECORD_ITEM_NEW) },
+                                onManage = {
+                                    showRecordSheet = false
+                                    navController.navigate(TemplateRoutes.MANAGE_RECORDS)
+                                },
+                                onCreateItem = {
+                                    showRecordSheet = false
+                                    navController.navigate(TemplateRoutes.RECORD_ITEM_NEW)
+                                },
+                                showRecordSheet = showRecordSheet,
+                                onDismissRecordSheet = { showRecordSheet = false },
+                                onRecord = { item, value, onResult ->
+                                    recordsViewModel.createEntry(item.id, value) { entryId, error ->
+                                        onResult(error)
+                                        if (entryId != null) {
+                                            showRecordSheet = false
+                                            coroutineScope.launch {
+                                                val result = snackbarHostState.showSnackbar(
+                                                    message = "Recorded ${item.name}.",
+                                                    actionLabel = "Undo",
+                                                    withDismissAction = true,
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) {
+                                                    recordsViewModel.deleteEntry(entryId)
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -211,11 +268,15 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                 arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
             ) { entry ->
                 val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
+                var measurementLocked by remember(itemId) { mutableStateOf(false) }
+                LaunchedEffect(itemId) {
+                    recordsViewModel.loadEntryCount(itemId) { count -> measurementLocked = count > 0 }
+                }
                 RecordItemFormScreen(
                     item = recordsState.findItem(itemId),
                     editing = true,
                     loading = recordsState.isLoading,
-                    measurementLocked = false,
+                    measurementLocked = measurementLocked,
                     onBack = { navController.popBackStack() },
                     onSave = { draft, onResult ->
                         recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->

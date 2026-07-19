@@ -14,15 +14,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
+import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.ui.TemplatePageHeader
+import com.wswensw.template.ui.TemplateDivider
+import com.wswensw.template.ui.TemplateListItem
 import com.wswensw.template.ui.TemplatePrimaryAction
+import com.wswensw.template.ui.TemplateSection
 import com.wswensw.template.ui.TemplateStyle
+import java.util.Locale
 
 @Composable
 fun RecordsScreen(
     state: RecordsUiState,
     onManage: () -> Unit,
     onCreateItem: () -> Unit,
+    showRecordSheet: Boolean,
+    onDismissRecordSheet: () -> Unit,
+    onRecord: (RecordItem, Double, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -65,14 +73,44 @@ fun RecordsScreen(
             }
 
             else -> item {
-                Text(
-                    text = "${state.activeItems.size} active record items",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                TemplateSection(title = "Today") {
+                    if (state.entries.isEmpty()) {
+                        TemplateListItem(
+                            title = "No records today",
+                            subtitle = "Use Record to add the first value.",
+                            iconRes = R.drawable.ic_records_24,
+                        )
+                    } else {
+                        state.entries.forEachIndexed { index, entry ->
+                            TemplateListItem(
+                                title = entry.itemName,
+                                subtitle = "${formatMinute(entry.localMinute)} · ${formatValue(entry.value)} ${entry.itemUnit}",
+                                iconRes = R.drawable.ic_records_24,
+                            )
+                            if (index != state.entries.lastIndex) {
+                                TemplateDivider()
+                            }
+                        }
+                    }
+                }
             }
         }
 
         item { Spacer(Modifier.height(TemplateStyle.spacing.pageBottom)) }
     }
+
+    if (showRecordSheet) {
+        RecordSheet(
+            items = state.activeItems,
+            onDismiss = onDismissRecordSheet,
+            onRecord = onRecord,
+        )
+    }
 }
+
+private fun formatMinute(minute: Int): String = String.format(
+    Locale.ROOT,
+    "%02d:%02d",
+    minute / 60,
+    minute % 60,
+)
