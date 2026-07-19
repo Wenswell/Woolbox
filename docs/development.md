@@ -69,7 +69,7 @@ adb shell am start -n com.wswensw.template/.MainActivity
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 
-这些是纯 JVM 领域测试，不能验证 Android 窗口恢复、无障碍服务绑定、`WindowManager.addView`、输入法、Tile 收起或厂商系统行为。
+这些是纯 JVM 领域测试，不能验证 Android 窗口恢复、无障碍服务绑定、`WindowManager.addView`、实际窗口硬件加速、输入法、Tile 收起或厂商系统行为。
 
 ## 真机验收
 
@@ -123,6 +123,7 @@ adb exec-out uiautomator dump /dev/tty
 | --- | --- | --- |
 | 页面持续 `Waiting for service` | `dumpsys accessibility` 的 `Binding`/`Crashed services`，再查 crash buffer。 | 页面状态不能代替系统绑定状态。 |
 | 点击工具后服务崩溃 | 栈是否指向 `ComposeOverlayWindow` 或 `WindowManager.addView`。 | 直接使用 `AccessibilityService` 的 `WindowManager` 与资源指标；不要从无 Display 的服务 Context 直接调用 `createWindowContext()`。 |
+| Global Copy 列表持续滑动卡顿 | 挂载后的 `ComposeView.isHardwareAccelerated` 是否为 `true`。 | `ComposeOverlayWindow` 必须在 `addView` 前统一设置 `FLAG_HARDWARE_ACCELERATED`。 |
 | Tile 长时间 `Preparing` | 当前 root 是否仍为 System UI，是否存在外部 `TYPE_APPLICATION` 窗口。 | 目标在面板收起后实时解析，命令两秒超时。 |
 | Global Copy 没有会话 | 目标节点是否可见、非密码、有边界和非空可访问文本。 | 空快照直接结束，不创建空覆盖层。 |
 | OLED 参数未恢复 | 包名键是否存在 `opacity`，保存是否发生在控制面板 `Save`。 | 应用配置不存在时读取当前默认值。 |

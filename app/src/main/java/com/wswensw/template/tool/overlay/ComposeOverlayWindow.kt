@@ -37,6 +37,8 @@ class ComposeOverlayWindow(
         content: @Composable () -> Unit,
     ) {
         check(composeView == null) { "Overlay is already visible." }
+        layoutParams.flags = layoutParams.flags or
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
 
         val owner = OverlayLifecycleOwner()
         val view = ComposeView(windowContext).apply {

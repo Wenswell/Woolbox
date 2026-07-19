@@ -95,6 +95,7 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 每个覆盖层窗口遵循：
 
 - `show` 前状态必须为空；`addView` 失败时立即销毁生命周期所有者并继续抛出原始错误。
+- `show` 在 `addView` 前统一添加 `FLAG_HARDWARE_ACCELERATED`，保证直接由服务创建的 Compose 窗口使用硬件渲染。
 - 添加成功后生命周期进入 `RESUMED`。
 - `dismiss` 使用 `removeViewImmediate`，随后进入 `DESTROYED` 并清空引用。
 - Copy 会话使用可聚焦全屏透明窗口，以支持同一窗口内编辑输入；窗口内的实体面板水平内缩 `12dp`、垂直内缩 `32dp`，外层 scrim 透出目标应用。
