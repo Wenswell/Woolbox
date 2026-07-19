@@ -110,6 +110,7 @@ fun TemplateRouteScaffold(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val contentScrollState = rememberScrollState()
@@ -139,6 +140,7 @@ fun TemplateRouteScaffold(
                             )
                         }
                     },
+                    actions = actions,
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                         scrolledContainerColor = MaterialTheme.colorScheme.surface,

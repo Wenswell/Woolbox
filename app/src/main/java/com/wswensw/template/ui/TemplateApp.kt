@@ -36,10 +36,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.wswensw.template.R
+import com.wswensw.template.record.ui.ManageRecordsScreen
+import com.wswensw.template.record.ui.RecordItemFormScreen
+import com.wswensw.template.record.ui.RecordsScreen
+import com.wswensw.template.record.ui.RecordsViewModel
 import com.wswensw.template.tool.service.ExternalToolCommand
 import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
@@ -51,6 +57,7 @@ private enum class MainTab(
     val iconRes: Int,
 ) {
     HOME(R.string.tab_home, R.drawable.ic_home_24),
+    RECORDS(R.string.tab_records, R.drawable.ic_records_24),
     SETTING(R.string.tab_setting, R.drawable.ic_settings_24),
 }
 
@@ -58,8 +65,12 @@ private enum class MainTab(
 fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
+    val recordsViewModel: RecordsViewModel = viewModel(
+        factory = RecordsViewModel.Factory(LocalContext.current),
+    )
     val toolState by toolViewModel.serviceState.collectAsStateWithLifecycle()
     val defaultOledConfig by toolViewModel.defaultOledConfig.collectAsStateWithLifecycle()
+    val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
@@ -115,6 +126,13 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                                 onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                             )
 
+                            MainTab.RECORDS -> RecordsScreen(
+                                state = recordsState,
+                                onManage = { navController.navigate(TemplateRoutes.MANAGE_RECORDS) },
+                                onCreateItem = { navController.navigate(TemplateRoutes.RECORD_ITEM_NEW) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+
                             MainTab.SETTING -> SettingScreen(
                                 themeMode = themeMode,
                                 onThemeModeChange = { themeMode = it },
@@ -159,6 +177,54 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                     },
                     onConfigChange = toolViewModel::updateDefaultOledConfig,
                     onSaveDefaultConfig = toolViewModel::saveDefaultOledConfig,
+                )
+            }
+            composable(TemplateRoutes.MANAGE_RECORDS) {
+                ManageRecordsScreen(
+                    state = recordsState,
+                    onBack = { navController.popBackStack() },
+                    onNewItem = { navController.navigate(TemplateRoutes.RECORD_ITEM_NEW) },
+                    onEditItem = { itemId ->
+                        navController.navigate(TemplateRoutes.recordItemEdit(itemId))
+                    },
+                )
+            }
+            composable(TemplateRoutes.RECORD_ITEM_NEW) {
+                RecordItemFormScreen(
+                    item = null,
+                    editing = false,
+                    loading = false,
+                    measurementLocked = false,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveItem(itemId = null, draft = draft) { error ->
+                            onResult(error)
+                            if (error == null) {
+                                navController.popBackStack()
+                            }
+                        }
+                    },
+                )
+            }
+            composable(
+                route = TemplateRoutes.RECORD_ITEM_EDIT,
+                arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
+                RecordItemFormScreen(
+                    item = recordsState.findItem(itemId),
+                    editing = true,
+                    loading = recordsState.isLoading,
+                    measurementLocked = false,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->
+                            onResult(error)
+                            if (error == null) {
+                                navController.popBackStack()
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -222,6 +288,12 @@ private object TemplateRoutes {
     const val ROOT = "root"
     const val GLOBAL_COPY = "global-copy"
     const val OLED_SHIELD = "oled-shield"
+    const val MANAGE_RECORDS = "manage-records"
+    const val RECORD_ITEM_NEW = "record-item/new"
+    const val RECORD_ITEM_ID = "recordItemId"
+    const val RECORD_ITEM_EDIT = "record-item/{$RECORD_ITEM_ID}"
+
+    fun recordItemEdit(itemId: Long) = "record-item/$itemId"
 }
 
 private const val PageTransitionMillis = 220
