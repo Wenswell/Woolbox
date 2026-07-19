@@ -8,9 +8,9 @@ import android.service.quicksettings.TileService
 import com.wswensw.template.MainActivity
 import com.wswensw.template.R
 import com.wswensw.template.tool.service.ExternalToolCommand
-import com.wswensw.template.tool.service.ToolActivity
 import com.wswensw.template.tool.service.ToolServiceController
 import com.wswensw.template.tool.service.ToolServiceStateStore
+import com.wswensw.template.tool.service.matches
 
 class GlobalCopyTileService : ToolTileService() {
     override val command: ExternalToolCommand = ExternalToolCommand.GLOBAL_COPY
@@ -62,11 +62,6 @@ abstract class ToolTileService : TileService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         startActivityAndCollapse(pendingIntent)
-    }
-
-    private fun ToolActivity.matches(command: ExternalToolCommand): Boolean = when (command) {
-        ExternalToolCommand.GLOBAL_COPY -> this == ToolActivity.COPY_PREPARING || this == ToolActivity.COPY_ACTIVE
-        ExternalToolCommand.OLED_SHIELD -> this == ToolActivity.OLED_PREPARING || this == ToolActivity.OLED_ACTIVE
     }
 }
 

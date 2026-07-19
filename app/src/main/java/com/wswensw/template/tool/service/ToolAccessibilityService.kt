@@ -264,14 +264,6 @@ class ToolAccessibilityService : AccessibilityService() {
         val deadlineAtMillis: Long,
     )
 
-    private fun ToolActivity.matches(command: ExternalToolCommand): Boolean = when (command) {
-        ExternalToolCommand.GLOBAL_COPY ->
-            this == ToolActivity.COPY_PREPARING || this == ToolActivity.COPY_ACTIVE
-
-        ExternalToolCommand.OLED_SHIELD ->
-            this == ToolActivity.OLED_PREPARING || this == ToolActivity.OLED_ACTIVE
-    }
-
     private fun ExternalToolCommand.preparingActivity(): ToolActivity = when (this) {
         ExternalToolCommand.GLOBAL_COPY -> ToolActivity.COPY_PREPARING
         ExternalToolCommand.OLED_SHIELD -> ToolActivity.OLED_PREPARING

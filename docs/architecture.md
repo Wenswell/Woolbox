@@ -62,6 +62,8 @@ Quick Settings Tiles ───────────────────�
 
 同类工具处于 `PREPARING` 或 `ACTIVE` 时再次提交命令，会取消命令并关闭工具。不同工具命令会先关闭现有工具，再进入新的准备状态。
 
+命令统一投递到服务主线程串行处理。服务是覆盖层的唯一所有者；`CopySessionController.show()` 与 `OledShieldController.show()` 在创建新窗口前释放自身已有窗口，OLED 控制面板在窗口已显示时忽略重复长按。因此任意时刻最多存在一个活动工具、一个 Global Copy 会话窗口、一个 OLED 遮罩和一个 OLED 控制面板。
+
 ## 目标窗口选择
 
 候选只包含具有 root 和包名的 `TYPE_APPLICATION` 窗口，并排除 `com.android.systemui` 与 `com.wswensw.template`。

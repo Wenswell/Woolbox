@@ -67,6 +67,7 @@ adb shell am start -n com.wswensw.template/.MainActivity
 | `CopyTextSelectionTest` | 捕获顺序、阅读顺序、视觉行、NFKC/空白归一化与去重。 |
 | `OledShieldConfigTest` | OLED 默认值和参数归一化。 |
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
+| `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 
 这些是纯 JVM 领域测试，不能验证 Android 窗口恢复、无障碍服务绑定、`WindowManager.addView`、输入法、Tile 收起或厂商系统行为。
 
@@ -82,8 +83,11 @@ adb shell am start -n com.wswensw.template/.MainActivity
 6. 返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开。
 7. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield` 和按应用恢复。
 8. 分别从 Quick Settings 触发两个 Tile，确认 System UI 收起后工具作用于原目标。
-9. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
-10. 旋转屏幕或改变显示尺寸，确认 OLED 遮罩和面板按比例重算。
+9. 在 `Preparing` 和 `Active` 状态分别连续触发同类 Tile，确认命令取消或活动工具关闭，且没有重复窗口。
+10. 依次快速触发两个不同 Tile，确认前一个工具关闭，最终只显示后触发的工具。
+11. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
+12. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
+13. 旋转屏幕或改变显示尺寸，确认 OLED 遮罩和面板按比例重算。
 
 ## 设备诊断
 
