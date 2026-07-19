@@ -21,3 +21,9 @@ data class OledShieldConfig(
         val Default = OledShieldConfig()
     }
 }
+
+data class OledShieldProfile(
+    val packageName: String,
+    val config: OledShieldConfig,
+    val recordedAt: Long,
+)
