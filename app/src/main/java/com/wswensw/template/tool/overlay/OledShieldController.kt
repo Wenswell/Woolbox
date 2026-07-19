@@ -73,9 +73,17 @@ class OledShieldController(
     }
 
     fun show(packageName: String) {
+        show(packageName, repository.loadForPackage(packageName))
+    }
+
+    fun show(
+        packageName: String,
+        config: OledShieldConfig,
+    ) {
         dismissOverlays(notify = false)
+        val normalizedConfig = config.normalized()
         targetPackageName = packageName
-        mutableUiState.value = OledOverlayUiState(config = repository.loadForPackage(packageName))
+        mutableUiState.value = OledOverlayUiState(config = normalizedConfig)
 
         val host = ComposeOverlayWindow(service)
         val params = shieldLayoutParams(host, mutableUiState.value.config)
@@ -89,7 +97,9 @@ class OledShieldController(
                 )
             }
         }
-        onStateChanged(true, packageName, mutableUiState.value.config)
+        val profile = repository.recordUse(packageName, normalizedConfig)
+        targetPackageName = profile.packageName
+        onStateChanged(true, profile.packageName, profile.config)
     }
 
     fun hide(notify: Boolean = true) {

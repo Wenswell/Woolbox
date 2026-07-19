@@ -116,7 +116,7 @@ class ToolAccessibilityService : AccessibilityService() {
 
             pendingCommand = PendingExternalCommand(
                 command = command,
-                deadlineAtMillis = SystemClock.uptimeMillis() + COMMAND_TIMEOUT_MILLIS,
+                deadlineAtMillis = SystemClock.uptimeMillis() + command.timeoutMillis(),
             )
             ToolServiceStateStore.update {
                 it.copy(
@@ -138,7 +138,7 @@ class ToolAccessibilityService : AccessibilityService() {
         }
 
         val target = windowResolver.resolve()
-        if (target == null) {
+        if (target == null || !pending.command.acceptsTarget(target.packageName)) {
             schedulePendingResolution(pending)
             return
         }
@@ -147,6 +147,9 @@ class ToolAccessibilityService : AccessibilityService() {
         when (pending.command) {
             ExternalToolCommand.GLOBAL_COPY -> startCopySession(target)
             ExternalToolCommand.OLED_SHIELD -> oledShieldController.show(target.packageName)
+            is ExternalToolCommand.OledShieldProfile -> {
+                oledShieldController.show(target.packageName, pending.command.config)
+            }
         }
     }
 
@@ -264,17 +267,11 @@ class ToolAccessibilityService : AccessibilityService() {
         val deadlineAtMillis: Long,
     )
 
-    private fun ExternalToolCommand.preparingActivity(): ToolActivity = when (this) {
-        ExternalToolCommand.GLOBAL_COPY -> ToolActivity.COPY_PREPARING
-        ExternalToolCommand.OLED_SHIELD -> ToolActivity.OLED_PREPARING
-    }
-
     private fun ToolActivity.isActive(): Boolean = this == ToolActivity.COPY_ACTIVE || this == ToolActivity.OLED_ACTIVE
 
     private companion object {
         const val SYSTEM_UI_PACKAGE = "com.android.systemui"
         const val TARGET_REFRESH_DELAY_MS = 80L
         const val COMMAND_POLL_MILLIS = 120L
-        const val COMMAND_TIMEOUT_MILLIS = 2_000L
     }
 }
