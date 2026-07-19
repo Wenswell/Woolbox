@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -123,39 +126,12 @@ fun TemplateRouteScaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
-            Box {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_arrow_back_24),
-                                contentDescription = "Back",
-                            )
-                        }
-                    },
-                    actions = actions,
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                )
-                if (showTopBarDivider) {
-                    HorizontalDivider(
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        thickness = Dp.Hairline,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                    )
-                }
-            }
+            TemplateRouteTopBar(
+                title = title,
+                onBack = onBack,
+                actions = actions,
+                showDivider = showTopBarDivider,
+            )
         },
     ) { innerPadding ->
         Column(
@@ -167,6 +143,92 @@ fun TemplateRouteScaffold(
         ) {
             Spacer(Modifier.height(12.dp))
             content()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TemplateLazyRouteScaffold(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
+    content: LazyListScope.() -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val showTopBarDivider by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > RouteTopTolerancePx
+        }
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = WindowInsets(0.dp),
+        topBar = {
+            TemplateRouteTopBar(
+                title = title,
+                onBack = onBack,
+                actions = actions,
+                showDivider = showTopBarDivider,
+            )
+        },
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            state = listState,
+            contentPadding = PaddingValues(
+                top = 12.dp,
+                bottom = TemplateStyle.spacing.pageBottom,
+            ),
+            content = content,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TemplateRouteTopBar(
+    title: String,
+    onBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+    showDivider: Boolean,
+) {
+    Box {
+        TopAppBar(
+            title = {
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_arrow_back_24),
+                        contentDescription = "Back",
+                    )
+                }
+            },
+            actions = actions,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        )
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                thickness = Dp.Hairline,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+            )
         }
     }
 }

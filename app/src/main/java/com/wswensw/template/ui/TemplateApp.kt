@@ -1,8 +1,11 @@
 package com.wswensw.template.ui
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
+import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
@@ -54,10 +57,13 @@ import com.wswensw.template.record.ui.RecordItemFormScreen
 import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
 import com.wswensw.template.tool.service.ExternalToolCommand
+import com.wswensw.template.tool.service.ToolLaunchResult
 import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
 import com.wswensw.template.tool.trigger.ToolTile
 import com.wswensw.template.tool.ui.ToolViewModel
+import com.wswensw.template.tool.ui.CopyHistoryScreen
+import com.wswensw.template.tool.ui.CopyHistoryViewModel
 import kotlinx.coroutines.launch
 
 private enum class MainTab(
@@ -70,14 +76,18 @@ private enum class MainTab(
 }
 
 @Composable
-fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
+fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
+    val copyHistoryViewModel: CopyHistoryViewModel = viewModel()
     val recordsViewModel: RecordsViewModel = viewModel(
         factory = RecordsViewModel.Factory(LocalContext.current),
     )
     val toolState by toolViewModel.serviceState.collectAsStateWithLifecycle()
     val defaultOledConfig by toolViewModel.defaultOledConfig.collectAsStateWithLifecycle()
+    val oledProfiles by toolViewModel.oledProfiles.collectAsStateWithLifecycle()
+    val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
+    val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
@@ -203,8 +213,12 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                 val context = LocalContext.current
                 GlobalCopyRoute(
                     state = toolState,
+                    historyCount = copyHistory.size,
                     onBack = { navController.popBackStack() },
-                    onLaunchTool = { onLaunchTool(ExternalToolCommand.GLOBAL_COPY) },
+                    onLaunchTool = {
+                        context.showToolLaunchResult(onLaunchTool(ExternalToolCommand.GLOBAL_COPY))
+                    },
+                    onOpenHistory = { navController.navigate(TemplateRoutes.COPY_HISTORY) },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     onRequestTile = {
                         TileRequestManager.request(
@@ -216,13 +230,45 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                     },
                 )
             }
+            composable(TemplateRoutes.COPY_HISTORY) {
+                val context = LocalContext.current
+                CopyHistoryScreen(
+                    history = copyHistory,
+                    selectedHistory = selectedCopyHistory,
+                    onBack = { navController.popBackStack() },
+                    onOpen = { historyId ->
+                        copyHistoryViewModel.open(historyId, context::showMessage)
+                    },
+                    onCloseEditor = copyHistoryViewModel::closeEditor,
+                    onSave = { historyId, state, onResult ->
+                        copyHistoryViewModel.save(historyId, state) { error ->
+                            if (error == null) context.showMessage("Copy history saved.")
+                            onResult(error)
+                        }
+                    },
+                    onCopy = { text ->
+                        context.copyToClipboard(text)
+                        copyHistoryViewModel.closeEditor()
+                    },
+                    onDelete = { historyId, onResult ->
+                        copyHistoryViewModel.delete(historyId) { error ->
+                            if (error == null) context.showMessage("Copy history deleted.")
+                            onResult(error)
+                        }
+                    },
+                    onError = context::showMessage,
+                )
+            }
             composable(TemplateRoutes.OLED_SHIELD) {
                 val context = LocalContext.current
                 OledShieldRoute(
                     state = toolState,
                     defaultConfig = defaultOledConfig,
+                    profiles = oledProfiles,
                     onBack = { navController.popBackStack() },
-                    onLaunchTool = { onLaunchTool(ExternalToolCommand.OLED_SHIELD) },
+                    onLaunchTool = {
+                        context.showToolLaunchResult(onLaunchTool(ExternalToolCommand.OLED_SHIELD))
+                    },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     onRequestTile = {
                         TileRequestManager.request(
@@ -234,6 +280,20 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> Unit) {
                     },
                     onConfigChange = toolViewModel::updateDefaultOledConfig,
                     onSaveDefaultConfig = toolViewModel::saveDefaultOledConfig,
+                    onEnableProfile = { profile ->
+                        context.showToolLaunchResult(
+                            onLaunchTool(
+                                ExternalToolCommand.OledShieldProfile(
+                                    packageName = profile.profile.packageName,
+                                    config = profile.profile.config,
+                                ),
+                            ),
+                        )
+                    },
+                    onDeleteProfile = { packageName ->
+                        toolViewModel.deleteOledProfile(packageName)
+                        context.showMessage("Saved app deleted.")
+                    },
                 )
             }
             composable(TemplateRoutes.MANAGE_RECORDS) {
@@ -320,7 +380,29 @@ private fun Context.showTileRequestResult(result: TileRequestResult) {
         TileRequestResult.NOT_ADDED -> "Tile was not added"
         TileRequestResult.ERROR -> "Unable to add tile"
     }
-    android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+    showMessage(message)
+}
+
+private fun Context.showToolLaunchResult(result: ToolLaunchResult) {
+    val message = when (result) {
+        ToolLaunchResult.Accepted -> return
+        ToolLaunchResult.ServiceUnavailable -> "Accessibility service is not connected."
+        ToolLaunchResult.TargetAppUnavailable -> "Target app is not available."
+        ToolLaunchResult.TargetLaunchFailed -> "Unable to open target app."
+    }
+    showMessage(message)
+}
+
+private fun Context.copyToClipboard(text: String) {
+    check(text.isNotBlank()) { "Copy history text must not be blank." }
+    getSystemService(ClipboardManager::class.java).setPrimaryClip(
+        ClipData.newPlainText("Global Copy", text),
+    )
+    showMessage("Copied to clipboard.")
+}
+
+private fun Context.showMessage(message: String) {
+    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
 
 @Composable
@@ -348,6 +430,7 @@ private fun BottomNavigationBar(
 private object TemplateRoutes {
     const val ROOT = "root"
     const val GLOBAL_COPY = "global-copy"
+    const val COPY_HISTORY = "global-copy/history"
     const val OLED_SHIELD = "oled-shield"
     const val MANAGE_RECORDS = "manage-records"
     const val RECORD_ITEM_NEW = "record-item/new"

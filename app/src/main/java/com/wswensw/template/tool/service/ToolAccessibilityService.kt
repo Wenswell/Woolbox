@@ -7,18 +7,32 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
+import android.widget.Toast
 import com.wswensw.template.tool.model.OledShieldConfig
 import com.wswensw.template.tool.overlay.CopySessionController
 import com.wswensw.template.tool.overlay.OledShieldController
+import com.wswensw.template.tool.storage.CopyHistoryDatabase
+import com.wswensw.template.tool.storage.CopyHistoryRepository
 import com.wswensw.template.tool.storage.OledShieldConfigRepository
 import com.wswensw.template.tool.trigger.ToolTileRefresher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ToolAccessibilityService : AccessibilityService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val windowResolver = ForegroundWindowResolver(this)
     private val snapshotBuilder = WindowSnapshotBuilder(this)
     private lateinit var copySessionController: CopySessionController
+    private lateinit var copyHistoryRepository: CopyHistoryRepository
     private lateinit var oledShieldController: OledShieldController
+    private var serviceScope: CoroutineScope? = null
+    private var copyHistoryJob: Job? = null
     private var pendingCommand: PendingExternalCommand? = null
     private var isCleanedUp: Boolean = false
     private val refreshTargetRunnable = Runnable(::refreshForegroundTarget)
@@ -29,9 +43,12 @@ class ToolAccessibilityService : AccessibilityService() {
         isCleanedUp = false
         mainHandler.removeCallbacksAndMessages(null)
         pendingCommand = null
+        serviceScope?.cancel()
+        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         if (::copySessionController.isInitialized) copySessionController.close(notify = false)
         if (::oledShieldController.isInitialized) oledShieldController.hide(notify = false)
         val repository = OledShieldConfigRepository(this)
+        copyHistoryRepository = CopyHistoryRepository(CopyHistoryDatabase.getInstance(this))
         copySessionController = CopySessionController(this, ::onCopySessionChanged)
         oledShieldController = OledShieldController(this, repository, ::onOledShieldChanged)
         ToolServiceController.attach(this)
@@ -92,6 +109,8 @@ class ToolAccessibilityService : AccessibilityService() {
         mainHandler.removeCallbacksAndMessages(null)
         cancelPendingCommand()
         closeAllTools()
+        serviceScope?.cancel()
+        serviceScope = null
         ToolServiceController.detach(this)
         ToolServiceStateStore.update {
             ToolServiceState(
@@ -175,7 +194,42 @@ class ToolAccessibilityService : AccessibilityService() {
             refreshTiles()
             return
         }
-        copySessionController.show(snapshot)
+        copyHistoryJob?.cancel()
+        copyHistoryJob = requireNotNull(serviceScope).launch {
+            val saved = try {
+                withContext(Dispatchers.IO) {
+                    copyHistoryRepository.insertSnapshot(snapshot)
+                }
+                true
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                false
+            }
+            copyHistoryJob = null
+            if (!saved) {
+                ToolServiceStateStore.update { it.copy(activeTool = ToolActivity.NONE) }
+                Toast.makeText(
+                    this@ToolAccessibilityService,
+                    "Unable to save copy history.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+                refreshTiles()
+                return@launch
+            }
+
+            val state = ToolServiceStateStore.state.value
+            if (
+                !isCleanedUp &&
+                state.activeTool == ToolActivity.COPY_PREPARING &&
+                state.targetPackageName == target.packageName
+            ) {
+                copySessionController.show(snapshot)
+            } else if (state.activeTool == ToolActivity.COPY_PREPARING) {
+                ToolServiceStateStore.update { it.copy(activeTool = ToolActivity.NONE) }
+                refreshTiles()
+            }
+        }
     }
 
     private fun refreshForegroundTarget() {
@@ -206,6 +260,8 @@ class ToolAccessibilityService : AccessibilityService() {
 
     private fun closeAllTools() {
         val hadActiveTool = ToolServiceStateStore.state.value.activeTool != ToolActivity.NONE
+        copyHistoryJob?.cancel()
+        copyHistoryJob = null
         if (::copySessionController.isInitialized) copySessionController.close(notify = false)
         if (::oledShieldController.isInitialized) oledShieldController.hide(notify = false)
         if (ToolServiceStateStore.state.value.activeTool != ToolActivity.NONE) {
