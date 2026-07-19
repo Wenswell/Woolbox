@@ -2,7 +2,7 @@
 
 ## 设计目标
 
-Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、状态和配置；Global Copy 会话面板与 OLED 控制面板属于系统覆盖层，不复用应用页面骨架。
+Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、历史和配置；跨应用会话使用系统覆盖层，Global Copy 历史在应用内复用同一编辑面板。
 
 基础技术为 Material 3、动态色和 edge-to-edge。组件优先表达操作层级，不使用装饰性卡片、营销式区块或与功能无关的视觉元素。
 
@@ -22,12 +22,14 @@ TemplateTheme
    ├─ Global Copy
    │  ├─ primary action
    │  ├─ accessibility state
-   │  └─ Tile request
+   │  ├─ Tile request
+   │  └─ History entry ──> Copy history
    └─ OLED shield
       ├─ primary action
       ├─ accessibility state
       ├─ Tile request
-      └─ default config
+      ├─ default config
+      └─ saved apps
 ```
 
 根页面保留 `Home`、`Setting` 底栏。工具详情页不显示底栏，使用顶部返回栏和独立滚动内容。
@@ -39,6 +41,7 @@ TemplateTheme
 | `TemplateSurface` | 根页面 | `Scaffold` 处理 safe drawing 与底栏。 |
 | `TemplatePage` | Home、Setting | 标题、说明、纵向滚动内容和底部留白。 |
 | `TemplateRouteScaffold` | 工具详情页 | 顶部栏、返回动作、滚动内容；滚动超过 `8px` 显示分隔线。 |
+| `TemplateLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
 | `ComposeOverlayWindow` | 跨应用工具 | 独立 Compose composition 与生命周期，不嵌入应用页面。 |
 
 路由和底栏切换均使用 `220ms` 水平滑动。顺序向后时内容向左，返回或顺序向前时内容向右。
@@ -91,6 +94,8 @@ TemplateTheme
 
 Tile 行的 `Add` 使用 tonal button，整行与按钮执行同一个系统添加请求。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
+Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，每行显示应用图标、名称、三项百分比、记录时间以及 Enable/Delete 图标操作；参数在窄屏可自然换行，不截断隐藏。
+
 ## 状态呈现
 
 页面只显示 [产品说明](product.md#状态语义) 定义的六个状态词，不在不同页面创建同义文案。
@@ -109,6 +114,8 @@ Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四�
 `Close` 与 `Back` 图标按钮保持至少 `48dp` 触控区域，并分别提供 `Close`、`Back` 无障碍说明。文本选择即时更新草稿；两种顺序草稿的编辑结果分别保留。
 
 `Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
+
+历史列表按时间倒序使用无卡片列表行，显示包名、文本块数量、时间和两行预览。点击后打开全屏 Dialog，并复用文本选择、阅读顺序、编辑和 Copy 内容；编辑页顶部增加 `Save`，只有状态改变时可用。删除使用确认 Dialog。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具，`Save` 保存当前应用配置。
 

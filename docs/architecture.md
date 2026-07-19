@@ -28,7 +28,7 @@ Quick Settings Tiles ───────────────────�
 
 | 模块 | 职责 |
 | --- | --- |
-| `MainActivity` | 承载 Compose；页面触发时将任务移到后台，并在 `onStop` 提交命令。 |
+| `MainActivity` | 承载 Compose；普通入口退到后台，OLED 已保存应用入口启动指定应用，并在 `onStop` 提交命令。 |
 | `ToolServiceController` | 通过弱引用把页面与 Tile 命令交给当前服务实例。 |
 | `ToolAccessibilityService` | 管理连接、命令状态机、目标变化、控制器生命周期和 Tile 刷新。 |
 | `ForegroundWindowResolver` | 从无障碍窗口中选择当前外部 `TYPE_APPLICATION` 目标。 |
@@ -37,14 +37,15 @@ Quick Settings Tiles ───────────────────�
 | `OledShieldController` | 管理遮罩、控制面板、实时配置和按应用保存。 |
 | `ComposeOverlayWindow` | 把 Compose 内容挂载为 `TYPE_ACCESSIBILITY_OVERLAY` 并管理生命周期。 |
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
-| `OledShieldConfigRepository` | 保存默认配置与按包名配置。 |
+| `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
+| `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
 
 ## 命令状态机
 
 ### 页面触发
 
 1. 页面只在 `isServiceConnected` 时启用主操作。
-2. `MainActivity` 保存命令并调用 `moveTaskToBack(true)`。
+2. 普通入口保存命令并调用 `moveTaskToBack(true)`；OLED 已保存应用入口通过 `getLaunchIntentSenderForPackage()` 启动指定包名。
 3. Activity 收到 `onStop` 后提交命令，避免本应用窗口参与目标选择。
 
 ### Tile 触发
@@ -56,9 +57,9 @@ Quick Settings Tiles ───────────────────�
 
 1. 服务关闭现有工具，把状态设为对应的 `*_PREPARING`。
 2. 首次等待 `120ms`，随后每 `120ms` 解析一次前台窗口。
-3. 命令只保存工具类型和基于 `SystemClock.uptimeMillis()` 的截止时间，不保存历史包名。
-4. 解析到外部目标后立即清除待执行命令，并启动对应控制器。
-5. `2,000ms` 内没有目标时恢复 `NONE`，不创建覆盖层。
+3. 普通命令只保存工具类型和两秒截止时间；OLED 已保存应用命令还携带包名、配置和五秒截止时间。
+4. 普通命令接受任一实时外部目标；已保存应用命令只接受指定包名。匹配后清除待执行命令并启动控制器。
+5. 截止时间内没有匹配目标时恢复 `NONE`，不创建覆盖层。
 
 同类工具处于 `PREPARING` 或 `ACTIVE` 时再次提交命令，会取消命令并关闭工具。不同工具命令会先关闭现有工具，再进入新的准备状态。
 
@@ -115,10 +116,14 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 
 `ClipboardManager.setPrimaryClip()` 写入后显示成功 Toast，再通过统一的 `close()` 销毁会话窗口并发布非活动状态。
 
+非空快照先写入 `copy_history.db`，成功后才显示会话。`copy_history_entries` 保存包名、捕获时间、两种草稿和当前顺序，`copy_history_blocks` 保存完整文本块与选择状态并随父记录级联删除。列表只查询最多 `240` 个字符的摘要；打开记录时才加载文本块。跨应用会话与应用内历史 Dialog 共用 `CopySessionUiState` 和编辑面板，窗口宿主分别由服务与 Activity 管理。
+
 ## OLED 配置
 
-配置保存在 `oled_shield_config` SharedPreferences 中。默认键前缀为 `default`，应用键前缀为 `package.<packageName>`；字段为 `opacity`、`width`、`height`、`panel_x`、`panel_y`。
+配置保存在 `oled_shield_config` SharedPreferences 中。默认键前缀为 `default`；应用包名集合键为 `profiles`，应用键前缀为 `profile.<packageName>`，字段为 `opacity`、`width`、`height`、`panel_x`、`panel_y`、`recorded_at`。
 
-读取应用配置时，以 `opacity` 键是否存在判断该应用是否已有配置；没有时返回当前默认配置。所有读写都经过 `OledShieldConfig.normalized()`：三个百分比限制为 `1..100`，面板位置限制为 `0f..1f`。
+每个包名只有一条完整配置。遮罩窗口显示成功后按包名 upsert 当次规范化参数和时间；控制面板 `Save` 只更新参数。没有应用配置时读取当前默认值。三个百分比限制为 `1..100`，面板位置限制为 `0f..1f`。
+
+页面通过 `MAIN` + `LAUNCHER` 包可见性查询当前应用名称、图标和可启动状态，不持久化图标副本。`Enable` 把列表中的包名与配置写入定向命令；服务等待该包名成为前台后才显示遮罩。
 
 遮罩尺寸按显示区域百分比计算并固定在左上角。面板宽度为 `360dp` 且不超过屏幕，估算高度为 `420dp`；拖动位置限制在显示区域内，再保存为可移动范围的相对比例。

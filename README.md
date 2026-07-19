@@ -6,8 +6,8 @@ Android Compose 工具应用，用 `Global Copy` 与 `OLED shield` 两个真实�
 
 | 工具 | 用途 | 启动方式 |
 | --- | --- | --- |
-| `Global Copy` | 读取目标应用当前窗口中的可访问文本，默认生成可编辑的视觉阅读顺序草稿，也可调整文本选择或切换为捕获顺序。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
-| `OLED shield` | 在目标应用上方显示可触摸黑色遮罩，并按应用保存尺寸、透明度和面板位置。 | 详情页 `Show shield`；Quick Settings Tile。 |
+| `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
+| `OLED shield` | 显示可触摸黑色遮罩，按应用记录参数，并从配置列表启动对应应用后再次启用。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
 
 两项工具共用 `Template tools` 无障碍服务。页面入口会先把 Template 移到后台，再对恢复的应用执行工具；Tile 用于在目标应用内快速启动。
 
@@ -24,6 +24,7 @@ Android Compose 工具应用，用 `Global Copy` 与 `OLED shield` 两个真实�
 2. 进入 `Global Copy` 或 `OLED shield` 详情页。
 3. 直接选择页面顶部的主操作；Template 进入后台后，工具作用于恢复的应用。
 4. 如需快捷入口，在详情页选择 Tile 的 `Add`，以后可从目标应用的 Quick Settings 启动。
+5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 
@@ -51,7 +52,7 @@ app/src/main/java/com/wswensw/template/
    ├─ model/           文本与 OLED 领域模型
    ├─ overlay/         Compose 无障碍覆盖层
    ├─ service/         无障碍服务、目标解析和状态
-   ├─ storage/         OLED 配置持久化
+   ├─ storage/         Global Copy 历史与 OLED 配置持久化
    ├─ trigger/         Quick Settings Tile 与添加请求
    └─ ui/              工具页面 ViewModel
 ```

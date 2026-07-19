@@ -22,18 +22,19 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 | 路径 | 修改入口 |
 | --- | --- |
-| `MainActivity.kt` | Activity 生命周期、页面触发后退到后台。 |
-| `ui/TemplateApp.kt` | 导航、底栏、页面接线和 Tile 添加请求。 |
+| `MainActivity.kt` | 普通入口退到后台、指定应用启动和 `onStop` 命令提交。 |
+| `ui/TemplateApp.kt` | 导航、工具页面、历史与配置操作接线。 |
 | `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
-| `ui/ToolScreens.kt` | 两个工具详情页的组件组合。 |
+| `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
 | `tool/service/WindowSnapshotBuilder.kt` | Global Copy 节点遍历和文本快照。 |
-| `tool/model/CopyTextModels.kt` | 复制排序、视觉行与去重。 |
-| `tool/overlay/ComposeOverlayWindow.kt` | Compose 系统窗口与生命周期。 |
-| `tool/overlay/CopySessionController.kt` | Global Copy 覆盖层与剪贴板动作。 |
+| `tool/model/CopyTextModels.kt`、`CopySessionState.kt` | 复制排序、选择、草稿和共享编辑状态。 |
+| `tool/overlay/ComposeOverlayWindow.kt`、`CopySessionController.kt` | 系统窗口生命周期与 Global Copy 共享编辑面板。 |
 | `tool/overlay/OledShieldController.kt` | OLED 遮罩、面板和实时布局。 |
-| `tool/storage/OledShieldConfigRepository.kt` | OLED 默认与按应用配置。 |
+| `tool/storage/CopyHistory*` | Global Copy Room 历史、摘要与完整会话映射。 |
+| `tool/storage/OledShieldConfigRepository.kt` | OLED 默认配置与按包名 profile。 |
+| `tool/ui/` | 历史页、工具 ViewModel、应用名称和图标解析。 |
 | `tool/trigger/` | Tile Service、Tile 状态刷新和添加请求。 |
 
 行为契约先查 [产品说明](product.md)，跨模块与平台契约先查 [系统架构](architecture.md)。
@@ -65,11 +66,13 @@ adb shell am start -n com.wswensw.template/.MainActivity
 | 测试 | 覆盖内容 |
 | --- | --- |
 | `CopyTextSelectionTest` | 捕获顺序、阅读顺序、视觉行、NFKC/空白归一化与去重。 |
+| `CopyHistoryMappingTest` | 历史摘要及文本块、选择、草稿和顺序的持久化映射。 |
 | `OledShieldConfigTest` | OLED 默认值和参数归一化。 |
+| `OledShieldConfigRepositoryTest` | OLED profile upsert、时间、排序、保存和删除。 |
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 
-这些是纯 JVM 领域测试，不能验证 Android 窗口恢复、无障碍服务绑定、`WindowManager.addView`、实际窗口硬件加速、输入法、Tile 收起或厂商系统行为。
+这些是纯 JVM 领域测试，不能验证 Android 窗口恢复、应用图标解析、目标应用启动、无障碍服务绑定、`WindowManager.addView`、输入法、Tile 收起或厂商系统行为。
 
 ## 真机验收
 
@@ -79,10 +82,10 @@ adb shell am start -n com.wswensw.template/.MainActivity
 2. 从一个包含可访问文本的目标应用进入 Template，点击 `Start Global Copy`；确认目标应用恢复、会话显示且服务未断开。
 3. 确认主面板左右 `12dp`、上下 `32dp` 留白；首屏为编辑页，`Reading order` 默认开启且草稿符合视觉阅读顺序。
 4. 编辑两种顺序草稿并往返切换，确认修改分别保留；进入 `Select text` 验证逐项选择、全选、清空和返回后的草稿。
-5. 确认 `Close`/`Back` 图标语义、输入法缩放和空白时禁用 `Copy`；复制后核对剪贴板、成功提示和会话关闭。
+5. 确认 `Close`/`Back`、输入法和空白禁用；复制后检查历史新增，重开后验证 Save、Copy 和 Delete。
 6. 返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开。
-7. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield` 和按应用恢复。
-8. 分别从 Quick Settings 触发两个 Tile，确认 System UI 收起后工具作用于原目标。
+7. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield`，并检查 Saved apps 的图标、参数和时间。
+8. 从 Saved apps 执行 Enable/Delete，确认只对指定应用显示记录参数；再验证两个 Tile 仍作用于原目标。
 9. 在 `Preparing` 和 `Active` 状态分别连续触发同类 Tile，确认命令取消或活动工具关闭，且没有重复窗口。
 10. 依次快速触发两个不同 Tile，确认前一个工具关闭，最终只显示后触发的工具。
 11. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
@@ -125,8 +128,8 @@ adb exec-out uiautomator dump /dev/tty
 | 点击工具后服务崩溃 | 栈是否指向 `ComposeOverlayWindow` 或 `WindowManager.addView`。 | 直接使用 `AccessibilityService` 的 `WindowManager` 与资源指标；不要从无 Display 的服务 Context 直接调用 `createWindowContext()`。 |
 | Global Copy 列表持续滑动卡顿 | 挂载后的 `ComposeView.isHardwareAccelerated` 是否为 `true`。 | `ComposeOverlayWindow` 必须在 `addView` 前统一设置 `FLAG_HARDWARE_ACCELERATED`。 |
 | Tile 长时间 `Preparing` | 当前 root 是否仍为 System UI，是否存在外部 `TYPE_APPLICATION` 窗口。 | 目标在面板收起后实时解析，命令两秒超时。 |
-| Global Copy 没有会话 | 目标节点是否可见、非密码、有边界和非空可访问文本。 | 空快照直接结束，不创建空覆盖层。 |
-| OLED 参数未恢复 | 包名键是否存在 `opacity`，保存是否发生在控制面板 `Save`。 | 应用配置不存在时读取当前默认值。 |
+| Global Copy 没有会话 | 节点是否有效，或 `copy_history.db` 写入是否失败。 | 空快照直接结束；非空快照保存成功后才显示会话。 |
+| OLED 参数未恢复 | `profiles` 是否包含包名，profile 六个字段是否完整。 | 应用 profile 不存在时读取当前默认值。 |
 | 打开 Template 后覆盖层关闭 | 本应用是否成为活动或焦点 `TYPE_APPLICATION` 窗口。 | 这是产品关闭规则；仅覆盖层事件不能触发关闭。 |
 
 ## 参考旧应用
