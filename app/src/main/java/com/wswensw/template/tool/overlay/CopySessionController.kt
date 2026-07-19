@@ -52,57 +52,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 import com.wswensw.template.tool.model.CopyTextBlock
-import com.wswensw.template.tool.model.CopyTextOrder
-import com.wswensw.template.tool.model.CopyTextSelection
+import com.wswensw.template.tool.model.CopySessionScreen
+import com.wswensw.template.tool.model.CopySessionUiState
 import com.wswensw.template.tool.model.TextSnapshot
+import com.wswensw.template.tool.model.initialCopySessionUiState
 import com.wswensw.template.ui.TemplateTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-
-internal enum class CopySessionScreen {
-    EDITOR,
-    TEXT_SELECTION,
-}
-
-internal data class CopySessionUiState(
-    val packageName: String = "",
-    val blocks: List<CopyTextBlock> = emptyList(),
-    val selectedIds: Set<String> = emptySet(),
-    val screen: CopySessionScreen = CopySessionScreen.EDITOR,
-    val captureDraftText: String = "",
-    val reorderedDraftText: String = "",
-    val useReadingOrder: Boolean = true,
-) {
-    val currentDraftText: String
-        get() = if (useReadingOrder) reorderedDraftText else captureDraftText
-
-    fun updateCurrentDraft(text: String): CopySessionUiState = if (useReadingOrder) {
-        copy(reorderedDraftText = text)
-    } else {
-        copy(captureDraftText = text)
-    }
-}
-
-internal fun TextSnapshot.initialCopySessionUiState(): CopySessionUiState {
-    val selectedIds = blocks.mapTo(linkedSetOf(), CopyTextBlock::id)
-    return CopySessionUiState(
-        packageName = packageName,
-        blocks = blocks,
-        selectedIds = selectedIds,
-        captureDraftText = CopyTextSelection.selected(
-            blocks = blocks,
-            selectedIds = selectedIds,
-            order = CopyTextOrder.CAPTURE,
-        ),
-        reorderedDraftText = CopyTextSelection.selected(
-            blocks = blocks,
-            selectedIds = selectedIds,
-            order = CopyTextOrder.READING,
-        ),
-    )
-}
 
 class CopySessionController(
     private val service: AccessibilityService,
@@ -120,8 +78,9 @@ class CopySessionController(
         overlayWindow = host
         host.show(copyOverlayLayoutParams()) {
             TemplateTheme(useDynamicColor = false) {
-                CopySessionOverlay(
-                    state = uiState,
+                val state by uiState.collectAsState()
+                CopySessionPanel(
+                    state = state,
                     onToggle = ::toggle,
                     onToggleAll = ::toggleAll,
                     onCopy = ::copy,
@@ -151,35 +110,12 @@ class CopySessionController(
     }
 
     private fun toggle(id: String) {
-        mutableUiState.update { state ->
-            state.withSelection(
-                state.selectedIds.toMutableSet().also { selected ->
-                    if (!selected.add(id)) selected.remove(id)
-                },
-            )
-        }
+        mutableUiState.update { it.toggleSelection(id) }
     }
 
     private fun toggleAll() {
-        mutableUiState.update { state ->
-            val allIds = state.blocks.mapTo(linkedSetOf(), CopyTextBlock::id)
-            state.withSelection(if (state.selectedIds.size == allIds.size) emptySet() else allIds)
-        }
+        mutableUiState.update(CopySessionUiState::toggleAll)
     }
-
-    private fun CopySessionUiState.withSelection(selectedIds: Set<String>): CopySessionUiState = copy(
-        selectedIds = selectedIds,
-        captureDraftText = CopyTextSelection.selected(
-            blocks = blocks,
-            selectedIds = selectedIds,
-            order = CopyTextOrder.CAPTURE,
-        ),
-        reorderedDraftText = CopyTextSelection.selected(
-            blocks = blocks,
-            selectedIds = selectedIds,
-            order = CopyTextOrder.READING,
-        ),
-    )
 
     private fun openTextSelection() {
         mutableUiState.update { it.copy(screen = CopySessionScreen.TEXT_SELECTION) }
@@ -226,8 +162,8 @@ class CopySessionController(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CopySessionOverlay(
-    state: StateFlow<CopySessionUiState>,
+internal fun CopySessionPanel(
+    state: CopySessionUiState,
     onToggle: (String) -> Unit,
     onToggleAll: () -> Unit,
     onCopy: () -> Unit,
@@ -236,10 +172,12 @@ private fun CopySessionOverlay(
     onReadingOrderChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onClose: () -> Unit,
+    onSave: (() -> Unit)? = null,
+    saveEnabled: Boolean = true,
+    title: String = "Global Copy",
 ) {
-    val uiState by state.collectAsState()
-    val selectedCount = uiState.selectedIds.size
-    val isSelectingText = uiState.screen == CopySessionScreen.TEXT_SELECTION
+    val selectedCount = state.selectedIds.size
+    val isSelectingText = state.screen == CopySessionScreen.TEXT_SELECTION
 
     Box(
         modifier = Modifier
@@ -258,7 +196,7 @@ private fun CopySessionOverlay(
                     TopAppBar(
                         title = {
                             Text(
-                                text = if (isSelectingText) "Select text" else "Global Copy",
+                                text = if (isSelectingText) "Select text" else title,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -280,7 +218,14 @@ private fun CopySessionOverlay(
                         actions = {
                             if (isSelectingText) {
                                 TextButton(onClick = onToggleAll) {
-                                    Text(if (selectedCount == uiState.blocks.size) "Clear" else "Select all")
+                                    Text(if (selectedCount == state.blocks.size) "Clear" else "Select all")
+                                }
+                            } else if (onSave != null) {
+                                TextButton(
+                                    enabled = saveEnabled,
+                                    onClick = onSave,
+                                ) {
+                                    Text("Save")
                                 }
                             }
                         },
@@ -289,7 +234,7 @@ private fun CopySessionOverlay(
                 bottomBar = {
                     if (!isSelectingText) {
                         CopyBottomBar(
-                            enabled = uiState.currentDraftText.isNotBlank(),
+                            enabled = state.currentDraftText.isNotBlank(),
                             onCopy = onCopy,
                         )
                     }
@@ -297,8 +242,8 @@ private fun CopySessionOverlay(
             ) { innerPadding ->
                 if (isSelectingText) {
                     CopyTextSelectionList(
-                        blocks = uiState.blocks,
-                        selectedIds = uiState.selectedIds,
+                        blocks = state.blocks,
+                        selectedIds = state.selectedIds,
                         onToggle = onToggle,
                         modifier = Modifier
                             .fillMaxSize()
@@ -306,9 +251,9 @@ private fun CopySessionOverlay(
                     )
                 } else {
                     CopyTextEditor(
-                        draftText = uiState.currentDraftText,
+                        draftText = state.currentDraftText,
                         selectedCount = selectedCount,
-                        useReadingOrder = uiState.useReadingOrder,
+                        useReadingOrder = state.useReadingOrder,
                         onDraftChange = onDraftChange,
                         onReadingOrderChange = onReadingOrderChange,
                         onOpenTextSelection = onOpenTextSelection,

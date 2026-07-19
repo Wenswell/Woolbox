@@ -1,9 +1,11 @@
 package com.wswensw.template.tool.overlay
 
 import com.wswensw.template.tool.model.CopyTextBlock
+import com.wswensw.template.tool.model.CopySessionScreen
 import com.wswensw.template.tool.model.ScreenBounds
 import com.wswensw.template.tool.model.TextSnapshot
 import com.wswensw.template.tool.model.TextSource
+import com.wswensw.template.tool.model.initialCopySessionUiState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
