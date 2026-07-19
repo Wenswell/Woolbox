@@ -76,12 +76,14 @@ adb shell am start -n com.wswensw.template/.MainActivity
 
 1. 启用 `Template tools`，确认两个详情页为 `Connected`，主操作可用。
 2. 从一个包含可访问文本的目标应用进入 Template，点击 `Start Global Copy`；确认目标应用恢复、会话显示且服务未断开。
-3. 验证文本选择、`Copy capture`、`Copy reading`、编辑复制和剪贴板结果。
-4. 返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开。
-5. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield` 和按应用恢复。
-6. 分别从 Quick Settings 触发两个 Tile，确认 System UI 收起后工具作用于原目标。
-7. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
-8. 旋转屏幕或改变显示尺寸，确认 OLED 遮罩和面板按比例重算。
+3. 确认主面板左右 `12dp`、上下 `32dp` 留白，四周可辨认目标应用；文本行包含序号、正文和元数据且没有空副行。
+4. 验证选择、`Copy capture`、`Copy reordered` 和剪贴板结果；两种直接复制均显示 `Copied to clipboard.`，随后关闭主面板。
+5. 重新启动会话并进入编辑模式，切换 `Reading order` 并核对草稿；复制后确认提示成功并关闭会话。
+6. 返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开。
+7. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield` 和按应用恢复。
+8. 分别从 Quick Settings 触发两个 Tile，确认 System UI 收起后工具作用于原目标。
+9. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
+10. 旋转屏幕或改变显示尺寸，确认 OLED 遮罩和面板按比例重算。
 
 ## 设备诊断
 

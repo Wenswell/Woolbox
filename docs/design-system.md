@@ -2,7 +2,7 @@
 
 ## 设计目标
 
-Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、状态和配置；全屏复制会话与 OLED 控制面板属于系统覆盖层，不复用应用页面 Scaffold。
+Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、状态和配置；Global Copy 会话面板与 OLED 控制面板属于系统覆盖层，不复用应用页面骨架。
 
 基础技术为 Material 3、动态色和 edge-to-edge。组件优先表达操作层级，不使用装饰性卡片、营销式区块或与功能无关的视觉元素。
 
@@ -69,6 +69,8 @@ TemplateTheme
 | 设置分组圆角 | `16dp` |
 | OLED 控制面板圆角 | `12dp` |
 | OLED 控制面板最大宽度 | `360dp` |
+| Global Copy 面板外边距 | 水平 `12dp`、垂直 `32dp` |
+| Global Copy 面板圆角 | `16dp` |
 
 - 页面背景使用 `surface`。
 - 设置分组使用 `surfaceContainerLow`。
@@ -100,7 +102,11 @@ Tile 行的 `Add` 使用 tonal button，整行与按钮执行同一个系统添�
 
 ## 覆盖层交互
 
-Global Copy 使用全屏 Scaffold：顶部提供 `Close`/`Back` 与全选切换，底部提供两个复制主动作和编辑入口。文本块使用复选框与整行点击，编辑模式使用全屏文本框。
+Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四周必须能辨认目标应用。面板顶部提供 `Close`/`Back` 与全选切换，底部提供 `Copy capture`、`Copy reordered` 和编辑入口。
+
+文本块行使用 `48dp` 复选框与整行点击。正文以 `captureOrder` 显示从 `0` 开始的序号并允许四行；副文本紧接正文，仅显示 `source · left,top-right,bottom`，不显示字段名。编辑模式提供 `Reading order` 复选框和占满剩余空间的文本框。
+
+任一复制动作写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具，`Save` 保存当前应用配置。
 

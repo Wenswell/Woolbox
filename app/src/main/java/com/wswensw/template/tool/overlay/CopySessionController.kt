@@ -7,6 +7,8 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +40,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.tool.model.CopyTextBlock
@@ -59,6 +64,9 @@ private data class CopySessionUiState(
     val selectedIds: Set<String> = emptySet(),
     val mode: CopySessionMode = CopySessionMode.SELECTING,
     val draftText: String = "",
+    val captureDraftText: String = "",
+    val reorderedDraftText: String = "",
+    val useReadingOrder: Boolean = false,
 )
 
 class CopySessionController(
@@ -88,6 +96,7 @@ class CopySessionController(
                     onCopy = ::copy,
                     onEdit = ::edit,
                     onDraftChange = ::updateDraft,
+                    onReadingOrderChange = ::setReadingOrder,
                     onBack = ::back,
                 )
             }
@@ -141,24 +150,47 @@ class CopySessionController(
 
         val clipboard = service.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("Global Copy", text))
+        Toast.makeText(
+            service,
+            "Copied to clipboard.",
+            Toast.LENGTH_SHORT,
+        ).show()
         close()
     }
 
     private fun edit() {
         mutableUiState.update { state ->
+            val captureText = CopyTextSelection.selected(
+                blocks = state.blocks,
+                selectedIds = state.selectedIds,
+                order = CopyTextOrder.CAPTURE,
+            )
+            val reorderedText = CopyTextSelection.selected(
+                blocks = state.blocks,
+                selectedIds = state.selectedIds,
+                order = CopyTextOrder.READING,
+            )
             state.copy(
                 mode = CopySessionMode.EDITING,
-                draftText = CopyTextSelection.selected(
-                    blocks = state.blocks,
-                    selectedIds = state.selectedIds,
-                    order = CopyTextOrder.CAPTURE,
-                ),
+                draftText = captureText,
+                captureDraftText = captureText,
+                reorderedDraftText = reorderedText,
+                useReadingOrder = false,
             )
         }
     }
 
     private fun updateDraft(text: String) {
         mutableUiState.update { it.copy(draftText = text) }
+    }
+
+    private fun setReadingOrder(enabled: Boolean) {
+        mutableUiState.update { state ->
+            state.copy(
+                draftText = if (enabled) state.reorderedDraftText else state.captureDraftText,
+                useReadingOrder = enabled,
+            )
+        }
     }
 
     private fun back() {
@@ -192,131 +224,165 @@ private fun CopySessionOverlay(
     onCopy: (CopyTextOrder) -> Unit,
     onEdit: () -> Unit,
     onDraftChange: (String) -> Unit,
+    onReadingOrderChange: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val uiState by state.collectAsState()
     val selectedCount = uiState.selectedIds.size
     val isEditing = uiState.mode == CopySessionMode.EDITING
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = if (isEditing) "Edit copy" else "Global Copy",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(OverlayScrim)
+            .padding(horizontal = 12.dp, vertical = 32.dp),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = 8.dp,
+        ) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = if (isEditing) "Edit copy" else "Global Copy",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        navigationIcon = {
+                            TextButton(onClick = onBack) {
+                                Text(if (isEditing) "Back" else "Close")
+                            }
+                        },
+                        actions = {
+                            if (!isEditing) {
+                                TextButton(onClick = onToggleAll) {
+                                    Text(
+                                        if (selectedCount == uiState.blocks.size) "Clear" else "Select all",
+                                    )
+                                }
+                            }
+                        },
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(if (isEditing) "Back" else "Close")
-                    }
-                },
-                actions = {
-                    if (!isEditing) {
-                        TextButton(onClick = onToggleAll) {
-                            Text(
-                                if (selectedCount == uiState.blocks.size) "Clear" else "Select all",
-                            )
+                bottomBar = {
+                    Surface(shadowElevation = 4.dp) {
+                        if (isEditing) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                Button(onClick = { onCopy(CopyTextOrder.CAPTURE) }) {
+                                    Text("Copy")
+                                }
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = "$selectedCount selected",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Button(
+                                        modifier = Modifier.weight(1f),
+                                        enabled = selectedCount > 0,
+                                        onClick = { onCopy(CopyTextOrder.CAPTURE) },
+                                    ) {
+                                        Text("Copy capture")
+                                    }
+                                    FilledTonalButton(
+                                        modifier = Modifier.weight(1f),
+                                        enabled = selectedCount > 0,
+                                        onClick = { onCopy(CopyTextOrder.READING) },
+                                    ) {
+                                        Text("Copy reordered")
+                                    }
+                                }
+                                TextButton(
+                                    modifier = Modifier.align(Alignment.End),
+                                    enabled = selectedCount > 0,
+                                    onClick = onEdit,
+                                ) {
+                                    Text("Edit before copy")
+                                }
+                            }
                         }
                     }
                 },
-            )
-        },
-        bottomBar = {
-            Surface(shadowElevation = 4.dp) {
+            ) { innerPadding ->
                 if (isEditing) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        Button(onClick = { onCopy(CopyTextOrder.CAPTURE) }) {
-                            Text("Copy")
-                        }
-                    }
-                } else {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = "$selectedCount selected",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = { onCopy(CopyTextOrder.CAPTURE) },
-                            ) {
-                                Text("Copy capture")
-                            }
-                            FilledTonalButton(
-                                modifier = Modifier.weight(1f),
-                                onClick = { onCopy(CopyTextOrder.READING) },
-                            ) {
-                                Text("Copy reading")
-                            }
-                        }
-                        TextButton(
-                            modifier = Modifier.align(Alignment.End),
-                            onClick = onEdit,
-                        ) {
-                            Text("Edit before copy")
-                        }
-                    }
-                }
-            }
-        },
-    ) { innerPadding ->
-        if (isEditing) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = uiState.draftText,
-                    onValueChange = onDraftChange,
-                    modifier = Modifier.fillMaxSize(),
-                    label = { Text("Text") },
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(vertical = 8.dp),
-            ) {
-                if (uiState.blocks.isEmpty()) {
-                    item {
-                        Box(
                             modifier = Modifier
-                                .fillParentMaxSize()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center,
+                                .fillMaxWidth()
+                                .clickable {
+                                    onReadingOrderChange(!uiState.useReadingOrder)
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("No accessible text in this window.")
+                            Checkbox(
+                                checked = uiState.useReadingOrder,
+                                onCheckedChange = onReadingOrderChange,
+                            )
+                            Text("Reading order")
                         }
+                        OutlinedTextField(
+                            value = uiState.draftText,
+                            onValueChange = onDraftChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            label = { Text("Text") },
+                        )
                     }
                 } else {
-                    items(uiState.blocks, key = CopyTextBlock::id) { block ->
-                        CopyTextRow(
-                            block = block,
-                            selected = block.id in uiState.selectedIds,
-                            onToggle = { onToggle(block.id) },
-                        )
-                        HorizontalDivider()
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                    ) {
+                        if (uiState.blocks.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillParentMaxSize()
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text("No accessible text in this window.")
+                                }
+                            }
+                        } else {
+                            items(uiState.blocks, key = CopyTextBlock::id) { block ->
+                                CopyTextRow(
+                                    block = block,
+                                    selected = block.id in uiState.selectedIds,
+                                    onToggle = { onToggle(block.id) },
+                                )
+                                HorizontalDivider()
+                            }
+                        }
                     }
                 }
             }
@@ -334,19 +400,38 @@ private fun CopyTextRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(start = 8.dp, top = 8.dp, end = 12.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Checkbox(
             checked = selected,
             onCheckedChange = { onToggle() },
         )
-        Text(
-            text = block.text,
+        Column(
             modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyLarge,
-        )
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "${block.captureOrder}. ${block.text.trim()}",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = block.metadataSummary(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
     }
 }
+
+private fun CopyTextBlock.metadataSummary(): String =
+    "${source.name.lowercase()} · ${bounds.left},${bounds.top}-${bounds.right},${bounds.bottom}"
+
+private val OverlayScrim = Color(0xB40C1018)

@@ -95,7 +95,8 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 - `show` 前状态必须为空；`addView` 失败时立即销毁生命周期所有者并继续抛出原始错误。
 - 添加成功后生命周期进入 `RESUMED`。
 - `dismiss` 使用 `removeViewImmediate`，随后进入 `DESTROYED` 并清空引用。
-- Copy 会话使用可聚焦全屏窗口，以支持编辑输入；OLED 遮罩和面板保持非焦点窗口。
+- Copy 会话使用可聚焦全屏透明窗口，以支持同一窗口内编辑输入；窗口内的实体面板水平内缩 `12dp`、垂直内缩 `32dp`，外层 scrim 透出目标应用。
+- OLED 遮罩和面板保持非焦点窗口。
 
 ## Global Copy 数据管线
 
@@ -105,7 +106,9 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 4. 按窗口、来源、NFKC/空白归一化文本和边界去重。
 5. 按 `top`、`left`、`bottom`、`right`、归一化文本排序，生成稳定 `captureOrder`。
 
-复制阶段按“来源 + 归一化文本”再次去重。捕获顺序逐块换行；阅读顺序先按几何位置分视觉行，行内从左到右用空格连接。
+复制阶段按“来源 + 归一化文本”再次去重。捕获顺序逐块换行；阅读顺序先按几何位置分视觉行，行内从左到右用空格连接。编辑模式同时生成两种草稿，`Reading order` 在原始草稿之间切换。
+
+`ClipboardManager.setPrimaryClip()` 写入后显示成功 Toast，再通过统一的 `close()` 销毁会话窗口并发布非活动状态。
 
 ## OLED 配置
 
