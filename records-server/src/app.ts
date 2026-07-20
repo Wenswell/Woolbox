@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
+import { resolve } from "node:path";
 import { openRecordsDatabase } from "./database.js";
 import {
   ApiError,
@@ -15,12 +17,17 @@ export interface BuildAppOptions {
   databaseFile: string;
   now?: () => number;
   logger?: boolean;
+  webRoot?: string;
 }
 
 export function buildApp(options: BuildAppOptions) {
   const app = Fastify({ logger: options.logger ?? false });
   const { db, sqlite } = openRecordsDatabase(options.databaseFile);
   const records = new RecordsService(db, options.now);
+
+  if (options.webRoot) {
+    app.register(fastifyStatic, { root: resolve(options.webRoot), wildcard: false });
+  }
 
   app.addHook("onClose", (_instance, done) => {
     sqlite.close();

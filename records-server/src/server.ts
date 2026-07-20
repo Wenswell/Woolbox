@@ -8,6 +8,7 @@ if (!Number.isSafeInteger(portValue) || portValue < 1 || portValue > 65535) {
 const app = buildApp({
   databaseFile: process.env.RECORDS_DATABASE_PATH ?? "/srv/records/records.sqlite",
   logger: true,
+  webRoot: process.env.RECORDS_WEB_ROOT ?? "./dist/web",
 });
 
 await app.listen({ host: "127.0.0.1", port: portValue });

@@ -8,24 +8,36 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "rm -rf ./dist && tsc --project tsconfig.build.json && cp -R drizzle dist/drizzle",
+    "build": "rm -rf ./dist && tsc --project tsconfig.build.json && vite build && cp -R drizzle dist/drizzle",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/src/server.js",
-    "test": "vitest run",
-    "test:web": "vitest run web",
+    "test": "vitest run --exclude 'web/**'",
+    "test:web": "vitest run --config vite.config.ts web/src/*.test.tsx",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.0",
+    "@tanstack/react-table": "^8.21.3",
     "better-sqlite3": "12.11.1",
     "drizzle-orm": "0.45.2",
-    "fastify": "5.10.0"
+    "fastify": "5.10.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-hook-form": "^7.82.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
     "drizzle-kit": "0.31.10",
+    "jsdom": "^29.1.1",
     "tsx": "4.23.1",
     "typescript": "7.0.2",
+    "vite": "^8.1.5",
     "vitest": "4.1.10"
   }
 }
