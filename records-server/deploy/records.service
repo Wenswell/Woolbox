@@ -6,12 +6,12 @@ After=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/ravvss/records
-Environment="PATH=/home/ravvss/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/ravvss/.local/node/bin:/home/ravvss/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin"
 Environment=NODE_ENV=production
 Environment=PORT=4320
 Environment=RECORDS_DATABASE_PATH=/srv/records/records.sqlite
 Environment=RECORDS_WEB_ROOT=/home/ravvss/records/dist/web
-ExecStart=/usr/bin/env node dist/src/server.js
+ExecStart=/home/ravvss/.local/node/bin/node dist/src/server.js
 Restart=on-failure
 RestartSec=3s
 KillSignal=SIGTERM

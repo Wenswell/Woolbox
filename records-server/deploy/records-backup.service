@@ -4,6 +4,6 @@ Description=Back up Records SQLite database
 [Service]
 Type=oneshot
 WorkingDirectory=/home/ravvss/records
-Environment="PATH=/home/ravvss/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/bin/env node scripts/backup.mjs
+Environment="PATH=/home/ravvss/.local/node/bin:/home/ravvss/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/ravvss/.local/node/bin/node scripts/backup.mjs
 UMask=0077

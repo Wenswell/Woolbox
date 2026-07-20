@@ -10,6 +10,8 @@ The service runs as `ravvss`, listens on `127.0.0.1:4320`, and stores data outsi
 | `~/.config/systemd/user/records.service` | Server unit. |
 | `~/.config/systemd/user/records-backup.{service,timer}` | Backup units. |
 
+The production runtime is the current Node 22 LTS installed at `~/.local/node`. This keeps native module installation independent from the host's non-LTS Node release.
+
 ## Release
 
 From the app repository:
