@@ -23,10 +23,10 @@ Quick Settings Tiles ───────────────────�
                                    ▼
                         ComposeOverlayWindow
 
-Records pages ──> RecordsViewModel ──> RecordRepository ──> records.db
+Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API ──> Records server SQLite
 ```
 
-一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。工具页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。Records 走独立的应用内 Room 数据流，不提交工具命令。
+一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。工具页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。Records 不提交工具命令，Android 与 PC 管理页共享服务端 SQLite。
 
 ## 模块职责
 
@@ -44,7 +44,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ──> records.
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 组合记录项与今天流水，并通过独立 Room 数据库执行校验和事务写入。 |
+| `RecordsViewModel` / `RecordRepository` | 组合今天流水和记录项状态，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。 |
 
 ## 命令状态机
 
@@ -129,7 +129,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 ## Records 数据
 
-`RecordDatabase` 使用应用 Context 创建独立的 `records.db`，当前 schema `version = 1`：
+`records-server` 使用 Drizzle ORM 管理服务端 SQLite 迁移；生产数据库固定为 `/srv/records/records.sqlite`，服务监听 `127.0.0.1:4320`，由 Caddy 在 `/apps/records` 路由提供 HTTPS 和 Basic Auth。数据不放入发布目录。
 
 | 表 | 关键字段与约束 |
 | --- | --- |
@@ -137,9 +137,11 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | `record_windows` | 保存记录项推荐区间的起止分钟；`itemId` 建索引并随父项级联删除。 |
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和正数值；索引 `itemId` 与 `(localDate, localMinute)`，并随父项级联删除。 |
 
-`RecordRepository.saveItem()` 在事务内校验并写入记录项及完整时间段集合。名称在活跃和归档项中忽略大小写唯一；已有流水后，计量类型和单位必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。
+服务端在事务内校验并写入记录项及完整时间段集合。名称在活跃和归档项中忽略大小写唯一；已有流水后，计量类型和单位必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。App 不再创建 `RecordDatabase`、Room DAO 或本地记录文件。
 
-新增流水以 epoch milliseconds 保存发生时刻，并按写入时的系统时区固化 ISO 本地日期与日内分钟。日期查询和今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、单位和类型联表展示。
+新增或编辑流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、单位和类型联表展示。
+
+服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、单条流水编辑、流水批量删除，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和三张表。
 
 ## OLED 配置
 

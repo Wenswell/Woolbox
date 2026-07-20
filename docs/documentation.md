@@ -38,7 +38,7 @@
 
 ## 当前基线
 
-仓库文档按上述长期结构维护。`Global Copy`、`OLED shield`、`Records` 当前能力、Tile 触发、应用内触发及覆盖层 Context 边界均归入对应主题；进行中的 [Records 在线化计划](records-remote-plan.md) 在功能收尾后删除。
+仓库文档按上述长期结构维护。`Global Copy`、`OLED shield`、`Records` 当前能力、Tile 触发、应用内触发及覆盖层 Context 边界均归入对应主题。
 
 基线要求：
 

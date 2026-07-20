@@ -9,7 +9,8 @@
 | Compose BOM | `2026.05.01` |
 | Java | Android Studio JBR `17` |
 | Android SDK | `compileSdk 36.1`、`minSdk 34`、`targetSdk 36` |
-| 数据与测试 | Room `2.8.4`、KSP `2.3.10`、JUnit `4.13.2` |
+| Android 数据与测试 | OkHttp `4.12.0`、Room `2.8.4`、KSP `2.3.10`、JUnit `4.13.2` |
+| Records server | Node `22+`、pnpm `11.11.0`、Fastify `5.10.0`、Drizzle ORM `0.45.2`、SQLite |
 
 项目使用 Gradle Wrapper。标准 macOS 环境变量：
 
@@ -26,7 +27,9 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records FAB/Snackbar 及页面接线。 |
 | `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
-| `record/{model,data,ui}/` | 记录规则、`records.db`、Repository、ViewModel、今天流水、记录 Sheet 和记录项表单。 |
+| `record/{model,data,ui}/` | 记录规则、HTTPS Repository、Keystore 凭据、ViewModel、今天流水、记录 Sheet 和记录项表单。 |
+| `records-server/src/`、`drizzle/` | Fastify API、服务端规则、SQLite schema 和迁移。 |
+| `records-server/web/`、`deploy/` | PC 管理页、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
 | `tool/service/WindowSnapshotBuilder.kt` | Global Copy 节点遍历和文本快照。 |
@@ -55,6 +58,15 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 git diff --check
 ```
 
+Records server 定向验证：
+
+```bash
+cd records-server
+pnpm typecheck && pnpm test && pnpm test:web && pnpm build
+```
+
+部署路径、`127.0.0.1:4320` 服务、备份与恢复检查见 [`records-server/deploy/README.md`](../records-server/deploy/README.md)。
+
 安装到已连接设备：
 
 ```bash
@@ -73,8 +85,10 @@ adb shell am start -n com.wswensw.template/.MainActivity
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化与正数校验、推荐排序、跨午夜时间段和十进制步进。 |
+| `records-server/test/api.test.ts` | 空库迁移、服务端数据规则、事务、筛选和批量 API。 |
+| `records-server/web/src/App.test.tsx` | 管理页筛选、流水编辑/批删和记录项归档/恢复。 |
 
-这些是纯 JVM 领域测试，不能验证 Room 查询与持久化，也不能验证 Android 窗口恢复、应用图标解析、目标应用启动、无障碍服务绑定、`WindowManager.addView`、输入法、Tile 收起或厂商系统行为。
+JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 
 ## 真机验收
 
@@ -94,7 +108,7 @@ adb shell am start -n com.wswensw.template/.MainActivity
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 在 Records 创建记录项并记录正数值，确认今天流水即时更新、Undo 只删除该条记录，重启后记录项和未撤销流水仍存在。
+15. 配置 Records 凭据，创建记录项并记录正数值；确认 PC 刷新可见，Undo 只删除该条远端流水，断网失败后服务端数据不变，恢复网络并 Retry 可重新读取。
 
 ## 设备诊断
 

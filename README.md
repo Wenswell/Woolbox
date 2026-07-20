@@ -1,6 +1,6 @@
 # Template
 
-Android Compose 工具应用，提供跨应用无障碍工具与本地量化记录，用真实场景沉淀页面结构、通用组件、持久化和覆盖层能力。
+Android Compose 工具应用，提供跨应用无障碍工具与在线量化记录，用真实场景沉淀页面结构、通用组件、持久化和覆盖层能力。
 
 ## 当前能力
 
@@ -10,7 +10,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与本地量化记�
 | `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Template，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
 | `Records` | 创建量化记录项，按当前时间搜索或推荐，并记录今天的数值或时长。 | `Records` 底栏；右下角 `Record`。 |
 
-`Global Copy` 与 OLED 的跨应用模式共用 `Template tools` 无障碍服务。OLED 没有服务时可在 Template 内直接使用；服务连接后，页面入口会先把 Template 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 使用独立的本地 Room 数据库，不依赖无障碍授权。
+`Global Copy` 与 OLED 的跨应用模式共用 `Template tools` 无障碍服务。OLED 没有服务时可在 Template 内直接使用；服务连接后，页面入口会先把 Template 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。
 
 ## 使用前提
 
@@ -27,7 +27,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与本地量化记�
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
-量化记录从 `Records` 进入；首次使用先创建记录项，随后通过 `Record` 选择项目并确认数值。
+量化记录从 `Records` 进入；首次使用先在 `Setting` 配置服务端 Basic Auth 凭据，再创建记录项并通过 `Record` 选择项目确认数值。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 
@@ -50,7 +50,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与本地量化记�
 
 ```text
 app/src/main/java/com/wswensw/template/
-├─ record/             记录领域规则、Room 数据层和 Compose 页面
+├─ record/             记录领域规则、网络 Repository 和 Compose 页面
 ├─ ui/                 应用页面、主题和模板组件
 └─ tool/
    ├─ model/           文本与 OLED 领域模型
@@ -60,6 +60,8 @@ app/src/main/java/com/wswensw/template/
    ├─ trigger/         Quick Settings Tile 与添加请求
    └─ ui/              工具页面 ViewModel
 ```
+
+`records-server/` 提供 Fastify API、PC 管理页、SQLite 迁移和部署脚本。
 
 模块协作、窗口选择和覆盖层 Context 约束见 [系统架构](docs/architecture.md)。
 
@@ -92,4 +94,4 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 | [设计系统](docs/design-system.md) | 页面结构、组件职责、视觉和交互规则。 |
 | [开发指南](docs/development.md) | 环境、源码路径、验证、设备验收和排障。 |
 | [文档维护](docs/documentation.md) | 文档分工、同步触发条件和质量标准。 |
-| [Records 在线化计划](docs/records-remote-plan.md) | 当前迁移的范围、顺序和验收；完成后删除。 |
+| `records-server/deploy/README.md` | 服务端构建、systemd、备份和恢复检查。 |
