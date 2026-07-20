@@ -13,6 +13,8 @@ import com.wswensw.template.R
 fun SettingScreen(
     themeMode: TemplateThemeMode,
     onThemeModeChange: (TemplateThemeMode) -> Unit,
+    recordsConnection: String,
+    onOpenRecordsConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
@@ -29,6 +31,15 @@ fun SettingScreen(
                 subtitle = themeMode.label,
                 iconRes = R.drawable.ic_color_lens_24,
                 onClick = { showThemeDialog = true },
+            )
+        }
+
+        TemplateSection(title = "Records") {
+            TemplateListItem(
+                title = "Connection",
+                subtitle = recordsConnection,
+                iconRes = R.drawable.ic_records_24,
+                onClick = onOpenRecordsConnection,
             )
         }
 

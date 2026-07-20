@@ -28,6 +28,8 @@ fun RecordsScreen(
     state: RecordsUiState,
     onManage: () -> Unit,
     onCreateItem: () -> Unit,
+    onConfigureConnection: () -> Unit,
+    onRetry: () -> Unit,
     showRecordSheet: Boolean,
     onDismissRecordSheet: () -> Unit,
     onRecord: (RecordItem, Double, (String?) -> Unit) -> Unit,
@@ -54,6 +56,21 @@ fun RecordsScreen(
 
         when {
             state.isLoading -> item { CircularProgressIndicator() }
+            state.error != null -> item {
+                Text(
+                    text = state.error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+                Spacer(Modifier.height(16.dp))
+                TemplatePrimaryAction(
+                    label = if (state.connection.isConfigured) "Retry" else "Configure connection",
+                    iconRes = R.drawable.ic_records_24,
+                    enabled = true,
+                    onClick = if (state.connection.isConfigured) onRetry else onConfigureConnection,
+                )
+            }
             state.activeItems.isEmpty() -> {
                 item {
                     Text(

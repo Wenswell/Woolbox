@@ -1,188 +1,277 @@
 package com.wswensw.template.record.data
 
-import androidx.room.withTransaction
+import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
 import com.wswensw.template.record.model.RecordValidationException
+import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
 import com.wswensw.template.record.model.validated
+import java.nio.charset.StandardCharsets
+import java.security.KeyStore
 import java.time.Instant
 import java.time.ZoneId
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+import okhttp3.Credentials
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 
-class RecordRepository(
-    private val database: RecordDatabase,
-) {
-    private val dao = database.recordDao()
+data class RecordsConnection(
+    val isConfigured: Boolean,
+    val username: String,
+)
 
-    val activeItems: Flow<List<RecordItem>> = dao.observeItems(archived = false).map(::mapItems)
-    val archivedItems: Flow<List<RecordItem>> = dao.observeItems(archived = true).map(::mapItems)
+class RecordRepository(context: Context) {
+    private val credentialStore = BasicAuthStore(context.applicationContext)
+    private val client = OkHttpClient()
+    private val _activeItems = MutableStateFlow<List<RecordItem>>(emptyList())
+    private val _archivedItems = MutableStateFlow<List<RecordItem>>(emptyList())
+    private val _entries = MutableStateFlow<List<RecordEntry>>(emptyList())
+    private val _connection = MutableStateFlow(credentialStore.connection())
 
-    fun entriesOnDate(localDate: String): Flow<List<RecordEntry>> =
-        dao.observeEntriesOnDate(localDate).map { rows -> rows.map(RecordEntryRow::toModel) }
+    val activeItems: StateFlow<List<RecordItem>> = _activeItems
+    val archivedItems: StateFlow<List<RecordItem>> = _archivedItems
+    val entries: StateFlow<List<RecordEntry>> = _entries
+    val connection: StateFlow<RecordsConnection> = _connection
 
-    fun entriesBetween(startDate: String, endDate: String): Flow<List<RecordEntry>> =
-        dao.observeEntriesBetween(startDate, endDate).map { rows -> rows.map(RecordEntryRow::toModel) }
-
-    fun dateCounts(startDate: String, endDate: String): Flow<Map<String, Int>> =
-        dao.observeDateCounts(startDate, endDate).map { rows ->
-            rows.associate { it.localDate to it.recordCount }
-        }
-
-    suspend fun saveItem(itemId: Long?, input: RecordItemDraft): Long {
-        val draft = input.validated()
-        val excludedId = itemId ?: 0
-        if (dao.nameExists(draft.name, excludedId)) {
-            throw RecordValidationException("A record item with this name already exists.")
-        }
-
-        return database.withTransaction {
-            if (itemId == null) {
-                val now = System.currentTimeMillis()
-                val newId = dao.insertItem(draft.toEntity(createdAt = now, updatedAt = now))
-                dao.insertWindows(draft.windows.map { it.toEntity(newId) })
-                newId
-            } else {
-                val current = dao.getItem(itemId)
-                    ?: throw RecordValidationException("Record item not found.")
-                if (dao.countEntries(itemId) > 0) {
-                    requireUnchangedMeasurement(current.item, draft)
-                }
-                dao.updateItem(
-                    draft.toEntity(
-                        id = itemId,
-                        archived = current.item.archived,
-                        createdAt = current.item.createdAt,
-                        updatedAt = System.currentTimeMillis(),
-                    ),
-                )
-                dao.deleteWindows(itemId)
-                dao.insertWindows(draft.windows.map { it.toEntity(itemId) })
-                itemId
-            }
-        }
-    }
-
-    suspend fun entryCount(itemId: Long): Int = dao.countEntries(itemId)
-
-    suspend fun setArchived(itemId: Long, archived: Boolean) {
-        if (dao.setArchived(itemId, archived, System.currentTimeMillis()) != 1) {
-            throw RecordValidationException("Record item not found.")
-        }
-    }
-
-    suspend fun deleteArchivedItem(itemId: Long) {
-        val item = dao.getItem(itemId)?.item
-            ?: throw RecordValidationException("Record item not found.")
-        if (!item.archived) {
-            throw RecordValidationException("Archive the record item before deleting it.")
-        }
-        if (dao.deleteItem(itemId) != 1) {
-            throw RecordValidationException("Record item not found.")
-        }
-    }
-
-    suspend fun createEntry(itemId: Long, value: Double, occurredAt: Long): Long {
-        if (!value.isFinite() || value <= 0) {
-            throw RecordValidationException("Value must be a positive number.")
-        }
-        val item = dao.getItem(itemId)?.item
-            ?: throw RecordValidationException("Record item not found.")
-        if (item.archived) {
-            throw RecordValidationException("Archived items cannot be recorded.")
-        }
-
-        val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
-        return dao.insertEntry(
-            RecordEntryEntity(
-                itemId = itemId,
-                occurredAt = occurredAt,
-                localDate = local.toLocalDate().toString(),
-                localMinute = local.hour * 60 + local.minute,
-                value = value,
-                createdAt = System.currentTimeMillis(),
-            ),
+    suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
+        val active = request("GET", "items", query = mapOf("archived" to "false"))
+        val archived = request("GET", "items", query = mapOf("archived" to "true"))
+        val entries = request(
+            "GET",
+            "entries",
+            query = mapOf("startDate" to localDate, "endDate" to localDate),
         )
+        _activeItems.value = active.getJSONArray("items").mapObjects(::parseItem)
+        _archivedItems.value = archived.getJSONArray("items").mapObjects(::parseItem)
+        _entries.value = entries.getJSONArray("entries").mapObjects(::parseEntry)
     }
 
-    suspend fun deleteEntry(entryId: Long) {
-        if (dao.deleteEntry(entryId) != 1) {
-            throw RecordValidationException("Record not found.")
+    suspend fun saveItem(itemId: Long?, input: RecordItemDraft): Long = withContext(Dispatchers.IO) {
+        val draft = input.validated()
+        val body = JSONObject().apply {
+            put("name", draft.name)
+            put("description", draft.description)
+            put("valueType", draft.valueType.name)
+            putNullable("defaultValue", draft.defaultValue)
+            put("stepValue", draft.stepValue)
+            put("unit", draft.unit)
+            putNullable("goalValue", draft.goalValue)
+            putNullable("goalPeriod", draft.goalPeriod?.name)
+            put("priority", draft.priority)
+            put("windows", JSONArray(draft.windows.map { window ->
+                JSONObject()
+                    .put("startMinute", window.startMinute)
+                    .put("endMinute", window.endMinute)
+            }))
         }
+        request(
+            method = if (itemId == null) "POST" else "PUT",
+            path = if (itemId == null) "items" else "items/$itemId",
+            body = body,
+        ).getJSONObject("item").getLong("id")
+    }
+
+    suspend fun entryCount(itemId: Long): Int = withContext(Dispatchers.IO) {
+        request(
+            "GET",
+            "entries",
+            query = mapOf(
+                "startDate" to "0001-01-01",
+                "endDate" to "9999-12-31",
+                "itemId" to itemId.toString(),
+            ),
+        ).getJSONArray("entries").length()
+    }
+
+    suspend fun createEntry(itemId: Long, value: Double, occurredAt: Long): Long =
+        withContext(Dispatchers.IO) {
+            if (!value.isFinite() || value <= 0) {
+                throw RecordValidationException("Value must be a positive number.")
+            }
+            val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
+            val body = JSONObject()
+                .put("itemId", itemId)
+                .put("occurredAt", occurredAt)
+                .put("localDate", local.toLocalDate().toString())
+                .put("localMinute", local.hour * 60 + local.minute)
+                .put("value", value)
+            request("POST", "entries", body = body).getJSONObject("entry").getLong("id")
+        }
+
+    suspend fun deleteEntry(entryId: Long) = withContext(Dispatchers.IO) {
+        request("DELETE", "entries/$entryId")
+        Unit
+    }
+
+    suspend fun configureCredentials(username: String, password: String) = withContext(Dispatchers.IO) {
+        val normalizedUsername = username.trim()
+        if (normalizedUsername.isEmpty() || password.isEmpty()) {
+            throw RecordValidationException("Username and password are required.")
+        }
+        credentialStore.save(normalizedUsername, password)
+        _connection.value = credentialStore.connection()
+    }
+
+    private fun request(
+        method: String,
+        path: String,
+        body: JSONObject? = null,
+        query: Map<String, String> = emptyMap(),
+    ): JSONObject {
+        val auth = credentialStore.load()
+            ?: throw RecordValidationException("Records credentials are not configured.")
+        val url = (BASE_API_URL + path).toHttpUrl().newBuilder().apply {
+            query.forEach(::addQueryParameter)
+        }.build()
+        val requestBody = body?.toString()?.toRequestBody(JSON)
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", Credentials.basic(auth.first, auth.second))
+            .method(method, requestBody)
+            .build()
+        client.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val message = runCatching {
+                    JSONObject(text).getJSONObject("error").getString("message")
+                }.getOrNull()
+                throw RecordValidationException(message ?: "Records request failed (${response.code}).")
+            }
+            return if (text.isBlank()) JSONObject() else JSONObject(text)
+        }
+    }
+
+    companion object {
+        const val BASE_URL = "https://gateway.1662803.xyz/apps/records/"
+        private const val BASE_API_URL = "${BASE_URL}api/"
+        private val JSON = "application/json".toMediaType()
     }
 }
 
-private fun mapItems(rows: List<RecordItemWithWindows>): List<RecordItem> = rows.map { it.toModel() }
+private fun parseItem(value: JSONObject) = RecordItem(
+    id = value.getLong("id"),
+    name = value.getString("name"),
+    description = value.getString("description"),
+    valueType = RecordValueType.valueOf(value.getString("valueType")),
+    defaultValue = value.nullableDouble("defaultValue"),
+    stepValue = value.getDouble("stepValue"),
+    unit = value.getString("unit"),
+    goalValue = value.nullableDouble("goalValue"),
+    goalPeriod = value.nullableString("goalPeriod")?.let(GoalPeriod::valueOf),
+    priority = value.getInt("priority"),
+    archived = value.getBoolean("archived"),
+    windows = value.getJSONArray("windows").mapObjects { window ->
+        RecordWindow(
+            id = window.getLong("id"),
+            startMinute = window.getInt("startMinute"),
+            endMinute = window.getInt("endMinute"),
+        )
+    },
+    createdAt = value.getLong("createdAt"),
+    updatedAt = value.getLong("updatedAt"),
+)
 
-private fun RecordItemWithWindows.toModel() = RecordItem(
-    id = item.id,
-    name = item.name,
-    description = item.description,
-    valueType = item.valueType,
-    defaultValue = item.defaultValue,
-    stepValue = item.stepValue,
-    unit = item.unit,
-    goalValue = item.goalValue,
-    goalPeriod = item.goalPeriod,
-    priority = item.priority,
-    archived = item.archived,
-    windows = windows
-        .sortedWith(compareBy(RecordWindowEntity::startMinute, RecordWindowEntity::endMinute))
-        .map { window ->
-            RecordWindow(
-                id = window.id,
-                startMinute = window.startMinute,
-                endMinute = window.endMinute,
+private fun parseEntry(value: JSONObject) = RecordEntry(
+    id = value.getLong("id"),
+    itemId = value.getLong("itemId"),
+    occurredAt = value.getLong("occurredAt"),
+    localDate = value.getString("localDate"),
+    localMinute = value.getInt("localMinute"),
+    value = value.getDouble("value"),
+    createdAt = value.getLong("createdAt"),
+    itemName = value.getString("itemName"),
+    itemUnit = value.getString("itemUnit"),
+    itemValueType = RecordValueType.valueOf(value.getString("itemValueType")),
+)
+
+private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =
+    (0 until length()).map { index -> transform(getJSONObject(index)) }
+
+private fun JSONObject.putNullable(key: String, value: Any?) {
+    put(key, value ?: JSONObject.NULL)
+}
+
+private fun JSONObject.nullableDouble(key: String): Double? =
+    if (isNull(key)) null else getDouble(key)
+
+private fun JSONObject.nullableString(key: String): String? =
+    if (isNull(key)) null else getString(key)
+
+private class BasicAuthStore(context: Context) {
+    private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+
+    fun connection(): RecordsConnection = RecordsConnection(
+        isConfigured = preferences.contains(DATA),
+        username = preferences.getString(USERNAME, "").orEmpty(),
+    )
+
+    fun save(username: String, password: String) {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        val encrypted = cipher.doFinal("$username\u0000$password".toByteArray(StandardCharsets.UTF_8))
+        preferences.edit()
+            .putString(USERNAME, username)
+            .putString(IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString(DATA, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            .apply()
+    }
+
+    fun load(): Pair<String, String>? {
+        val iv = preferences.getString(IV, null) ?: return null
+        val data = preferences.getString(DATA, null) ?: return null
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            key(),
+            GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)),
+        )
+        val values = String(
+            cipher.doFinal(Base64.decode(data, Base64.NO_WRAP)),
+            StandardCharsets.UTF_8,
+        ).split('\u0000', limit = 2)
+        return values.takeIf { it.size == 2 }?.let { it[0] to it[1] }
+    }
+
+    private fun key(): SecretKey {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(
+            KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
             )
-        },
-    createdAt = item.createdAt,
-    updatedAt = item.updatedAt,
-)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build(),
+        )
+        return generator.generateKey()
+    }
 
-private fun RecordEntryRow.toModel() = RecordEntry(
-    id = entry.id,
-    itemId = entry.itemId,
-    occurredAt = entry.occurredAt,
-    localDate = entry.localDate,
-    localMinute = entry.localMinute,
-    value = entry.value,
-    createdAt = entry.createdAt,
-    itemName = itemName,
-    itemUnit = itemUnit,
-    itemValueType = itemValueType,
-)
-
-private fun RecordItemDraft.toEntity(
-    id: Long = 0,
-    archived: Boolean = false,
-    createdAt: Long,
-    updatedAt: Long,
-) = RecordItemEntity(
-    id = id,
-    name = name,
-    description = description,
-    valueType = valueType,
-    defaultValue = defaultValue,
-    stepValue = stepValue,
-    unit = unit,
-    goalValue = goalValue,
-    goalPeriod = goalPeriod,
-    priority = priority,
-    archived = archived,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-)
-
-private fun RecordWindow.toEntity(itemId: Long) = RecordWindowEntity(
-    itemId = itemId,
-    startMinute = startMinute,
-    endMinute = endMinute,
-)
-
-private fun requireUnchangedMeasurement(current: RecordItemEntity, draft: RecordItemDraft) {
-    if (current.valueType != draft.valueType || current.unit != draft.unit) {
-        throw RecordValidationException("Type and unit cannot change after records exist.")
+    companion object {
+        private const val PREFERENCES = "records_credentials"
+        private const val KEY_ALIAS = "records_basic_auth"
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val USERNAME = "username"
+        private const val IV = "iv"
+        private const val DATA = "data"
     }
 }

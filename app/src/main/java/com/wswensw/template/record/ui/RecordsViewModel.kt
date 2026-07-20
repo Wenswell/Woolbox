@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.wswensw.template.record.data.RecordDatabase
 import com.wswensw.template.record.data.RecordRepository
+import com.wswensw.template.record.data.RecordsConnection
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
@@ -14,10 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 data class RecordsUiState(
     val isLoading: Boolean = true,
@@ -25,38 +23,77 @@ data class RecordsUiState(
     val archivedItems: List<RecordItem> = emptyList(),
     val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
+    val error: String? = null,
+    val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
     fun findItem(id: Long): RecordItem? =
         activeItems.firstOrNull { it.id == id } ?: archivedItems.firstOrNull { it.id == id }
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class RecordsViewModel(
     private val repository: RecordRepository,
 ) : ViewModel() {
     private val selectedDate = MutableStateFlow(LocalDate.now())
-    private val selectedEntries = selectedDate.flatMapLatest { date ->
-        repository.entriesOnDate(date.toString())
-    }
+    private val selectedEntries = repository.entries
+    private val error = MutableStateFlow<String?>(null)
+    private val isLoading = MutableStateFlow(true)
 
-    val uiState: StateFlow<RecordsUiState> = combine(
+    private val contentState = combine(
         repository.activeItems,
         repository.archivedItems,
         selectedDate,
         selectedEntries,
-    ) { activeItems, archivedItems, date, entries ->
+        error,
+    ) { activeItems, archivedItems, date, entries, message ->
         RecordsUiState(
-            isLoading = false,
             activeItems = activeItems,
             archivedItems = archivedItems,
             selectedDate = date,
             entries = entries,
+            error = message,
         )
+    }
+
+    val uiState: StateFlow<RecordsUiState> = combine(
+        contentState,
+        repository.connection,
+        isLoading,
+    ) { content, connection, loading ->
+        content.copy(isLoading = loading, connection = connection)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = RecordsUiState(),
     )
+
+    fun refresh() {
+        viewModelScope.launch {
+            isLoading.value = true
+            runCatching { repository.refresh(selectedDate.value.toString()) }
+                .onFailure { error.value = it.message ?: "Unable to load records." }
+                .onSuccess { error.value = null }
+            isLoading.value = false
+        }
+    }
+
+    fun configureCredentials(username: String, password: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                repository.configureCredentials(username, password)
+                repository.refresh(selectedDate.value.toString())
+            }.fold(
+                onSuccess = {
+                    error.value = null
+                    onResult(null)
+                },
+                onFailure = { failure ->
+                    val message = failure.message ?: "Unable to connect to Records."
+                    error.value = message
+                    onResult(message)
+                },
+            )
+        }
+    }
 
     fun saveItem(
         itemId: Long?,
@@ -65,7 +102,7 @@ class RecordsViewModel(
     ) {
         viewModelScope.launch {
             runCatching { repository.saveItem(itemId, draft) }.fold(
-                onSuccess = { onResult(null) },
+                onSuccess = { refresh(); onResult(null) },
                 onFailure = { error -> onResult(error.message ?: "Unable to save record item.") },
             )
         }
@@ -81,6 +118,7 @@ class RecordsViewModel(
                 val occurredAt = System.currentTimeMillis()
                 val entryId = repository.createEntry(itemId, value, occurredAt)
                 selectedDate.value = LocalDate.now()
+                repository.refresh(selectedDate.value.toString())
                 entryId
             }.fold(
                 onSuccess = { entryId -> onResult(entryId, null) },
@@ -91,14 +129,14 @@ class RecordsViewModel(
 
     fun deleteEntry(entryId: Long, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { repository.deleteEntry(entryId) }
+            runCatching { repository.deleteEntry(entryId); repository.refresh(selectedDate.value.toString()) }
                 .onFailure { error -> onError(error.message ?: "Unable to undo record.") }
         }
     }
 
     fun loadEntryCount(itemId: Long, onResult: (Int) -> Unit) {
         viewModelScope.launch {
-            onResult(repository.entryCount(itemId))
+            runCatching { repository.entryCount(itemId) }.onSuccess(onResult)
         }
     }
 
@@ -108,8 +146,7 @@ class RecordsViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
-            val database = RecordDatabase.getInstance(applicationContext)
-            return RecordsViewModel(RecordRepository(database)) as T
+            return RecordsViewModel(RecordRepository(applicationContext)) as T
         }
     }
 }

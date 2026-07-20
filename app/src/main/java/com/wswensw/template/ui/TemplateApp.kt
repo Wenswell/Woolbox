@@ -55,6 +55,7 @@ import androidx.navigation.navArgument
 import com.wswensw.template.R
 import com.wswensw.template.record.ui.ManageRecordsScreen
 import com.wswensw.template.record.ui.RecordItemFormScreen
+import com.wswensw.template.record.ui.RecordsConnectionScreen
 import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
 import com.wswensw.template.tool.service.ExternalToolCommand
@@ -100,10 +101,11 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner, toolViewModel) {
+    DisposableEffect(lifecycleOwner, toolViewModel, recordsViewModel, selectedTab) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 toolViewModel.refreshAccessibilityState()
+                if (selectedTab == MainTab.RECORDS) recordsViewModel.refresh()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -132,6 +134,9 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         BottomNavigationBar(
                             selectedTab = selectedTab,
                             onSelectTab = { tab ->
+                                if (tab == MainTab.RECORDS && selectedTab != MainTab.RECORDS) {
+                                    recordsViewModel.refresh()
+                                }
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
                                     showRecordSheet = false
@@ -182,6 +187,10 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     showRecordSheet = false
                                     navController.navigate(TemplateRoutes.RECORD_ITEM_NEW)
                                 },
+                                onConfigureConnection = {
+                                    navController.navigate(TemplateRoutes.RECORDS_CONNECTION)
+                                },
+                                onRetry = recordsViewModel::refresh,
                                 showRecordSheet = showRecordSheet,
                                 onDismissRecordSheet = { showRecordSheet = false },
                                 onRecord = { item, value, onResult ->
@@ -208,6 +217,12 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             MainTab.SETTING -> SettingScreen(
                                 themeMode = themeMode,
                                 onThemeModeChange = { themeMode = it },
+                                recordsConnection = recordsState.connection.username
+                                    .takeIf { recordsState.connection.isConfigured }
+                                    ?: "Not configured",
+                                onOpenRecordsConnection = {
+                                    navController.navigate(TemplateRoutes.RECORDS_CONNECTION)
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -313,6 +328,13 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onEditItem = { itemId ->
                         navController.navigate(TemplateRoutes.recordItemEdit(itemId))
                     },
+                )
+            }
+            composable(TemplateRoutes.RECORDS_CONNECTION) {
+                RecordsConnectionScreen(
+                    state = recordsState,
+                    onBack = { navController.popBackStack() },
+                    onSave = recordsViewModel::configureCredentials,
                 )
             }
             composable(TemplateRoutes.RECORD_ITEM_NEW) {
@@ -454,6 +476,7 @@ private object TemplateRoutes {
     const val COPY_HISTORY = "global-copy/history"
     const val OLED_SHIELD = "oled-shield"
     const val MANAGE_RECORDS = "manage-records"
+    const val RECORDS_CONNECTION = "records-connection"
     const val RECORD_ITEM_NEW = "record-item/new"
     const val RECORD_ITEM_ID = "recordItemId"
     const val RECORD_ITEM_EDIT = "record-item/{$RECORD_ITEM_ID}"
