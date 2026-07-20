@@ -146,6 +146,7 @@ class RecordsViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
+            applicationContext.deleteDatabase("records.db")
             return RecordsViewModel(RecordRepository(applicationContext)) as T
         }
     }
