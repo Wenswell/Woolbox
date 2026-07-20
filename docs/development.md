@@ -85,15 +85,16 @@ adb shell am start -n com.wswensw.template/.MainActivity
 3. 确认主面板左右 `12dp`、上下 `32dp` 留白；首屏为编辑页，`Reading order` 默认开启且草稿符合视觉阅读顺序。
 4. 编辑两种顺序草稿并往返切换，确认修改分别保留；进入 `Select text` 验证逐项选择、全选、清空和返回后的草稿。
 5. 确认 `Close`/`Back`、输入法和空白禁用；复制后检查历史新增，重开后验证 Save、Copy 和 Delete。
-6. 返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开。
-7. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield`，并检查 Saved apps 的图标、参数和时间。
-8. 从 Saved apps 执行 Enable/Delete，确认只对指定应用显示记录参数；再验证两个 Tile 仍作用于原目标。
-9. 在 `Preparing` 和 `Active` 状态分别连续触发同类 Tile，确认命令取消或活动工具关闭，且没有重复窗口。
-10. 依次快速触发两个不同 Tile，确认前一个工具关闭，最终只显示后触发的工具。
-11. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
-12. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
-13. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-14. 在 Records 创建记录项并记录正数值，确认今天流水即时更新、Undo 只删除该条记录，重启后记录项和未撤销流水仍存在。
+6. 关闭无障碍服务，在 OLED 页面点击 `Show shield`；确认遮罩留在 Template 内，长按后可调整、保存默认值和关闭，且不新增 Saved apps。
+7. 启用无障碍服务后返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开，顶部遮罩覆盖状态栏和显示刘海区域。
+8. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield`，并检查 Saved apps 的图标、参数和时间。
+9. 从 Saved apps 执行 Enable/Delete，确认只对指定应用显示记录参数；再验证两个 Tile 仍作用于原目标。
+10. 在 `Preparing` 和 `Active` 状态分别连续触发同类 Tile，确认命令取消或活动工具关闭，且没有重复窗口。
+11. 依次快速触发两个不同 Tile，确认前一个工具关闭，最终只显示后触发的工具。
+12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
+13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
+14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
+15. 在 Records 创建记录项并记录正数值，确认今天流水即时更新、Undo 只删除该条记录，重启后记录项和未撤销流水仍存在。
 
 ## 设备诊断
 

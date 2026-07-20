@@ -129,7 +129,7 @@ fun OledShieldRoute(
         TemplatePrimaryAction(
             label = "Show shield",
             iconRes = R.drawable.ic_oled_shield_24,
-            enabled = state.isServiceConnected,
+            enabled = true,
             onClick = onLaunchTool,
         )
 

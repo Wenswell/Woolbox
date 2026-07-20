@@ -13,6 +13,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -58,6 +59,7 @@ import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
 import com.wswensw.template.tool.service.ExternalToolCommand
 import com.wswensw.template.tool.service.ToolLaunchResult
+import com.wswensw.template.tool.overlay.InAppOledShield
 import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
 import com.wswensw.template.tool.trigger.ToolTile
@@ -92,6 +94,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
     var showRecordSheet by rememberSaveable { mutableStateOf(false) }
+    var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
@@ -113,14 +116,16 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         themeMode = themeMode,
         darkTheme = darkTheme,
     ) {
-        NavHost(
-            navController = navController,
-            startDestination = TemplateRoutes.ROOT,
-            enterTransition = { pageEnterTransition() },
-            exitTransition = { pageExitTransition() },
-            popEnterTransition = { pagePopEnterTransition() },
-            popExitTransition = { pagePopExitTransition() },
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = TemplateRoutes.ROOT,
+                modifier = Modifier.fillMaxSize(),
+                enterTransition = { pageEnterTransition() },
+                exitTransition = { pageExitTransition() },
+                popEnterTransition = { pagePopEnterTransition() },
+                popExitTransition = { pagePopExitTransition() },
+            ) {
             composable(TemplateRoutes.ROOT) {
                 TemplateSurface(
                     bottomBar = {
@@ -267,7 +272,11 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     profiles = oledProfiles,
                     onBack = { navController.popBackStack() },
                     onLaunchTool = {
-                        context.showToolLaunchResult(onLaunchTool(ExternalToolCommand.OLED_SHIELD))
+                        if (toolState.isServiceConnected) {
+                            context.showToolLaunchResult(onLaunchTool(ExternalToolCommand.OLED_SHIELD))
+                        } else {
+                            showInAppOledShield = true
+                        }
                     },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     onRequestTile = {
@@ -346,6 +355,18 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             }
                         }
                     },
+                )
+            }
+            }
+
+            if (showInAppOledShield) {
+                InAppOledShield(
+                    config = defaultOledConfig,
+                    onConfigChange = { updated ->
+                        toolViewModel.updateDefaultOledConfig { updated }
+                    },
+                    onSave = toolViewModel::saveDefaultOledConfig,
+                    onHide = { showInAppOledShield = false },
                 )
             }
         }

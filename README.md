@@ -7,17 +7,17 @@ Android Compose 工具应用，提供跨应用无障碍工具与本地量化记�
 | 工具 | 用途 | 启动方式 |
 | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
-| `OLED shield` | 显示可触摸黑色遮罩，按应用记录参数，并从配置列表启动对应应用后再次启用。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
+| `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Template，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
 | `Records` | 创建量化记录项，按当前时间搜索或推荐，并记录今天的数值或时长。 | `Records` 底栏；右下角 `Record`。 |
 
-`Global Copy` 与 `OLED shield` 共用 `Template tools` 无障碍服务。页面入口会先把 Template 移到后台，再对恢复的应用执行工具；Tile 用于在目标应用内快速启动。`Records` 使用独立的本地 Room 数据库，不依赖无障碍授权。
+`Global Copy` 与 OLED 的跨应用模式共用 `Template tools` 无障碍服务。OLED 没有服务时可在 Template 内直接使用；服务连接后，页面入口会先把 Template 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 使用独立的本地 Room 数据库，不依赖无障碍授权。
 
 ## 使用前提
 
 - Android `14` 或更高版本。
 - 在系统无障碍设置中启用 `Template tools`。
 - Global Copy 只能读取目标应用通过无障碍节点公开的文本。
-- `Global Copy` 与 `OLED shield` 使用 `TYPE_ACCESSIBILITY_OVERLAY`，无需悬浮窗权限。
+- `Global Copy` 与 OLED 的跨应用模式使用 `TYPE_ACCESSIBILITY_OVERLAY`，无需悬浮窗权限；OLED 的应用内模式不需要额外权限。
 
 ## 快速使用
 

@@ -91,8 +91,9 @@ class OledShieldController(
         shieldLayoutParams = params
         host.show(params) {
             TemplateTheme(useDynamicColor = false) {
+                val state by uiState.collectAsState()
                 OledShieldSurface(
-                    state = uiState,
+                    config = state.config,
                     onLongPress = ::showPanel,
                 )
             }
@@ -130,8 +131,9 @@ class OledShieldController(
         panelLayoutParams = params
         host.show(params) {
             TemplateTheme(useDynamicColor = false) {
+                val state by uiState.collectAsState()
                 OledControlPanel(
-                    state = uiState,
+                    config = state.config,
                     onOpacityChange = { updateConfig { config -> config.copy(opacityPercent = it) } },
                     onWidthChange = { updateConfig { config -> config.copy(widthPercent = it) } },
                     onHeightChange = { updateConfig { config -> config.copy(heightPercent = it) } },
@@ -201,12 +203,14 @@ class OledShieldController(
             (display.height * config.heightPercent / 100f).roundToInt().coerceAtLeast(1),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
     }
 
@@ -238,15 +242,14 @@ class OledShieldController(
 }
 
 @Composable
-private fun OledShieldSurface(
-    state: kotlinx.coroutines.flow.StateFlow<OledOverlayUiState>,
+internal fun OledShieldSurface(
+    config: OledShieldConfig,
     onLongPress: () -> Unit,
 ) {
-    val uiState by state.collectAsState()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = uiState.config.opacityPercent / 100f))
+            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = config.opacityPercent / 100f))
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = {},
@@ -257,8 +260,8 @@ private fun OledShieldSurface(
 }
 
 @Composable
-private fun OledControlPanel(
-    state: kotlinx.coroutines.flow.StateFlow<OledOverlayUiState>,
+internal fun OledControlPanel(
+    config: OledShieldConfig,
     onOpacityChange: (Int) -> Unit,
     onWidthChange: (Int) -> Unit,
     onHeightChange: (Int) -> Unit,
@@ -266,10 +269,10 @@ private fun OledControlPanel(
     onSave: () -> Unit,
     onClosePanel: () -> Unit,
     onHideShield: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val uiState by state.collectAsState()
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .widthIn(max = 360.dp)
             .fillMaxWidth(),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
@@ -302,17 +305,17 @@ private fun OledControlPanel(
             }
             OledSliderRow(
                 label = "Opacity",
-                value = uiState.config.opacityPercent,
+                value = config.opacityPercent,
                 onValueChange = onOpacityChange,
             )
             OledSliderRow(
                 label = "Width",
-                value = uiState.config.widthPercent,
+                value = config.widthPercent,
                 onValueChange = onWidthChange,
             )
             OledSliderRow(
                 label = "Height",
-                value = uiState.config.heightPercent,
+                value = config.heightPercent,
                 onValueChange = onHeightChange,
             )
             Row(

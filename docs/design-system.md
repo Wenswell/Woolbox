@@ -2,7 +2,7 @@
 
 ## 设计目标
 
-Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、历史和配置；跨应用会话使用系统覆盖层，Global Copy 历史在应用内复用同一编辑面板。
+Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、历史和配置；跨应用会话使用系统覆盖层，OLED 无服务时在 Activity 顶层复用同一遮罩交互，Global Copy 历史在应用内复用同一编辑面板。
 
 基础技术为 Material 3、动态色和 edge-to-edge。组件优先表达操作层级，不使用装饰性卡片、营销式区块或与功能无关的视觉元素。
 
@@ -94,7 +94,7 @@ TemplateTheme
 3. `Quick settings` Tile 添加入口。
 4. 工具专属配置。
 
-主操作按钮使用工具图标和结果导向文案：`Start Global Copy`、`Show shield`。`isServiceConnected == false` 时禁用，不提供替代执行路径；授权入口保持可用。
+主操作按钮使用工具图标和结果导向文案：`Start Global Copy`、`Show shield`。`Start Global Copy` 在 `isServiceConnected == false` 时禁用；`Show shield` 始终可用，无服务时显示应用内遮罩，有服务时启动跨应用遮罩。授权入口保持可用。
 
 Tile 行的 `Add` 使用 tonal button，整行与按钮执行同一个系统添加请求。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
@@ -131,7 +131,7 @@ Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四�
 
 历史列表按时间倒序使用无卡片列表行，显示包名、文本块数量、时间和两行预览。点击后打开全屏 Dialog，并复用文本选择、阅读顺序、编辑和 Copy 内容；编辑页顶部增加 `Save`，只有状态改变时可用。删除使用确认 Dialog。
 
-OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具，`Save` 保存当前应用配置。
+OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具。无障碍模式的 `Save` 保存当前应用配置，应用内模式的 `Save` 保存默认配置。
 
 覆盖层交互的业务语义归 [产品说明](product.md)，窗口参数和生命周期归 [系统架构](architecture.md)。
 

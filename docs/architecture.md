@@ -4,6 +4,8 @@
 
 ```text
 Tool pages ─────> MainActivity ───────────────┐
+     │                                        │
+     └─ OLED without service ─> InAppOledShield
 Quick Settings Tiles ─────────────────────────┤
                                               ▼
                                     ToolServiceController
@@ -36,7 +38,8 @@ Records pages ──> RecordsViewModel ──> RecordRepository ──> records.
 | `ForegroundWindowResolver` | 从无障碍窗口中选择当前外部 `TYPE_APPLICATION` 目标。 |
 | `WindowSnapshotBuilder` | 遍历目标应用节点并生成稳定的文本快照。 |
 | `CopySessionController` | 管理文本选择、草稿、剪贴板写入和复制会话窗口。 |
-| `OledShieldController` | 管理遮罩、控制面板、实时配置和按应用保存。 |
+| `OledShieldController` | 管理无障碍遮罩、控制面板、实时配置和按应用保存。 |
+| `InAppOledShield` | 服务未连接时在 Activity composition 顶层显示 OLED 遮罩，复用遮罩与控制面板 UI。 |
 | `ComposeOverlayWindow` | 把 Compose 内容挂载为 `TYPE_ACCESSIBILITY_OVERLAY` 并管理生命周期。 |
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
@@ -47,9 +50,10 @@ Records pages ──> RecordsViewModel ──> RecordRepository ──> records.
 
 ### 页面触发
 
-1. 页面只在 `isServiceConnected` 时启用主操作。
-2. 普通入口保存命令并调用 `moveTaskToBack(true)`；OLED 已保存应用入口通过 `getLaunchIntentSenderForPackage()` 启动指定包名。
-3. Activity 收到 `onStop` 后提交命令，避免本应用窗口参与目标选择。
+1. Global Copy 只在 `isServiceConnected` 时启用主操作；OLED 主操作始终可用。
+2. OLED 在服务未连接时直接更新应用内遮罩状态，不提交 `ExternalToolCommand`。
+3. 服务连接时，普通入口保存命令并调用 `moveTaskToBack(true)`；OLED 已保存应用入口通过 `getLaunchIntentSenderForPackage()` 启动指定包名。
+4. Activity 收到 `onStop` 后提交命令，避免本应用窗口参与目标选择。
 
 ### Tile 触发
 
@@ -104,6 +108,8 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 - `dismiss` 使用 `removeViewImmediate`，随后进入 `DESTROYED` 并清空引用。
 - Copy 会话使用可聚焦全屏透明窗口，以支持同一窗口内编辑输入；窗口使用 `SOFT_INPUT_ADJUST_RESIZE`，根布局消费 IME Insets，使面板和底部操作保持在输入法上方。窗口内的实体面板水平内缩 `12dp`、垂直内缩 `32dp`，外层 scrim 透出目标应用。
 - OLED 遮罩和面板保持非焦点窗口。
+
+OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS`。遮罩尺寸仍按完整显示指标计算，使顶部遮罩能布局到状态栏和显示刘海区域；控制面板不使用越界布局。
 
 ## Global Copy 数据管线
 
