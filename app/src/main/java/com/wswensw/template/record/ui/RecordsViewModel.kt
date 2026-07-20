@@ -69,6 +69,7 @@ class RecordsViewModel(
     fun refresh() {
         viewModelScope.launch {
             isLoading.value = true
+            selectedDate.value = LocalDate.now()
             runCatching { repository.refresh(selectedDate.value.toString()) }
                 .onFailure { error.value = it.message ?: "Unable to load records." }
                 .onSuccess { error.value = null }
