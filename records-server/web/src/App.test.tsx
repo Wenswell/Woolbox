@@ -52,8 +52,25 @@ describe("Records administration", () => {
     const call = vi.mocked(fetch).mock.calls.find(([url]) => String(url) === "api/entries/3")!;
     expect(JSON.parse(String(call[1]?.body))).toMatchObject({ itemId:1,localDate:"2025-07-21",localMinute:690,value:4 });
   });
+
+  it("shows an entry save failure inside the open dialog", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("2 ml");
+    await user.click(screen.getByRole("button", { name:"Edit" }));
+    vi.mocked(fetch).mockResolvedValueOnce(await errorResponse("Record item is archived."));
+
+    await user.click(screen.getByRole("button", { name:"Save" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Record item is archived.");
+    expect(screen.getByRole("dialog", { name:"Edit entry" })).toBeTruthy();
+  });
 });
 
 function response(value: unknown) {
   return Promise.resolve({ ok:true, json:async()=>value } as Response);
+}
+
+function errorResponse(message: string) {
+  return Promise.resolve({ ok:false, json:async()=>({ error:{ message } }) } as Response);
 }
