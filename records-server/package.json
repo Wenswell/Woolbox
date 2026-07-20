@@ -8,8 +8,10 @@
     "node": ">=22"
   },
   "scripts": {
+    "backup": "node scripts/backup.mjs",
     "build": "rm -rf ./dist && tsc --project tsconfig.build.json && vite build && cp -R drizzle dist/drizzle",
     "dev": "tsx watch src/server.ts",
+    "restore-check": "node scripts/restore-check.mjs",
     "start": "node dist/src/server.js",
     "test": "vitest run --exclude 'web/**'",
     "test:web": "vitest run --config vite.config.ts web/src/*.test.tsx",

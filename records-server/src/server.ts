@@ -1,6 +1,6 @@
 import { buildApp } from "./app.js";
 
-const portValue = Number(process.env.PORT ?? "3100");
+const portValue = Number(process.env.PORT ?? "4320");
 if (!Number.isSafeInteger(portValue) || portValue < 1 || portValue > 65535) {
   throw new Error("PORT must be an integer from 1 to 65535.");
 }

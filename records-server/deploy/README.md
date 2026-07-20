@@ -1,0 +1,59 @@
+# Records server deployment
+
+The service runs as `ravvss`, listens on `127.0.0.1:4320`, and stores data outside the release directory.
+
+| Path | Purpose |
+| --- | --- |
+| `/home/ravvss/records` | Application release and production dependencies. |
+| `/srv/records/records.sqlite` | Live SQLite database. |
+| `/srv/records/backups` | Fourteen daily consistent backups. |
+| `~/.config/systemd/user/records.service` | Server unit. |
+| `~/.config/systemd/user/records-backup.{service,timer}` | Backup units. |
+
+## Release
+
+From the app repository:
+
+```bash
+cd records-server
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+
+rsync -a --delete \
+  --exclude node_modules \
+  --exclude '*.sqlite*' \
+  ./ cloud:/home/ravvss/records/
+```
+
+On the cloud server, install production dependencies and units:
+
+```bash
+ssh cloud '
+  sudo install -d -o ravvss -g ravvss -m 750 /srv/records /srv/records/backups
+  cd /home/ravvss/records
+  pnpm install --prod --frozen-lockfile
+  install -m 644 deploy/records.service ~/.config/systemd/user/records.service
+  install -m 644 deploy/records-backup.service ~/.config/systemd/user/records-backup.service
+  install -m 644 deploy/records-backup.timer ~/.config/systemd/user/records-backup.timer
+  systemctl --user daemon-reload
+  systemctl --user enable --now records.service records-backup.timer
+'
+```
+
+The Caddy route is maintained by `debian-cloud-server`. Install and validate that route before exposing the service.
+
+## Verify
+
+```bash
+ssh cloud '
+  systemctl --user is-active records.service records-backup.timer
+  curl -fsS http://127.0.0.1:4320/api/items
+  systemctl --user start records-backup.service
+  latest=$(find /srv/records/backups -maxdepth 1 -name "records-*.sqlite" -print | sort | tail -1)
+  cd /home/ravvss/records
+  pnpm restore-check -- "$latest"
+'
+```
+
+The restore check copies the selected backup to a temporary directory, runs SQLite integrity validation, verifies the three Records tables, and removes the temporary copy.
