@@ -126,6 +126,13 @@ class RecordRepository(context: Context) {
         if (normalizedUsername.isEmpty() || password.isEmpty()) {
             throw RecordValidationException("Username and password are required.")
         }
+        val candidate = normalizedUsername to password
+        request(
+            method = "GET",
+            path = "items",
+            query = mapOf("archived" to "false"),
+            authentication = candidate,
+        )
         credentialStore.save(normalizedUsername, password)
         _connection.value = credentialStore.connection()
     }
@@ -135,8 +142,9 @@ class RecordRepository(context: Context) {
         path: String,
         body: JSONObject? = null,
         query: Map<String, String> = emptyMap(),
+        authentication: Pair<String, String>? = null,
     ): JSONObject {
-        val auth = credentialStore.load()
+        val auth = authentication ?: credentialStore.load()
             ?: throw RecordValidationException("Records credentials are not configured.")
         val url = (BASE_API_URL + path).toHttpUrl().newBuilder().apply {
             query.forEach(::addQueryParameter)
