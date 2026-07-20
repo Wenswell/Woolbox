@@ -70,7 +70,10 @@ fun RecordsConnectionScreen(
                         onSave(username, password) { message ->
                             saving = false
                             error = message
-                            if (message == null) password = ""
+                            if (message == null) {
+                                password = ""
+                                onBack()
+                            }
                         }
                     },
                     enabled = !saving && username.isNotBlank() && password.isNotEmpty(),
