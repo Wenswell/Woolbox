@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 class RecordRulesTest {
     @Test
@@ -69,6 +70,25 @@ class RecordRulesTest {
         assertEquals("0.2", stepRecordValue("0.2", 0.2, -1))
     }
 
+    @Test
+    fun calculatesDailyAndWeeklyGoalValues() {
+        val daily = item(1, "Water", "", 0, 1).copy(goalValue = 8.0, goalPeriod = GoalPeriod.DAY)
+        val weekly = item(2, "Read", "", 0, 1).copy(goalValue = 10.0, goalPeriod = GoalPeriod.WEEK)
+        val values = goalValues(
+            items = listOf(daily, weekly),
+            date = LocalDate.parse("2026-07-21"),
+            dayEntries = listOf(entry(1, "2026-07-21", 2.0), entry(2, "2026-07-21", 3.0)),
+            weekEntries = listOf(
+                entry(2, "2026-07-20", 4.0),
+                entry(2, "2026-07-21", 3.0),
+                entry(2, "2026-07-26", 5.0),
+            ),
+        )
+
+        assertEquals(2.0, values[1])
+        assertEquals(12.0, values[2])
+    }
+
     private fun draft(
         name: String = "Water",
         description: String = "",
@@ -81,6 +101,7 @@ class RecordRulesTest {
         priority: Int = 1,
         windows: List<RecordWindow> = emptyList(),
     ) = RecordItemDraft(
+        icon = RecordIcon.CHECK_CIRCLE,
         name = name,
         description = description,
         valueType = valueType,
@@ -95,6 +116,7 @@ class RecordRulesTest {
 
     private fun item(id: Long, name: String, description: String, start: Int, end: Int) = RecordItem(
         id = id,
+        icon = RecordIcon.CHECK_CIRCLE,
         name = name,
         description = description,
         valueType = RecordValueType.NUMBER,
@@ -108,5 +130,18 @@ class RecordRulesTest {
         windows = listOf(RecordWindow(startMinute = start, endMinute = end)),
         createdAt = 0,
         updatedAt = 0,
+    )
+
+    private fun entry(itemId: Long, localDate: String, value: Double) = RecordEntry(
+        id = 0,
+        itemId = itemId,
+        occurredAt = 0,
+        localDate = localDate,
+        localMinute = 0,
+        value = value,
+        createdAt = 0,
+        itemName = "",
+        itemUnit = "次",
+        itemValueType = RecordValueType.NUMBER,
     )
 }

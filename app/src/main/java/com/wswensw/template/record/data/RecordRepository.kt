@@ -8,14 +8,19 @@ import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
+import com.wswensw.template.record.model.RecordIcon
 import com.wswensw.template.record.model.RecordValidationException
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
+import com.wswensw.template.record.model.goalValues
 import com.wswensw.template.record.model.validated
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.time.Instant
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -44,11 +49,13 @@ class RecordRepository(context: Context) {
     private val _activeItems = MutableStateFlow<List<RecordItem>>(emptyList())
     private val _archivedItems = MutableStateFlow<List<RecordItem>>(emptyList())
     private val _entries = MutableStateFlow<List<RecordEntry>>(emptyList())
+    private val _goalValues = MutableStateFlow<Map<Long, Double>>(emptyMap())
     private val _connection = MutableStateFlow(credentialStore.connection())
 
     val activeItems: StateFlow<List<RecordItem>> = _activeItems
     val archivedItems: StateFlow<List<RecordItem>> = _archivedItems
     val entries: StateFlow<List<RecordEntry>> = _entries
+    val goalValues: StateFlow<Map<Long, Double>> = _goalValues
     val connection: StateFlow<RecordsConnection> = _connection
 
     suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
@@ -59,14 +66,27 @@ class RecordRepository(context: Context) {
             "entries",
             query = mapOf("startDate" to localDate, "endDate" to localDate),
         )
-        _activeItems.value = active.getJSONArray("items").mapObjects(::parseItem)
+        val activeItems = active.getJSONArray("items").mapObjects(::parseItem)
+        val todayEntries = entries.getJSONArray("entries").mapObjects(::parseEntry)
+        val date = LocalDate.parse(localDate)
+        val weekEntries = if (activeItems.any { it.goalPeriod == GoalPeriod.WEEK && it.goalValue != null }) {
+            val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
+            val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
+            request("GET", "entries", query = mapOf("startDate" to weekStart, "endDate" to weekEnd))
+                .getJSONArray("entries").mapObjects(::parseEntry)
+        } else {
+            emptyList()
+        }
+        _activeItems.value = activeItems
         _archivedItems.value = archived.getJSONArray("items").mapObjects(::parseItem)
-        _entries.value = entries.getJSONArray("entries").mapObjects(::parseEntry)
+        _entries.value = todayEntries
+        _goalValues.value = goalValues(activeItems, date, todayEntries, weekEntries)
     }
 
     suspend fun saveItem(itemId: Long?, input: RecordItemDraft): Long = withContext(Dispatchers.IO) {
         val draft = input.validated()
         val body = JSONObject().apply {
+            put("iconKey", draft.icon.name)
             put("name", draft.name)
             put("description", draft.description)
             put("valueType", draft.valueType.name)
@@ -176,6 +196,7 @@ class RecordRepository(context: Context) {
 
 private fun parseItem(value: JSONObject) = RecordItem(
     id = value.getLong("id"),
+    icon = RecordIcon.valueOf(value.getString("iconKey")),
     name = value.getString("name"),
     description = value.getString("description"),
     valueType = RecordValueType.valueOf(value.getString("valueType")),

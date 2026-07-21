@@ -10,6 +10,17 @@ enum class GoalPeriod {
     WEEK,
 }
 
+enum class RecordIcon {
+    CHECK_CIRCLE,
+    WATER_DROP,
+    MENU_BOOK,
+    DIRECTIONS_RUN,
+    SELF_IMPROVEMENT,
+    MEDICATION,
+    RESTAURANT,
+    BEDTIME,
+}
+
 data class RecordWindow(
     val id: Long = 0,
     val startMinute: Int,
@@ -18,6 +29,7 @@ data class RecordWindow(
 
 data class RecordItem(
     val id: Long,
+    val icon: RecordIcon,
     val name: String,
     val description: String,
     val valueType: RecordValueType,
@@ -34,6 +46,7 @@ data class RecordItem(
 )
 
 data class RecordItemDraft(
+    val icon: RecordIcon,
     val name: String,
     val description: String,
     val valueType: RecordValueType,

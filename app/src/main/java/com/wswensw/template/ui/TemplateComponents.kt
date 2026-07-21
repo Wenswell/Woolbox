@@ -297,6 +297,7 @@ fun TemplateListItem(
     title: String,
     subtitle: String,
     @DrawableRes iconRes: Int? = null,
+    leadingContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
@@ -332,7 +333,7 @@ fun TemplateListItem(
                 overflow = TextOverflow.Ellipsis,
             )
         },
-        leadingContent = iconRes?.let { resource ->
+        leadingContent = leadingContent ?: iconRes?.let { resource ->
             {
                 Icon(
                     painter = painterResource(resource),

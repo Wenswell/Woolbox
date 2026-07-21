@@ -1,6 +1,7 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +44,7 @@ import com.wswensw.template.record.model.DURATION_UNITS
 import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
+import com.wswensw.template.record.model.RecordIcon
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
 import com.wswensw.template.ui.TemplateRouteScaffold
@@ -88,6 +90,9 @@ fun RecordItemFormScreen(
 
     var name by rememberSaveable(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var description by rememberSaveable(item?.id) { mutableStateOf(item?.description.orEmpty()) }
+    var iconName by rememberSaveable(item?.id) {
+        mutableStateOf((item?.icon ?: RecordIcon.CHECK_CIRCLE).name)
+    }
     var valueTypeName by rememberSaveable(item?.id) {
         mutableStateOf((item?.valueType ?: RecordValueType.NUMBER).name)
     }
@@ -116,6 +121,7 @@ fun RecordItemFormScreen(
     var saving by rememberSaveable { mutableStateOf(false) }
 
     val valueType = RecordValueType.valueOf(valueTypeName)
+    val icon = RecordIcon.valueOf(iconName)
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
     val parsedWindows = windows.map(::decodeWindow)
 
@@ -124,6 +130,21 @@ fun RecordItemFormScreen(
         onBack = onBack,
         modifier = modifier,
     ) {
+        FormHeading("Icon")
+        Column(modifier = Modifier.formField(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            recordIcons.chunked(4).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { candidate ->
+                        RecordIconButton(
+                            icon = candidate,
+                            selected = candidate == icon,
+                            onClick = { iconName = candidate.name },
+                        )
+                    }
+                }
+            }
+        }
+
         FormHeading("Details")
         OutlinedTextField(
             value = name,
@@ -302,6 +323,7 @@ fun RecordItemFormScreen(
             onClick = {
                 val draft = runCatching {
                     RecordItemDraft(
+                        icon = icon,
                         name = name,
                         description = description,
                         valueType = valueType,

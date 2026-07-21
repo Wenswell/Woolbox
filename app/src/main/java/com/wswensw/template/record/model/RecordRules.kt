@@ -1,6 +1,9 @@
 package com.wswensw.template.record.model
 
 import java.math.BigDecimal
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 const val DEFAULT_NUMBER_UNIT = "次"
@@ -96,6 +99,24 @@ fun stepRecordValue(value: String, step: Double, direction: Int): String {
     val next = (current + stepValue * BigDecimal.valueOf(direction.toLong()))
         .max(stepValue)
     return next.stripTrailingZeros().toPlainString()
+}
+
+fun goalValues(
+    items: List<RecordItem>,
+    date: LocalDate,
+    dayEntries: List<RecordEntry>,
+    weekEntries: List<RecordEntry>,
+): Map<Long, Double> {
+    val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
+    val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
+    return items.mapNotNull { item ->
+        val period = item.goalPeriod ?: return@mapNotNull null
+        item.goalValue ?: return@mapNotNull null
+        val entries = if (period == GoalPeriod.DAY) dayEntries else weekEntries.filter {
+            it.localDate in weekStart..weekEnd
+        }
+        item.id to entries.filter { it.itemId == item.id }.sumOf(RecordEntry::value)
+    }.toMap()
 }
 
 fun isMinuteInWindow(minute: Int, startMinute: Int, endMinute: Int): Boolean {

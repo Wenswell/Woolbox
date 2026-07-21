@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -95,29 +98,25 @@ fun RecordsScreen(
             }
 
             else -> item {
+                GoalProgressSection(items = state.activeItems, values = state.goalValues)
                 AnimatedContent(
                     targetState = state.entries,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(180)) togetherWith
-                            fadeOut(animationSpec = tween(90))
-                    },
+                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(90)) },
                     label = "TodayRecords",
                 ) { entries ->
                     TemplateSection(title = "Today") {
                         if (entries.isEmpty()) {
-                            TemplateListItem(
-                                title = "No records today",
-                                subtitle = "Use Record to add the first value.",
-                            )
+                            TemplateListItem(title = "No records today", subtitle = "Use Record to add the first value.")
                         } else {
                             entries.forEachIndexed { index, entry ->
+                                val item = state.findItem(entry.itemId)
                                 TemplateListItem(
-                                    title = formatMinute(entry.localMinute),
-                                    subtitle = entry.subtitle(state.findItem(entry.itemId)),
+                                    title = entry.itemName,
+                                    subtitle = "${formatValue(entry.value)} ${entry.itemUnit}",
+                                    leadingContent = item?.let { { RecordItemIcon(it.icon) } },
+                                    trailing = { Text(formatMinute(entry.localMinute), style = MaterialTheme.typography.labelLarge) },
                                 )
-                                if (index != entries.lastIndex) {
-                                    TemplateDivider()
-                                }
+                                if (index != entries.lastIndex) TemplateDivider()
                             }
                         }
                     }
@@ -144,7 +143,29 @@ private fun formatMinute(minute: Int): String = String.format(
     minute % 60,
 )
 
-private fun com.wswensw.template.record.model.RecordEntry.subtitle(item: RecordItem?): String = listOfNotNull(
-    "$itemName · ${formatValue(value)} $itemUnit",
-    item?.goalSummary(),
-).joinToString("\n")
+@Composable
+private fun GoalProgressSection(items: List<RecordItem>, values: Map<Long, Double>) {
+    val goals = items.filter { it.goalValue != null && it.goalPeriod != null }
+    if (goals.isEmpty()) return
+    TemplateSection(title = "Goals") {
+        goals.forEachIndexed { index, item ->
+            val value = values[item.id] ?: 0.0
+            val progress by animateFloatAsState(
+                targetValue = (value / item.goalValue!!).coerceIn(0.0, 1.0).toFloat(),
+                label = "GoalProgress",
+            )
+            TemplateListItem(
+                title = item.name,
+                subtitle = "${formatValue(value)} / ${formatValue(item.goalValue)} ${item.unit} ${if (item.goalPeriod == com.wswensw.template.record.model.GoalPeriod.DAY) "today" else "this week"}",
+                leadingContent = { RecordItemIcon(item.icon) },
+                trailing = {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.padding(start = 8.dp).height(6.dp),
+                    )
+                },
+            )
+            if (index != goals.lastIndex) TemplateDivider()
+        }
+    }
+}

@@ -23,6 +23,7 @@ data class RecordsUiState(
     val archivedItems: List<RecordItem> = emptyList(),
     val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
+    val goalValues: Map<Long, Double> = emptyMap(),
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
@@ -43,23 +44,24 @@ class RecordsViewModel(
         repository.archivedItems,
         selectedDate,
         selectedEntries,
-        error,
-    ) { activeItems, archivedItems, date, entries, message ->
+        repository.goalValues,
+    ) { activeItems, archivedItems, date, entries, goalValues ->
         RecordsUiState(
             activeItems = activeItems,
             archivedItems = archivedItems,
             selectedDate = date,
             entries = entries,
-            error = message,
+            goalValues = goalValues,
         )
     }
 
     val uiState: StateFlow<RecordsUiState> = combine(
         contentState,
         repository.connection,
+        error,
         isLoading,
-    ) { content, connection, loading ->
-        content.copy(isLoading = loading, connection = connection)
+    ) { content, connection, message, loading ->
+        content.copy(isLoading = loading, connection = connection, error = message)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

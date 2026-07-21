@@ -64,6 +64,7 @@ private fun RecordItemRow(
     TemplateListItem(
         title = item.name,
         subtitle = item.summary(),
+        leadingContent = { RecordItemIcon(item.icon) },
         onClick = onClick,
     )
 }

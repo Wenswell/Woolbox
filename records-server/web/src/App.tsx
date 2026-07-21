@@ -2,9 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type RowSelectionState } from "@tanstack/react-table";
 import { api } from "./api";
-import type { EntryAuditSnapshot, ItemAuditSnapshot, ItemInput, RecordAuditLog, RecordEntry, RecordItem, ValueType } from "./types";
+import type { EntryAuditSnapshot, ItemAuditSnapshot, ItemInput, RecordAuditLog, RecordEntry, RecordIconKey, RecordItem, ValueType } from "./types";
 
 const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+const recordIcons: Array<{ key: RecordIconKey; label: string }> = [
+  { key: "CHECK_CIRCLE", label: "Check circle" }, { key: "WATER_DROP", label: "Water drop" },
+  { key: "MENU_BOOK", label: "Book" }, { key: "DIRECTIONS_RUN", label: "Running" },
+  { key: "SELF_IMPROVEMENT", label: "Meditation" }, { key: "MEDICATION", label: "Medication" },
+  { key: "RESTAURANT", label: "Meal" }, { key: "BEDTIME", label: "Sleep" },
+];
 type View = "entries" | "items" | "logs";
 
 export function App() {
@@ -68,7 +74,7 @@ function ItemsView({ items, loading, onRefresh, onError }: { items: RecordItem[]
   const [editing, setEditing] = useState<RecordItem | "new" | null>(null);
   const columns = useMemo<ColumnDef<RecordItem>[]>(() => [
     { id: "select", header: ({ table }) => <input aria-label="Select all items" type="checkbox" checked={table.getIsAllRowsSelected()} onChange={table.getToggleAllRowsSelectedHandler()} />, cell: ({ row }) => <input aria-label={`Select ${row.original.name}`} type="checkbox" checked={row.getIsSelected()} onChange={row.getToggleSelectedHandler()} /> },
-    { accessorKey: "name", header: "Name" }, { accessorKey: "valueType", header: "Type" }, { id: "unit", header: "Unit / step", cell: ({ row }) => `${row.original.unit} / ${row.original.stepValue}` },
+    { accessorKey: "name", header: "Name" }, { id: "icon", header: "Icon", cell: ({ row }) => iconLabel(row.original.iconKey) }, { accessorKey: "valueType", header: "Type" }, { id: "unit", header: "Unit / step", cell: ({ row }) => `${row.original.unit} / ${row.original.stepValue}` },
     { id: "status", header: "Status", cell: ({ row }) => <span className={row.original.archived ? "status archived" : "status"}>{row.original.archived ? "Archived" : "Active"}</span> }, { id: "actions", header: "", cell: ({ row }) => <button className="link" onClick={() => setEditing(row.original)}>Edit</button> },
   ], []);
   const table = useReactTable({ data: items, columns, state: { rowSelection: selection }, onRowSelectionChange: setSelection, getRowId: (row) => String(row.id), enableRowSelection: true, getCoreRowModel: getCoreRowModel() });
@@ -93,20 +99,21 @@ function DataTable({ table, empty }: { table: ReturnType<typeof useReactTable<an
 
 function ItemForm({ item, onClose, onSaved }: { item?: RecordItem; onClose: () => void; onSaved: () => Promise<void> }) {
   const [formError, setFormError] = useState<string | null>(null);
-  const { register, watch, handleSubmit, formState: { isSubmitting } } = useForm<ItemFormValues>({ defaultValues: { name: item?.name ?? "", description: item?.description ?? "", valueType: item?.valueType ?? "NUMBER", defaultValue: item?.defaultValue ?? "", stepValue: item?.stepValue ?? 1, unit: item?.unit ?? "次", goalValue: item?.goalValue ?? "", goalPeriod: item?.goalPeriod ?? "DAY", priority: item?.priority ?? 0, windows: item?.windows.map((window) => `${minute(window.startMinute)}-${minute(window.endMinute)}`).join("\n") ?? "" } });
+  const { register, watch, handleSubmit, formState: { isSubmitting } } = useForm<ItemFormValues>({ defaultValues: { name: item?.name ?? "", description: item?.description ?? "", iconKey: item?.iconKey ?? "CHECK_CIRCLE", valueType: item?.valueType ?? "NUMBER", defaultValue: item?.defaultValue ?? "", stepValue: item?.stepValue ?? 1, unit: item?.unit ?? "次", goalValue: item?.goalValue ?? "", goalPeriod: item?.goalPeriod ?? "DAY", priority: item?.priority ?? 0, windows: item?.windows.map((window) => `${minute(window.startMinute)}-${minute(window.endMinute)}`).join("\n") ?? "" } });
   const valueType = watch("valueType");
   return <Modal title={item ? "Edit record item" : "New record item"} onClose={onClose}><form onSubmit={handleSubmit(async (values) => {
     setFormError(null);
-    const input: ItemInput = { name: values.name, description: values.description, valueType: values.valueType, defaultValue: numberOrNull(values.defaultValue), stepValue: Number(values.stepValue), unit: values.unit, goalValue: numberOrNull(values.goalValue), goalPeriod: values.goalValue ? values.goalPeriod : null, priority: Number(values.priority), windows: parseWindows(values.windows) };
+    const input: ItemInput = { name: values.name, description: values.description, iconKey: values.iconKey, valueType: values.valueType, defaultValue: numberOrNull(values.defaultValue), stepValue: Number(values.stepValue), unit: values.unit, goalValue: numberOrNull(values.goalValue), goalPeriod: values.goalValue ? values.goalPeriod : null, priority: Number(values.priority), windows: parseWindows(values.windows) };
     try { await api.saveItem(input, item?.id); await onSaved(); } catch (reason) { setFormError(message(reason)); }
-  })}><label>Name<input {...register("name", { required: true })} /></label><label>Description<textarea {...register("description")} /></label><div className="grid"><label>Type<select {...register("valueType")}><option value="NUMBER">Number</option><option value="DURATION">Duration</option></select></label><label>Unit{valueType === "DURATION" ? <select {...register("unit")}><option>秒</option><option>分</option><option>小时</option></select> : <input {...register("unit", { required: true })} />}</label><label>Default value<input type="number" min="0" step="any" {...register("defaultValue")} /></label><label>Step<input type="number" min="0.000001" step="any" {...register("stepValue", { required: true })} /></label><label>Goal<input type="number" min="0" step="any" {...register("goalValue")} /></label><label>Goal period<select {...register("goalPeriod")}><option value="DAY">Day</option><option value="WEEK">Week</option></select></label><label>Priority<input type="number" step="1" {...register("priority", { required: true })} /></label></div><label>Suggested windows<textarea placeholder="08:00-09:00, one per line" {...register("windows")} /></label>{formError && <p className="form-error" role="alert">{formError}</p>}<FormActions saving={isSubmitting} onClose={onClose} /></form></Modal>;
+  })}><label>Name<input {...register("name", { required: true })} /></label><label>Description<textarea {...register("description")} /></label><div className="grid"><label>Icon<select {...register("iconKey")}>{recordIcons.map((icon) => <option key={icon.key} value={icon.key}>{icon.label}</option>)}</select></label><label>Type<select {...register("valueType")}><option value="NUMBER">Number</option><option value="DURATION">Duration</option></select></label><label>Unit{valueType === "DURATION" ? <select {...register("unit")}><option>秒</option><option>分</option><option>小时</option></select> : <input {...register("unit", { required: true })} />}</label><label>Default value<input type="number" min="0" step="any" {...register("defaultValue")} /></label><label>Step<input type="number" min="0.000001" step="any" {...register("stepValue", { required: true })} /></label><label>Goal<input type="number" min="0" step="any" {...register("goalValue")} /></label><label>Goal period<select {...register("goalPeriod")}><option value="DAY">Day</option><option value="WEEK">Week</option></select></label><label>Priority<input type="number" step="1" {...register("priority", { required: true })} /></label></div><label>Suggested windows<textarea placeholder="08:00-09:00, one per line" {...register("windows")} /></label>{formError && <p className="form-error" role="alert">{formError}</p>}<FormActions saving={isSubmitting} onClose={onClose} /></form></Modal>;
 }
 
-interface ItemFormValues { name: string; description: string; valueType: ValueType; defaultValue: string | number; stepValue: string | number; unit: string; goalValue: string | number; goalPeriod: "DAY" | "WEEK"; priority: string | number; windows: string }
+interface ItemFormValues { name: string; description: string; iconKey: RecordIconKey; valueType: ValueType; defaultValue: string | number; stepValue: string | number; unit: string; goalValue: string | number; goalPeriod: "DAY" | "WEEK"; priority: string | number; windows: string }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="modal-title"><h2>{title}</h2><button className="icon" aria-label="Close" onClick={onClose}>x</button></div>{children}</div></div>; }
 function FormActions({ saving, onClose }: { saving: boolean; onClose: () => void }) { return <div className="form-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button><button disabled={saving}>{saving ? "Saving..." : "Save"}</button></div>; }
 function minute(value: number) { return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`; }
+function iconLabel(key: RecordIconKey) { return recordIcons.find((icon) => icon.key === key)!.label; }
 function numberOrNull(value: string | number) { return value === "" ? null : Number(value); }
 function parseWindows(value: string) { return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean).map((window) => { const [start, end] = window.split("-"); return { startMinute: timeMinute(start), endMinute: timeMinute(end) }; }); }
 function timeMinute(value: string) { const [hour, minuteValue] = value.split(":").map(Number); return hour * 60 + minuteValue; }
@@ -124,7 +131,7 @@ function auditChanges(log: RecordAuditLog) {
   if (log.action === "ITEM_ARCHIVED") return "Status: Active to Archived";
   if (log.action === "ITEM_RESTORED") return "Status: Archived to Active";
   if (!before || !after || !("name" in before) || !("name" in after)) return "No details.";
-  const changes = [fieldChange("Name", before.name, after.name), fieldChange("Description", before.description, after.description), fieldChange("Type", before.valueType, after.valueType), fieldChange("Default", before.defaultValue, after.defaultValue), fieldChange("Step", before.stepValue, after.stepValue), fieldChange("Unit", before.unit, after.unit), fieldChange("Goal", itemGoal(before), itemGoal(after)), fieldChange("Priority", before.priority, after.priority), fieldChange("Suggested windows", itemWindows(before), itemWindows(after))].filter((value): value is string => value !== null);
+  const changes = [fieldChange("Name", before.name, after.name), fieldChange("Icon", iconLabel(before.iconKey), iconLabel(after.iconKey)), fieldChange("Description", before.description, after.description), fieldChange("Type", before.valueType, after.valueType), fieldChange("Default", before.defaultValue, after.defaultValue), fieldChange("Step", before.stepValue, after.stepValue), fieldChange("Unit", before.unit, after.unit), fieldChange("Goal", itemGoal(before), itemGoal(after)), fieldChange("Priority", before.priority, after.priority), fieldChange("Suggested windows", itemWindows(before), itemWindows(after))].filter((value): value is string => value !== null);
   return changes.join("; ") || "No visible field changes.";
 }
 function itemDescription(item: ItemAuditSnapshot) { return `${item.name}; ${itemGoal(item)}; step ${item.stepValue} ${item.unit}`; }

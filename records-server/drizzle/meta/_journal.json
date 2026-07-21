@@ -15,6 +15,13 @@
       "when": 1784596236168,
       "tag": "0001_plain_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784599600000,
+      "tag": "0002_record_item_icons",
+      "breakpoints": true
     }
   ]
 }
