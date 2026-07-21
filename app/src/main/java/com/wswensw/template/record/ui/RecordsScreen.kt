@@ -6,10 +6,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,10 +26,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
+import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordItem
-import com.wswensw.template.ui.TemplatePageHeader
 import com.wswensw.template.ui.TemplateDivider
 import com.wswensw.template.ui.TemplateListItem
 import com.wswensw.template.ui.TemplatePrimaryAction
@@ -48,22 +55,27 @@ fun RecordsScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         item {
-            Spacer(Modifier.height(TemplateStyle.spacing.pageTop))
-            TemplatePageHeader(
-                title = "Records",
-                subtitle = "Review recorded values by time.",
-                titleActions = {
-                    TextButton(onClick = onManage) {
-                        Text("Manage")
-                    }
-                },
-                modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal),
-            )
-            Spacer(Modifier.height(32.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = TemplateStyle.spacing.pageHorizontal,
+                        end = TemplateStyle.spacing.pageHorizontal,
+                        top = TemplateStyle.spacing.pageTop,
+                    ),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onManage) {
+                    Text("Manage")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
         }
 
         when {
-            state.isLoading -> item { CircularProgressIndicator() }
+            state.isLoading -> item {
+                CircularProgressIndicator(modifier = Modifier.padding(48.dp))
+            }
             state.error != null -> item {
                 Text(
                     text = state.error,
@@ -97,26 +109,31 @@ fun RecordsScreen(
                 }
             }
 
-            else -> item {
-                GoalProgressSection(items = state.activeItems, values = state.goalValues)
-                AnimatedContent(
-                    targetState = state.entries,
-                    transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(90)) },
-                    label = "TodayRecords",
-                ) { entries ->
-                    TemplateSection(title = "Today") {
-                        if (entries.isEmpty()) {
-                            TemplateListItem(title = "No records today", subtitle = "Use Record to add the first value.")
-                        } else {
-                            entries.forEachIndexed { index, entry ->
-                                val item = state.findItem(entry.itemId)
-                                TemplateListItem(
-                                    title = entry.itemName,
-                                    subtitle = "${formatValue(entry.value)} ${entry.itemUnit}",
-                                    leadingContent = item?.let { { RecordItemIcon(it.icon) } },
-                                    trailing = { Text(formatMinute(entry.localMinute), style = MaterialTheme.typography.labelLarge) },
-                                )
-                                if (index != entries.lastIndex) TemplateDivider()
+            else -> {
+                if (state.activeItems.any { it.goalValue != null && it.goalPeriod != null }) {
+                    item {
+                        GoalProgressSection(items = state.activeItems, values = state.goalValues)
+                    }
+                }
+                item {
+                    AnimatedContent(
+                        targetState = state.entries,
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(90)) },
+                        label = "TodayRecords",
+                    ) { entries ->
+                        TemplateSection(title = "Today") {
+                            if (entries.isEmpty()) {
+                                TemplateListItem(title = "No records today", subtitle = "Use Record to add the first value.")
+                            } else {
+                                entries.forEachIndexed { index, entry ->
+                                    TemplateListItem(
+                                        title = entry.itemName,
+                                        subtitle = "${formatValue(entry.value)} ${entry.itemUnit}",
+                                        leadingContent = { RecordItemInitial(entry.itemName) },
+                                        trailing = { Text(formatMinute(entry.localMinute), style = MaterialTheme.typography.labelLarge) },
+                                    )
+                                    if (index != entries.lastIndex) TemplateDivider()
+                                }
                             }
                         }
                     }
@@ -150,22 +167,51 @@ private fun GoalProgressSection(items: List<RecordItem>, values: Map<Long, Doubl
     TemplateSection(title = "Goals") {
         goals.forEachIndexed { index, item ->
             val value = values[item.id] ?: 0.0
+            val goal = checkNotNull(item.goalValue)
             val progress by animateFloatAsState(
-                targetValue = (value / item.goalValue!!).coerceIn(0.0, 1.0).toFloat(),
+                targetValue = (value / goal).coerceIn(0.0, 1.0).toFloat(),
                 label = "GoalProgress",
             )
-            TemplateListItem(
-                title = item.name,
-                subtitle = "${formatValue(value)} / ${formatValue(item.goalValue)} ${item.unit} ${if (item.goalPeriod == com.wswensw.template.record.model.GoalPeriod.DAY) "today" else "this week"}",
-                leadingContent = { RecordItemIcon(item.icon) },
-                trailing = {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.padding(start = 8.dp).height(6.dp),
-                    )
-                },
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 88.dp)
+                    .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RecordItemInitial(item.name)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = item.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = goalProgressLabel(item, value, goal),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 52.dp, top = 10.dp)
+                        .height(6.dp),
+                )
+            }
             if (index != goals.lastIndex) TemplateDivider()
         }
     }
 }
+
+private fun goalProgressLabel(item: RecordItem, value: Double, goal: Double): String =
+    "${formatValue(value)} / ${formatValue(goal)} ${item.unit} ${if (item.goalPeriod == GoalPeriod.DAY) "today" else "this week"}"
