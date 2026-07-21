@@ -80,6 +80,7 @@ private enum class MainTab(
 
 @Composable
 fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
+    val context = LocalContext.current
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
     val copyHistoryViewModel: CopyHistoryViewModel = viewModel()
@@ -175,6 +176,9 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onOpenGlobalCopy = { navController.navigate(TemplateRoutes.GLOBAL_COPY) },
                                 onOpenOledShield = { navController.navigate(TemplateRoutes.OLED_SHIELD) },
                                 onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
+                                onAccessibilityAlreadyEnabled = {
+                                    context.showMessage("Accessibility service is already enabled.")
+                                },
                             )
 
                             MainTab.RECORDS -> RecordsScreen(
@@ -239,7 +243,6 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         context.showToolLaunchResult(onLaunchTool(ExternalToolCommand.GLOBAL_COPY))
                     },
                     onOpenHistory = { navController.navigate(TemplateRoutes.COPY_HISTORY) },
-                    onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     tileRequestAvailable = TileRequestManager.isRequestSupported,
                     onRequestTile = {
                         TileRequestManager.request(
@@ -294,7 +297,6 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             showInAppOledShield = true
                         }
                     },
-                    onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                     tileRequestAvailable = TileRequestManager.isRequestSupported,
                     onRequestTile = {
                         TileRequestManager.request(

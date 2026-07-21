@@ -1,5 +1,10 @@
 package com.wswensw.template.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.wswensw.template.R
@@ -12,6 +17,7 @@ fun HomeScreen(
     onOpenGlobalCopy: () -> Unit,
     onOpenOledShield: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
+    onAccessibilityAlreadyEnabled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     TemplatePage(
@@ -19,6 +25,33 @@ fun HomeScreen(
         subtitle = "Accessibility tools for the active app.",
         modifier = modifier,
     ) {
+        TemplateSection(title = "Access") {
+            TemplateListItem(
+                title = "Accessibility service",
+                subtitle = state.accessibilityStatus(),
+                leadingContent = {
+                    Icon(
+                        imageVector = if (state.isAccessibilityEnabled) {
+                            Icons.Outlined.CheckCircle
+                        } else {
+                            Icons.Outlined.Lock
+                        },
+                        contentDescription = null,
+                        tint = if (state.isAccessibilityEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                },
+                onClick = if (state.isAccessibilityEnabled) {
+                    onAccessibilityAlreadyEnabled
+                } else {
+                    onOpenAccessibilitySettings
+                },
+            )
+        }
+
         TemplateSection(title = "Available") {
             TemplateListItem(
                 title = "Global Copy",
@@ -35,14 +68,6 @@ fun HomeScreen(
             )
         }
 
-        TemplateSection(title = "Service") {
-            TemplateListItem(
-                title = "Accessibility service",
-                subtitle = state.accessibilityStatus(),
-                iconRes = R.drawable.ic_settings_24,
-                onClick = onOpenAccessibilitySettings,
-            )
-        }
     }
 }
 

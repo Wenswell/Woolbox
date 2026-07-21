@@ -14,9 +14,10 @@ TemplateTheme
    ├─ root
    │  └─ TemplateSurface
    │     ├─ Home
-   │     │  ├─ Global Copy entry
-   │     │  ├─ OLED shield entry
-   │     │  └─ Accessibility service entry
+   │     │  ├─ Access / Accessibility service entry
+   │     │  └─ Available
+   │     │     ├─ Global Copy entry
+   │     │     └─ OLED shield entry
    │     ├─ Records
    │     │  ├─ Today list
    │     │  └─ Record sheet
@@ -57,8 +58,8 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplatePageHeader` | 根页面标题与说明 | 标题最多两行；右侧只放页面级动作。 |
 | `TemplateSection` | 设置分组 | 显示分组标题与一个 `surfaceContainerLow` 内容容器。 |
-| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件；有动作时整行可点击。Records 使用项目图标作为前导内容，流水时间置于尾部。 |
-| `TemplatePrimaryAction` | 工具详情页主命令 | 全宽 filled button、图标和明确动词；位于详情页首项。 |
+| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 使用项目图标作为前导内容，流水时间置于尾部。 |
+| `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
 | `TemplateDivider` | 同组列表项分隔 | 从卡片左侧 `16dp` 开始，不贴容器边缘。 |
 | `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
 | `TemplateInfoDialog` | 简短说明 | 只承载当前任务需要的信息和关闭动作。 |
@@ -90,14 +91,13 @@ TemplateTheme
 
 详情页按固定优先级排列：
 
-1. 主操作。
-2. `Access` 服务状态。
-3. `Quick settings` Tile 添加入口。
-4. 工具专属配置。
+1. `Actions` 工具操作条目。
+2. `Quick settings` Tile 添加入口。
+3. 工具专属配置。
 
-主操作按钮使用工具图标和结果导向文案：`Start Global Copy`、`Show shield`。`Start Global Copy` 在 `isServiceConnected == false` 时禁用；`Show shield` 始终可用，无服务时显示应用内遮罩，有服务时启动跨应用遮罩。授权入口保持可用。
+工具操作使用带图标、状态说明和整行点击的 `TemplateListItem`：`Start Global Copy` 在 `isServiceConnected == false` 时禁用；`Show shield` 始终可用，无服务时显示应用内遮罩，有服务时启动跨应用遮罩。授权入口只在 Home 的 `Access` 区域显示。
 
-Tile 行的 `Add` 使用 tonal button。Android 13 及以上整行与按钮执行同一个系统添加请求；Android 12/12L 保留稳定尺寸并禁用整行与按钮。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
+Quick Settings 行在 Android 13 及以上整行执行系统添加请求，不再显示右侧 `Add` 按钮；Android 12/12L 整行禁用，由系统快捷设置编辑页负责添加。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
 Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，每行显示应用图标、名称、三项百分比、记录时间以及 Enable/Delete 图标操作；参数在窄屏可自然换行，不截断隐藏。
 
@@ -117,10 +117,10 @@ PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期
 
 页面只显示 [产品说明](product.md#状态语义) 定义的六个状态词，不在不同页面创建同义文案。
 
-- 服务状态显示在 `Accessibility service` 行。
+- 服务授权状态只显示在 Home 的 `Access` 区域；详情页不重复显示权限行。
 - 工具状态显示在 Home 工具行和对应 Tile 行。
 - `Preparing` 与 `Active` 反映服务状态机，不由页面自行推断。
-- 状态变化不得改变列表行、主操作或 Tile 添加按钮的稳定尺寸。
+- 状态变化不得改变列表行、主操作或 Tile 行的稳定尺寸。
 
 ## 覆盖层交互
 
@@ -132,7 +132,7 @@ Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四�
 
 `Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
-历史列表按时间倒序使用无卡片列表行，显示包名、文本块数量、时间和两行预览。点击后打开全屏 Dialog，并复用文本选择、阅读顺序、编辑和 Copy 内容；编辑页顶部增加 `Save`，只有状态改变时可用。删除使用确认 Dialog。
+历史列表按时间倒序使用无卡片列表行，显示目标应用图标、名称、文本块数量、时间和两行预览，不显示包名。点击后打开全屏 Dialog，并复用文本选择、阅读顺序、编辑和 Copy 内容；编辑页顶部增加 `Save`，只有状态改变时可用。删除使用确认 Dialog。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具。无障碍模式的 `Save` 保存当前应用配置，应用内模式的 `Save` 保存默认配置。
 

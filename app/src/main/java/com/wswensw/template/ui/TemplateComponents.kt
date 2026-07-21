@@ -1,6 +1,8 @@
 package com.wswensw.template.ui
 
+import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,7 +57,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -299,6 +304,7 @@ fun TemplateListItem(
     @DrawableRes iconRes: Int? = null,
     leadingContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -312,6 +318,7 @@ fun TemplateListItem(
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = androidx.compose.material3.ripple(),
                 onClick = onClick,
@@ -322,6 +329,7 @@ fun TemplateListItem(
         headlineContent = {
             Text(
                 text = title,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -329,6 +337,7 @@ fun TemplateListItem(
         supportingContent = {
             Text(
                 text = subtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -345,12 +354,34 @@ fun TemplateListItem(
         modifier = rowModifier,
         colors = ListItemDefaults.colors(
             containerColor = Color.Transparent,
-            leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
         ),
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     )
+}
+
+@Composable
+fun TemplateAppIcon(
+    bitmap: Bitmap?,
+    @DrawableRes fallbackIconRes: Int,
+    contentDescription: String? = null,
+    modifier: Modifier = Modifier.size(40.dp),
+) {
+    if (bitmap == null) {
+        Icon(
+            painter = painterResource(fallbackIconRes),
+            contentDescription = contentDescription,
+            modifier = modifier,
+        )
+    } else {
+        Image(
+            bitmap = remember(bitmap) { bitmap.asImageBitmap() },
+            contentDescription = contentDescription,
+            modifier = modifier.clip(RoundedCornerShape(8.dp)),
+        )
+    }
 }
 
 @Composable
