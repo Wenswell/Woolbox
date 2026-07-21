@@ -58,7 +58,7 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplatePageHeader` | 根页面标题与说明 | 标题最多两行；右侧只放页面级动作。 |
 | `TemplateSection` | 设置分组 | 显示分组标题与一个 `surfaceContainerLow` 内容容器。 |
-| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 管理和选择列表使用项目图标，根页面目标与流水使用项目名称首个 Unicode 字符，流水时间置于尾部。 |
+| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 列表前导统一显示项目名称首个 Unicode 字符，流水时间置于尾部。 |
 | `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
 | `TemplateDivider` | 同组列表项分隔 | 从卡片左侧 `16dp` 开始，不贴容器边缘。 |
 | `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
@@ -103,11 +103,11 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn`，顶部不显示页面标题和描述，只保留右侧 `Manage` 操作；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则先显示独立的 `Goals` 区域，再显示 `Today` 分组。目标行显示项目名称、累计值和下方线性进度条；日目标累计当天值，周目标累计周一至周日值，进度最多显示至 `100%`，变化使用 Compose 动画。根页面目标与今天流水的左侧前导显示项目名称首个 Unicode 字符，支持文字、单码点 emoji 和组合字符；今天流水右侧显示时间，管理与选择列表继续使用配置的 Material 图标。今天流水切换使用 `180ms` 淡入和 `90ms` 淡出。只有存在活跃记录项时，根 `Scaffold` 才显示带图标和 `Record` 文案的扩展 FAB。
+Records 根页面使用 `LazyColumn`，顶部不显示页面标题和描述，只保留右侧 `Manage` 操作；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则先显示独立的 `Goals` 区域，再显示 `Today` 分组。`Goals` 区域为可横向滑动的圆环进度行，每个目标渲染为 `84dp` 圆环：主环显示 `0-100%` 进度，超出 `100%` 的部分以内层第二环呈现，中心显示百分比，环下显示项目名称与累计值；日目标累计当天值，周目标累计周一至周日值，进度变化使用 Compose 动画。今天流水为单行条目，左侧前导显示项目名称首个 Unicode 字符（支持文字、单码点 emoji 和组合字符），名称裁掉首字符后显示，随后显示数值、单位和记录时刻，时间置于尾部。管理与选择列表前导同样使用项目名称首个字符。今天流水切换使用 `180ms` 淡入和 `90ms` 淡出。只有存在活跃记录项时，根 `Scaffold` 才显示带图标和 `Record` 文案的扩展 FAB。
 
 `Record` 打开单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。第一阶段使用搜索框和无卡片列表选择记录项，空搜索标题为 `Suggested now` 且最多显示五项；第二阶段显示记录项名称、说明、已配置目标、数值输入、单位、步进提示以及减号/加号图标按钮，底部使用全宽确认按钮。
 
-`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Icon、Details、Measurement、Goal、Recommendation 分段；Icon 使用固定 Material 图标选择网格，类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
+`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
 
 `Records connection` 使用独立路由，只显示固定服务地址、用户名和密码；保存成功后返回上一页。Android Records 只呈现今天流水和活跃项目标进度，不显示归档项。
 
