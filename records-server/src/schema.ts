@@ -7,7 +7,6 @@ export const recordItems = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
     description: text("description").notNull(),
-    iconKey: text("icon_key", { enum: ["CHECK_CIRCLE", "WATER_DROP", "MENU_BOOK", "DIRECTIONS_RUN", "SELF_IMPROVEMENT", "MEDICATION", "RESTAURANT", "BEDTIME"] }).notNull(),
     valueType: text("value_type", { enum: ["NUMBER", "DURATION"] }).notNull(),
     defaultValue: real("default_value"),
     stepValue: real("step_value").notNull(),

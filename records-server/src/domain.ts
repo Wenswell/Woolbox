@@ -1,18 +1,15 @@
 export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "WEEK"] as const;
-export const RECORD_ICON_KEYS = ["CHECK_CIRCLE", "WATER_DROP", "MENU_BOOK", "DIRECTIONS_RUN", "SELF_IMPROVEMENT", "MEDICATION", "RESTAURANT", "BEDTIME"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
-export type RecordIconKey = (typeof RECORD_ICON_KEYS)[number];
 
 export interface RecordWindowInput {
   startMinute: number;
   endMinute: number;
 }
 export interface RecordItemInput {
-  iconKey: RecordIconKey;
   name: string;
   description: string;
   valueType: ValueType;
@@ -48,7 +45,6 @@ export function parseItemInput(value: unknown): RecordItemInput {
   const description = stringField(input, "description").trim();
   const unit = stringField(input, "unit").trim();
   const valueType = enumField(input, "valueType", VALUE_TYPES);
-  const iconKey = enumField(input, "iconKey", RECORD_ICON_KEYS);
   const defaultValue = nullableNumberField(input, "defaultValue");
   const stepValue = numberField(input, "stepValue");
   const goalValue = nullableNumberField(input, "goalValue");
@@ -70,7 +66,6 @@ export function parseItemInput(value: unknown): RecordItemInput {
   requireRule(uniqueWindows.size === windows.length, "Suggested time windows must be unique.");
 
   return {
-    iconKey,
     name,
     description,
     valueType,

@@ -27,7 +27,6 @@ describe("Records API", () => {
     expect(created.json().item).toMatchObject({
       id: 1,
       name: "Water",
-      iconKey: "CHECK_CIRCLE",
       description: "drink",
       unit: "ml",
       archived: false,
@@ -54,7 +53,6 @@ describe("Records API", () => {
 
   it.each([
     ["empty name", { name: " " }],
-    ["invalid icon", { iconKey: "UNKNOWN" }],
     ["empty unit", { unit: " " }],
     ["non-positive default", { defaultValue: 0 }],
     ["non-positive step", { stepValue: -1 }],
@@ -252,7 +250,6 @@ describe("Records API", () => {
 
 function itemInput(patch: Record<string, unknown> = {}) {
   return {
-    iconKey: "CHECK_CIRCLE",
     name: "Water",
     description: "",
     valueType: "NUMBER",

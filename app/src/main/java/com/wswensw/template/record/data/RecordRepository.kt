@@ -8,7 +8,6 @@ import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
-import com.wswensw.template.record.model.RecordIcon
 import com.wswensw.template.record.model.RecordValidationException
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
@@ -86,7 +85,6 @@ class RecordRepository(context: Context) {
     suspend fun saveItem(itemId: Long?, input: RecordItemDraft): Long = withContext(Dispatchers.IO) {
         val draft = input.validated()
         val body = JSONObject().apply {
-            put("iconKey", draft.icon.name)
             put("name", draft.name)
             put("description", draft.description)
             put("valueType", draft.valueType.name)
@@ -196,7 +194,6 @@ class RecordRepository(context: Context) {
 
 private fun parseItem(value: JSONObject) = RecordItem(
     id = value.getLong("id"),
-    icon = RecordIcon.valueOf(value.getString("iconKey")),
     name = value.getString("name"),
     description = value.getString("description"),
     valueType = RecordValueType.valueOf(value.getString("valueType")),

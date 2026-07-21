@@ -22,7 +22,6 @@ type AuditAction =
 
 interface ItemAuditSnapshot {
   id: number;
-  iconKey: string;
   name: string;
   description: string;
   valueType: string;
@@ -370,7 +369,7 @@ function groupWindows(windows: RecordWindowRow[]) {
 }
 
 function itemSnapshot(
-  item: Pick<RecordItemRow, "id" | "iconKey" | "name" | "description" | "valueType" | "defaultValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
+  item: Pick<RecordItemRow, "id" | "name" | "description" | "valueType" | "defaultValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
   windows: Array<Pick<RecordWindowRow, "startMinute" | "endMinute">> = [],
 ): ItemAuditSnapshot {
   return {

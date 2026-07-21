@@ -101,7 +101,6 @@ class RecordRulesTest {
         priority: Int = 1,
         windows: List<RecordWindow> = emptyList(),
     ) = RecordItemDraft(
-        icon = RecordIcon.CHECK_CIRCLE,
         name = name,
         description = description,
         valueType = valueType,
@@ -116,7 +115,6 @@ class RecordRulesTest {
 
     private fun item(id: Long, name: String, description: String, start: Int, end: Int) = RecordItem(
         id = id,
-        icon = RecordIcon.CHECK_CIRCLE,
         name = name,
         description = description,
         valueType = RecordValueType.NUMBER,

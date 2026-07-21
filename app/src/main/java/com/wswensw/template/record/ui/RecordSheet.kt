@@ -155,7 +155,7 @@ private fun RecordItemPicker(
                     TemplateListItem(
                         title = suggestion.item.name,
                         subtitle = suggestion.subtitle(),
-                        leadingContent = { RecordItemIcon(suggestion.item.icon) },
+                        leadingContent = { RecordItemInitial(suggestion.item.name) },
                         onClick = { onSelect(suggestion.item) },
                     )
                 }
