@@ -43,6 +43,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `ComposeOverlayWindow` | 把 Compose 内容挂载为 `TYPE_ACCESSIBILITY_OVERLAY` 并管理生命周期。 |
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
+| `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
 | `RecordsViewModel` / `RecordRepository` | 组合今天流水和记录项状态，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。 |
 
@@ -125,7 +126,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 `ClipboardManager.setPrimaryClip()` 写入后显示成功 Toast，再通过统一的 `close()` 销毁会话窗口并发布非活动状态。
 
-非空快照先写入 `copy_history.db`，成功后才显示会话。`copy_history_entries` 保存包名、捕获时间、两种草稿和当前顺序，`copy_history_blocks` 保存完整文本块与选择状态并随父记录级联删除。列表只查询最多 `240` 个字符的摘要；打开记录时才加载文本块。跨应用会话与应用内历史 Dialog 共用 `CopySessionUiState` 和编辑面板，窗口宿主分别由服务与 Activity 管理。
+非空快照先写入 `copy_history.db`，成功后才显示会话。`copy_history_entries` 保存包名、捕获时间、两种草稿和当前顺序，`copy_history_blocks` 保存完整文本块与选择状态并随父记录级联删除。列表只查询最多 `240` 个字符的摘要；`CopyHistoryViewModel` 再通过 `AppDisplayInfo` 解析当前应用名称和图标，应用不可用时使用通用名称和图标，列表不显示包名；打开记录时才加载文本块。跨应用会话与应用内历史 Dialog 共用 `CopySessionUiState` 和编辑面板，窗口宿主分别由服务与 Activity 管理。
 
 ## Records 数据
 

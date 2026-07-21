@@ -33,10 +33,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.wswensw.template.R
 import com.wswensw.template.tool.model.CopyHistoryEntry
-import com.wswensw.template.tool.model.CopyHistorySummary
 import com.wswensw.template.tool.model.CopySessionScreen
 import com.wswensw.template.tool.model.CopySessionUiState
 import com.wswensw.template.tool.overlay.CopySessionPanel
+import com.wswensw.template.ui.TemplateAppIcon
 import com.wswensw.template.ui.TemplateLazyRouteScaffold
 import java.time.Instant
 import java.time.ZoneId
@@ -46,7 +46,7 @@ import java.util.Locale
 
 @Composable
 fun CopyHistoryScreen(
-    history: List<CopyHistorySummary>,
+    history: List<CopyHistorySummaryUi>,
     selectedHistory: CopyHistoryEntry?,
     onBack: () -> Unit,
     onOpen: (Long) -> Unit,
@@ -77,7 +77,7 @@ fun CopyHistoryScreen(
                 }
             }
         } else {
-            items(history, key = CopyHistorySummary::id) { summary ->
+            items(history, key = CopyHistorySummaryUi::id) { summary ->
                 CopyHistoryRow(
                     summary = summary,
                     onOpen = { onOpen(summary.id) },
@@ -129,14 +129,14 @@ fun CopyHistoryScreen(
 
 @Composable
 private fun CopyHistoryRow(
-    summary: CopyHistorySummary,
+    summary: CopyHistorySummaryUi,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
 ) {
     ListItem(
         headlineContent = {
             Text(
-                text = summary.packageName,
+                text = summary.appName,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -156,8 +156,9 @@ private fun CopyHistoryRow(
             }
         },
         leadingContent = {
-            Icon(
-                painter = painterResource(R.drawable.ic_content_copy_24),
+            TemplateAppIcon(
+                bitmap = summary.appIcon,
+                fallbackIconRes = R.drawable.ic_app_icon,
                 contentDescription = null,
             )
         },

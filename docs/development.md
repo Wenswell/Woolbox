@@ -38,7 +38,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `tool/overlay/OledShieldController.kt` | OLED 遮罩、面板和实时布局。 |
 | `tool/storage/CopyHistory*` | Global Copy Room 历史、摘要与完整会话映射。 |
 | `tool/storage/OledShieldConfigRepository.kt` | OLED 默认配置与按包名 profile。 |
-| `tool/ui/` | 历史页、工具 ViewModel、应用名称和图标解析。 |
+| `tool/ui/` | 历史页、工具 ViewModel、应用名称和图标解析；`AppDisplayInfo.kt` 统一提供应用展示信息。 |
 | `tool/trigger/` | Tile Service、Tile 状态刷新和添加请求。 |
 
 行为契约先查 [产品说明](product.md)，跨模块与平台契约先查 [系统架构](architecture.md)。
@@ -74,7 +74,7 @@ pnpm typecheck && pnpm test && pnpm test:web && pnpm build
 adb shell am start -n com.wswensw.template/.MainActivity
 ```
 
-Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Add` 保持禁用；在系统快捷设置编辑页手动添加两个 Tile。
+Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick settings` 行保持禁用；在系统快捷设置编辑页手动添加两个 Tile。
 
 ## 自动测试边界
 
@@ -112,6 +112,9 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
 15. 配置 Records 凭据，创建记录项并记录正数值；确认 PC 刷新可见，Undo 只删除该条远端流水，断网失败后服务端数据不变，恢复网络并 Retry 可重新读取。
+16. 在 Home 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
+17. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
+18. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
 
 ## 设备诊断
 

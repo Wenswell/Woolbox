@@ -1,6 +1,5 @@
 package com.wswensw.template.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,11 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,13 +18,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
@@ -50,7 +43,6 @@ fun GlobalCopyRoute(
     onBack: () -> Unit,
     onLaunchTool: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenAccessibilitySettings: () -> Unit,
     tileRequestAvailable: Boolean,
     onRequestTile: () -> Unit,
 ) {
@@ -58,19 +50,17 @@ fun GlobalCopyRoute(
         title = "Global Copy",
         onBack = onBack,
     ) {
-        TemplatePrimaryAction(
-            label = "Start Global Copy",
-            iconRes = R.drawable.ic_content_copy_24,
-            enabled = state.isServiceConnected,
-            onClick = onLaunchTool,
-        )
-
-        TemplateSection(title = "Access") {
+        TemplateSection(title = "Actions") {
             TemplateListItem(
-                title = "Accessibility service",
-                subtitle = state.accessibilityStatus(),
-                iconRes = R.drawable.ic_settings_24,
-                onClick = onOpenAccessibilitySettings,
+                title = "Start Global Copy",
+                subtitle = if (state.isServiceConnected) {
+                    state.globalCopyStatus()
+                } else {
+                    state.accessibilityStatus()
+                },
+                iconRes = R.drawable.ic_content_copy_24,
+                enabled = state.isServiceConnected,
+                onClick = onLaunchTool,
             )
         }
 
@@ -81,15 +71,8 @@ fun GlobalCopyRoute(
                 title = "Global Copy tile",
                 subtitle = state.globalCopyStatus(),
                 iconRes = R.drawable.ic_content_copy_24,
-                trailing = {
-                    FilledTonalButton(
-                        onClick = onRequestTile,
-                        enabled = tileRequestAvailable,
-                    ) {
-                        Text("Add")
-                    }
-                },
-                onClick = onRequestTile.takeIf { tileRequestAvailable },
+                enabled = tileRequestAvailable,
+                onClick = onRequestTile,
             )
         }
 
@@ -117,7 +100,6 @@ fun OledShieldRoute(
     profiles: List<OledShieldProfileUi>,
     onBack: () -> Unit,
     onLaunchTool: () -> Unit,
-    onOpenAccessibilitySettings: () -> Unit,
     tileRequestAvailable: Boolean,
     onRequestTile: () -> Unit,
     onConfigChange: ((OledShieldConfig) -> OledShieldConfig) -> Unit,
@@ -131,19 +113,12 @@ fun OledShieldRoute(
         title = "OLED shield",
         onBack = onBack,
     ) {
-        TemplatePrimaryAction(
-            label = "Show shield",
-            iconRes = R.drawable.ic_oled_shield_24,
-            enabled = true,
-            onClick = onLaunchTool,
-        )
-
-        TemplateSection(title = "Access") {
+        TemplateSection(title = "Actions") {
             TemplateListItem(
-                title = "Accessibility service",
-                subtitle = state.accessibilityStatus(),
-                iconRes = R.drawable.ic_settings_24,
-                onClick = onOpenAccessibilitySettings,
+                title = "Show shield",
+                subtitle = state.oledStatus(),
+                iconRes = R.drawable.ic_oled_shield_24,
+                onClick = onLaunchTool,
             )
         }
 
@@ -154,15 +129,8 @@ fun OledShieldRoute(
                 title = "OLED shield tile",
                 subtitle = state.oledStatus(),
                 iconRes = R.drawable.ic_oled_shield_24,
-                trailing = {
-                    FilledTonalButton(
-                        onClick = onRequestTile,
-                        enabled = tileRequestAvailable,
-                    ) {
-                        Text("Add")
-                    }
-                },
-                onClick = onRequestTile.takeIf { tileRequestAvailable },
+                enabled = tileRequestAvailable,
+                onClick = onRequestTile,
             )
         }
 
@@ -273,23 +241,11 @@ private fun OledProfileRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val icon = profile.appIcon
-            if (icon == null) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_oled_shield_24),
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                )
-            } else {
-                val imageBitmap = remember(icon) { icon.asImageBitmap() }
-                Image(
-                    bitmap = imageBitmap,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                )
-            }
+            TemplateAppIcon(
+                bitmap = profile.appIcon,
+                fallbackIconRes = R.drawable.ic_oled_shield_24,
+                contentDescription = null,
+            )
             Column(
                 modifier = Modifier
                     .weight(1f)

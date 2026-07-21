@@ -2,10 +2,8 @@ package com.wswensw.template.tool.ui
 
 import android.app.Application
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.provider.Settings
-import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.wswensw.template.tool.model.OledShieldConfig
@@ -77,28 +75,21 @@ class ToolViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-private fun Application.resolveProfile(profile: OledShieldProfile): OledShieldProfileUi = try {
-    val applicationInfo = packageManager.getApplicationInfo(
-        profile.packageName,
-        0,
-    )
-    OledShieldProfileUi(
-        profile = profile,
-        appName = applicationInfo.loadLabel(packageManager).toString(),
-        appIcon = applicationInfo.loadIcon(packageManager).toBitmap(
-            width = APP_ICON_SIZE_PX,
-            height = APP_ICON_SIZE_PX,
-            config = Bitmap.Config.ARGB_8888,
-        ),
-        isLaunchable = packageManager.getLaunchIntentForPackage(profile.packageName) != null,
-    )
-} catch (_: PackageManager.NameNotFoundException) {
-    OledShieldProfileUi(
-        profile = profile,
-        appName = profile.packageName,
-        appIcon = null,
-        isLaunchable = false,
-    )
+private fun Application.resolveProfile(profile: OledShieldProfile): OledShieldProfileUi {
+    val appInfo = resolveAppDisplayInfo(profile.packageName)
+    return if (appInfo == null) {
+        OledShieldProfileUi(
+            profile = profile,
+            appName = profile.packageName,
+            appIcon = null,
+            isLaunchable = false,
+        )
+    } else {
+        OledShieldProfileUi(
+            profile = profile,
+            appName = appInfo.name,
+            appIcon = appInfo.icon,
+            isLaunchable = packageManager.getLaunchIntentForPackage(profile.packageName) != null,
+        )
+    }
 }
-
-private const val APP_ICON_SIZE_PX = 128
