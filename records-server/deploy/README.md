@@ -34,7 +34,7 @@ On the cloud server, install production dependencies and units:
 ssh cloud '
   sudo install -d -o ravvss -g ravvss -m 750 /srv/records /srv/records/backups
   cd /home/ravvss/records
-  pnpm install --prod --frozen-lockfile
+  PATH="$HOME/.local/node/bin:$HOME/.local/share/pnpm:$PATH" pnpm install --prod --frozen-lockfile
   install -m 644 deploy/records.service ~/.config/systemd/user/records.service
   install -m 644 deploy/records-backup.service ~/.config/systemd/user/records-backup.service
   install -m 644 deploy/records-backup.timer ~/.config/systemd/user/records-backup.timer
@@ -54,7 +54,7 @@ ssh cloud '
   systemctl --user start records-backup.service
   latest=$(find /srv/records/backups -maxdepth 1 -name "records-*.sqlite" -print | sort | tail -1)
   cd /home/ravvss/records
-  pnpm restore-check -- "$latest"
+  /home/ravvss/.local/node/bin/node scripts/restore-check.mjs -- "$latest"
 '
 ```
 
