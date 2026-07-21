@@ -23,7 +23,7 @@ try {
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
       .all()
       .map(({ name }) => name);
-    for (const table of ["record_items", "record_windows", "record_entries"]) {
+    for (const table of ["record_items", "record_windows", "record_entries", "record_audit_logs"]) {
       if (!tables.includes(table)) throw new Error(`Restored database is missing ${table}.`);
     }
   } finally {

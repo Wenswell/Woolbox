@@ -10,6 +10,7 @@ import {
   parseIds,
   parseIsoDate,
   parseItemInput,
+  parseOptionalId,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
 
@@ -83,6 +84,11 @@ export function buildApp(options: BuildAppOptions) {
     return { item };
   });
 
+  app.get("/api/audit-logs", (request) => {
+    const query = request.query as Record<string, unknown>;
+    return records.listAuditLogs(parseOptionalId(query.beforeId, "Audit log cursor"));
+  });
+
   app.get("/api/entries", (request) => {
     const query = request.query as Record<string, unknown>;
     const startDate = parseIsoDate(query.startDate, "Start date");
@@ -94,11 +100,6 @@ export function buildApp(options: BuildAppOptions) {
   app.post("/api/entries", (request, reply) => {
     const entry = records.createEntry(parseEntryInput(request.body));
     return reply.status(201).send({ entry });
-  });
-
-  app.put("/api/entries/:id", (request) => {
-    const entry = records.updateEntry(parseId((request.params as { id?: unknown }).id), parseEntryInput(request.body));
-    return { entry };
   });
 
   app.post("/api/entries/batch-delete", (request) => {

@@ -28,7 +28,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `record/{model,data,ui}/` | 记录规则、HTTPS Repository、Keystore 凭据、ViewModel、今天流水、记录 Sheet 和记录项表单。 |
-| `records-server/src/`、`drizzle/` | Fastify API、服务端规则、SQLite schema 和迁移。 |
+| `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
 | `records-server/web/`、`deploy/` | PC 管理页、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
@@ -85,8 +85,8 @@ adb shell am start -n com.wswensw.template/.MainActivity
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化与正数校验、推荐排序、跨午夜时间段和十进制步进。 |
-| `records-server/test/api.test.ts` | 空库迁移、服务端数据规则、事务、筛选和批量 API。 |
-| `records-server/web/src/App.test.tsx` | 管理页筛选、流水编辑/批删和记录项归档/恢复。 |
+| `records-server/test/api.test.ts` | 空库迁移、服务端数据规则、审计快照、事务、筛选和批量 API。 |
+| `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志和记录项归档/恢复。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 

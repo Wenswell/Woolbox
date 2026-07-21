@@ -103,15 +103,15 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn`。页头右侧固定为 `Manage`；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则显示 `Today` 分组。只有存在活跃记录项时，根 `Scaffold` 才显示带图标和 `Record` 文案的扩展 FAB。
+Records 根页面使用 `LazyColumn`。页头右侧固定为 `Manage`；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则显示 `Today` 分组。今天流水按时间倒序，时间作为标题，项目、数值和已配置目标作为副文本；记录项与流水列表不使用无语义前置图标。今天流水切换使用 `180ms` 淡入和 `90ms` 淡出。只有存在活跃记录项时，根 `Scaffold` 才显示带图标和 `Record` 文案的扩展 FAB。
 
-`Record` 打开单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。第一阶段使用搜索框和无卡片列表选择记录项，空搜索标题为 `Suggested now` 且最多显示五项；第二阶段显示记录项名称、说明、数值输入、单位、步进提示以及减号/加号图标按钮，底部使用全宽确认按钮。
+`Record` 打开单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。第一阶段使用搜索框和无卡片列表选择记录项，空搜索标题为 `Suggested now` 且最多显示五项；第二阶段显示记录项名称、说明、已配置目标、数值输入、单位、步进提示以及减号/加号图标按钮，底部使用全宽确认按钮。
 
-`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
+`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
 
 `Records connection` 使用独立路由，只显示固定服务地址、用户名和密码；保存成功后返回上一页。Android Records 只呈现今天流水，不显示归档项或目标进度。
 
-PC 管理页使用 Entries/Record items 两个页签。Entries 使用日期范围和记录项筛选、可选择表格、单条编辑 Dialog 与批量删除；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
+PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期范围和记录项筛选、可选择表格与批量删除，不提供编辑入口；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复；Logs 使用只读表格显示操作时间、对象、动作和变更摘要，并可加载更早日志。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
 
 ## 状态呈现
 

@@ -296,7 +296,7 @@ fun TemplateSection(
 fun TemplateListItem(
     title: String,
     subtitle: String,
-    @DrawableRes iconRes: Int,
+    @DrawableRes iconRes: Int? = null,
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
@@ -332,11 +332,13 @@ fun TemplateListItem(
                 overflow = TextOverflow.Ellipsis,
             )
         },
-        leadingContent = {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = null,
-            )
+        leadingContent = iconRes?.let { resource ->
+            {
+                Icon(
+                    painter = painterResource(resource),
+                    contentDescription = null,
+                )
+            }
         },
         trailingContent = trailing,
         modifier = rowModifier,

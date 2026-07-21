@@ -1,8 +1,61 @@
-import { and, asc, count, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
 import type { RecordEntryInput, RecordItemInput } from "./domain.js";
 import { ApiError } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
-import { recordEntries, recordItems, recordWindows } from "./schema.js";
+import { recordAuditLogs, recordEntries, recordItems, recordWindows } from "./schema.js";
+
+const AuditLogPageSize = 100;
+
+type RecordItemRow = typeof recordItems.$inferSelect;
+type RecordWindowRow = typeof recordWindows.$inferSelect;
+type RecordEntryRow = typeof recordEntries.$inferSelect;
+type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
+
+type AuditAction =
+  | "ITEM_CREATED"
+  | "ITEM_UPDATED"
+  | "ITEM_ARCHIVED"
+  | "ITEM_RESTORED"
+  | "ITEM_DELETED"
+  | "ENTRY_CREATED"
+  | "ENTRY_DELETED";
+
+interface ItemAuditSnapshot {
+  id: number;
+  name: string;
+  description: string;
+  valueType: string;
+  defaultValue: number | null;
+  stepValue: number;
+  unit: string;
+  goalValue: number | null;
+  goalPeriod: string | null;
+  priority: number;
+  archived: boolean;
+  windows: Array<{ startMinute: number; endMinute: number }>;
+  entryCount?: number;
+}
+
+interface EntryAuditSnapshot {
+  id: number;
+  itemId: number;
+  itemName: string;
+  occurredAt: number;
+  localDate: string;
+  localMinute: number;
+  value: number;
+}
+
+type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot;
+
+interface AuditWrite {
+  action: AuditAction;
+  entityType: "ITEM" | "ENTRY";
+  entityId: number;
+  before?: AuditSnapshot;
+  after?: AuditSnapshot;
+  createdAt: number;
+}
 
 export class RecordsService {
   constructor(
@@ -40,6 +93,13 @@ export class RecordsService {
           .values(input.windows.map((window) => ({ ...window, itemId: created.id })))
           .run();
       }
+      this.writeAudit(tx, {
+        action: "ITEM_CREATED",
+        entityType: "ITEM",
+        entityId: created.id,
+        after: itemSnapshot({ id: created.id, ...input, archived: false }),
+        createdAt: now,
+      });
       return created.id;
     });
     return this.getItem(id);
@@ -59,8 +119,13 @@ export class RecordsService {
         throw new ApiError(400, "Type and unit cannot change after records exist.");
       }
 
+      const before = itemSnapshot(
+        current,
+        tx.select().from(recordWindows).where(eq(recordWindows.itemId, id)).all(),
+      );
+      const now = this.now();
       tx.update(recordItems)
-        .set({ ...withoutWindows(input), updatedAt: this.now() })
+        .set({ ...withoutWindows(input), updatedAt: now })
         .where(eq(recordItems.id, id))
         .run();
       tx.delete(recordWindows).where(eq(recordWindows.itemId, id)).run();
@@ -69,33 +134,70 @@ export class RecordsService {
           .values(input.windows.map((window) => ({ ...window, itemId: id })))
           .run();
       }
+      this.writeAudit(tx, {
+        action: "ITEM_UPDATED",
+        entityType: "ITEM",
+        entityId: id,
+        before,
+        after: itemSnapshot({ ...current, ...withoutWindows(input) }, input.windows),
+        createdAt: now,
+      });
     });
     return this.getItem(id);
   }
 
   setItemsArchived(ids: number[], archived: boolean) {
     this.db.transaction((tx) => {
-      const existing = tx
-        .select({ id: recordItems.id })
-        .from(recordItems)
-        .where(inArray(recordItems.id, ids))
-        .all();
+      const existing = tx.select().from(recordItems).where(inArray(recordItems.id, ids)).all();
       if (existing.length !== ids.length) throw new ApiError(404, "Record item not found.");
+      const changed = existing.filter((item) => item.archived !== archived);
+      if (changed.length === 0) return;
+
+      const windows = tx
+        .select()
+        .from(recordWindows)
+        .where(inArray(recordWindows.itemId, changed.map((item) => item.id)))
+        .all();
+      const windowsByItem = groupWindows(windows);
+      const now = this.now();
       tx.update(recordItems)
-        .set({ archived, updatedAt: this.now() })
-        .where(inArray(recordItems.id, ids))
+        .set({ archived, updatedAt: now })
+        .where(inArray(recordItems.id, changed.map((item) => item.id)))
         .run();
+      for (const item of changed) {
+        this.writeAudit(tx, {
+          action: archived ? "ITEM_ARCHIVED" : "ITEM_RESTORED",
+          entityType: "ITEM",
+          entityId: item.id,
+          before: itemSnapshot(item, windowsByItem.get(item.id) ?? []),
+          after: itemSnapshot({ ...item, archived }, windowsByItem.get(item.id) ?? []),
+          createdAt: now,
+        });
+      }
     });
     return ids.map((id) => this.getItem(id));
   }
 
   deleteArchivedItem(id: number) {
-    const deleted = this.getItem(id);
-    this.db.transaction((tx) => {
+    const deleted = this.db.transaction((tx) => {
       const current = tx.select().from(recordItems).where(eq(recordItems.id, id)).get();
       if (!current) throw new ApiError(404, "Record item not found.");
       if (!current.archived) throw new ApiError(400, "Archive the record item before deleting it.");
+      const windows = tx.select().from(recordWindows).where(eq(recordWindows.itemId, id)).all();
+      const entryCount = tx
+        .select({ value: count() })
+        .from(recordEntries)
+        .where(eq(recordEntries.itemId, id))
+        .get()!.value;
+      this.writeAudit(tx, {
+        action: "ITEM_DELETED",
+        entityType: "ITEM",
+        entityId: id,
+        before: { ...itemSnapshot(current, windows), entryCount },
+        createdAt: this.now(),
+      });
       tx.delete(recordItems).where(eq(recordItems.id, id)).run();
+      return { ...current, windows };
     });
     return deleted;
   }
@@ -105,10 +207,10 @@ export class RecordsService {
     const dateRange = and(gte(recordEntries.localDate, startDate), lte(recordEntries.localDate, endDate));
     const condition = itemId === undefined ? dateRange : and(dateRange, eq(recordEntries.itemId, itemId));
     return this.entryQuery().where(condition).orderBy(
-      asc(recordEntries.localDate),
-      asc(recordEntries.localMinute),
-      asc(recordEntries.createdAt),
-      asc(recordEntries.id),
+      desc(recordEntries.localDate),
+      desc(recordEntries.localMinute),
+      desc(recordEntries.createdAt),
+      desc(recordEntries.id),
     ).all();
   }
 
@@ -123,44 +225,85 @@ export class RecordsService {
       const item = tx.select().from(recordItems).where(eq(recordItems.id, input.itemId)).get();
       if (!item) throw new ApiError(404, "Record item not found.");
       if (item.archived) throw new ApiError(400, "Archived items cannot be recorded.");
-      return tx
+      const now = this.now();
+      const created = tx
         .insert(recordEntries)
-        .values({ ...input, createdAt: this.now() })
+        .values({ ...input, createdAt: now })
         .returning({ id: recordEntries.id })
-        .get().id;
-    });
-    return this.getEntry(id);
-  }
-
-  updateEntry(id: number, input: RecordEntryInput) {
-    this.db.transaction((tx) => {
-      const current = tx.select().from(recordEntries).where(eq(recordEntries.id, id)).get();
-      if (!current) throw new ApiError(404, "Record not found.");
-      const item = tx.select().from(recordItems).where(eq(recordItems.id, input.itemId)).get();
-      if (!item) throw new ApiError(404, "Record item not found.");
-      tx.update(recordEntries).set(input).where(eq(recordEntries.id, id)).run();
+        .get();
+      this.writeAudit(tx, {
+        action: "ENTRY_CREATED",
+        entityType: "ENTRY",
+        entityId: created.id,
+        after: entrySnapshot({ id: created.id, ...input, createdAt: now }, item.name),
+        createdAt: now,
+      });
+      return created.id;
     });
     return this.getEntry(id);
   }
 
   deleteEntry(id: number) {
-    const deleted = this.getEntry(id);
-    this.db.delete(recordEntries).where(eq(recordEntries.id, id)).run();
-    return deleted;
+    return this.db.transaction((tx) => {
+      const entry = tx.select().from(recordEntries).where(eq(recordEntries.id, id)).get();
+      if (!entry) throw new ApiError(404, "Record not found.");
+      const item = tx.select().from(recordItems).where(eq(recordItems.id, entry.itemId)).get();
+      if (!item) throw new ApiError(404, "Record item not found.");
+      this.writeAudit(tx, {
+        action: "ENTRY_DELETED",
+        entityType: "ENTRY",
+        entityId: id,
+        before: entrySnapshot(entry, item.name),
+        createdAt: this.now(),
+      });
+      tx.delete(recordEntries).where(eq(recordEntries.id, id)).run();
+      return entryResponse(entry, item);
+    });
   }
 
   deleteEntries(ids: number[]) {
     const deleted = this.db.transaction((tx) => {
-      const existing = this.entryQuery().where(inArray(recordEntries.id, ids)).all();
+      const existing = tx
+        .select({ entry: recordEntries, item: recordItems })
+        .from(recordEntries)
+        .innerJoin(recordItems, eq(recordItems.id, recordEntries.itemId))
+        .where(inArray(recordEntries.id, ids))
+        .all();
       if (existing.length !== ids.length) throw new ApiError(404, "Record not found.");
+      const now = this.now();
       tx.delete(recordEntries).where(inArray(recordEntries.id, ids)).run();
+      for (const { entry, item } of existing) {
+        this.writeAudit(tx, {
+          action: "ENTRY_DELETED",
+          entityType: "ENTRY",
+          entityId: entry.id,
+          before: entrySnapshot(entry, item.name),
+          createdAt: now,
+        });
+      }
       return existing;
     });
-    const byId = new Map(deleted.map((entry) => [entry.id, entry]));
+    const byId = new Map(deleted.map(({ entry, item }) => [entry.id, entryResponse(entry, item)]));
     return ids.map((id) => byId.get(id)!);
   }
 
-  private attachWindows(rows: Array<typeof recordItems.$inferSelect>) {
+  listAuditLogs(beforeId?: number) {
+    const query = this.db.select().from(recordAuditLogs);
+    const rows = (beforeId === undefined ? query : query.where(lt(recordAuditLogs.id, beforeId)))
+      .orderBy(desc(recordAuditLogs.id))
+      .limit(AuditLogPageSize)
+      .all();
+    return {
+      logs: rows.map((row) => ({
+        ...row,
+        before: row.beforeJson === null ? null : JSON.parse(row.beforeJson),
+        after: row.afterJson === null ? null : JSON.parse(row.afterJson),
+      })),
+      nextBeforeId: rows.length === AuditLogPageSize ? rows.at(-1)!.id : null,
+    };
+  }
+
+  private attachWindows(rows: RecordItemRow[]) {
     if (rows.length === 0) return [];
     const windows = this.db
       .select()
@@ -168,12 +311,7 @@ export class RecordsService {
       .where(inArray(recordWindows.itemId, rows.map((row) => row.id)))
       .orderBy(asc(recordWindows.startMinute), asc(recordWindows.endMinute), asc(recordWindows.id))
       .all();
-    const grouped = new Map<number, typeof windows>();
-    for (const window of windows) {
-      const itemWindows = grouped.get(window.itemId) ?? [];
-      itemWindows.push(window);
-      grouped.set(window.itemId, itemWindows);
-    }
+    const grouped = groupWindows(windows);
     return rows.map((row) => ({ ...row, windows: grouped.get(row.id) ?? [] }));
   }
 
@@ -195,6 +333,17 @@ export class RecordsService {
       .innerJoin(recordItems, eq(recordItems.id, recordEntries.itemId));
   }
 
+  private writeAudit(tx: RecordsTransaction, audit: AuditWrite) {
+    tx.insert(recordAuditLogs).values({
+      action: audit.action,
+      entityType: audit.entityType,
+      entityId: audit.entityId,
+      beforeJson: audit.before === undefined ? null : JSON.stringify(audit.before),
+      afterJson: audit.after === undefined ? null : JSON.stringify(audit.after),
+      createdAt: audit.createdAt,
+    }).run();
+  }
+
   private requireUniqueName(name: string, excludedId?: number) {
     const sameName = sql`lower(${recordItems.name}) = lower(${name}) COLLATE NOCASE`;
     const condition = excludedId === undefined ? sameName : and(sameName, ne(recordItems.id, excludedId));
@@ -207,4 +356,45 @@ export class RecordsService {
 function withoutWindows(input: RecordItemInput) {
   const { windows: _windows, ...item } = input;
   return item;
+}
+
+function groupWindows(windows: RecordWindowRow[]) {
+  const grouped = new Map<number, RecordWindowRow[]>();
+  for (const window of windows) {
+    const itemWindows = grouped.get(window.itemId) ?? [];
+    itemWindows.push(window);
+    grouped.set(window.itemId, itemWindows);
+  }
+  return grouped;
+}
+
+function itemSnapshot(
+  item: Pick<RecordItemRow, "id" | "name" | "description" | "valueType" | "defaultValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
+  windows: Array<Pick<RecordWindowRow, "startMinute" | "endMinute">> = [],
+): ItemAuditSnapshot {
+  return {
+    ...item,
+    windows: windows.map(({ startMinute, endMinute }) => ({ startMinute, endMinute })),
+  };
+}
+
+function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnapshot {
+  return {
+    id: entry.id,
+    itemId: entry.itemId,
+    itemName,
+    occurredAt: entry.occurredAt,
+    localDate: entry.localDate,
+    localMinute: entry.localMinute,
+    value: entry.value,
+  };
+}
+
+function entryResponse(entry: RecordEntryRow, item: RecordItemRow) {
+  return {
+    ...entry,
+    itemName: item.name,
+    itemUnit: item.unit,
+    itemValueType: item.valueType,
+  };
 }

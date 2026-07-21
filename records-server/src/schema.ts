@@ -52,3 +52,17 @@ export const recordEntries = sqliteTable(
     index("record_entries_local_date_minute_index").on(table.localDate, table.localMinute),
   ],
 );
+
+export const recordAuditLogs = sqliteTable(
+  "record_audit_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    action: text("action").notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY"] }).notNull(),
+    entityId: integer("entity_id").notNull(),
+    beforeJson: text("before_json"),
+    afterJson: text("after_json"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [index("record_audit_logs_created_at_index").on(table.createdAt)],
+);

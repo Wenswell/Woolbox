@@ -100,6 +100,10 @@ export function parseId(value: unknown, label = "ID"): number {
   return Number(id);
 }
 
+export function parseOptionalId(value: unknown, label = "ID"): number | undefined {
+  return value === undefined ? undefined : parseId(value, label);
+}
+
 export function parseIds(value: unknown): number[] {
   const input = objectInput(value);
   requireRule(Array.isArray(input.ids) && input.ids.length > 0, "IDs must be a non-empty array.");

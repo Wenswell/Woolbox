@@ -58,4 +58,4 @@ ssh cloud '
 '
 ```
 
-The restore check copies the selected backup to a temporary directory, runs SQLite integrity validation, verifies the three Records tables, and removes the temporary copy.
+The restore check copies the selected backup to a temporary directory, runs SQLite integrity validation, verifies the four Records tables, and removes the temporary copy.

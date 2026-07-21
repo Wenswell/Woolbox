@@ -155,7 +155,6 @@ private fun RecordItemPicker(
                     TemplateListItem(
                         title = suggestion.item.name,
                         subtitle = suggestion.subtitle(),
-                        iconRes = R.drawable.ic_records_24,
                         onClick = { onSelect(suggestion.item) },
                     )
                 }
@@ -186,6 +185,13 @@ private fun RecordValueConfirmation(
         if (item.description.isNotEmpty()) {
             Text(
                 text = item.description,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        item.goalSummary()?.let { goal ->
+            Text(
+                text = goal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -253,7 +259,8 @@ private fun RecordSuggestion.subtitle(): String {
         "${formatMinute(window.startMinute)}-${formatMinute(window.endMinute)}"
     } ?: "Anytime"
     val value = item.defaultValue?.let { " · ${formatValue(it)} ${item.unit}" }.orEmpty()
-    return "$time$value"
+    val goal = item.goalSummary()?.let { " · $it" }.orEmpty()
+    return "$time$value$goal"
 }
 
 private fun formatMinute(minute: Int): String = String.format(

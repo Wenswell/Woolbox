@@ -41,6 +41,14 @@ describe("Records API", () => {
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.json().item).toMatchObject({ name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] });
+
+    expect((await getAuditLogs()).map((log) => log.action)).toEqual(["ITEM_UPDATED", "ITEM_CREATED"]);
+    expect((await getAuditLogs())[0]).toMatchObject({
+      entityType: "ITEM",
+      entityId: 1,
+      before: { name: "Water", windows: [{ startMinute: 480, endMinute: 540 }] },
+      after: { name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] },
+    });
   });
 
   it.each([
@@ -59,6 +67,7 @@ describe("Records API", () => {
     const response = await createItem(itemInput(patch));
     expect(response.statusCode).toBe(400);
     expect(await getItems(false)).toEqual([]);
+    expect(await getAuditLogs()).toEqual([]);
   });
 
   it("returns a client error for malformed JSON without writing", async () => {
@@ -121,6 +130,13 @@ describe("Records API", () => {
 
     expect((await archiveItems([2], false)).statusCode).toBe(200);
     expect((await getItems(false)).map((item) => item.name)).toEqual(["Read"]);
+    expect((await getAuditLogs()).map((log) => log.action)).toEqual([
+      "ITEM_RESTORED",
+      "ITEM_ARCHIVED",
+      "ITEM_ARCHIVED",
+      "ITEM_CREATED",
+      "ITEM_CREATED",
+    ]);
   });
 
   it("rejects recording archived items and only permanently deletes archived items", async () => {
@@ -138,7 +154,7 @@ describe("Records API", () => {
     expect(await getItems(true)).toEqual([]);
   });
 
-  it("creates, filters, fully updates, and deletes entries", async () => {
+  it("creates, filters, and deletes entries without an update route", async () => {
     await createItem(itemInput({ name: "Water", unit: "ml" }));
     await createItem(itemInput({ name: "Read", unit: "pages" }));
     await createEntry(entryInput({ itemId: 1, localDate: "2026-07-19", localMinute: 600, value: 2 }));
@@ -150,26 +166,21 @@ describe("Records API", () => {
       expect.objectContaining({ id: 2, itemId: 2, itemName: "Read", localDate: "2026-07-20" }),
     ]);
 
-    const updated = await app.inject({
+    const update = await app.inject({
       method: "PUT",
       url: "/api/entries/1",
       payload: entryInput({ itemId: 2, occurredAt: 20, localDate: "2026-07-18", localMinute: 59, value: 4 }),
     });
-    expect(updated.statusCode).toBe(200);
-    expect(updated.json().entry).toMatchObject({
-      id: 1,
-      itemId: 2,
-      occurredAt: 20,
-      localDate: "2026-07-18",
-      localMinute: 59,
-      value: 4,
-      itemName: "Read",
-      createdAt: 1_700_000_000_000,
-    });
+    expect(update.statusCode).toBe(404);
 
     const deleted = await app.inject({ method: "DELETE", url: "/api/entries/1" });
     expect(deleted.statusCode).toBe(200);
     expect(deleted.json().entry.id).toBe(1);
+    expect((await getAuditLogs()).slice(0, 3)).toMatchObject([
+      { action: "ENTRY_DELETED", before: { id: 1, itemName: "Water", value: 2 } },
+      { action: "ENTRY_CREATED", after: { id: 2, itemName: "Read", value: 3 } },
+      { action: "ENTRY_CREATED", after: { id: 1, itemName: "Water", value: 2 } },
+    ]);
   });
 
   it("validates entry timestamps and values without writing", async () => {
@@ -200,6 +211,10 @@ describe("Records API", () => {
     expect(deleted.statusCode).toBe(200);
     expect(deleted.json().entries.map((entry: { id: number }) => entry.id)).toEqual([2, 1]);
     expect(await getEntries()).toEqual([]);
+    expect((await getAuditLogs()).slice(0, 2)).toMatchObject([
+      { action: "ENTRY_DELETED", entityId: 2, before: { value: 2 } },
+      { action: "ENTRY_DELETED", entityId: 1, before: { value: 1 } },
+    ]);
   });
 
   async function createItem(payload: Record<string, unknown>) {
@@ -224,6 +239,12 @@ describe("Records API", () => {
     const response = await app.inject({ method: "GET", url: "/api/entries?startDate=2026-07-01&endDate=2026-07-31" });
     expect(response.statusCode).toBe(200);
     return response.json().entries;
+  }
+
+  async function getAuditLogs(): Promise<Array<Record<string, unknown>>> {
+    const response = await app.inject({ method: "GET", url: "/api/audit-logs" });
+    expect(response.statusCode).toBe(200);
+    return response.json().logs;
   }
 });
 

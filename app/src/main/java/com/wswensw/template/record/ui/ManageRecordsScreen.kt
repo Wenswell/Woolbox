@@ -5,7 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.wswensw.template.R
+import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.ui.TemplateDivider
@@ -38,7 +38,6 @@ fun ManageRecordsScreen(
                     TemplateListItem(
                         title = "No active items",
                         subtitle = "Choose New to create the first record item.",
-                        iconRes = R.drawable.ic_records_24,
                     )
                 }
             }
@@ -65,7 +64,6 @@ private fun RecordItemRow(
     TemplateListItem(
         title = item.name,
         subtitle = item.summary(),
-        iconRes = R.drawable.ic_records_24,
         onClick = onClick,
     )
 }
@@ -73,7 +71,14 @@ private fun RecordItemRow(
 private fun RecordItem.summary(): String {
     val type = if (valueType == RecordValueType.NUMBER) "Number" else "Duration"
     val default = defaultValue?.let(::formatValue) ?: "No default"
-    return "$type · $default $unit · step ${formatValue(stepValue)}"
+    return listOf(
+        "$type · $default $unit · step ${formatValue(stepValue)}",
+        goalSummary(),
+    ).filterNotNull().joinToString("\n")
+}
+
+internal fun RecordItem.goalSummary(): String? = goalValue?.let { target ->
+    "Target ${formatValue(target)} $unit / ${if (goalPeriod == GoalPeriod.DAY) "day" else "week"}"
 }
 
 internal fun formatValue(value: Double): String =

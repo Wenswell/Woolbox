@@ -1,5 +1,10 @@
 package com.wswensw.template.record.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -43,7 +48,7 @@ fun RecordsScreen(
             Spacer(Modifier.height(TemplateStyle.spacing.pageTop))
             TemplatePageHeader(
                 title = "Records",
-                subtitle = "Track values and daily progress.",
+                subtitle = "Review recorded values by time.",
                 titleActions = {
                     TextButton(onClick = onManage) {
                         Text("Manage")
@@ -90,22 +95,29 @@ fun RecordsScreen(
             }
 
             else -> item {
-                TemplateSection(title = "Today") {
-                    if (state.entries.isEmpty()) {
-                        TemplateListItem(
-                            title = "No records today",
-                            subtitle = "Use Record to add the first value.",
-                            iconRes = R.drawable.ic_records_24,
-                        )
-                    } else {
-                        state.entries.forEachIndexed { index, entry ->
+                AnimatedContent(
+                    targetState = state.entries,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(180)) togetherWith
+                            fadeOut(animationSpec = tween(90))
+                    },
+                    label = "TodayRecords",
+                ) { entries ->
+                    TemplateSection(title = "Today") {
+                        if (entries.isEmpty()) {
                             TemplateListItem(
-                                title = entry.itemName,
-                                subtitle = "${formatMinute(entry.localMinute)} · ${formatValue(entry.value)} ${entry.itemUnit}",
-                                iconRes = R.drawable.ic_records_24,
+                                title = "No records today",
+                                subtitle = "Use Record to add the first value.",
                             )
-                            if (index != state.entries.lastIndex) {
-                                TemplateDivider()
+                        } else {
+                            entries.forEachIndexed { index, entry ->
+                                TemplateListItem(
+                                    title = formatMinute(entry.localMinute),
+                                    subtitle = entry.subtitle(state.findItem(entry.itemId)),
+                                )
+                                if (index != entries.lastIndex) {
+                                    TemplateDivider()
+                                }
                             }
                         }
                     }
@@ -131,3 +143,8 @@ private fun formatMinute(minute: Int): String = String.format(
     minute / 60,
     minute % 60,
 )
+
+private fun com.wswensw.template.record.model.RecordEntry.subtitle(item: RecordItem?): String = listOfNotNull(
+    "$itemName · ${formatValue(value)} $itemUnit",
+    item?.goalSummary(),
+).joinToString("\n")
