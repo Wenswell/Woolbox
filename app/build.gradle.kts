@@ -16,7 +16,7 @@ android {
     defaultConfig {
         applicationId = "com.wswensw.template"
         minSdk {
-            version = release(34)
+            version = release(31)
         }
         targetSdk {
             version = release(36)

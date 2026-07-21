@@ -97,7 +97,7 @@ TemplateTheme
 
 主操作按钮使用工具图标和结果导向文案：`Start Global Copy`、`Show shield`。`Start Global Copy` 在 `isServiceConnected == false` 时禁用；`Show shield` 始终可用，无服务时显示应用内遮罩，有服务时启动跨应用遮罩。授权入口保持可用。
 
-Tile 行的 `Add` 使用 tonal button，整行与按钮执行同一个系统添加请求。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
+Tile 行的 `Add` 使用 tonal button。Android 13 及以上整行与按钮执行同一个系统添加请求；Android 12/12L 保留稳定尺寸并禁用整行与按钮。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
 Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，每行显示应用图标、名称、三项百分比、记录时间以及 Enable/Delete 图标操作；参数在窄屏可自然换行，不截断隐藏。
 

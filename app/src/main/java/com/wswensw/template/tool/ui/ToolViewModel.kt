@@ -80,7 +80,7 @@ class ToolViewModel(application: Application) : AndroidViewModel(application) {
 private fun Application.resolveProfile(profile: OledShieldProfile): OledShieldProfileUi = try {
     val applicationInfo = packageManager.getApplicationInfo(
         profile.packageName,
-        PackageManager.ApplicationInfoFlags.of(0),
+        0,
     )
     OledShieldProfileUi(
         profile = profile,

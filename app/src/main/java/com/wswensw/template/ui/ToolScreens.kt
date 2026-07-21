@@ -51,6 +51,7 @@ fun GlobalCopyRoute(
     onLaunchTool: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
+    tileRequestAvailable: Boolean,
     onRequestTile: () -> Unit,
 ) {
     TemplateRouteScaffold(
@@ -81,11 +82,14 @@ fun GlobalCopyRoute(
                 subtitle = state.globalCopyStatus(),
                 iconRes = R.drawable.ic_content_copy_24,
                 trailing = {
-                    FilledTonalButton(onClick = onRequestTile) {
+                    FilledTonalButton(
+                        onClick = onRequestTile,
+                        enabled = tileRequestAvailable,
+                    ) {
                         Text("Add")
                     }
                 },
-                onClick = onRequestTile,
+                onClick = onRequestTile.takeIf { tileRequestAvailable },
             )
         }
 
@@ -114,6 +118,7 @@ fun OledShieldRoute(
     onBack: () -> Unit,
     onLaunchTool: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
+    tileRequestAvailable: Boolean,
     onRequestTile: () -> Unit,
     onConfigChange: ((OledShieldConfig) -> OledShieldConfig) -> Unit,
     onSaveDefaultConfig: () -> Unit,
@@ -150,11 +155,14 @@ fun OledShieldRoute(
                 subtitle = state.oledStatus(),
                 iconRes = R.drawable.ic_oled_shield_24,
                 trailing = {
-                    FilledTonalButton(onClick = onRequestTile) {
+                    FilledTonalButton(
+                        onClick = onRequestTile,
+                        enabled = tileRequestAvailable,
+                    ) {
                         Text("Add")
                     }
                 },
-                onClick = onRequestTile,
+                onClick = onRequestTile.takeIf { tileRequestAvailable },
             )
         }
 

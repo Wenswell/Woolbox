@@ -240,6 +240,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                     onOpenHistory = { navController.navigate(TemplateRoutes.COPY_HISTORY) },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
+                    tileRequestAvailable = TileRequestManager.isRequestSupported,
                     onRequestTile = {
                         TileRequestManager.request(
                             context = context,
@@ -294,6 +295,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         }
                     },
                     onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
+                    tileRequestAvailable = TileRequestManager.isRequestSupported,
                     onRequestTile = {
                         TileRequestManager.request(
                             context = context,

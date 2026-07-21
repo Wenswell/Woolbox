@@ -4,6 +4,7 @@ import android.app.StatusBarManager
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
+import android.os.Build
 import com.wswensw.template.R
 
 enum class ToolTile {
@@ -19,11 +20,17 @@ enum class TileRequestResult {
 }
 
 object TileRequestManager {
+    val isRequestSupported: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
     fun request(
         context: Context,
         tile: ToolTile,
         onResult: (TileRequestResult) -> Unit,
     ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            error("Tile add requests require Android 13 or newer.")
+        }
         val serviceClass = when (tile) {
             ToolTile.GLOBAL_COPY -> GlobalCopyTileService::class.java
             ToolTile.OLED_SHIELD -> OledShieldTileService::class.java

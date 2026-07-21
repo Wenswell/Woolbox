@@ -8,7 +8,7 @@
 | Kotlin | `2.3.21` |
 | Compose BOM | `2026.05.01` |
 | Java | Android Studio JBR `17` |
-| Android SDK | `compileSdk 36.1`、`minSdk 34`、`targetSdk 36` |
+| Android SDK | `compileSdk 36.1`、`minSdk 31`、`targetSdk 36` |
 | Android 数据与测试 | OkHttp `4.12.0`、Room `2.8.4`、KSP `2.3.10`、JUnit `4.13.2` |
 | Records server | Node `22+`、pnpm `11.11.0`、Fastify `5.10.0`、Drizzle ORM `0.45.2`、SQLite |
 
@@ -73,6 +73,8 @@ pnpm typecheck && pnpm test && pnpm test:web && pnpm build
 ./gradlew :app:installDebug
 adb shell am start -n com.wswensw.template/.MainActivity
 ```
+
+Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Add` 保持禁用；在系统快捷设置编辑页手动添加两个 Tile。
 
 ## 自动测试边界
 
@@ -152,13 +154,7 @@ adb exec-out uiautomator dump /dev/tty
 
 ## 参考旧应用
 
-旧应用位于 `/Users/wswensw/Documents/repos/playground/app0603`。参考时按以下顺序核对：
-
-1. 业务规则：输入、排序、默认值、保存粒度和关闭条件。
-2. 平台边界：Context 来源、`WindowManager` 获取、窗口类型/flags、系统动作与生命周期。
-3. 当前实现：使用 Compose 和当前组件重新设计页面与覆盖层，不复制旧布局。
-
-已验证的系统边界不能仅凭 API 看似更新而替换。本项目曾因迁移时引入 `AccessibilityService.createWindowContext()` 导致 Android 14 设备在创建两类覆盖层时抛出 `UnsupportedOperationException`；旧应用直接使用服务 Context 的实现才是本项目的基准。
+旧应用位于 `/Users/wswensw/Documents/repos/playground/app0603`。参考时同时核对业务规则和 Context、`WindowManager`、窗口类型、触发时机与生命周期；当前页面使用 Compose 重新设计。无 Display 的服务 Context 调用 `createWindowContext()` 会使 Android 14 无障碍服务崩溃，覆盖层继续直接使用服务 Context。
 
 ## 收尾
 

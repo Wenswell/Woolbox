@@ -52,7 +52,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 
 1. Global Copy 只在 `isServiceConnected` 时启用主操作；OLED 主操作始终可用。
 2. OLED 在服务未连接时直接更新应用内遮罩状态，不提交 `ExternalToolCommand`。
-3. 服务连接时，普通入口保存命令并调用 `moveTaskToBack(true)`；OLED 已保存应用入口通过 `getLaunchIntentSenderForPackage()` 启动指定包名。
+3. 服务连接时，普通入口保存命令并调用 `moveTaskToBack(true)`；OLED 已保存应用入口通过包管理器的 launcher Intent 启动指定包名。
 4. Activity 收到 `onStop` 后提交命令，避免本应用窗口参与目标选择。
 
 ### Tile 触发
@@ -115,7 +115,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 1. 遍历目标包名的全部应用窗口；活动 root 尚未包含时补充遍历一次。
 2. 节点必须可见、非密码、边界非空。
-3. 每个节点按 `text`、`contentDescription`、`hintText`、`stateDescription`、`error`、`tooltipText`、`paneTitle`、`containerTitle` 顺序取首个非空值。
+3. 每个节点按 `text`、`contentDescription`、`hintText`、`stateDescription`、`error`、`tooltipText`、`paneTitle` 顺序取首个非空值；Android 14 及以上在这些值均为空时再读取 `containerTitle`。
 4. 按窗口、来源、NFKC/空白归一化文本和边界去重。
 5. 按 `top`、`left`、`bottom`、`right`、归一化文本排序，生成稳定 `captureOrder`。
 

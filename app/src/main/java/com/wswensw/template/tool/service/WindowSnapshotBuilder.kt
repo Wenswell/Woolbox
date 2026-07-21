@@ -2,6 +2,7 @@ package com.wswensw.template.tool.service
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.os.Build
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.wswensw.template.tool.model.CopyTextBlock
@@ -28,7 +29,7 @@ class WindowSnapshotBuilder(
                     )
                 }
             }
-        val activeRoot = service.getRootInActiveWindow(NODE_PREFETCH_FLAGS)
+        val activeRoot = service.rootInActiveWindow
         if (
             activeRoot?.packageName?.toString() == target.packageName &&
             blocks.none { it.windowId == activeRoot.windowId }
@@ -101,16 +102,24 @@ class WindowSnapshotBuilder(
         }
     }
 
-    private fun AccessibilityNodeInfo.textCandidate(): TextCandidate? = listOfNotNull(
-        candidate(TextSource.TEXT, text),
-        candidate(TextSource.CONTENT_DESCRIPTION, contentDescription),
-        candidate(TextSource.HINT, hintText),
-        candidate(TextSource.STATE_DESCRIPTION, stateDescription),
-        candidate(TextSource.ERROR, error),
-        candidate(TextSource.TOOLTIP, tooltipText),
-        candidate(TextSource.PANE_TITLE, paneTitle),
-        candidate(TextSource.CONTAINER_TITLE, containerTitle),
-    ).firstOrNull()
+    private fun AccessibilityNodeInfo.textCandidate(): TextCandidate? {
+        val commonCandidate = listOfNotNull(
+            candidate(TextSource.TEXT, text),
+            candidate(TextSource.CONTENT_DESCRIPTION, contentDescription),
+            candidate(TextSource.HINT, hintText),
+            candidate(TextSource.STATE_DESCRIPTION, stateDescription),
+            candidate(TextSource.ERROR, error),
+            candidate(TextSource.TOOLTIP, tooltipText),
+            candidate(TextSource.PANE_TITLE, paneTitle),
+        ).firstOrNull()
+        if (commonCandidate != null) return commonCandidate
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            candidate(TextSource.CONTAINER_TITLE, containerTitle)
+        } else {
+            null
+        }
+    }
 
     private fun candidate(
         source: TextSource,
@@ -126,10 +135,4 @@ class WindowSnapshotBuilder(
         val text: String,
     )
 
-    private companion object {
-        const val NODE_PREFETCH_FLAGS =
-            AccessibilityNodeInfo.FLAG_PREFETCH_ANCESTORS or
-                AccessibilityNodeInfo.FLAG_PREFETCH_SIBLINGS or
-                AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_HYBRID
-    }
 }

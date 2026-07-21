@@ -1,7 +1,6 @@
 package com.wswensw.template
 
-import android.content.IntentSender
-import android.content.pm.PackageManager
+import android.content.ActivityNotFoundException
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -61,17 +60,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchProfile(command: ExternalToolCommand.OledShieldProfile): ToolLaunchResult {
-        val intentSender = try {
-            packageManager.getLaunchIntentSenderForPackage(command.packageName)
-        } catch (_: PackageManager.NameNotFoundException) {
-            return ToolLaunchResult.TargetAppUnavailable
-        }
+        val intent = packageManager.getLaunchIntentForPackage(command.packageName)
+            ?: return ToolLaunchResult.TargetAppUnavailable
 
         pendingToolCommand = command
         return try {
-            startIntentSender(intentSender, null, 0, 0, 0)
+            startActivity(intent)
             ToolLaunchResult.Accepted
-        } catch (_: IntentSender.SendIntentException) {
+        } catch (_: ActivityNotFoundException) {
             pendingToolCommand = null
             ToolLaunchResult.TargetLaunchFailed
         }
