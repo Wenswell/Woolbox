@@ -87,6 +87,7 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Add` 保持�
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化与正数校验、推荐排序、跨午夜时间段和十进制步进。 |
+| `RecordsScreenTest` | Records 页面项目首个文字、emoji、组合字符和空名称的前导展示规则。 |
 | `records-server/test/api.test.ts` | 空库迁移、服务端数据规则、审计快照、事务、筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志和记录项归档/恢复。 |
 
