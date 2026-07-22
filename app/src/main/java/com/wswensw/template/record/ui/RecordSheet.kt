@@ -1,5 +1,6 @@
 package com.wswensw.template.record.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -106,7 +107,8 @@ fun RecordSheet(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = TemplateStyle.cardShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     LazyColumn(modifier = Modifier.heightIn(max = 168.dp)) {
                         items(

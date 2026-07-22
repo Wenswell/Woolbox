@@ -2,6 +2,7 @@ package com.wswensw.template.ui
 
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -292,12 +293,14 @@ fun TemplateSection(
             .fillMaxWidth()
             .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(modifier = Modifier.fillMaxWidth(), content = content)
     }
 }
+
 
 @Composable
 fun TemplateListItem(

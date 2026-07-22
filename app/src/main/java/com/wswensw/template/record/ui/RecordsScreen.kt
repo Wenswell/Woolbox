@@ -1,6 +1,7 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -187,7 +188,6 @@ private fun QuickRecordCard(
     onClick: () -> Unit,
 ) {
     val colors = recordItemColors(item.name)
-    val hasLoggedToday = todayValue > 0.0
     val target = item.goalValue
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0.0 && period != null
@@ -200,10 +200,10 @@ private fun QuickRecordCard(
         colors.accent
     }
     val container by animateColorAsState(
-        targetValue = when {
-            goalReached -> MaterialTheme.colorScheme.tertiaryContainer
-            hasLoggedToday -> colors.container
-            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        targetValue = if (goalReached) {
+            MaterialTheme.colorScheme.tertiaryContainer
+        } else {
+            colors.container
         },
         label = "QuickRecordContainer",
     )
@@ -319,7 +319,11 @@ internal fun RecordsStatusCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Column(
             modifier = Modifier

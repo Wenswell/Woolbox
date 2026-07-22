@@ -1,5 +1,6 @@
 package com.wswensw.template.record.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -53,7 +54,8 @@ fun RecordsConnectionScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = TemplateStyle.cardShape,
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Text(
                     text = RecordRepository.BASE_URL,
@@ -74,7 +76,8 @@ fun RecordsConnectionScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = TemplateStyle.cardShape,
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     OutlinedTextField(

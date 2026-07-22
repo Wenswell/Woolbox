@@ -106,18 +106,11 @@ private fun ManageRecordCard(
     modifier: Modifier = Modifier,
 ) {
     val colors = recordItemColors(item.name)
-    val hasGoal = item.goalValue != null && item.goalPeriod != null
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = if (hasGoal) {
-                colors.container
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            },
-        ),
+        colors = CardDefaults.cardColors(containerColor = colors.container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
