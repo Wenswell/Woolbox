@@ -36,7 +36,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -53,6 +55,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.wswensw.template.R
+import com.wswensw.template.record.ui.GoalsScreen
 import com.wswensw.template.record.ui.ManageRecordsScreen
 import com.wswensw.template.record.ui.RecordItemFormScreen
 import com.wswensw.template.record.ui.RecordSheet
@@ -100,6 +103,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val hapticFeedback = LocalHapticFeedback.current
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -170,6 +174,10 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
 
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
+                                onGoals = {
+                                    recordSheetItemId = null
+                                    navController.navigate(TemplateRoutes.RECORD_GOALS)
+                                },
                                 onManage = {
                                     recordSheetItemId = null
                                     navController.navigate(TemplateRoutes.MANAGE_RECORDS)
@@ -292,6 +300,19 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                 )
             }
+            composable(TemplateRoutes.RECORD_GOALS) {
+                GoalsScreen(
+                    state = recordsState,
+                    onBack = { navController.popBackStack() },
+                    onManage = { navController.navigate(TemplateRoutes.MANAGE_RECORDS) },
+                    onConfigureConnection = {
+                        navController.navigate(TemplateRoutes.RECORDS_CONNECTION)
+                    },
+                    onRetry = recordsViewModel::refresh,
+                    onRecordItem = { recordSheetItemId = it.id },
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                )
+            }
             composable(TemplateRoutes.MANAGE_RECORDS) {
                 ManageRecordsScreen(
                     state = recordsState,
@@ -359,11 +380,14 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     RecordSheet(
                         item = item,
                         entries = recordsState.entries.filter { it.itemId == itemId },
+                        cumulative = recordsState.goalValues[itemId]
+                            ?: recordsState.entries.filter { it.itemId == itemId }.sumOf { it.value },
                         onDismiss = { recordSheetItemId = null },
                         onRecord = { recordedItem, value, onResult ->
                             recordsViewModel.createEntry(recordedItem.id, value) { entryId, error ->
                                 onResult(error)
                                 if (entryId != null) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
                                     recordSheetItemId = null
                                     coroutineScope.launch {
                                         val result = snackbarHostState.showSnackbar(
@@ -476,6 +500,7 @@ private object TemplateRoutes {
     const val GLOBAL_COPY = "global-copy"
     const val COPY_HISTORY = "global-copy/history"
     const val OLED_SHIELD = "oled-shield"
+    const val RECORD_GOALS = "record-goals"
     const val MANAGE_RECORDS = "manage-records"
     const val RECORDS_CONNECTION = "records-connection"
     const val RECORD_ITEM_NEW = "record-item/new"

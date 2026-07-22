@@ -24,10 +24,10 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | 路径 | 修改入口 |
 | --- | --- |
 | `MainActivity.kt` | 普通入口退到后台、指定应用启动和 `onStop` 命令提交。 |
-| `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records FAB/Snackbar 及页面接线。 |
+| `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records Goals/Sheet/Snackbar 及页面接线。 |
 | `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
-| `record/{model,data,ui}/` | 记录规则、HTTPS Repository、Keystore 凭据、ViewModel、今天流水、记录 Sheet 和记录项表单。 |
+| `record/{model,data,ui}/` | 记录规则、HTTPS Repository、Keystore 凭据、ViewModel、焦点与目标页面、记录 Sheet 和记录项表单。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
 | `records-server/web/`、`deploy/` | PC 管理页、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
@@ -87,7 +87,7 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化与正数校验、推荐排序、跨午夜时间段和十进制步进。 |
-| `RecordsScreenTest` | Records 页面项目首个文字、emoji、组合字符和空名称的前导与标题裁剪规则。 |
+| `RecordsScreenTest` | Records 首字符与标题裁剪、焦点上限与排序、目标周期分组、进度边界、今日累计和日期文案。 |
 | `records-server/test/api.test.ts` | 空库迁移、服务端数据规则、审计快照、事务、筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志和记录项归档/恢复。 |
 
@@ -111,7 +111,7 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 凭据，创建记录项；点击项目行打开单阶段 Sheet，记录正数值后确认 Sheet 关闭且页面底部短时显示 `Undo`，点击后只删除刚创建的流水；确认 Sheet 的今日流水无删除按钮；断网失败后 Sheet 保持打开并显示错误，服务端数据不变，恢复网络后重新记录成功。
+15. 配置 Records 凭据并准备至少一个日目标、一个周目标和四个有目标记录项；确认主页只显示优先级最高的三个焦点目标，多项可横向滚动且露出下一项，Goals 页面按 Daily/Weekly 分组，日目标使用圆形进度、周目标使用横向进度。点击项目打开单阶段 Sheet，记录正数值后确认 Sheet 关闭、产生一次确认触感且当前页面短时显示 `Undo`，点击后只删除刚创建的流水；确认周目标使用本周累计、Sheet 的今日流水无删除按钮；断网失败后 Sheet 保持打开并显示错误，服务端数据不变，恢复网络后重新记录成功。
 16. 在 Home 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 17. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 18. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。

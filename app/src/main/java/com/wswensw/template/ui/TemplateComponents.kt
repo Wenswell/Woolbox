@@ -159,6 +159,7 @@ fun TemplateLazyRouteScaffold(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -172,6 +173,7 @@ fun TemplateLazyRouteScaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
         contentWindowInsets = WindowInsets(0.dp),
+        snackbarHost = snackbarHost,
         topBar = {
             TemplateRouteTopBar(
                 title = title,

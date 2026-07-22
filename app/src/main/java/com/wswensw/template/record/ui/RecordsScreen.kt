@@ -1,8 +1,11 @@
 package com.wswensw.template.record.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,31 +14,40 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 import com.wswensw.template.record.model.GoalPeriod
+import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
-import com.wswensw.template.ui.TemplateDivider
-import com.wswensw.template.ui.TemplatePrimaryAction
 import com.wswensw.template.ui.TemplateStyle
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
 fun RecordsScreen(
     state: RecordsUiState,
+    onGoals: () -> Unit,
     onManage: () -> Unit,
     onCreateItem: () -> Unit,
     onConfigureConnection: () -> Unit,
@@ -45,78 +57,74 @@ fun RecordsScreen(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = TemplateStyle.spacing.pageHorizontal,
+            top = TemplateStyle.spacing.pageTop,
+            end = TemplateStyle.spacing.pageHorizontal,
+            bottom = TemplateStyle.spacing.pageBottom,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        end = TemplateStyle.spacing.pageHorizontal,
-                        top = TemplateStyle.spacing.pageTop,
-                    ),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                IconButton(onClick = onManage) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_settings_24),
-                        contentDescription = "Manage records",
-                    )
-                }
-            }
+            RecordsHeader(
+                date = state.selectedDate,
+                onGoals = onGoals,
+                onManage = onManage,
+            )
         }
 
         when {
             state.isLoading -> item {
-                CircularProgressIndicator(
-                    modifier = Modifier.padding(48.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
             }
             state.error != null -> item {
-                Column(modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal)) {
-                    Text(
-                        text = state.error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    TemplatePrimaryAction(
-                        label = if (state.connection.isConfigured) "Retry" else "Configure connection",
-                        iconRes = R.drawable.ic_records_24,
-                        enabled = true,
-                        onClick = if (state.connection.isConfigured) onRetry else onConfigureConnection,
-                    )
-                }
+                RecordsMessage(
+                    message = state.error,
+                    actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
+                    onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
+                )
             }
             state.activeItems.isEmpty() -> item {
-                Column(modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal)) {
-                    Text(
-                        text = "Create a record item before recording.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    TemplatePrimaryAction(
-                        label = "Create record item",
-                        iconRes = R.drawable.ic_records_24,
-                        enabled = true,
-                        onClick = onCreateItem,
-                    )
-                }
+                RecordsMessage(
+                    message = "No record items yet.",
+                    actionLabel = "Create record item",
+                    onAction = onCreateItem,
+                )
             }
             else -> {
-                val sorted = state.activeItems.sortedWith(
-                    compareByDescending<RecordItem> { it.priority }
-                        .thenBy { it.name.lowercase(Locale.ROOT) },
-                )
-                itemsIndexed(sorted) { index, item ->
-                    RecordItemRow(
+                val orderedItems = orderedRecordItems(state.activeItems)
+                val focusGoals = focusGoalItems(orderedItems)
+                val todayValues = todayRecordValues(state.entries)
+
+                if (focusGoals.isNotEmpty()) {
+                    item {
+                        RecordsSectionTitle("Focus")
+                    }
+                    item(key = "focus-goals") {
+                        FocusGoalsRow(
+                            goals = focusGoals,
+                            values = state.goalValues,
+                            onRecordItem = onRecordItem,
+                        )
+                    }
+                }
+
+                item {
+                    RecordsSectionTitle("Records")
+                }
+                items(orderedItems, key = RecordItem::id) { item ->
+                    QuickRecordCard(
                         item = item,
-                        cumulative = state.goalValues[item.id] ?: 0.0,
+                        todayValue = todayValues[item.id] ?: 0.0,
                         onClick = { onRecordItem(item) },
                     )
-                    if (index != sorted.lastIndex) {
-                        TemplateDivider()
-                    }
                 }
             }
         }
@@ -124,61 +132,192 @@ fun RecordsScreen(
 }
 
 @Composable
-private fun RecordItemRow(
-    item: RecordItem,
-    cumulative: Double,
-    onClick: () -> Unit,
+private fun FocusGoalsRow(
+    goals: List<RecordItem>,
+    values: Map<Long, Double>,
+    onRecordItem: (RecordItem) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RecordItemInitial(item.name)
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = dropFirstRecordCharacter(item.name),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "${formatValue(cumulative)} ${item.unit}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-            val goal = item.goalValue
-            if (goal != null && goal > 0) {
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { (cumulative / goal).coerceIn(0.0, 1.0).toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = goalProgressLabel(item, cumulative, goal),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val cardWidth = if (goals.size == 1) maxWidth else (maxWidth * 0.88f).coerceAtMost(360.dp)
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(goals, key = RecordItem::id) { goal ->
+                GoalCard(
+                    item = goal,
+                    cumulative = values[goal.id] ?: 0.0,
+                    featured = true,
+                    onClick = { onRecordItem(goal) },
+                    modifier = Modifier
+                        .width(cardWidth)
+                        .height(148.dp),
                 )
             }
         }
     }
 }
 
-private fun goalProgressLabel(item: RecordItem, value: Double, goal: Double): String =
-    "${formatValue(value)} / ${formatValue(goal)} ${item.unit}" +
-        " · ${if (item.goalPeriod == GoalPeriod.DAY) "today" else "this week"}"
+@Composable
+private fun RecordsHeader(
+    date: LocalDate,
+    onGoals: () -> Unit,
+    onManage: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Today",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = recordsDateLabel(date),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        IconButton(onClick = onGoals) {
+            Icon(
+                imageVector = Icons.Outlined.Flag,
+                contentDescription = "Goals",
+            )
+        }
+        IconButton(onClick = onManage) {
+            Icon(
+                painter = painterResource(R.drawable.ic_settings_24),
+                contentDescription = "Manage records",
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecordsSectionTitle(title: String) {
+    Text(
+        text = title,
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+@Composable
+private fun QuickRecordCard(
+    item: RecordItem,
+    todayValue: Double,
+    onClick: () -> Unit,
+) {
+    val colors = recordItemColors(item.name)
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 80.dp),
+        shape = TemplateStyle.cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, colors.container),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RecordItemInitial(name = item.name, size = 48.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayRecordName(item.name),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (item.description.isNotEmpty()) {
+                    Text(
+                        text = item.description,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(
+                modifier = Modifier.widthIn(max = 132.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                Text(
+                    text = "${formatValue(todayValue)} ${item.unit}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "today",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordsMessage(
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onAction,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_records_24),
+                contentDescription = null,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(actionLabel)
+        }
+    }
+}
+
+internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
+    items.sortedWith(
+        compareByDescending<RecordItem> { it.priority }
+            .thenBy { it.name.lowercase(Locale.ROOT) },
+    )
+
+internal fun goalItems(items: List<RecordItem>, period: GoalPeriod? = null): List<RecordItem> =
+    orderedRecordItems(items).filter { item ->
+        item.goalValue != null && item.goalPeriod != null && (period == null || item.goalPeriod == period)
+    }
+
+internal fun focusGoalItems(items: List<RecordItem>, limit: Int = MAX_FOCUS_GOALS): List<RecordItem> {
+    require(limit > 0)
+    return goalItems(items).take(limit)
+}
+
+internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =
+    entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) -> itemEntries.sumOf(RecordEntry::value) }
+
+internal fun recordsDateLabel(date: LocalDate): String =
+    date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH))
+
+private const val MAX_FOCUS_GOALS = 3

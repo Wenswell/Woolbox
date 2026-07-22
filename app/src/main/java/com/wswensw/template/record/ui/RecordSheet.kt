@@ -14,9 +14,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -30,11 +29,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
-import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.stepRecordValue
@@ -46,6 +45,7 @@ import java.util.Locale
 fun RecordSheet(
     item: RecordItem,
     entries: List<RecordEntry>,
+    cumulative: Double,
     onDismiss: () -> Unit,
     onRecord: (RecordItem, Double, (String?) -> Unit) -> Unit,
 ) {
@@ -63,14 +63,23 @@ fun RecordSheet(
                 .padding(bottom = 24.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                RecordItemInitial(item.name)
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = item.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                RecordItemInitial(name = item.name, size = 52.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "Today · ${formatValue(entries.sumOf { it.value })} ${item.unit}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (item.description.isNotEmpty()) {
                 Text(
@@ -82,25 +91,17 @@ fun RecordSheet(
             }
             item.goalValue?.let { goal ->
                 if (goal > 0) {
-                    Spacer(Modifier.height(8.dp))
-                    GoalProgress(item = item, cumulative = entries.sumOf { it.value }, goal = goal)
+                    Spacer(Modifier.height(12.dp))
+                    GoalProgressPanel(item = item, cumulative = cumulative)
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            if (entries.isNotEmpty()) {
-                Text(
-                    text = "Today",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Spacer(Modifier.height(4.dp))
-                LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
-                    items(entries, key = { it.id }) { entry ->
-                        EntryRow(entry = entry)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = "Record progress",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(Modifier.height(8.dp))
             ValueInput(
                 item = item,
                 valueText = valueText,
@@ -125,24 +126,22 @@ fun RecordSheet(
                     }
                 },
             )
+            if (entries.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = "Today",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Spacer(Modifier.height(4.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 160.dp)) {
+                    items(entries, key = { it.id }) { entry ->
+                        EntryRow(entry = entry)
+                    }
+                }
+            }
         }
     }
-}
-
-@Composable
-private fun GoalProgress(item: RecordItem, cumulative: Double, goal: Double) {
-    LinearProgressIndicator(
-        progress = { (cumulative / goal).coerceIn(0.0, 1.0).toFloat() },
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(2.dp))
-    Text(
-        text = "${formatValue(cumulative)} / ${formatValue(goal)} ${item.unit}" +
-            " · ${if (item.goalPeriod == GoalPeriod.DAY) "today" else "this week"}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-    )
 }
 
 @Composable
@@ -184,7 +183,7 @@ private fun ValueInput(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconButton(
+        FilledTonalIconButton(
             onClick = { onValueChange(stepRecordValue(valueText, item.stepValue, -1)) },
         ) {
             Icon(
@@ -201,7 +200,7 @@ private fun ValueInput(
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        IconButton(
+        FilledTonalIconButton(
             onClick = { onValueChange(stepRecordValue(valueText, item.stepValue, 1)) },
         ) {
             Icon(
@@ -214,7 +213,10 @@ private fun ValueInput(
         text = "Step ${formatValue(item.stepValue)} ${item.unit}",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(start = 56.dp, top = 4.dp),
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
     )
     errorMessage?.let { message ->
         Text(
@@ -228,8 +230,15 @@ private fun ValueInput(
     Button(
         onClick = onConfirm,
         enabled = !saving,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp),
     ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_add_24),
+            contentDescription = null,
+        )
+        Spacer(Modifier.width(8.dp))
         Text(if (saving) "Saving" else "Record")
     }
 }
