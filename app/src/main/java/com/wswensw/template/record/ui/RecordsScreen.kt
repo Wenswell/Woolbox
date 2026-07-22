@@ -1,5 +1,8 @@
 package com.wswensw.template.record.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,25 +15,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,8 +75,12 @@ fun RecordsScreen(
         verticalArrangement = Arrangement.spacedBy(TemplateStyle.spacing.block),
     ) {
         item {
+            val orderedItems = orderedRecordItems(state.activeItems)
+            val focusGoals = goalItems(orderedItems)
+            val completion = focusGoalCompletion(focusGoals, state.goalValues)
             RecordsHeader(
                 date = state.selectedDate,
+                completion = completion,
                 onGoals = onGoals,
                 onManage = onManage,
             )
@@ -102,10 +115,14 @@ fun RecordsScreen(
                 val orderedItems = orderedRecordItems(state.activeItems)
                 val focusGoals = goalItems(orderedItems)
                 val todayValues = todayRecordValues(state.entries)
+                val completion = focusGoalCompletion(focusGoals, state.goalValues)
 
                 if (focusGoals.isNotEmpty()) {
                     item {
-                        RecordsSectionTitle("Focus")
+                        RecordsSectionTitle(
+                            title = "Focus",
+                            trailing = "${completion.done}/${completion.total}",
+                        )
                     }
                     item(key = "focus-goals") {
                         FocusGoalsRow(
@@ -117,12 +134,13 @@ fun RecordsScreen(
                 }
 
                 item {
-                    RecordsSectionTitle("Records")
+                    RecordsSectionTitle(title = "Records")
                 }
                 items(orderedItems, key = RecordItem::id) { item ->
                     QuickRecordCard(
                         item = item,
                         todayValue = todayValues[item.id] ?: 0.0,
+                        goalCumulative = state.goalValues[item.id],
                         onClick = { onRecordItem(item) },
                     )
                 }
@@ -162,76 +180,213 @@ private fun FocusGoalsRow(
 @Composable
 private fun RecordsHeader(
     date: LocalDate,
+    completion: FocusGoalCompletion,
     onGoals: () -> Unit,
     onManage: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Today",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = recordsDateLabel(date),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Today",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = recordsDateLabel(date),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            FilledTonalIconButton(onClick = onGoals) {
+                Icon(
+                    imageVector = Icons.Outlined.Flag,
+                    contentDescription = "Goals",
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            FilledTonalIconButton(onClick = onManage) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings_24),
+                    contentDescription = "Manage records",
+                )
+            }
         }
-        FilledTonalIconButton(onClick = onGoals) {
-            Icon(
-                imageVector = Icons.Outlined.Flag,
-                contentDescription = "Goals",
-            )
+
+        if (completion.total > 0) {
+            DayProgressBanner(completion = completion)
         }
-        Spacer(Modifier.width(4.dp))
-        FilledTonalIconButton(onClick = onManage) {
-            Icon(
-                painter = painterResource(R.drawable.ic_settings_24),
-                contentDescription = "Manage records",
+    }
+}
+
+@Composable
+private fun DayProgressBanner(completion: FocusGoalCompletion) {
+    val progress by animateFloatAsState(
+        targetValue = completion.fraction,
+        animationSpec = spring(),
+        label = "DayGoalProgress",
+    )
+    val allDone = completion.done == completion.total
+    val container by animateColorAsState(
+        targetValue = if (allDone) {
+            MaterialTheme.colorScheme.tertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        label = "DayProgressContainer",
+    )
+    val content by animateColorAsState(
+        targetValue = if (allDone) {
+            MaterialTheme.colorScheme.onTertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        label = "DayProgressContent",
+    )
+    val barColor = if (allDone) {
+        MaterialTheme.colorScheme.tertiary
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = TemplateStyle.cardShape,
+        color = container,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = dayStatusLabel(completion),
+                    modifier = Modifier.weight(1f),
+                    color = content,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (allDone) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = barColor,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        color = content.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(CircleShape),
+                color = barColor,
+                trackColor = barColor.copy(alpha = 0.16f),
+                gapSize = 0.dp,
+                drawStopIndicator = {},
             )
         }
     }
 }
 
 @Composable
-private fun RecordsSectionTitle(title: String) {
-    Text(
-        text = title,
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 4.dp),
-    )
+private fun RecordsSectionTitle(
+    title: String,
+    trailing: String? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        if (trailing != null) {
+            Text(
+                text = trailing,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
 }
 
 @Composable
 private fun QuickRecordCard(
     item: RecordItem,
     todayValue: Double,
+    goalCumulative: Double?,
     onClick: () -> Unit,
 ) {
     val colors = recordItemColors(item.name)
+    val hasLoggedToday = todayValue > 0.0
+    val target = item.goalValue
+    val cumulative = goalCumulative ?: todayValue
+    val goalProgress = if (target != null && target > 0.0) {
+        goalProgressFraction(cumulative, target)
+    } else {
+        null
+    }
+    val goalReached = target != null && cumulative >= target
+    val container by animateColorAsState(
+        targetValue = when {
+            goalReached -> MaterialTheme.colorScheme.tertiaryContainer
+            hasLoggedToday -> colors.container
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        label = "QuickRecordContainer",
+    )
+    val valueColor by animateColorAsState(
+        targetValue = when {
+            goalReached -> MaterialTheme.colorScheme.tertiary
+            else -> colors.accent
+        },
+        label = "QuickRecordValue",
+    )
+
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        colors = CardDefaults.cardColors(containerColor = container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp)
+                .heightIn(min = 76.dp)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RecordItemInitial(name = item.name, size = 48.dp)
+            QuickRecordLeading(
+                name = item.name,
+                progress = goalProgress,
+                reached = goalReached,
+                progressColor = valueColor,
+            )
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -241,15 +396,13 @@ private fun QuickRecordCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (item.description.isNotEmpty()) {
-                    Text(
-                        text = item.description,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    text = quickRecordSubtitle(item, hasLoggedToday, goalReached),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             Spacer(Modifier.width(12.dp))
             Column(
@@ -258,19 +411,56 @@ private fun QuickRecordCard(
             ) {
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
-                    color = colors.accent,
+                    color = valueColor,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Today",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = if (goalReached) "Done" else "Today",
+                    color = if (goalReached) valueColor else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun QuickRecordLeading(
+    name: String,
+    progress: Float?,
+    reached: Boolean,
+    progressColor: androidx.compose.ui.graphics.Color,
+) {
+    if (progress == null) {
+        RecordItemInitial(name = name, size = 48.dp)
+        return
+    }
+    Box(
+        modifier = Modifier.size(48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxSize(),
+            color = progressColor,
+            strokeWidth = 3.5.dp,
+            trackColor = progressColor.copy(alpha = 0.16f),
+            gapSize = 0.dp,
+        )
+        RecordItemInitial(name = name, size = 34.dp)
+        if (reached) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = progressColor,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(16.dp),
+            )
         }
     }
 }
@@ -312,6 +502,53 @@ private fun RecordsMessage(
             }
         }
     }
+}
+
+internal data class FocusGoalCompletion(
+    val done: Int,
+    val total: Int,
+) {
+    val fraction: Float
+        get() = if (total <= 0) 0f else done.toFloat() / total.toFloat()
+}
+
+internal fun focusGoalCompletion(
+    goals: List<RecordItem>,
+    values: Map<Long, Double>,
+): FocusGoalCompletion {
+    val done = goals.count { item ->
+        val target = item.goalValue ?: return@count false
+        (values[item.id] ?: 0.0) >= target
+    }
+    return FocusGoalCompletion(done = done, total = goals.size)
+}
+
+internal fun dayStatusLabel(completion: FocusGoalCompletion): String = when {
+    completion.total <= 0 -> ""
+    completion.done <= 0 -> "0 of ${completion.total} goals done"
+    completion.done >= completion.total -> "All goals done"
+    else -> "${completion.done} of ${completion.total} goals done"
+}
+
+internal fun crossedGoalThreshold(
+    previous: Double,
+    current: Double,
+    target: Double?,
+): Boolean {
+    if (target == null || target <= 0.0) return false
+    return previous < target && current >= target
+}
+
+internal fun quickRecordSubtitle(
+    item: RecordItem,
+    hasLoggedToday: Boolean,
+    goalReached: Boolean,
+): String = when {
+    goalReached -> "Goal reached"
+    item.description.isNotEmpty() -> item.description
+    hasLoggedToday -> "Logged today"
+    item.goalValue != null -> "Tap to log"
+    else -> "Tap to log"
 }
 
 internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =

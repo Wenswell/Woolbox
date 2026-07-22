@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -282,21 +283,31 @@ private fun DailyGoalMedallion(
     progressColor: Color,
     size: Dp,
 ) {
+    val scale by animateFloatAsState(
+        targetValue = if (reached) 1.06f else 1f,
+        animationSpec = spring(),
+        label = "DailyGoalMedallionScale",
+    )
     Box(
-        modifier = Modifier.size(size),
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
             progress = { progress },
             modifier = Modifier.fillMaxSize(),
             color = progressColor,
-            strokeWidth = if (size > 72.dp) 8.dp else 7.dp,
+            strokeWidth = if (size > 72.dp) 9.dp else 7.5.dp,
             trackColor = progressColor.copy(alpha = 0.18f),
             gapSize = 0.dp,
         )
         RecordItemInitial(
             name = item.name,
-            size = size - if (size > 72.dp) 24.dp else 20.dp,
+            size = size - if (size > 72.dp) 26.dp else 22.dp,
         )
         if (reached) {
             Icon(
@@ -305,7 +316,7 @@ private fun DailyGoalMedallion(
                 tint = progressColor,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(if (size > 72.dp) 26.dp else 22.dp),
+                    .size(if (size > 72.dp) 28.dp else 22.dp),
             )
         }
     }
@@ -318,27 +329,44 @@ private fun GoalStatus(
     periodLabel: String,
     color: Color,
 ) {
+    if (reached) {
+        Surface(
+            modifier = Modifier.padding(top = 6.dp),
+            shape = CircleShape,
+            color = color.copy(alpha = 0.16f),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = "Goal reached",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = color,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            }
+        }
+        return
+    }
     Row(
         modifier = Modifier.padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        if (reached) {
-            Icon(
-                imageVector = Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(16.dp),
-            )
-        }
         Text(
-            text = if (reached) {
-                "Goal reached"
-            } else {
-                "${(progress * 100).roundToInt()}% $periodLabel"
-            },
+            text = "${(progress * 100).roundToInt()}% $periodLabel",
             style = MaterialTheme.typography.labelMedium,
             color = color,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
     }
@@ -419,7 +447,7 @@ internal fun GoalProgressPanel(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
+                        .height(10.dp)
                         .clip(CircleShape),
                     color = progressColor,
                     trackColor = progressColor.copy(alpha = 0.18f),

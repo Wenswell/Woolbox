@@ -19,6 +19,7 @@ TemplateTheme
    │     │     ├─ Global Copy entry
    │     │     └─ OLED shield entry
    │     ├─ Records
+   │     │  ├─ Day progress banner
    │     │  ├─ Focus goals
    │     │  ├─ Quick record cards
    │     │  └─ Record sheet
@@ -105,13 +106,13 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，顶部以紧凑标题显示 `Today`、当前日期，以及 tonal 的 `Goals`/`Manage` 图标按钮。未配置凭据或远端读取失败、以及没有活跃记录项时，使用 `surfaceContainerLow` 空状态卡和全宽主操作（`Configure connection`/`Retry`/`Create record item`）。正常状态依次显示 `Focus` 和 `Records`：焦点区按优先级和名称横向展示全部目标，卡片宽度为可用宽度约 `82%` 且不超过 `300dp`，行间距 `12dp`；快速记录区按优先级降序、名称升序显示全部活跃项。
+Records 根页面使用 `LazyColumn` 与 `16dp` 块间距。顶部标题区显示 `Today`、当前日期，以及 tonal 的 `Goals`/`Manage` 图标按钮；当存在活跃目标时，标题下增加日进度条横幅：文案为 `N of M goals done` 或 `All goals done`，进度为完成数/目标数，全完成时使用 `tertiaryContainer` 与完成图标。未配置凭据、远端失败或无活跃项时，使用 `surfaceContainerLow` 空状态卡和全宽主操作（`Configure connection`/`Retry`/`Create record item`）。正常状态依次显示 `Focus` 与 `Records`：`Focus` 标题右侧显示 `done/total`；焦点卡横向展示全部目标，宽度约可用宽度 `82%` 且不超过 `300dp`，行间距 `12dp`；快速记录区按优先级降序、名称升序显示全部活跃项。
 
-项目色由名称首字符稳定映射到 6 档 Material 角色（primary / secondary / tertiary 及其 surface 强调档），在头像、目标卡、今日数值和 Sheet 进度中共用。目标周期使用不同构图：日目标以圆形进度，周目标以横向进度与 `this week` 文案。未完成目标卡填充项目 `container`；达标后改为 `tertiaryContainer`，并同时显示完成图标与 `Goal reached`，颜色不是唯一状态提示。独立 `Goals` 路由按 `Daily`、`Weekly` 分组显示全部当前目标。
+项目色由名称首字符稳定映射到 6 档 Material 角色，在头像、目标卡、今日数值和 Sheet 进度中共用。日目标用圆形进度勋章（达标时略放大并显示完成勾），周目标用 `10dp` 横向进度与 `this week` 文案。未完成目标卡用项目 `container`；达标后改为 `tertiaryContainer`，状态以完成图标与 `Goal reached` 胶囊同时表达。独立 `Goals` 路由按 `Daily`、`Weekly` 分组。
 
-快速记录卡片使用 `surfaceContainerLow` 填充、无边框，前导为首字符圆形图标，尾部今日累计数值使用项目 accent，标签为 `Today`。标题显示去掉首个 Unicode 字符并清理分隔空白后的名称，不重复目标进度。焦点目标、目标列表项和快速记录卡片整块可点击并打开项目专属 Sheet。根 `Scaffold` 不显示 FAB。
+快速记录卡：未记录用 `surfaceContainerLow`；今日已记用项目 `container`；目标达标用 `tertiaryContainer`。有目标时前导为迷你进度环 + 首字符；达标时显示完成勾与尾部 `Done`。副文案优先 `Goal reached`，否则描述、`Logged today` 或 `Tap to log`。焦点目标、目标列表与快速卡整块点击打开 Sheet。根 `Scaffold` 不显示 FAB。
 
-点击项目打开该项目专属单个 `ModalBottomSheet`。Sheet 标题使用项目名称首字符图标和裁剪后的名称；目标信息只在 `GoalProgressPanel` 中展示一次，日目标圆形进度、周目标横向进度，色规则与目标卡一致。数值输入预填默认值，单位作为后缀，减号/加号使用 tonal 图标按钮，底部全宽确认按钮；`Today` 流水置于 `surfaceContainerLow` 列表，每行只显示时刻与数值。确认成功后执行一次系统确认触感、关闭 Sheet，并在当前页面显示短时 `Snackbar`，仅提供 `Undo` 删除刚创建的流水。错误在 Sheet 内显示，失败时不关闭 Sheet。
+点击项目打开单个 `ModalBottomSheet`。Sheet 标题用首字符图标与裁剪名称；目标信息只在 `GoalProgressPanel` 展示一次。确认成功后关闭 Sheet：若本次记录使该项目从「未达标」跨到「达标」，触感用 `LongPress`，Snackbar 为 `Goal reached · 名称`；否则触感 `Confirm`，Snackbar 为 `Recorded 名称.`。Snackbar 均提供短时 `Undo`。错误留在 Sheet 内。
 
 `Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。编辑页首帧即禁用类型与单位控件，新建页保持可配置。
 

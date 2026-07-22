@@ -108,20 +108,65 @@ class RecordsScreenTest {
         assertEquals("Wednesday, July 22", recordsDateLabel(LocalDate.of(2026, 7, 22)))
     }
 
+
+    @Test
+    fun focusGoalCompletionCountsReachedGoals() {
+        val goals = listOf(
+            recordItem(id = 1, name = "A", priority = 10, period = GoalPeriod.DAY, goalValue = 10.0),
+            recordItem(id = 2, name = "B", priority = 9, period = GoalPeriod.WEEK, goalValue = 20.0),
+            recordItem(id = 3, name = "C", priority = 8, period = GoalPeriod.DAY, goalValue = 5.0),
+        )
+        val completion = focusGoalCompletion(
+            goals = goals,
+            values = mapOf(1L to 10.0, 2L to 5.0, 3L to 8.0),
+        )
+        assertEquals(2, completion.done)
+        assertEquals(3, completion.total)
+        assertEquals(2f / 3f, completion.fraction, 0.0001f)
+    }
+
+    @Test
+    fun dayStatusLabelCoversEmptyPartialAndComplete() {
+        assertEquals("", dayStatusLabel(FocusGoalCompletion(0, 0)))
+        assertEquals("0 of 2 goals done", dayStatusLabel(FocusGoalCompletion(0, 2)))
+        assertEquals("1 of 2 goals done", dayStatusLabel(FocusGoalCompletion(1, 2)))
+        assertEquals("All goals done", dayStatusLabel(FocusGoalCompletion(2, 2)))
+    }
+
+    @Test
+    fun crossedGoalThresholdOnlyOnFirstCrossing() {
+        assertEquals(true, crossedGoalThreshold(9.0, 10.0, 10.0))
+        assertEquals(false, crossedGoalThreshold(10.0, 12.0, 10.0))
+        assertEquals(false, crossedGoalThreshold(3.0, 4.0, 10.0))
+        assertEquals(false, crossedGoalThreshold(0.0, 1.0, null))
+    }
+
+    @Test
+    fun quickRecordSubtitlePrefersGoalAndDescription() {
+        val withDescription = recordItem(id = 1, name = "A", priority = 1, period = GoalPeriod.DAY, goalValue = 5.0, description = "Read")
+        assertEquals("Goal reached", quickRecordSubtitle(withDescription, hasLoggedToday = true, goalReached = true))
+        assertEquals("Read", quickRecordSubtitle(withDescription, hasLoggedToday = false, goalReached = false))
+        val plain = recordItem(id = 2, name = "B", priority = 1, period = null, goalValue = null)
+        assertEquals("Logged today", quickRecordSubtitle(plain, hasLoggedToday = true, goalReached = false))
+        assertEquals("Tap to log", quickRecordSubtitle(plain, hasLoggedToday = false, goalReached = false))
+    }
+
     private fun recordItem(
         id: Long,
         name: String,
         priority: Int,
         period: GoalPeriod?,
+        goalValue: Double? = period?.let { 10.0 },
+        description: String = "",
     ) = RecordItem(
         id = id,
         name = name,
-        description = "",
+        description = description,
         valueType = RecordValueType.NUMBER,
         defaultValue = 1.0,
         stepValue = 1.0,
         unit = "count",
-        goalValue = period?.let { 10.0 },
+        goalValue = goalValue,
         goalPeriod = period,
         priority = priority,
         archived = false,

@@ -59,6 +59,8 @@ import com.wswensw.template.record.ui.GoalsScreen
 import com.wswensw.template.record.ui.ManageRecordsScreen
 import com.wswensw.template.record.ui.RecordItemFormScreen
 import com.wswensw.template.record.ui.RecordSheet
+import com.wswensw.template.record.ui.crossedGoalThreshold
+import com.wswensw.template.record.ui.displayRecordName
 import com.wswensw.template.record.ui.RecordsConnectionScreen
 import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
@@ -380,14 +382,34 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             ?: recordsState.entries.filter { it.itemId == itemId }.sumOf { it.value },
                         onDismiss = { recordSheetItemId = null },
                         onRecord = { recordedItem, value, onResult ->
+                            val previous = recordsState.goalValues[recordedItem.id]
+                                ?: recordsState.entries
+                                    .filter { it.itemId == recordedItem.id }
+                                    .sumOf { it.value }
                             recordsViewModel.createEntry(recordedItem.id, value) { entryId, error ->
                                 onResult(error)
                                 if (entryId != null) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
+                                    val goalJustReached = crossedGoalThreshold(
+                                        previous = previous,
+                                        current = previous + value,
+                                        target = recordedItem.goalValue,
+                                    )
+                                    hapticFeedback.performHapticFeedback(
+                                        if (goalJustReached) {
+                                            HapticFeedbackType.LongPress
+                                        } else {
+                                            HapticFeedbackType.Confirm
+                                        },
+                                    )
                                     recordSheetItemId = null
                                     coroutineScope.launch {
+                                        val label = displayRecordName(recordedItem.name)
                                         val result = snackbarHostState.showSnackbar(
-                                            message = "Recorded ${recordedItem.name}.",
+                                            message = if (goalJustReached) {
+                                                "Goal reached · $label"
+                                            } else {
+                                                "Recorded $label."
+                                            },
                                             actionLabel = "Undo",
                                             duration = SnackbarDuration.Short,
                                         )
