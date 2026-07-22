@@ -58,7 +58,7 @@ TemplateTheme
 | 组件 | 职责 | 使用规则 |
 | --- | --- | --- |
 | `TemplatePageHeader` | 根页面标题与说明 | 标题最多两行；右侧只放页面级动作。 |
-| `TemplateSection` | 设置分组 | 显示分组标题与一个 `surface + outline` 内容容器。 |
+| `TemplateSection` | 设置/表单分组 | 仅分组标题 + 内容，无外框卡片。 |
 | `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 项目行前导统一显示项目名称首个 Unicode 字符。 |
 | `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
 | `TemplateDivider` | 同组列表项分隔 | 从卡片左侧 `16dp` 开始，不贴容器边缘。 |
@@ -83,7 +83,7 @@ TemplateTheme
 | Global Copy 面板圆角 | `16dp` |
 
 - 页面背景使用 `surface`。
-- 设置分组使用 `surface + outline`。
+- 设置/表单分组仅用标题分区，无外框。
 - OLED 控制面板使用 `surfaceContainerHigh` 和 `8dp` 阴影。
 - 分组标题使用 `primary`；正文使用 `onSurface`，说明和次要状态使用 `onSurfaceVariant`。
 - 应用主题支持 `Follow system`、`Light`、`Dark`；覆盖层关闭动态色，保证跨应用显示稳定。
@@ -114,7 +114,7 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Foc
 
 未配置凭据、远端失败或无活跃项时，使用空状态卡与全宽主操作。
 
-项目色由名称**首个 Unicode 字符**的 hash 稳定映射到 3 档色相（primary / secondary / tertiary 的 container），同名同色，非随机；禁止 `surfaceContainer*` 灰底。日目标环支持超过 100% 的叠圈：第一圈完成后以半透明铺满，当前圈以实色从顶点再扫；百分比文案不封顶。列表与管理卡统一用项目 `container` 色底（不用灰底）；达标 `tertiaryContainer`；中性块（空态、连接、Sheet 流水、`TemplateSection`）用 `surface` + `outlineVariant` 描边。有目标前导进度环，无目标首字符；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 仍按 `Daily`/`Weekly` 全宽目标卡。
+项目色由名称**首个 Unicode 字符**的 hash 稳定映射到 3 档色相（primary / secondary / tertiary 的 container），同名同色，非随机；禁止 `surfaceContainer*` 灰底。日目标环支持超过 100% 的叠圈：第一圈完成后以半透明铺满，当前圈以实色从顶点再扫；百分比文案不封顶。列表与管理卡统一用项目 `container` 色底（不用灰底）；达标 `tertiaryContainer`；中性块（空态、连接、Sheet 流水）用 `surface` + `outlineVariant` 描边；表单 `TemplateSection` 无外框。有目标前导进度环，无目标首字符；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 仍按 `Daily`/`Weekly` 全宽目标卡。
 
 Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 

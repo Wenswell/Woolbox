@@ -2,7 +2,6 @@ package com.wswensw.template.ui
 
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -223,7 +222,17 @@ private fun TemplateRouteTopBar(
                     )
                 }
             },
-            actions = actions,
+            actions = {
+                Row(
+                    modifier = Modifier.padding(end = TemplateStyle.spacing.pageHorizontal - 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = actions,
+                )
+            },
+            windowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+            ),
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.surface,
                 scrolledContainerColor = MaterialTheme.colorScheme.surface,
@@ -277,28 +286,22 @@ fun TemplateSection(
     title: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(12.dp))
     Text(
         text = title,
         color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(
             start = TemplateStyle.spacing.pageHorizontal,
             end = TemplateStyle.spacing.pageHorizontal,
-            bottom = 8.dp,
+            bottom = 4.dp,
         ),
     )
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
-        shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth(), content = content)
-    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        content = content,
+    )
 }
 
 
