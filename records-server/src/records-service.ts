@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordEntryUpdateInput, RecordItemInput, TaskInput } from "./domain.js";
+import type { RecordEntryInput, RecordItemInput, RecordMode, TaskInput } from "./domain.js";
 import { ApiError } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
@@ -27,7 +27,6 @@ type AuditAction =
   | "ITEM_RESTORED"
   | "ITEM_DELETED"
   | "ENTRY_CREATED"
-  | "ENTRY_UPDATED"
   | "ENTRY_DELETED"
   | "TASK_CREATED"
   | "TASK_UPDATED"
@@ -242,10 +241,11 @@ export class RecordsService {
     return deleted;
   }
 
-  listEntries(startDate: string, endDate: string, itemId?: number) {
+  listEntries(startDate: string, endDate: string, itemId?: number, mode?: RecordMode) {
     if (startDate > endDate) throw new ApiError(400, "Start date must not be after end date.");
     const dateRange = and(gte(recordEntries.localDate, startDate), lte(recordEntries.localDate, endDate));
-    const condition = itemId === undefined ? dateRange : and(dateRange, eq(recordEntries.itemId, itemId));
+    const itemCondition = itemId === undefined ? dateRange : and(dateRange, eq(recordEntries.itemId, itemId));
+    const condition = mode === undefined ? itemCondition : and(itemCondition, eq(recordItems.mode, mode));
     return this.entryQuery().where(condition).orderBy(
       desc(recordEntries.occurredAt),
       desc(recordEntries.id),
@@ -262,7 +262,7 @@ export class RecordsService {
     const activeItems = this.db
       .select()
       .from(recordItems)
-      .where(eq(recordItems.archived, false))
+      .where(and(eq(recordItems.archived, false), eq(recordItems.mode, "MEASUREMENT")))
       .orderBy(sql`${recordItems.name} COLLATE NOCASE`)
       .all();
     return activeItems.map((item) => {
@@ -297,28 +297,6 @@ export class RecordsService {
         createdAt: now,
       });
       return created.id;
-    });
-    return this.getEntry(id);
-  }
-
-  updateEntry(id: number, input: RecordEntryUpdateInput) {
-    this.db.transaction((tx) => {
-      const current = tx.select().from(recordEntries).where(eq(recordEntries.id, id)).get();
-      if (!current) throw new ApiError(404, "Record not found.");
-      const item = tx.select().from(recordItems).where(eq(recordItems.id, current.itemId)).get();
-      if (!item) throw new ApiError(404, "Record item not found.");
-      if (item.archived) throw new ApiError(400, "Archived items cannot be recorded.");
-      this.requireEntryValue(item, input.value);
-      const now = this.now();
-      tx.update(recordEntries).set(input).where(eq(recordEntries.id, id)).run();
-      this.writeAudit(tx, {
-        action: "ENTRY_UPDATED",
-        entityType: "ENTRY",
-        entityId: id,
-        before: entrySnapshot(current, item.name),
-        after: entrySnapshot({ ...current, ...input }, item.name),
-        createdAt: now,
-      });
     });
     return this.getEntry(id);
   }

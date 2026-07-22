@@ -158,33 +158,41 @@ describe("Records API", () => {
     expect(await getItems(true)).toEqual([]);
   });
 
-  it("creates, filters, updates, and deletes entries", async () => {
+  it("creates, filters by item and mode, and deletes entries", async () => {
     await createItem(itemInput({ name: "Water", unit: "ml" }));
-    await createItem(itemInput({ name: "Read", unit: "pages" }));
+    await createItem(itemInput({
+      name: "Temperature",
+      mode: "MEASUREMENT",
+      defaultValue: null,
+      unit: "°C",
+      windows: [],
+    }));
     await createEntry(entryInput({ itemId: 1, localDate: "2026-07-19", localMinute: 600, value: 2 }));
     await createEntry(entryInput({ itemId: 2, localDate: "2026-07-20", localMinute: 700, value: 3 }));
 
     const filtered = await app.inject({ method: "GET", url: "/api/entries?startDate=2026-07-19&endDate=2026-07-20&itemId=2" });
     expect(filtered.statusCode).toBe(200);
     expect(filtered.json().entries).toEqual([
-      expect.objectContaining({ id: 2, itemId: 2, itemName: "Read", localDate: "2026-07-20" }),
+      expect.objectContaining({ id: 2, itemId: 2, itemName: "Temperature", localDate: "2026-07-20" }),
     ]);
 
-    const update = await app.inject({
-      method: "PUT",
-      url: "/api/entries/1",
-      payload: entryUpdateInput({ occurredAt: 20, localDate: "2026-07-18", localMinute: 59, value: 4 }),
-    });
-    expect(update.statusCode).toBe(200);
-    expect(update.json().entry).toMatchObject({ id: 1, itemId: 1, occurredAt: 20, localDate: "2026-07-18", localMinute: 59, value: 4 });
+    const accumulated = await app.inject({ method: "GET", url: "/api/entries?startDate=2026-07-19&endDate=2026-07-20&mode=ACCUMULATE" });
+    expect(accumulated.statusCode).toBe(200);
+    expect(accumulated.json().entries).toEqual([expect.objectContaining({ id: 1, itemMode: "ACCUMULATE" })]);
+
+    const measurements = await app.inject({ method: "GET", url: "/api/entries?startDate=2026-07-19&endDate=2026-07-20&mode=MEASUREMENT" });
+    expect(measurements.statusCode).toBe(200);
+    expect(measurements.json().entries).toEqual([expect.objectContaining({ id: 2, itemMode: "MEASUREMENT" })]);
+
+    const invalidMode = await app.inject({ method: "GET", url: "/api/entries?startDate=2026-07-19&endDate=2026-07-20&mode=UNKNOWN" });
+    expect(invalidMode.statusCode).toBe(400);
 
     const deleted = await app.inject({ method: "DELETE", url: "/api/entries/1" });
     expect(deleted.statusCode).toBe(200);
     expect(deleted.json().entry.id).toBe(1);
-    expect((await getAuditLogs()).slice(0, 3)).toMatchObject([
-      { action: "ENTRY_DELETED", before: { id: 1, itemName: "Water", value: 4 } },
-      { action: "ENTRY_UPDATED", before: { id: 1, itemName: "Water", value: 2 }, after: { id: 1, itemName: "Water", value: 4 } },
-      { action: "ENTRY_CREATED", after: { id: 2, itemName: "Read", value: 3 } },
+    expect((await getAuditLogs()).slice(0, 2)).toMatchObject([
+      { action: "ENTRY_DELETED", before: { id: 1, itemName: "Water", value: 2 } },
+      { action: "ENTRY_CREATED", after: { id: 2, itemName: "Temperature", value: 3 } },
     ]);
   });
 
@@ -217,6 +225,9 @@ describe("Records API", () => {
     expect((await createEntry(entryInput({ itemId: 1, value: 0 }))).statusCode).toBe(201);
     expect((await createEntry(entryInput({ itemId: 1, value: -5.5 }))).statusCode).toBe(201);
     expect((await getEntries()).map((entry) => entry.value)).toEqual([-5.5, 0]);
+
+    expect((await createItem(itemInput({ name: "Water" }))).statusCode).toBe(201);
+    expect((await createEntry(entryInput({ itemId: 2, value: 1 }))).statusCode).toBe(201);
 
     const latest = await app.inject({ method: "GET", url: "/api/entries/latest" });
     expect(latest.statusCode).toBe(200);
@@ -387,16 +398,6 @@ function itemInput(patch: Record<string, unknown> = {}) {
 function entryInput(patch: Record<string, unknown> = {}) {
   return {
     itemId: 1,
-    occurredAt: 10,
-    localDate: "2026-07-20",
-    localMinute: 600,
-    value: 1,
-    ...patch,
-  };
-}
-
-function entryUpdateInput(patch: Record<string, unknown> = {}) {
-  return {
     occurredAt: 10,
     localDate: "2026-07-20",
     localMinute: 600,

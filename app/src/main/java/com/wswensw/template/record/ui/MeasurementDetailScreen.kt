@@ -1,6 +1,5 @@
 package com.wswensw.template.record.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,13 +12,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -68,8 +65,6 @@ fun MeasurementDetailScreen(
     onEditItem: () -> Unit,
     onAddEntry: () -> Unit,
     onRangeChange: (MeasurementRange) -> Unit,
-    onEditEntry: (Long) -> Unit,
-    onDeleteEntry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     TemplateRouteScaffold(
@@ -173,8 +168,6 @@ fun MeasurementDetailScreen(
                 MeasurementEntryRow(
                     entry = entry,
                     unit = item.unit,
-                    onEdit = { onEditEntry(entry.id) },
-                    onDelete = { onDeleteEntry(entry.id) },
                 )
                 if (index < state.entries.lastIndex) {
                     HorizontalDivider(
@@ -259,13 +252,10 @@ private fun MeasurementChart(
 private fun MeasurementEntryRow(
     entry: RecordEntry,
     unit: String,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onEdit)
             .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -280,12 +270,6 @@ private fun MeasurementEntryRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
-        }
-        IconButton(onClick = onEdit) {
-            Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Edit measurement")
-        }
-        IconButton(onClick = onDelete) {
-            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Delete measurement")
         }
     }
 }

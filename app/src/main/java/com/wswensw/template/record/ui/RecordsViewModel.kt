@@ -174,24 +174,6 @@ class RecordsViewModel(
         }
     }
 
-    fun updateEntry(
-        entry: RecordEntry,
-        value: Double,
-        occurredAt: Long,
-        onResult: (String?) -> Unit,
-    ) {
-        viewModelScope.launch {
-            runCatching {
-                repository.updateEntry(entry, value, occurredAt)
-                repository.refresh(selectedDate.value.toString())
-                reloadMeasurementDetail(entry.itemId)
-            }.fold(
-                onSuccess = { onResult(null) },
-                onFailure = { error -> onResult(error.message ?: "Unable to update record.") },
-            )
-        }
-    }
-
     fun deleteEntry(entryId: Long, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             val itemId = _measurementDetail.value.entries.firstOrNull { it.id == entryId }?.itemId

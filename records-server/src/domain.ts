@@ -33,13 +33,6 @@ export interface RecordEntryInput {
   value: number;
 }
 
-export interface RecordEntryUpdateInput {
-  occurredAt: number;
-  localDate: string;
-  localMinute: number;
-  value: number;
-}
-
 export interface TaskInput {
   title: string;
 }
@@ -104,12 +97,16 @@ export function parseItemInput(value: unknown): RecordItemInput {
 
 export function parseEntryInput(value: unknown): RecordEntryInput {
   const input = objectInput(value);
-  const entry = parseEntryFields(input);
-  return { itemId: positiveIntegerField(input, "itemId"), ...entry };
-}
-
-export function parseEntryUpdateInput(value: unknown): RecordEntryUpdateInput {
-  return parseEntryFields(objectInput(value));
+  const entry = {
+    itemId: positiveIntegerField(input, "itemId"),
+    occurredAt: integerField(input, "occurredAt"),
+    localDate: stringField(input, "localDate"),
+    localMinute: integerField(input, "localMinute"),
+    value: numberField(input, "value"),
+  };
+  requireRule(/^\d{4}-\d{2}-\d{2}$/.test(entry.localDate) && isRealDate(entry.localDate), "Local date is invalid.");
+  requireRule(entry.localMinute >= 0 && entry.localMinute <= 1439, "Local minute is invalid.");
+  return entry;
 }
 
 export function parseTaskInput(value: unknown): TaskInput {
@@ -124,16 +121,10 @@ export function parseCompleted(value: unknown): boolean {
   return input.completed;
 }
 
-function parseEntryFields(input: Record<string, unknown>): RecordEntryUpdateInput {
-  const entry = {
-    occurredAt: integerField(input, "occurredAt"),
-    localDate: stringField(input, "localDate"),
-    localMinute: integerField(input, "localMinute"),
-    value: numberField(input, "value"),
-  };
-  requireRule(/^\d{4}-\d{2}-\d{2}$/.test(entry.localDate) && isRealDate(entry.localDate), "Local date is invalid.");
-  requireRule(entry.localMinute >= 0 && entry.localMinute <= 1439, "Local minute is invalid.");
-  return entry;
+export function parseOptionalRecordMode(value: unknown): RecordMode | undefined {
+  if (value === undefined) return undefined;
+  requireRule(typeof value === "string" && RECORD_MODES.includes(value as RecordMode), "Record mode is invalid.");
+  return value as RecordMode;
 }
 
 export function parseId(value: unknown, label = "ID"): number {

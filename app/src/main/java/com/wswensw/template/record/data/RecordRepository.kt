@@ -78,7 +78,11 @@ class RecordRepository(context: Context) {
         val range = request(
             "GET",
             "entries",
-            query = mapOf("startDate" to lookbackStart, "endDate" to localDate),
+            query = mapOf(
+                "startDate" to lookbackStart,
+                "endDate" to localDate,
+                "mode" to RecordMode.ACCUMULATE.name,
+            ),
         )
         val latest = request("GET", "entries/latest")
         val tasks = request("GET", "tasks")
@@ -143,18 +147,6 @@ class RecordRepository(context: Context) {
                 .put("value", value)
             request("POST", "entries", body = body).getJSONObject("entry").getLong("id")
         }
-
-    suspend fun updateEntry(entry: RecordEntry, value: Double, occurredAt: Long) = withContext(Dispatchers.IO) {
-        requireEntryValue(entry.itemMode, value)
-        val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
-        val body = JSONObject()
-            .put("occurredAt", occurredAt)
-            .put("localDate", local.toLocalDate().toString())
-            .put("localMinute", local.hour * 60 + local.minute)
-            .put("value", value)
-        request("PUT", "entries/${entry.id}", body = body)
-        Unit
-    }
 
     suspend fun entriesForItem(itemId: Long, startDate: String, endDate: String): List<RecordEntry> =
         withContext(Dispatchers.IO) {

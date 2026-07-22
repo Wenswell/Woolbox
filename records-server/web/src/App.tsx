@@ -115,7 +115,7 @@ function timeMinute(value: string) { const [hour, minuteValue] = value.split(":"
 function message(reason: unknown) { return reason instanceof Error ? reason.message : "Request failed."; }
 function formatDateTime(epoch: number) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(epoch); }
 function auditSubject(log: RecordAuditLog) { const snapshot = log.after ?? log.before; if (!snapshot) return `${log.entityType} #${log.entityId}`; if ("name" in snapshot) return `Record item: ${snapshot.name}`; if ("itemName" in snapshot) return `Entry: ${snapshot.itemName}`; return "taskTitle" in snapshot ? `Subtask: ${snapshot.taskTitle}` : `Task: ${snapshot.title}`; }
-function actionLabel(action: RecordAuditLog["action"]) { return ({ ITEM_CREATED: "Created item", ITEM_UPDATED: "Updated item", ITEM_ARCHIVED: "Archived item", ITEM_RESTORED: "Restored item", ITEM_DELETED: "Deleted item", ENTRY_CREATED: "Created entry", ENTRY_UPDATED: "Updated entry", ENTRY_DELETED: "Deleted entry", TASK_CREATED: "Created task", TASK_UPDATED: "Updated task", TASK_COMPLETED: "Completed task", TASK_REOPENED: "Reopened task", TASK_DELETED: "Deleted task", STEP_CREATED: "Created subtask", STEP_UPDATED: "Updated subtask", STEP_COMPLETED: "Completed subtask", STEP_REOPENED: "Reopened subtask", STEP_DELETED: "Deleted subtask" })[action]; }
+function actionLabel(action: RecordAuditLog["action"]) { return ({ ITEM_CREATED: "Created item", ITEM_UPDATED: "Updated item", ITEM_ARCHIVED: "Archived item", ITEM_RESTORED: "Restored item", ITEM_DELETED: "Deleted item", ENTRY_CREATED: "Created entry", ENTRY_DELETED: "Deleted entry", TASK_CREATED: "Created task", TASK_UPDATED: "Updated task", TASK_COMPLETED: "Completed task", TASK_REOPENED: "Reopened task", TASK_DELETED: "Deleted task", STEP_CREATED: "Created subtask", STEP_UPDATED: "Updated subtask", STEP_COMPLETED: "Completed subtask", STEP_REOPENED: "Reopened subtask", STEP_DELETED: "Deleted subtask" })[action]; }
 function auditChanges(log: RecordAuditLog) {
   const before = log.before;
   const after = log.after;
@@ -123,7 +123,6 @@ function auditChanges(log: RecordAuditLog) {
   if (log.action === "ITEM_DELETED" && before && "name" in before) return itemDescription(before);
   if (log.action === "ENTRY_CREATED" && after && isEntrySnapshot(after)) return entryDescription(after);
   if (log.action === "ENTRY_DELETED" && before && isEntrySnapshot(before)) return entryDescription(before);
-  if (log.action === "ENTRY_UPDATED" && before && after && isEntrySnapshot(before) && isEntrySnapshot(after)) return `${entryDescription(before)} to ${entryDescription(after)}`;
   if (log.action === "TASK_CREATED" && after && isTaskSnapshot(after)) return taskDescription(after);
   if (log.action === "TASK_DELETED" && before && isTaskSnapshot(before)) return taskDescription(before);
   if (log.action === "STEP_CREATED" && after && isStepSnapshot(after)) return stepDescription(after);

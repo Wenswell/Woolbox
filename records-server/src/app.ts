@@ -7,12 +7,12 @@ import {
   parseArchived,
   parseCompleted,
   parseEntryInput,
-  parseEntryUpdateInput,
   parseId,
   parseIds,
   parseIsoDate,
   parseItemInput,
   parseOptionalId,
+  parseOptionalRecordMode,
   parseTaskInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
@@ -148,7 +148,7 @@ export function buildApp(options: BuildAppOptions) {
     const startDate = parseIsoDate(query.startDate, "Start date");
     const endDate = parseIsoDate(query.endDate, "End date");
     const itemId = query.itemId === undefined ? undefined : parseId(query.itemId, "Record item ID");
-    return { entries: records.listEntries(startDate, endDate, itemId) };
+    return { entries: records.listEntries(startDate, endDate, itemId, parseOptionalRecordMode(query.mode)) };
   });
 
   app.get("/api/entries/latest", () => ({ entries: records.listLatestEntries() }));
@@ -160,14 +160,6 @@ export function buildApp(options: BuildAppOptions) {
   app.post("/api/entries", (request, reply) => {
     const entry = records.createEntry(parseEntryInput(request.body));
     return reply.status(201).send({ entry });
-  });
-
-  app.put("/api/entries/:id", (request) => {
-    const entry = records.updateEntry(
-      parseId((request.params as { id?: unknown }).id, "Record ID"),
-      parseEntryUpdateInput(request.body),
-    );
-    return { entry };
   });
 
   app.post("/api/entries/batch-delete", (request) => {
