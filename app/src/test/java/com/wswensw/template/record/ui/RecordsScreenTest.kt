@@ -55,6 +55,20 @@ class RecordsScreenTest {
         assertEquals("阅", displayRecordName("阅"))
     }
 
+
+    @Test
+    fun orderedRecordItemsPreferGoalsFirst() {
+        val ordered = orderedRecordItems(
+            listOf(
+                recordItem(id = 1, name = "A", priority = 100, period = null),
+                recordItem(id = 2, name = "B", priority = 20, period = GoalPeriod.WEEK),
+                recordItem(id = 3, name = "C", priority = 50, period = GoalPeriod.DAY),
+                recordItem(id = 4, name = "D", priority = 90, period = null),
+            ),
+        )
+        assertEquals(listOf(3L, 2L, 1L, 4L), ordered.map(RecordItem::id))
+    }
+
     @Test
     fun focusGoalsUsePriorityAndIncludeAllConfiguredGoals() {
         val focus = goalItems(

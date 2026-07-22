@@ -19,8 +19,7 @@ TemplateTheme
    │     │     ├─ Global Copy entry
    │     │     └─ OLED shield entry
    │     ├─ Records
-   │     │  ├─ Focus goals
-   │     │  ├─ Quick record cards
+   │     │  ├─ Record cards
    │     │  └─ Record sheet
    │     └─ Setting
    │        ├─ Theme entry
@@ -105,22 +104,19 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn` 与 `16dp` 块间距。信息分区职责：
+Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Focus 分区。
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| 标题区 | 日期导航；有目标时在日期下用一行文案汇总完成数（`N of M goals done` / `All goals done`），无独立进度卡 |
-| `Focus` | 各项目标进度与达标态；横向卡宽约 `82%`、上限 `300dp` |
-| `Records` | 快速记账：首字符、名称、说明、今日累计；连击只在此展示 |
-| Sheet | 单次目标进度、今日流水、数值输入 |
+| 标题区 | 日期；有目标时一行汇总 `N of M goals done` / `All goals done` |
+| 记录列表 | 有目标项优先（再按优先级、名称）；有目标项前导进度环 + 进度文案，周目标附细进度条；尾部今日累计与连击 |
+| Sheet | 身份与进度合并为同一标题行；下方仅数值输入与今日流水 |
 
-未配置凭据、远端失败或无活跃项时，使用 `surfaceContainerLow` 空状态卡和全宽主操作。
+未配置凭据、远端失败或无活跃项时，使用空状态卡与全宽主操作。
 
-项目色由名称首字符稳定映射到 6 档 Material 角色。日目标圆形进度、周目标横向进度；达标用 `tertiaryContainer` + 完成图标 + `Goal reached`。`Goals` 路由按 `Daily`/`Weekly` 分组，卡上不再附连击。
+列表卡：无目标用首字符；有目标用进度环；达标 `tertiaryContainer` + `Goal reached`；今日已记用项目 `container`；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 路由仍按 `Daily`/`Weekly` 分组全宽目标卡。
 
-快速记录卡不重复目标进度或达标文案；未记 `surfaceContainerLow`，今日已记项目 `container`；`current≥1` 时尾部火焰 + `N day(s)`（`best` 更大时 `· best M`）。整卡点击打开 Sheet。根 `Scaffold` 不显示 FAB。
-
-点击项目打开单个 `ModalBottomSheet`。Sheet 标题用首字符图标与裁剪名称；目标信息只在 `GoalProgressPanel` 展示一次。确认成功后关闭 Sheet：若本次记录使该项目从「未达标」跨到「达标」，触感用 `LongPress`，Snackbar 为 `Goal reached · 名称`；否则触感 `Confirm`，Snackbar 为 `Recorded 名称.`。Snackbar 均提供短时 `Undo`。错误留在 Sheet 内。
+Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 
 `Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。编辑页首帧即禁用类型与单位控件，新建页保持可配置。
 

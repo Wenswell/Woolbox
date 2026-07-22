@@ -3,7 +3,6 @@ package com.wswensw.template.record.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,8 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.LocalFireDepartment
@@ -28,12 +27,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -110,61 +111,16 @@ fun RecordsScreen(
             }
             else -> {
                 val orderedItems = orderedRecordItems(state.activeItems)
-                val focusGoals = goalItems(orderedItems)
                 val todayValues = todayRecordValues(state.entries)
-
-                if (focusGoals.isNotEmpty()) {
-                    item {
-                        RecordsSectionTitle(title = "Focus")
-                    }
-                    item(key = "focus-goals") {
-                        FocusGoalsRow(
-                            goals = focusGoals,
-                            values = state.goalValues,
-                            onRecordItem = onRecordItem,
-                        )
-                    }
-                }
-
-                item {
-                    RecordsSectionTitle(title = "Records")
-                }
                 items(orderedItems, key = RecordItem::id) { item ->
                     QuickRecordCard(
                         item = item,
                         todayValue = todayValues[item.id] ?: 0.0,
+                        goalCumulative = state.goalValues[item.id],
                         streak = state.streaks[item.id],
                         onClick = { onRecordItem(item) },
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FocusGoalsRow(
-    goals: List<RecordItem>,
-    values: Map<Long, Double>,
-    onRecordItem: (RecordItem) -> Unit,
-) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val cardWidth = (maxWidth * 0.82f).coerceAtMost(300.dp)
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(end = 8.dp),
-        ) {
-            items(goals, key = RecordItem::id) { goal ->
-                GoalCard(
-                    item = goal,
-                    cumulative = values[goal.id] ?: 0.0,
-                    featured = true,
-                    onClick = { onRecordItem(goal) },
-                    modifier = Modifier
-                        .width(cardWidth)
-                        .heightIn(min = 136.dp),
-                )
             }
         }
     }
@@ -223,48 +179,31 @@ private fun RecordsHeader(
 }
 
 @Composable
-private fun RecordsSectionTitle(
-    title: String,
-    trailing: String? = null,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
-        )
-        if (trailing != null) {
-            Text(
-                text = trailing,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-}
-
-@Composable
 private fun QuickRecordCard(
     item: RecordItem,
     todayValue: Double,
+    goalCumulative: Double?,
     streak: ItemStreak?,
     onClick: () -> Unit,
 ) {
     val colors = recordItemColors(item.name)
     val hasLoggedToday = todayValue > 0.0
+    val target = item.goalValue
+    val period = item.goalPeriod
+    val hasGoal = target != null && target > 0.0 && period != null
+    val cumulative = goalCumulative ?: todayValue
+    val progress = if (hasGoal) goalProgressFraction(cumulative, checkNotNull(target)) else 0f
+    val goalReached = hasGoal && cumulative >= checkNotNull(target)
+    val progressColor = if (goalReached) {
+        MaterialTheme.colorScheme.tertiary
+    } else {
+        colors.accent
+    }
     val container by animateColorAsState(
-        targetValue = if (hasLoggedToday) {
-            colors.container
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+        targetValue = when {
+            goalReached -> MaterialTheme.colorScheme.tertiaryContainer
+            hasLoggedToday -> colors.container
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
         },
         label = "QuickRecordContainer",
     )
@@ -279,11 +218,21 @@ private fun QuickRecordCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp)
+                .heightIn(min = 76.dp)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RecordItemInitial(name = item.name, size = 48.dp)
+            if (hasGoal) {
+                DailyGoalMedallion(
+                    item = item,
+                    progress = progress,
+                    reached = goalReached,
+                    progressColor = progressColor,
+                    size = 48.dp,
+                )
+            } else {
+                RecordItemInitial(name = item.name, size = 48.dp)
+            }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -293,13 +242,31 @@ private fun QuickRecordCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (item.description.isNotEmpty()) {
-                    Text(
-                        text = item.description,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Text(
+                    text = quickRecordSupportingText(
+                        item = item,
+                        hasGoal = hasGoal,
+                        cumulative = cumulative,
+                        goalReached = goalReached,
+                        progress = progress,
+                    ),
+                    color = if (goalReached) progressColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (hasGoal && period == GoalPeriod.WEEK && !goalReached) {
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(CircleShape),
+                        color = progressColor,
+                        trackColor = progressColor.copy(alpha = 0.16f),
+                        gapSize = 0.dp,
+                        drawStopIndicator = {},
                     )
                 }
             }
@@ -310,7 +277,7 @@ private fun QuickRecordCard(
             ) {
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
-                    color = colors.accent,
+                    color = progressColor,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -325,12 +292,12 @@ private fun QuickRecordCard(
                         Icon(
                             imageVector = Icons.Rounded.LocalFireDepartment,
                             contentDescription = null,
-                            tint = colors.accent,
+                            tint = progressColor,
                             modifier = Modifier.size(14.dp),
                         )
                         Text(
                             text = streakText,
-                            color = colors.accent,
+                            color = progressColor,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -417,9 +384,28 @@ internal fun crossedGoalThreshold(
 }
 
 
+
+internal fun quickRecordSupportingText(
+    item: RecordItem,
+    hasGoal: Boolean,
+    cumulative: Double,
+    goalReached: Boolean,
+    progress: Float,
+): String = when {
+    goalReached -> "Goal reached"
+    hasGoal -> {
+        val target = checkNotNull(item.goalValue)
+        val period = if (item.goalPeriod == GoalPeriod.DAY) "today" else "this week"
+        "${goalValueLabel(cumulative, target, item.unit)} · ${(progress * 100).toInt()}% $period"
+    }
+    item.description.isNotEmpty() -> item.description
+    else -> "Today"
+}
+
 internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
     items.sortedWith(
-        compareByDescending<RecordItem> { it.priority }
+        compareByDescending<RecordItem> { it.goalValue != null && it.goalPeriod != null }
+            .thenByDescending { it.priority }
             .thenBy { it.name.lowercase(Locale.ROOT) },
     )
 

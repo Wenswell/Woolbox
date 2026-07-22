@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
+import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.stepRecordValue
@@ -64,40 +65,11 @@ fun RecordSheet(
                 .padding(horizontal = TemplateStyle.spacing.pageHorizontal)
                 .padding(bottom = 28.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RecordItemInitial(name = item.name, size = 52.dp)
-                Spacer(Modifier.width(14.dp))
-                Text(
-                    text = displayRecordName(item.name),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            if (item.description.isNotEmpty()) {
-                Text(
-                    text = item.description,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-            item.goalValue?.let { goal ->
-                if (goal > 0) {
-                    Spacer(Modifier.height(16.dp))
-                    GoalProgressPanel(item = item, cumulative = cumulative)
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = "Record progress",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+            RecordSheetIdentity(
+                item = item,
+                cumulative = cumulative,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(20.dp))
             ValueInput(
                 item = item,
                 valueText = valueText,
@@ -180,6 +152,69 @@ private fun EntryRow(entry: RecordEntry) {
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.End,
         )
+    }
+}
+
+
+@Composable
+private fun RecordSheetIdentity(
+    item: RecordItem,
+    cumulative: Double,
+) {
+    val target = item.goalValue
+    val period = item.goalPeriod
+    val hasGoal = target != null && target > 0 && period != null
+    val progress = if (hasGoal) {
+        goalProgressFraction(cumulative, checkNotNull(target))
+    } else {
+        0f
+    }
+    val reached = hasGoal && cumulative >= checkNotNull(target)
+    val colors = recordItemColors(item.name)
+    val progressColor = if (reached) {
+        MaterialTheme.colorScheme.tertiary
+    } else {
+        colors.accent
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (hasGoal && period == GoalPeriod.DAY) {
+            DailyGoalMedallion(
+                item = item,
+                progress = progress,
+                reached = reached,
+                progressColor = progressColor,
+                size = 56.dp,
+            )
+        } else {
+            RecordItemInitial(name = item.name, size = 52.dp)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = displayRecordName(item.name),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (item.description.isNotEmpty()) {
+                Text(
+                    text = item.description,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (hasGoal) {
+                GoalProgressPanel(
+                    item = item,
+                    cumulative = cumulative,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
     }
 }
 
