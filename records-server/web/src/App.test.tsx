@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
-const activeItem = { id: 1, name: "Water", description: "", valueType: "NUMBER", defaultValue: 1, stepValue: 1, unit: "ml", goalValue: null, goalPeriod: null, priority: 1, archived: false, createdAt: 1, updatedAt: 1, windows: [] };
+const activeItem = { id: 1, name: "Water", description: "", mode: "ACCUMULATE", valueType: "NUMBER", defaultValue: 1, stepValue: 1, unit: "ml", goalValue: null, goalPeriod: null, priority: 1, archived: false, createdAt: 1, updatedAt: 1, windows: [] };
 const archivedItem = { ...activeItem, id: 2, name: "Read", unit: "pages", archived: true };
-const entry = { id: 3, itemId: 1, occurredAt: 1_752_984_000_000, localDate: "2025-07-20", localMinute: 600, value: 2, createdAt: 1, itemName: "Water", itemUnit: "ml", itemValueType: "NUMBER" };
+const entry = { id: 3, itemId: 1, occurredAt: 1_752_984_000_000, localDate: "2025-07-20", localMinute: 600, value: 2, createdAt: 1, itemName: "Water", itemMode: "ACCUMULATE", itemUnit: "ml", itemValueType: "NUMBER" };
 const auditLog = { id: 4, action: "ENTRY_CREATED", entityType: "ENTRY", entityId: 3, before: null, after: { id: 3, itemId: 1, itemName: "Water", occurredAt: entry.occurredAt, localDate: entry.localDate, localMinute: entry.localMinute, value: 2 }, createdAt: entry.occurredAt };
 
 describe("Records administration", () => {

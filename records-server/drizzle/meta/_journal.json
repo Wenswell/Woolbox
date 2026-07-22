@@ -29,6 +29,13 @@
       "when": 1784635884987,
       "tag": "0003_drop_record_item_icons",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784729687880,
+      "tag": "0004_measurement_mode",
+      "breakpoints": true
     }
   ]
 }

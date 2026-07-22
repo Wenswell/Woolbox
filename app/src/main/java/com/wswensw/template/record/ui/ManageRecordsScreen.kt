@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordItem
+import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.ui.TemplateLazyRouteScaffold
 import com.wswensw.template.ui.TemplateStyle
@@ -162,6 +163,10 @@ private fun ManageRecordCard(
 }
 
 private fun RecordItem.measurementSummary(): String {
+    if (mode == RecordMode.MEASUREMENT) {
+        val default = defaultValue?.let(::formatValue) ?: "No default"
+        return "Measurement · default $default $unit · step ${formatValue(stepValue)}"
+    }
     val type = if (valueType == RecordValueType.NUMBER) "Number" else "Duration"
     val default = defaultValue?.let(::formatValue) ?: "No default"
     return "$type · default $default $unit · step ${formatValue(stepValue)}"

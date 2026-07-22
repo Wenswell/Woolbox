@@ -28,6 +28,7 @@ describe("Records API", () => {
       id: 1,
       name: "Water",
       description: "drink",
+      mode: "ACCUMULATE",
       unit: "ml",
       archived: false,
       createdAt: 1_700_000_000_000,
@@ -63,6 +64,9 @@ describe("Records API", () => {
     ["invalid end minute", { windows: [{ startMinute: 60, endMinute: 1440 }] }],
     ["equal window bounds", { windows: [{ startMinute: 60, endMinute: 60 }] }],
     ["duplicate windows", { windows: [{ startMinute: 60, endMinute: 120 }, { startMinute: 60, endMinute: 120 }] }],
+    ["measurement duration", { mode: "MEASUREMENT", valueType: "DURATION", unit: "分", windows: [] }],
+    ["measurement goal", { mode: "MEASUREMENT", goalValue: 2, goalPeriod: "DAY", windows: [] }],
+    ["measurement windows", { mode: "MEASUREMENT" }],
   ])("rejects %s without changing tables", async (_label, patch) => {
     const response = await createItem(itemInput(patch));
     expect(response.statusCode).toBe(400);
@@ -154,7 +158,7 @@ describe("Records API", () => {
     expect(await getItems(true)).toEqual([]);
   });
 
-  it("creates, filters, and deletes entries without an update route", async () => {
+  it("creates, filters, updates, and deletes entries", async () => {
     await createItem(itemInput({ name: "Water", unit: "ml" }));
     await createItem(itemInput({ name: "Read", unit: "pages" }));
     await createEntry(entryInput({ itemId: 1, localDate: "2026-07-19", localMinute: 600, value: 2 }));
@@ -169,21 +173,22 @@ describe("Records API", () => {
     const update = await app.inject({
       method: "PUT",
       url: "/api/entries/1",
-      payload: entryInput({ itemId: 2, occurredAt: 20, localDate: "2026-07-18", localMinute: 59, value: 4 }),
+      payload: entryUpdateInput({ occurredAt: 20, localDate: "2026-07-18", localMinute: 59, value: 4 }),
     });
-    expect(update.statusCode).toBe(404);
+    expect(update.statusCode).toBe(200);
+    expect(update.json().entry).toMatchObject({ id: 1, itemId: 1, occurredAt: 20, localDate: "2026-07-18", localMinute: 59, value: 4 });
 
     const deleted = await app.inject({ method: "DELETE", url: "/api/entries/1" });
     expect(deleted.statusCode).toBe(200);
     expect(deleted.json().entry.id).toBe(1);
     expect((await getAuditLogs()).slice(0, 3)).toMatchObject([
-      { action: "ENTRY_DELETED", before: { id: 1, itemName: "Water", value: 2 } },
+      { action: "ENTRY_DELETED", before: { id: 1, itemName: "Water", value: 4 } },
+      { action: "ENTRY_UPDATED", before: { id: 1, itemName: "Water", value: 2 }, after: { id: 1, itemName: "Water", value: 4 } },
       { action: "ENTRY_CREATED", after: { id: 2, itemName: "Read", value: 3 } },
-      { action: "ENTRY_CREATED", after: { id: 1, itemName: "Water", value: 2 } },
     ]);
   });
 
-  it("validates entry timestamps and values without writing", async () => {
+  it("validates accumulated entry timestamps and values without writing", async () => {
     await createItem(itemInput());
     for (const patch of [
       { value: 0 },
@@ -196,6 +201,37 @@ describe("Records API", () => {
       expect([400, 404]).toContain(response.statusCode);
     }
     expect(await getEntries()).toEqual([]);
+  });
+
+  it("allows signed measurement values and rejects incompatible measurement fields", async () => {
+    const created = await createItem(itemInput({
+      name: "Temperature",
+      mode: "MEASUREMENT",
+      defaultValue: null,
+      unit: "°C",
+      windows: [],
+    }));
+    expect(created.statusCode).toBe(201);
+    expect(created.json().item).toMatchObject({ mode: "MEASUREMENT", valueType: "NUMBER", goalValue: null, windows: [] });
+
+    expect((await createEntry(entryInput({ itemId: 1, value: 0 }))).statusCode).toBe(201);
+    expect((await createEntry(entryInput({ itemId: 1, value: -5.5 }))).statusCode).toBe(201);
+    expect((await getEntries()).map((entry) => entry.value)).toEqual([-5.5, 0]);
+
+    const latest = await app.inject({ method: "GET", url: "/api/entries/latest" });
+    expect(latest.statusCode).toBe(200);
+    expect(latest.json().entries).toEqual([
+      expect.objectContaining({ itemId: 1, itemMode: "MEASUREMENT", value: -5.5 }),
+    ]);
+
+    const invalid = await createItem(itemInput({
+      name: "Invalid measurement",
+      mode: "MEASUREMENT",
+      valueType: "DURATION",
+      unit: "分",
+      windows: [],
+    }));
+    expect(invalid.statusCode).toBe(400);
   });
 
   it("batch deletes entries atomically and returns deleted resources", async () => {
@@ -252,6 +288,7 @@ function itemInput(patch: Record<string, unknown> = {}) {
   return {
     name: "Water",
     description: "",
+    mode: "ACCUMULATE",
     valueType: "NUMBER",
     defaultValue: 1,
     stepValue: 1,
@@ -267,6 +304,16 @@ function itemInput(patch: Record<string, unknown> = {}) {
 function entryInput(patch: Record<string, unknown> = {}) {
   return {
     itemId: 1,
+    occurredAt: 10,
+    localDate: "2026-07-20",
+    localMinute: 600,
+    value: 1,
+    ...patch,
+  };
+}
+
+function entryUpdateInput(patch: Record<string, unknown> = {}) {
+  return {
     occurredAt: 10,
     localDate: "2026-07-20",
     localMinute: 600,

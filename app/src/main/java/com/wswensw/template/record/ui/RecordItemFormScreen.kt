@@ -52,6 +52,7 @@ import com.wswensw.template.record.model.DURATION_UNITS
 import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
+import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
 import com.wswensw.template.ui.TemplateRouteScaffold
@@ -98,6 +99,9 @@ fun RecordItemFormScreen(
 
     var name by rememberSaveable(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var description by rememberSaveable(item?.id) { mutableStateOf(item?.description.orEmpty()) }
+    var modeName by rememberSaveable(item?.id) {
+        mutableStateOf((item?.mode ?: RecordMode.ACCUMULATE).name)
+    }
     var valueTypeName by rememberSaveable(item?.id) {
         mutableStateOf((item?.valueType ?: RecordValueType.NUMBER).name)
     }
@@ -132,6 +136,7 @@ fun RecordItemFormScreen(
     var saving by rememberSaveable { mutableStateOf(false) }
 
     val valueType = RecordValueType.valueOf(valueTypeName)
+    val mode = RecordMode.valueOf(modeName)
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
     val parsedWindows = windows.map(::decodeWindow)
 
@@ -155,7 +160,13 @@ fun RecordItemFormScreen(
             unitError = "Unit is required."
             valid = false
         }
-        runCatching { parseOptionalPositive(defaultValue, "Default value") }
+        runCatching {
+            if (mode == RecordMode.ACCUMULATE) {
+                parseOptionalPositive(defaultValue, "Default value")
+            } else {
+                parseOptionalFinite(defaultValue, "Default value")
+            }
+        }
             .onFailure {
                 defaultError = it.message
                 valid = false
@@ -165,7 +176,7 @@ fun RecordItemFormScreen(
                 stepError = it.message
                 valid = false
             }
-        if (goalEnabled) {
+        if (mode == RecordMode.ACCUMULATE && goalEnabled) {
             runCatching { parsePositive(goalValue, "Goal") }
                 .onFailure {
                     goalError = it.message
@@ -181,9 +192,15 @@ fun RecordItemFormScreen(
 
     val formValid = name.isNotBlank() &&
         unit.isNotBlank() &&
-        runCatching { parseOptionalPositive(defaultValue, "Default value") }.isSuccess &&
+        runCatching {
+            if (mode == RecordMode.ACCUMULATE) {
+                parseOptionalPositive(defaultValue, "Default value")
+            } else {
+                parseOptionalFinite(defaultValue, "Default value")
+            }
+        }.isSuccess &&
         runCatching { parsePositive(stepValue, "Step") }.isSuccess &&
-        (!goalEnabled || runCatching { parsePositive(goalValue, "Goal") }.isSuccess) &&
+        (mode != RecordMode.ACCUMULATE || !goalEnabled || runCatching { parsePositive(goalValue, "Goal") }.isSuccess) &&
         priority.toIntOrNull() != null
 
     fun submit() {
@@ -195,14 +212,23 @@ fun RecordItemFormScreen(
         val draft = RecordItemDraft(
             name = name,
             description = description,
+            mode = mode,
             valueType = valueType,
-            defaultValue = parseOptionalPositive(defaultValue, "Default value"),
+            defaultValue = if (mode == RecordMode.ACCUMULATE) {
+                parseOptionalPositive(defaultValue, "Default value")
+            } else {
+                parseOptionalFinite(defaultValue, "Default value")
+            },
             stepValue = parsePositive(stepValue, "Step"),
             unit = unit,
-            goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
-            goalPeriod = goalPeriod.takeIf { goalEnabled },
+            goalValue = if (mode == RecordMode.ACCUMULATE && goalEnabled) {
+                parsePositive(goalValue, "Goal")
+            } else {
+                null
+            },
+            goalPeriod = goalPeriod.takeIf { mode == RecordMode.ACCUMULATE && goalEnabled },
             priority = checkNotNull(priority.toIntOrNull()),
-            windows = parsedWindows,
+            windows = if (mode == RecordMode.ACCUMULATE) parsedWindows else emptyList(),
         )
         saving = true
         onSave(draft) { error ->
@@ -290,6 +316,31 @@ fun RecordItemFormScreen(
 
         TemplateSection(title = "Measurement") {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
+                RecordMode.entries.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        selected = mode == option,
+                        onClick = {
+                            modeName = option.name
+                            if (option == RecordMode.MEASUREMENT) {
+                                valueTypeName = RecordValueType.NUMBER.name
+                                defaultValue = ""
+                                unit = DEFAULT_NUMBER_UNIT
+                                goalEnabled = false
+                                goalValue = ""
+                                windows = emptyList()
+                                priority = "0"
+                            }
+                        },
+                        enabled = !measurementLocked && !saving,
+                        shape = SegmentedButtonDefaults.itemShape(index, RecordMode.entries.size),
+                        label = {
+                            Text(if (option == RecordMode.ACCUMULATE) "Accumulate" else "Measure")
+                        },
+                    )
+                }
+            }
+            if (mode == RecordMode.ACCUMULATE) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
                 RecordValueType.entries.forEachIndexed { index, type ->
                     SegmentedButton(
                         selected = valueType == type,
@@ -309,6 +360,7 @@ fun RecordItemFormScreen(
                     )
                 }
             }
+            }
             Row(
                 modifier = Modifier.formField(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -320,7 +372,7 @@ fun RecordItemFormScreen(
                         defaultError = null
                     },
                     enabled = !saving,
-                    label = { Text("Default") },
+                    label = { Text(if (mode == RecordMode.MEASUREMENT) "Default (optional)" else "Default") },
                     isError = defaultError != null,
                     supportingText = defaultError?.let { message ->
                         { Text(message) }
@@ -377,7 +429,7 @@ fun RecordItemFormScreen(
             }
         }
 
-        TemplateSection(title = "Goal") {
+        if (mode == RecordMode.ACCUMULATE) TemplateSection(title = "Goal") {
             Row(
                 modifier = Modifier
                     .formField()
@@ -428,7 +480,7 @@ fun RecordItemFormScreen(
             }
         }
 
-        TemplateSection(title = "Recommendation") {
+        if (mode == RecordMode.ACCUMULATE) TemplateSection(title = "Recommendation") {
             parsedWindows.forEachIndexed { index, window ->
                 Row(
                     modifier = Modifier.formField(),
@@ -569,6 +621,13 @@ private fun formatMinute(minute: Int): String = String.format(
 
 private fun parseOptionalPositive(value: String, label: String): Double? =
     value.trim().takeIf(String::isNotEmpty)?.let { parsePositive(it, label) }
+
+private fun parseOptionalFinite(value: String, label: String): Double? =
+    value.trim().takeIf(String::isNotEmpty)?.let { raw ->
+        val parsed = raw.toDoubleOrNull()
+        check(parsed != null && parsed.isFinite()) { "$label must be a finite number." }
+        parsed
+    }
 
 private fun parsePositive(value: String, label: String): Double {
     val parsed = value.trim().toDoubleOrNull()

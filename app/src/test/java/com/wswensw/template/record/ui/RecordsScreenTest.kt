@@ -3,6 +3,7 @@ package com.wswensw.template.record.ui
 import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
+import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -94,6 +95,24 @@ class RecordsScreenTest {
 
         assertEquals(listOf(3L, 1L), goalItems(items, GoalPeriod.DAY).map(RecordItem::id))
         assertEquals(listOf(2L), goalItems(items, GoalPeriod.WEEK).map(RecordItem::id))
+    }
+
+    @Test
+    fun goalItemsExcludeMeasurements() {
+        val measurement = recordItem(
+            id = 1,
+            name = "Temperature",
+            priority = 100,
+            period = GoalPeriod.DAY,
+        ).copy(mode = RecordMode.MEASUREMENT)
+        val accumulation = recordItem(
+            id = 2,
+            name = "Water",
+            priority = 1,
+            period = GoalPeriod.DAY,
+        )
+
+        assertEquals(listOf(2L), goalItems(listOf(measurement, accumulation)).map(RecordItem::id))
     }
 
     @Test

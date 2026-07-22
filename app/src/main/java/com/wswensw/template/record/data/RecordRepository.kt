@@ -8,6 +8,7 @@ import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
+import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValidationException
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
@@ -51,6 +52,7 @@ class RecordRepository(context: Context) {
     private val _activeItems = MutableStateFlow<List<RecordItem>>(emptyList())
     private val _archivedItems = MutableStateFlow<List<RecordItem>>(emptyList())
     private val _entries = MutableStateFlow<List<RecordEntry>>(emptyList())
+    private val _latestEntries = MutableStateFlow<Map<Long, RecordEntry>>(emptyMap())
     private val _goalValues = MutableStateFlow<Map<Long, Double>>(emptyMap())
     private val _streaks = MutableStateFlow<Map<Long, ItemStreak>>(emptyMap())
     private val _connection = MutableStateFlow(credentialStore.connection())
@@ -58,6 +60,7 @@ class RecordRepository(context: Context) {
     val activeItems: StateFlow<List<RecordItem>> = _activeItems
     val archivedItems: StateFlow<List<RecordItem>> = _archivedItems
     val entries: StateFlow<List<RecordEntry>> = _entries
+    val latestEntries: StateFlow<Map<Long, RecordEntry>> = _latestEntries
     val goalValues: StateFlow<Map<Long, Double>> = _goalValues
     val streaks: StateFlow<Map<Long, ItemStreak>> = _streaks
     val connection: StateFlow<RecordsConnection> = _connection
@@ -72,6 +75,7 @@ class RecordRepository(context: Context) {
             "entries",
             query = mapOf("startDate" to lookbackStart, "endDate" to localDate),
         )
+        val latest = request("GET", "entries/latest")
         val activeItems = active.getJSONArray("items").mapObjects(::parseItem)
         val rangeEntries = range.getJSONArray("entries").mapObjects(::parseEntry)
         val todayEntries = rangeEntries.filter { it.localDate == localDate }
@@ -81,9 +85,14 @@ class RecordRepository(context: Context) {
         _activeItems.value = activeItems
         _archivedItems.value = archived.getJSONArray("items").mapObjects(::parseItem)
         _entries.value = todayEntries
+        _latestEntries.value = latest.getJSONArray("entries")
+            .mapObjects(::parseEntry)
+            .associateBy(RecordEntry::itemId)
         _goalValues.value = goalValues(activeItems, date, todayEntries, weekEntries)
         _streaks.value = itemStreaks(
-            itemIds = activeItems.map(RecordItem::id),
+            itemIds = activeItems
+                .filter { it.mode == RecordMode.ACCUMULATE }
+                .map(RecordItem::id),
             entries = rangeEntries,
             today = date,
         )
@@ -94,6 +103,7 @@ class RecordRepository(context: Context) {
         val body = JSONObject().apply {
             put("name", draft.name)
             put("description", draft.description)
+            put("mode", draft.mode.name)
             put("valueType", draft.valueType.name)
             putNullable("defaultValue", draft.defaultValue)
             put("stepValue", draft.stepValue)
@@ -114,19 +124,38 @@ class RecordRepository(context: Context) {
         ).getJSONObject("item").getLong("id")
     }
 
-    suspend fun createEntry(itemId: Long, value: Double, occurredAt: Long): Long =
+    suspend fun createEntry(item: RecordItem, value: Double, occurredAt: Long): Long =
         withContext(Dispatchers.IO) {
-            if (!value.isFinite() || value <= 0) {
-                throw RecordValidationException("Value must be a positive number.")
-            }
+            requireEntryValue(item.mode, value)
             val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
             val body = JSONObject()
-                .put("itemId", itemId)
+                .put("itemId", item.id)
                 .put("occurredAt", occurredAt)
                 .put("localDate", local.toLocalDate().toString())
                 .put("localMinute", local.hour * 60 + local.minute)
                 .put("value", value)
             request("POST", "entries", body = body).getJSONObject("entry").getLong("id")
+        }
+
+    suspend fun updateEntry(entry: RecordEntry, value: Double, occurredAt: Long) = withContext(Dispatchers.IO) {
+        requireEntryValue(entry.itemMode, value)
+        val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
+        val body = JSONObject()
+            .put("occurredAt", occurredAt)
+            .put("localDate", local.toLocalDate().toString())
+            .put("localMinute", local.hour * 60 + local.minute)
+            .put("value", value)
+        request("PUT", "entries/${entry.id}", body = body)
+        Unit
+    }
+
+    suspend fun entriesForItem(itemId: Long, startDate: String, endDate: String): List<RecordEntry> =
+        withContext(Dispatchers.IO) {
+            request(
+                "GET",
+                "entries",
+                query = mapOf("startDate" to startDate, "endDate" to endDate, "itemId" to itemId.toString()),
+            ).getJSONArray("entries").mapObjects(::parseEntry)
         }
 
     suspend fun deleteEntry(entryId: Long) = withContext(Dispatchers.IO) {
@@ -191,6 +220,7 @@ private fun parseItem(value: JSONObject) = RecordItem(
     id = value.getLong("id"),
     name = value.getString("name"),
     description = value.getString("description"),
+    mode = RecordMode.valueOf(value.getString("mode")),
     valueType = RecordValueType.valueOf(value.getString("valueType")),
     defaultValue = value.nullableDouble("defaultValue"),
     stepValue = value.getDouble("stepValue"),
@@ -219,6 +249,7 @@ private fun parseEntry(value: JSONObject) = RecordEntry(
     value = value.getDouble("value"),
     createdAt = value.getLong("createdAt"),
     itemName = value.getString("itemName"),
+    itemMode = RecordMode.valueOf(value.getString("itemMode")),
     itemUnit = value.getString("itemUnit"),
     itemValueType = RecordValueType.valueOf(value.getString("itemValueType")),
 )
@@ -235,6 +266,15 @@ private fun JSONObject.nullableDouble(key: String): Double? =
 
 private fun JSONObject.nullableString(key: String): String? =
     if (isNull(key)) null else getString(key)
+
+private fun requireEntryValue(mode: RecordMode, value: Double) {
+    if (!value.isFinite()) {
+        throw RecordValidationException("Value must be a finite number.")
+    }
+    if (mode == RecordMode.ACCUMULATE && value <= 0) {
+        throw RecordValidationException("Value must be a positive number.")
+    }
+}
 
 private class BasicAuthStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)

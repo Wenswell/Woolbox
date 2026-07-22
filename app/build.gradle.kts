@@ -76,6 +76,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.vico.compose)
+    implementation(libs.vico.compose.m3)
 
     ksp(libs.androidx.room.compiler)
 

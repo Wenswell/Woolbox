@@ -10,6 +10,7 @@ import com.wswensw.template.record.data.RecordsConnection
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
+import com.wswensw.template.record.model.MeasurementRange
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,7 @@ data class RecordsUiState(
     val archivedItems: List<RecordItem> = emptyList(),
     val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
+    val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val goalValues: Map<Long, Double> = emptyMap(),
     val streaks: Map<Long, ItemStreak> = emptyMap(),
     val error: String? = null,
@@ -41,6 +43,14 @@ data class RecordsUiState(
         activeItems.firstOrNull { it.id == id } ?: archivedItems.firstOrNull { it.id == id }
 }
 
+data class MeasurementDetailUiState(
+    val itemId: Long? = null,
+    val range: MeasurementRange = MeasurementRange.LAST_24_HOURS,
+    val entries: List<RecordEntry> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null,
+)
+
 class RecordsViewModel(
     private val repository: RecordRepository,
 ) : ViewModel() {
@@ -48,8 +58,11 @@ class RecordsViewModel(
     private val selectedEntries = repository.entries
     private val error = MutableStateFlow<String?>(null)
     private val isLoading = MutableStateFlow(true)
+    private val _measurementDetail = MutableStateFlow(MeasurementDetailUiState())
 
-    private val contentState = combine(
+    val measurementDetail: StateFlow<MeasurementDetailUiState> = _measurementDetail
+
+    private val recordsContent = combine(
         combine(
             repository.activeItems,
             repository.archivedItems,
@@ -65,20 +78,22 @@ class RecordsViewModel(
                 goalValues = goalValues,
             )
         },
+        repository.latestEntries,
         repository.streaks,
-    ) { content, streaks ->
+    ) { content, latestEntries, streaks ->
         RecordsUiState(
             activeItems = content.activeItems,
             archivedItems = content.archivedItems,
             selectedDate = content.selectedDate,
             entries = content.entries,
+            latestEntries = latestEntries,
             goalValues = content.goalValues,
             streaks = streaks,
         )
     }
 
     val uiState: StateFlow<RecordsUiState> = combine(
-        contentState,
+        recordsContent,
         repository.connection,
         error,
         isLoading,
@@ -134,16 +149,17 @@ class RecordsViewModel(
     }
 
     fun createEntry(
-        itemId: Long,
+        item: RecordItem,
         value: Double,
+        occurredAt: Long = System.currentTimeMillis(),
         onResult: (entryId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
             runCatching {
-                val occurredAt = System.currentTimeMillis()
-                val entryId = repository.createEntry(itemId, value, occurredAt)
+                val entryId = repository.createEntry(item, value, occurredAt)
                 selectedDate.value = LocalDate.now()
                 repository.refresh(selectedDate.value.toString())
+                reloadMeasurementDetail(item.id)
                 entryId
             }.fold(
                 onSuccess = { entryId -> onResult(entryId, null) },
@@ -152,10 +168,73 @@ class RecordsViewModel(
         }
     }
 
+    fun updateEntry(
+        entry: RecordEntry,
+        value: Double,
+        occurredAt: Long,
+        onResult: (String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                repository.updateEntry(entry, value, occurredAt)
+                repository.refresh(selectedDate.value.toString())
+                reloadMeasurementDetail(entry.itemId)
+            }.fold(
+                onSuccess = { onResult(null) },
+                onFailure = { error -> onResult(error.message ?: "Unable to update record.") },
+            )
+        }
+    }
+
     fun deleteEntry(entryId: Long, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { repository.deleteEntry(entryId); repository.refresh(selectedDate.value.toString()) }
+            val itemId = _measurementDetail.value.entries.firstOrNull { it.id == entryId }?.itemId
+            runCatching {
+                repository.deleteEntry(entryId)
+                repository.refresh(selectedDate.value.toString())
+                itemId?.let(::reloadMeasurementDetail)
+            }
                 .onFailure { error -> onError(error.message ?: "Unable to undo record.") }
+        }
+    }
+
+    fun loadMeasurementEntries(itemId: Long, range: MeasurementRange) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            _measurementDetail.value = MeasurementDetailUiState(
+                itemId = itemId,
+                range = range,
+                isLoading = true,
+            )
+            runCatching {
+                repository.entriesForItem(
+                    itemId = itemId,
+                    startDate = range.queryStartDate(now),
+                    endDate = LocalDate.now().toString(),
+                ).filter { entry -> range.contains(entry.occurredAt, now) }
+            }.fold(
+                onSuccess = { entries ->
+                    _measurementDetail.value = MeasurementDetailUiState(
+                        itemId = itemId,
+                        range = range,
+                        entries = entries,
+                    )
+                },
+                onFailure = { failure ->
+                    _measurementDetail.value = MeasurementDetailUiState(
+                        itemId = itemId,
+                        range = range,
+                        error = failure.message ?: "Unable to load measurements.",
+                    )
+                },
+            )
+        }
+    }
+
+    private fun reloadMeasurementDetail(itemId: Long) {
+        val detail = _measurementDetail.value
+        if (detail.itemId == itemId) {
+            loadMeasurementEntries(itemId, detail.range)
         }
     }
 

@@ -22,12 +22,33 @@ class RecordRulesTest {
     }
 
     @Test
-    fun rejectsNonPositiveMeasurementValues() {
+    fun rejectsNonPositiveAccumulateValues() {
         assertThrows(RecordValidationException::class.java) {
             draft(stepValue = 0.0).validated()
         }
         assertThrows(RecordValidationException::class.java) {
             draft(defaultValue = -1.0).validated()
+        }
+    }
+
+    @Test
+    fun allowsSignedMeasurementDefaultsAndRejectsMeasurementOnlyConflicts() {
+        val result = draft(
+            mode = RecordMode.MEASUREMENT,
+            defaultValue = -12.5,
+            goalValue = null,
+            goalPeriod = null,
+            windows = emptyList(),
+        ).validated()
+
+        assertEquals(RecordMode.MEASUREMENT, result.mode)
+        assertEquals(-12.5, result.defaultValue)
+        assertThrows(RecordValidationException::class.java) {
+            draft(
+                mode = RecordMode.MEASUREMENT,
+                valueType = RecordValueType.DURATION,
+                unit = "分",
+            ).validated()
         }
     }
 
@@ -71,6 +92,12 @@ class RecordRulesTest {
     }
 
     @Test
+    fun stepsSignedMeasurementValuesWithoutClamping() {
+        assertEquals("-0.2", stepMeasurementValue("0", 0.2, -1))
+        assertEquals("0", stepMeasurementValue("-0.2", 0.2, 1))
+    }
+
+    @Test
     fun calculatesDailyAndWeeklyGoalValues() {
         val daily = item(1, "Water", "", 0, 1).copy(goalValue = 8.0, goalPeriod = GoalPeriod.DAY)
         val weekly = item(2, "Read", "", 0, 1).copy(goalValue = 10.0, goalPeriod = GoalPeriod.WEEK)
@@ -92,6 +119,7 @@ class RecordRulesTest {
     private fun draft(
         name: String = "Water",
         description: String = "",
+        mode: RecordMode = RecordMode.ACCUMULATE,
         valueType: RecordValueType = RecordValueType.NUMBER,
         defaultValue: Double? = 1.0,
         stepValue: Double = 1.0,
@@ -103,6 +131,7 @@ class RecordRulesTest {
     ) = RecordItemDraft(
         name = name,
         description = description,
+        mode = mode,
         valueType = valueType,
         defaultValue = defaultValue,
         stepValue = stepValue,

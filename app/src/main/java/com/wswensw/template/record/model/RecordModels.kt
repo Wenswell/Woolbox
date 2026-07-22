@@ -5,6 +5,11 @@ enum class RecordValueType {
     DURATION,
 }
 
+enum class RecordMode {
+    ACCUMULATE,
+    MEASUREMENT,
+}
+
 enum class GoalPeriod {
     DAY,
     WEEK,
@@ -20,6 +25,7 @@ data class RecordItem(
     val id: Long,
     val name: String,
     val description: String,
+    val mode: RecordMode = RecordMode.ACCUMULATE,
     val valueType: RecordValueType,
     val defaultValue: Double?,
     val stepValue: Double,
@@ -36,6 +42,7 @@ data class RecordItem(
 data class RecordItemDraft(
     val name: String,
     val description: String,
+    val mode: RecordMode = RecordMode.ACCUMULATE,
     val valueType: RecordValueType,
     val defaultValue: Double?,
     val stepValue: Double,
@@ -55,6 +62,7 @@ data class RecordEntry(
     val value: Double,
     val createdAt: Long,
     val itemName: String,
+    val itemMode: RecordMode = RecordMode.ACCUMULATE,
     val itemUnit: String,
     val itemValueType: RecordValueType,
 )

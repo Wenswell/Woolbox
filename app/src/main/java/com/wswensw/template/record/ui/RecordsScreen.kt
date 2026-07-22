@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +48,7 @@ import com.wswensw.template.record.model.ItemStreak
 import com.wswensw.template.record.model.streakLabel
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
+import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.ui.TemplateStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -61,6 +63,8 @@ fun RecordsScreen(
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
+    onOpenMeasurement: (RecordItem) -> Unit,
+    onAddMeasurement: (RecordItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -111,15 +115,97 @@ fun RecordsScreen(
                 )
             }
             else -> {
-                val orderedItems = orderedRecordItems(state.activeItems)
+                val accumulateItems = orderedRecordItems(state.activeItems)
+                    .filter { it.mode == RecordMode.ACCUMULATE }
+                val measurementItems = state.activeItems
+                    .filter { it.mode == RecordMode.MEASUREMENT }
+                    .sortedBy { it.name.lowercase(Locale.ROOT) }
                 val todayValues = todayRecordValues(state.entries)
-                items(orderedItems, key = RecordItem::id) { item ->
+                items(accumulateItems, key = RecordItem::id) { item ->
                     QuickRecordCard(
                         item = item,
                         todayValue = todayValues[item.id] ?: 0.0,
                         goalCumulative = state.goalValues[item.id],
                         streak = state.streaks[item.id],
                         onClick = { onRecordItem(item) },
+                    )
+                }
+                if (measurementItems.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Measurements",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                    items(measurementItems, key = RecordItem::id) { item ->
+                        MeasurementCard(
+                            item = item,
+                            latest = state.latestEntries[item.id],
+                            onOpen = { onOpenMeasurement(item) },
+                            onAdd = { onAddMeasurement(item) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MeasurementCard(
+    item: RecordItem,
+    latest: RecordEntry?,
+    onOpen: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    val colors = recordItemColors(item.name)
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        shape = TemplateStyle.cardShape,
+        colors = CardDefaults.cardColors(containerColor = colors.container),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 76.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RecordItemInitial(name = item.name, size = 48.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayRecordName(item.name),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = latest?.let { measurementDateTimeLabel(it.occurredAt) } ?: "No measurements yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = latest?.let { "${formatValue(it.value)} ${item.unit}" } ?: "--",
+                    color = colors.accent,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                FilledTonalIconButton(onClick = onAdd) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Add measurement",
                     )
                 }
             }
@@ -416,7 +502,10 @@ internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
 
 internal fun goalItems(items: List<RecordItem>, period: GoalPeriod? = null): List<RecordItem> =
     orderedRecordItems(items).filter { item ->
-        item.goalValue != null && item.goalPeriod != null && (period == null || item.goalPeriod == period)
+        item.mode == RecordMode.ACCUMULATE &&
+            item.goalValue != null &&
+            item.goalPeriod != null &&
+            (period == null || item.goalPeriod == period)
     }
 
 internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =

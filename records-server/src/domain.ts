@@ -1,9 +1,11 @@
 export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "WEEK"] as const;
+export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
+export type RecordMode = (typeof RECORD_MODES)[number];
 
 export interface RecordWindowInput {
   startMinute: number;
@@ -12,6 +14,7 @@ export interface RecordWindowInput {
 export interface RecordItemInput {
   name: string;
   description: string;
+  mode: RecordMode;
   valueType: ValueType;
   defaultValue: number | null;
   stepValue: number;
@@ -24,6 +27,13 @@ export interface RecordItemInput {
 
 export interface RecordEntryInput {
   itemId: number;
+  occurredAt: number;
+  localDate: string;
+  localMinute: number;
+  value: number;
+}
+
+export interface RecordEntryUpdateInput {
   occurredAt: number;
   localDate: string;
   localMinute: number;
@@ -44,6 +54,7 @@ export function parseItemInput(value: unknown): RecordItemInput {
   const name = stringField(input, "name").trim();
   const description = stringField(input, "description").trim();
   const unit = stringField(input, "unit").trim();
+  const mode = enumField(input, "mode", RECORD_MODES);
   const valueType = enumField(input, "valueType", VALUE_TYPES);
   const defaultValue = nullableNumberField(input, "defaultValue");
   const stepValue = numberField(input, "stepValue");
@@ -54,20 +65,28 @@ export function parseItemInput(value: unknown): RecordItemInput {
 
   requireRule(name.length > 0, "Name is required.");
   requireRule(unit.length > 0, "Unit is required.");
-  requirePositive(defaultValue, "Default value");
   requirePositive(stepValue, "Step");
-  requirePositive(goalValue, "Goal");
-  requireRule(goalValue === null || goalPeriod !== null, "Goal period is required when a goal is set.");
-  requireRule(valueType !== "DURATION" || DURATION_UNITS.includes(unit as never), "Duration unit must be 秒, 分, or 小时.");
   requireRule(Array.isArray(windowsValue), "Windows must be an array.");
 
   const windows = windowsValue.map((window) => parseWindowInput(window));
   const uniqueWindows = new Set(windows.map(({ startMinute, endMinute }) => `${startMinute}:${endMinute}`));
   requireRule(uniqueWindows.size === windows.length, "Suggested time windows must be unique.");
 
+  if (mode === "ACCUMULATE") {
+    requirePositive(defaultValue, "Default value");
+    requirePositive(goalValue, "Goal");
+    requireRule(goalValue === null || goalPeriod !== null, "Goal period is required when a goal is set.");
+    requireRule(valueType !== "DURATION" || DURATION_UNITS.includes(unit as never), "Duration unit must be 秒, 分, or 小时.");
+  } else {
+    requireRule(valueType === "NUMBER", "Measurements must use Number.");
+    requireRule(goalValue === null && goalPeriod === null, "Measurements do not support goals.");
+    requireRule(windows.length === 0, "Measurements do not support suggested time windows.");
+  }
+
   return {
     name,
     description,
+    mode,
     valueType,
     defaultValue,
     stepValue,
@@ -81,8 +100,16 @@ export function parseItemInput(value: unknown): RecordItemInput {
 
 export function parseEntryInput(value: unknown): RecordEntryInput {
   const input = objectInput(value);
+  const entry = parseEntryFields(input);
+  return { itemId: positiveIntegerField(input, "itemId"), ...entry };
+}
+
+export function parseEntryUpdateInput(value: unknown): RecordEntryUpdateInput {
+  return parseEntryFields(objectInput(value));
+}
+
+function parseEntryFields(input: Record<string, unknown>): RecordEntryUpdateInput {
   const entry = {
-    itemId: positiveIntegerField(input, "itemId"),
     occurredAt: integerField(input, "occurredAt"),
     localDate: stringField(input, "localDate"),
     localMinute: integerField(input, "localMinute"),
@@ -90,7 +117,6 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
   };
   requireRule(/^\d{4}-\d{2}-\d{2}$/.test(entry.localDate) && isRealDate(entry.localDate), "Local date is invalid.");
   requireRule(entry.localMinute >= 0 && entry.localMinute <= 1439, "Local minute is invalid.");
-  requirePositive(entry.value, "Value");
   return entry;
 }
 

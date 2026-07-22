@@ -57,6 +57,10 @@ import androidx.navigation.navArgument
 import com.wswensw.template.R
 import com.wswensw.template.record.ui.GoalsScreen
 import com.wswensw.template.record.ui.ManageRecordsScreen
+import com.wswensw.template.record.ui.MeasurementDetailScreen
+import com.wswensw.template.record.ui.MeasurementEntryScreen
+import com.wswensw.template.record.ui.MeasurementDetailUiState
+import com.wswensw.template.record.model.MeasurementRange
 import com.wswensw.template.record.ui.RecordItemFormScreen
 import com.wswensw.template.record.ui.RecordSheet
 import com.wswensw.template.record.ui.crossedGoalThreshold
@@ -100,6 +104,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
+    val measurementDetailState by recordsViewModel.measurementDetail.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -194,6 +199,12 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 },
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
+                                onOpenMeasurement = { item ->
+                                    navController.navigate(TemplateRoutes.measurementDetail(item.id))
+                                },
+                                onAddMeasurement = { item ->
+                                    navController.navigate(TemplateRoutes.measurementEntryNew(item.id))
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -395,6 +406,71 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                 )
             }
+            composable(
+                route = TemplateRoutes.MEASUREMENT_DETAIL,
+                arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
+                val item = recordsState.activeItems.firstOrNull { it.id == itemId } ?: return@composable
+                LaunchedEffect(itemId) {
+                    recordsViewModel.loadMeasurementEntries(itemId, MeasurementRange.LAST_24_HOURS)
+                }
+                MeasurementDetailScreen(
+                    item = item,
+                    state = measurementDetailState.takeIf { it.itemId == itemId }
+                        ?: MeasurementDetailUiState(itemId = itemId, isLoading = true),
+                    onBack = { navController.popBackStack() },
+                    onEditItem = { navController.navigate(TemplateRoutes.recordItemEdit(itemId)) },
+                    onAddEntry = { navController.navigate(TemplateRoutes.measurementEntryNew(itemId)) },
+                    onRangeChange = { range -> recordsViewModel.loadMeasurementEntries(itemId, range) },
+                    onEditEntry = { entryId ->
+                        navController.navigate(TemplateRoutes.measurementEntryEdit(itemId, entryId))
+                    },
+                    onDeleteEntry = { entryId -> recordsViewModel.deleteEntry(entryId) },
+                )
+            }
+            composable(
+                route = TemplateRoutes.MEASUREMENT_ENTRY_NEW,
+                arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
+                val item = recordsState.activeItems.firstOrNull { it.id == itemId } ?: return@composable
+                MeasurementEntryScreen(
+                    item = item,
+                    entry = null,
+                    onBack = { navController.popBackStack() },
+                    onSave = { value, occurredAt, onResult ->
+                        recordsViewModel.createEntry(item, value, occurredAt) { entryId, error ->
+                            onResult(error)
+                            if (entryId != null) navController.popBackStack()
+                        }
+                    },
+                )
+            }
+            composable(
+                route = TemplateRoutes.MEASUREMENT_ENTRY_EDIT,
+                arguments = listOf(
+                    navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType },
+                    navArgument(TemplateRoutes.RECORD_ENTRY_ID) { type = NavType.LongType },
+                ),
+            ) { routeEntry ->
+                val itemId = routeEntry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
+                val entryId = routeEntry.arguments?.getLong(TemplateRoutes.RECORD_ENTRY_ID) ?: return@composable
+                val item = recordsState.activeItems.firstOrNull { it.id == itemId } ?: return@composable
+                val recordEntry = measurementDetailState.entries.firstOrNull { it.id == entryId }
+                    ?: return@composable
+                MeasurementEntryScreen(
+                    item = item,
+                    entry = recordEntry,
+                    onBack = { navController.popBackStack() },
+                    onSave = { value, occurredAt, onResult ->
+                        recordsViewModel.updateEntry(recordEntry, value, occurredAt) { error ->
+                            onResult(error)
+                            if (error == null) navController.popBackStack()
+                        }
+                    },
+                )
+            }
             }
 
             recordSheetItemId?.let { itemId ->
@@ -411,7 +487,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 ?: recordsState.entries
                                     .filter { it.itemId == recordedItem.id }
                                     .sumOf { it.value }
-                            recordsViewModel.createEntry(recordedItem.id, value) { entryId, error ->
+                            recordsViewModel.createEntry(recordedItem, value) { entryId, error ->
                                 onResult(error)
                                 if (entryId != null) {
                                     val goalJustReached = crossedGoalThreshold(
@@ -553,8 +629,15 @@ private object TemplateRoutes {
     const val RECORD_ITEM_NEW = "record-item/new"
     const val RECORD_ITEM_ID = "recordItemId"
     const val RECORD_ITEM_EDIT = "record-item/{$RECORD_ITEM_ID}"
+    const val RECORD_ENTRY_ID = "recordEntryId"
+    const val MEASUREMENT_DETAIL = "measurement/{$RECORD_ITEM_ID}"
+    const val MEASUREMENT_ENTRY_NEW = "measurement/{$RECORD_ITEM_ID}/entry/new"
+    const val MEASUREMENT_ENTRY_EDIT = "measurement/{$RECORD_ITEM_ID}/entry/{$RECORD_ENTRY_ID}"
 
     fun recordItemEdit(itemId: Long) = "record-item/$itemId"
+    fun measurementDetail(itemId: Long) = "measurement/$itemId"
+    fun measurementEntryNew(itemId: Long) = "measurement/$itemId/entry/new"
+    fun measurementEntryEdit(itemId: Long, entryId: Long) = "measurement/$itemId/entry/$entryId"
 }
 
 private const val PageTransitionMillis = 220

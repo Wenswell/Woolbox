@@ -28,17 +28,7 @@ fun RecordItemDraft.validated(): RecordItemDraft {
 
     requireRecord(normalizedName.isNotEmpty(), "Name is required.")
     requireRecord(normalizedUnit.isNotEmpty(), "Unit is required.")
-    requirePositive(defaultValue, "Default value")
     requirePositive(stepValue, "Step")
-    requirePositive(goalValue, "Goal")
-    requireRecord(
-        goalValue == null || goalPeriod != null,
-        "Goal period is required when a goal is set.",
-    )
-    requireRecord(
-        valueType != RecordValueType.DURATION || normalizedUnit in DURATION_UNITS,
-        "Duration unit must be 秒, 分, or 小时.",
-    )
 
     val normalizedWindows = windows.map { window ->
         requireRecord(window.startMinute in 0..1439, "Start time is invalid.")
@@ -51,11 +41,32 @@ fun RecordItemDraft.validated(): RecordItemDraft {
         "Suggested time windows must be unique.",
     )
 
+    when (mode) {
+        RecordMode.ACCUMULATE -> {
+            requirePositive(defaultValue, "Default value")
+            requirePositive(goalValue, "Goal")
+            requireRecord(
+                goalValue == null || goalPeriod != null,
+                "Goal period is required when a goal is set.",
+            )
+            requireRecord(
+                valueType != RecordValueType.DURATION || normalizedUnit in DURATION_UNITS,
+                "Duration unit must be 秒, 分, or 小时.",
+            )
+        }
+        RecordMode.MEASUREMENT -> {
+            requireRecord(valueType == RecordValueType.NUMBER, "Measurements must use Number.")
+            requireFinite(defaultValue, "Default value")
+            requireRecord(goalValue == null && goalPeriod == null, "Measurements do not support goals.")
+            requireRecord(normalizedWindows.isEmpty(), "Measurements do not support suggested time windows.")
+        }
+    }
+
     return copy(
         name = normalizedName,
         description = normalizedDescription,
         unit = normalizedUnit,
-        goalPeriod = goalPeriod.takeIf { goalValue != null },
+        goalPeriod = goalPeriod.takeIf { mode == RecordMode.ACCUMULATE && goalValue != null },
         windows = normalizedWindows,
     )
 }
@@ -101,6 +112,15 @@ fun stepRecordValue(value: String, step: Double, direction: Int): String {
     return next.stripTrailingZeros().toPlainString()
 }
 
+fun stepMeasurementValue(value: String, step: Double, direction: Int): String {
+    require(direction == -1 || direction == 1)
+    val stepValue = BigDecimal.valueOf(step)
+    val current = value.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
+    return (current + stepValue * BigDecimal.valueOf(direction.toLong()))
+        .stripTrailingZeros()
+        .toPlainString()
+}
+
 fun goalValues(
     items: List<RecordItem>,
     date: LocalDate,
@@ -110,6 +130,7 @@ fun goalValues(
     val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
     val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
     return items.mapNotNull { item ->
+        if (item.mode != RecordMode.ACCUMULATE) return@mapNotNull null
         val period = item.goalPeriod ?: return@mapNotNull null
         item.goalValue ?: return@mapNotNull null
         val entries = if (period == GoalPeriod.DAY) dayEntries else weekEntries.filter {
@@ -192,6 +213,12 @@ private fun normalizeMinute(minute: Int): Int = ((minute % (24 * 60)) + 24 * 60)
 private fun requirePositive(value: Double?, label: String) {
     if (value != null) {
         requireRecord(value.isFinite() && value > 0, "$label must be a positive number.")
+    }
+}
+
+private fun requireFinite(value: Double?, label: String) {
+    if (value != null) {
+        requireRecord(value.isFinite(), "$label must be a finite number.")
     }
 }
 

@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordItemInput } from "./domain.js";
+import type { RecordEntryInput, RecordEntryUpdateInput, RecordItemInput } from "./domain.js";
 import { ApiError } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import { recordAuditLogs, recordEntries, recordItems, recordWindows } from "./schema.js";
@@ -18,12 +18,14 @@ type AuditAction =
   | "ITEM_RESTORED"
   | "ITEM_DELETED"
   | "ENTRY_CREATED"
+  | "ENTRY_UPDATED"
   | "ENTRY_DELETED";
 
 interface ItemAuditSnapshot {
   id: number;
   name: string;
   description: string;
+  mode: string;
   valueType: string;
   defaultValue: number | null;
   stepValue: number;
@@ -115,8 +117,12 @@ export class RecordsService {
         .from(recordEntries)
         .where(eq(recordEntries.itemId, id))
         .get()!.value;
-      if (entryTotal > 0 && (current.valueType !== input.valueType || current.unit !== input.unit)) {
-        throw new ApiError(400, "Type and unit cannot change after records exist.");
+      if (entryTotal > 0 && (
+        current.mode !== input.mode
+        || current.valueType !== input.valueType
+        || current.unit !== input.unit
+      )) {
+        throw new ApiError(400, "Mode, type, and unit cannot change after records exist.");
       }
 
       const before = itemSnapshot(
@@ -207,9 +213,7 @@ export class RecordsService {
     const dateRange = and(gte(recordEntries.localDate, startDate), lte(recordEntries.localDate, endDate));
     const condition = itemId === undefined ? dateRange : and(dateRange, eq(recordEntries.itemId, itemId));
     return this.entryQuery().where(condition).orderBy(
-      desc(recordEntries.localDate),
-      desc(recordEntries.localMinute),
-      desc(recordEntries.createdAt),
+      desc(recordEntries.occurredAt),
       desc(recordEntries.id),
     ).all();
   }
@@ -220,11 +224,31 @@ export class RecordsService {
     return row;
   }
 
+  listLatestEntries() {
+    const activeItems = this.db
+      .select()
+      .from(recordItems)
+      .where(eq(recordItems.archived, false))
+      .orderBy(sql`${recordItems.name} COLLATE NOCASE`)
+      .all();
+    return activeItems.map((item) => {
+      const entry = this.db
+        .select()
+        .from(recordEntries)
+        .where(eq(recordEntries.itemId, item.id))
+        .orderBy(desc(recordEntries.occurredAt), desc(recordEntries.id))
+        .limit(1)
+        .get();
+      return entry === undefined ? undefined : entryResponse(entry, item);
+    }).filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
+  }
+
   createEntry(input: RecordEntryInput) {
     const id = this.db.transaction((tx) => {
       const item = tx.select().from(recordItems).where(eq(recordItems.id, input.itemId)).get();
       if (!item) throw new ApiError(404, "Record item not found.");
       if (item.archived) throw new ApiError(400, "Archived items cannot be recorded.");
+      this.requireEntryValue(item, input.value);
       const now = this.now();
       const created = tx
         .insert(recordEntries)
@@ -239,6 +263,28 @@ export class RecordsService {
         createdAt: now,
       });
       return created.id;
+    });
+    return this.getEntry(id);
+  }
+
+  updateEntry(id: number, input: RecordEntryUpdateInput) {
+    this.db.transaction((tx) => {
+      const current = tx.select().from(recordEntries).where(eq(recordEntries.id, id)).get();
+      if (!current) throw new ApiError(404, "Record not found.");
+      const item = tx.select().from(recordItems).where(eq(recordItems.id, current.itemId)).get();
+      if (!item) throw new ApiError(404, "Record item not found.");
+      if (item.archived) throw new ApiError(400, "Archived items cannot be recorded.");
+      this.requireEntryValue(item, input.value);
+      const now = this.now();
+      tx.update(recordEntries).set(input).where(eq(recordEntries.id, id)).run();
+      this.writeAudit(tx, {
+        action: "ENTRY_UPDATED",
+        entityType: "ENTRY",
+        entityId: id,
+        before: entrySnapshot(current, item.name),
+        after: entrySnapshot({ ...current, ...input }, item.name),
+        createdAt: now,
+      });
     });
     return this.getEntry(id);
   }
@@ -326,6 +372,7 @@ export class RecordsService {
         value: recordEntries.value,
         createdAt: recordEntries.createdAt,
         itemName: recordItems.name,
+        itemMode: recordItems.mode,
         itemUnit: recordItems.unit,
         itemValueType: recordItems.valueType,
       })
@@ -351,6 +398,13 @@ export class RecordsService {
       throw new ApiError(409, "A record item with this name already exists.");
     }
   }
+
+  private requireEntryValue(item: RecordItemRow, value: number) {
+    if (!Number.isFinite(value)) throw new ApiError(400, "Value must be a finite number.");
+    if (item.mode === "ACCUMULATE" && value <= 0) {
+      throw new ApiError(400, "Value must be a positive number.");
+    }
+  }
 }
 
 function withoutWindows(input: RecordItemInput) {
@@ -369,7 +423,7 @@ function groupWindows(windows: RecordWindowRow[]) {
 }
 
 function itemSnapshot(
-  item: Pick<RecordItemRow, "id" | "name" | "description" | "valueType" | "defaultValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
+  item: Pick<RecordItemRow, "id" | "name" | "description" | "mode" | "valueType" | "defaultValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
   windows: Array<Pick<RecordWindowRow, "startMinute" | "endMinute">> = [],
 ): ItemAuditSnapshot {
   return {
@@ -394,6 +448,7 @@ function entryResponse(entry: RecordEntryRow, item: RecordItemRow) {
   return {
     ...entry,
     itemName: item.name,
+    itemMode: item.mode,
     itemUnit: item.unit,
     itemValueType: item.valueType,
   };

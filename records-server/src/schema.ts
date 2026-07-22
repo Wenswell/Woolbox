@@ -7,6 +7,7 @@ export const recordItems = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
     description: text("description").notNull(),
+    mode: text("mode", { enum: ["ACCUMULATE", "MEASUREMENT"] }).notNull().default("ACCUMULATE"),
     valueType: text("value_type", { enum: ["NUMBER", "DURATION"] }).notNull(),
     defaultValue: real("default_value"),
     stepValue: real("step_value").notNull(),
@@ -49,6 +50,7 @@ export const recordEntries = sqliteTable(
   },
   (table) => [
     index("record_entries_item_id_index").on(table.itemId),
+    index("record_entries_item_occurred_at_index").on(table.itemId, table.occurredAt),
     index("record_entries_local_date_minute_index").on(table.localDate, table.localMinute),
   ],
 );
