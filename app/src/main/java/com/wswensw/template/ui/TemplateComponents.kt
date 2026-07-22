@@ -228,7 +228,8 @@ private fun TemplateRouteTopBar(
             },
             actions = {
                 Row(
-                    modifier = Modifier.padding(end = TemplateStyle.spacing.pageHorizontal - 12.dp),
+                    // Align trailing actions with page content (16dp), not the screen edge.
+                    modifier = Modifier.padding(end = TemplateStyle.spacing.pageHorizontal),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                     content = actions,

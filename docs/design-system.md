@@ -47,7 +47,7 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplateSurface` | 根页面 | `Scaffold` 处理 safe drawing 及底栏。 |
 | `TemplatePage` | Home、Setting | 标题、说明、纵向滚动内容和底部留白。 |
-| `TemplateRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回动作、可选标题动作和滚动内容；滚动超过 `8px` 显示分隔线。 |
+| `TemplateRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线。 |
 | `TemplateLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
 | `ComposeOverlayWindow` | 跨应用工具 | 独立 Compose composition 与生命周期，不嵌入应用页面。 |
 
@@ -118,13 +118,13 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Foc
 
 Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 
-`Manage records` 使用独立路由与列表卡（同主页：首字符、裁剪名、测量摘要、目标强调色）；顶部 tonal `+` 新建。空态复用 `RecordsStatusCard`。
+`Manage records` 使用标准路由骨架（返回 + 标题 + 顶栏 `New` + 列表内容）；列表卡同主页。空态复用 `RecordsStatusCard`。
 
-记录项表单按 Details、Measurement、Goal、Recommendation 分段；名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关 Switch；时间 TimePicker。编辑页锁定类型与单位。主按钮全宽 `52dp`。
+记录项表单同标准路由骨架，顶栏 `Save`；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关 Switch；时间 TimePicker。编辑页锁定类型与单位。
 
 `Goals` 空/错误态复用 `RecordsStatusCard`，分区标题与主页一致。
 
-`Records connection` 用表面卡展示固定服务地址与凭据表单，主按钮全宽 `52dp`；保存成功后返回。Android 不展示归档项。
+`Records connection` 无分组外框：分区标题 + 明文服务地址 + 凭据输入 + 全宽连接按钮；保存成功后返回。
 
 PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期范围和记录项筛选、可选择表格与批量删除，不提供编辑入口；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复；Logs 使用只读表格显示操作时间、对象、动作和变更摘要，并可加载更早日志。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
 

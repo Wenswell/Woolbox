@@ -124,10 +124,44 @@ fun RecordItemFormScreen(
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
     val parsedWindows = windows.map(::decodeWindow)
 
+    fun submit() {
+        val draft = runCatching {
+            RecordItemDraft(
+                name = name,
+                description = description,
+                valueType = valueType,
+                defaultValue = parseOptionalPositive(defaultValue, "Default value"),
+                stepValue = parsePositive(stepValue, "Step"),
+                unit = unit,
+                goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
+                goalPeriod = goalPeriod.takeIf { goalEnabled },
+                priority = priority.toIntOrNull() ?: error("Priority must be an integer."),
+                windows = parsedWindows,
+            )
+        }.getOrElse { error ->
+            errorMessage = error.message ?: "Check the form values."
+            return
+        }
+        saving = true
+        errorMessage = null
+        onSave(draft) { error ->
+            saving = false
+            errorMessage = error
+        }
+    }
+
     TemplateRouteScaffold(
         title = if (editing) "Edit record item" else "New record item",
         onBack = onBack,
         modifier = modifier,
+        actions = {
+            TextButton(
+                onClick = ::submit,
+                enabled = !saving,
+            ) {
+                Text(if (saving) "Saving" else "Save")
+            }
+        },
     ) {
         if (name.isNotBlank()) {
             Surface(
@@ -337,40 +371,6 @@ fun RecordItemFormScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.formField(),
             )
-        }
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = {
-                val draft = runCatching {
-                    RecordItemDraft(
-                        name = name,
-                        description = description,
-                        valueType = valueType,
-                        defaultValue = parseOptionalPositive(defaultValue, "Default value"),
-                        stepValue = parsePositive(stepValue, "Step"),
-                        unit = unit,
-                        goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
-                        goalPeriod = goalPeriod.takeIf { goalEnabled },
-                        priority = priority.toIntOrNull() ?: error("Priority must be an integer."),
-                        windows = parsedWindows,
-                    )
-                }.getOrElse { error ->
-                    errorMessage = error.message ?: "Check the form values."
-                    return@Button
-                }
-                saving = true
-                errorMessage = null
-                onSave(draft) { error ->
-                    saving = false
-                    errorMessage = error
-                }
-            },
-            enabled = !saving,
-            modifier = Modifier
-                .formField()
-                .heightIn(min = 52.dp),
-        ) {
-            Text(if (saving) "Saving" else "Save")
         }
         Spacer(Modifier.height(16.dp))
     }

@@ -1,6 +1,5 @@
 package com.wswensw.template.record.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,20 +48,12 @@ fun RecordsConnectionScreen(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
-            Spacer(Modifier.height(10.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = TemplateStyle.cardShape,
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            ) {
-                Text(
-                    text = RecordRepository.BASE_URL,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = RecordRepository.BASE_URL,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             Spacer(Modifier.height(20.dp))
             Text(
@@ -72,60 +62,51 @@ fun RecordsConnectionScreen(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
-            Spacer(Modifier.height(10.dp))
-            Surface(
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Username") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = TemplateStyle.cardShape,
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            error?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    saving = true
+                    error = null
+                    onSave(username, password) { message ->
+                        saving = false
+                        error = message
+                        if (message == null) {
+                            password = ""
+                            onBack()
+                        }
+                    }
+                },
+                enabled = !saving && username.isNotBlank() && password.isNotEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Username") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    error?.let {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            saving = true
-                            error = null
-                            onSave(username, password) { message ->
-                                saving = false
-                                error = message
-                                if (message == null) {
-                                    password = ""
-                                    onBack()
-                                }
-                            }
-                        },
-                        enabled = !saving && username.isNotBlank() && password.isNotEmpty(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 52.dp),
-                    ) {
-                        Text(if (saving) "Connecting" else "Save and connect")
-                    }
-                }
+                Text(if (saving) "Connecting" else "Save and connect")
             }
         }
     }
