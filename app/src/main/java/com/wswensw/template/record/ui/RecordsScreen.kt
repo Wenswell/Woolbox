@@ -96,14 +96,14 @@ fun RecordsScreen(
                 }
             }
             state.error != null -> item {
-                RecordsMessage(
+                RecordsStatusCard(
                     message = state.error,
                     actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
                     onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
                 )
             }
             state.activeItems.isEmpty() -> item {
-                RecordsMessage(
+                RecordsStatusCard(
                     message = "No record items yet.",
                     actionLabel = "Create record item",
                     onAction = onCreateItem,
@@ -310,13 +310,14 @@ private fun QuickRecordCard(
 }
 
 @Composable
-private fun RecordsMessage(
+internal fun RecordsStatusCard(
     message: String,
     actionLabel: String,
     onAction: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {

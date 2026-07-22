@@ -1,23 +1,21 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 import com.wswensw.template.record.model.GoalPeriod
@@ -44,7 +42,7 @@ fun GoalsScreen(
         onBack = onBack,
         modifier = modifier,
         actions = {
-            IconButton(onClick = onManage) {
+            FilledTonalIconButton(onClick = onManage) {
                 Icon(
                     painter = painterResource(R.drawable.ic_settings_24),
                     contentDescription = "Manage records",
@@ -65,17 +63,19 @@ fun GoalsScreen(
                 }
             }
             state.error != null -> item {
-                GoalPageMessage(
+                RecordsStatusCard(
                     message = state.error,
                     actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
                     onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
+                    modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal),
                 )
             }
             dailyGoals.isEmpty() && weeklyGoals.isEmpty() -> item {
-                GoalPageMessage(
+                RecordsStatusCard(
                     message = "No goals yet.",
                     actionLabel = "Manage records",
                     onAction = onManage,
+                    modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal),
                 )
             }
             else -> {
@@ -118,6 +118,7 @@ private fun GoalSectionHeader(title: String) {
         text = title,
         color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(
             start = TemplateStyle.spacing.pageHorizontal,
             top = 8.dp,
@@ -127,36 +128,3 @@ private fun GoalSectionHeader(title: String) {
     )
 }
 
-@Composable
-private fun GoalPageMessage(
-    message: String,
-    actionLabel: String,
-    onAction: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
-        shape = TemplateStyle.cardShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-        ) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onAction,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(actionLabel)
-            }
-        }
-    }
-}

@@ -118,9 +118,13 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Foc
 
 Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 
-`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。编辑页首帧即禁用类型与单位控件，新建页保持可配置。
+`Manage records` 使用独立路由与列表卡（同主页：首字符、裁剪名、测量摘要、目标强调色）；顶部 tonal `+` 新建。空态复用 `RecordsStatusCard`。
 
-`Records connection` 使用独立路由，只显示固定服务地址、用户名和密码；保存成功后返回上一页。Android Records 只呈现今天流水和活跃项目标进度，不显示归档项。
+记录项表单按 Details、Measurement、Goal、Recommendation 分段；名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关 Switch；时间 TimePicker。编辑页锁定类型与单位。主按钮全宽 `52dp`。
+
+`Goals` 空/错误态复用 `RecordsStatusCard`，分区标题与主页一致。
+
+`Records connection` 用表面卡展示固定服务地址与凭据表单，主按钮全宽 `52dp`；保存成功后返回。Android 不展示归档项。
 
 PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期范围和记录项筛选、可选择表格与批量删除，不提供编辑入口；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复；Logs 使用只读表格显示操作时间、对象、动作和变更摘要，并可加载更早日志。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
 
