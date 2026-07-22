@@ -1,6 +1,5 @@
 package com.wswensw.template.record.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -23,9 +23,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -62,7 +63,7 @@ fun RecordsScreen(
             end = TemplateStyle.spacing.pageHorizontal,
             bottom = TemplateStyle.spacing.pageBottom,
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(TemplateStyle.spacing.block),
     ) {
         item {
             RecordsHeader(
@@ -137,10 +138,11 @@ private fun FocusGoalsRow(
     onRecordItem: (RecordItem) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val cardWidth = (maxWidth * 0.8f).coerceAtMost(300.dp)
+        val cardWidth = (maxWidth * 0.82f).coerceAtMost(300.dp)
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(end = 8.dp),
         ) {
             items(goals, key = RecordItem::id) { goal ->
                 GoalCard(
@@ -150,7 +152,7 @@ private fun FocusGoalsRow(
                     onClick = { onRecordItem(goal) },
                     modifier = Modifier
                         .width(cardWidth)
-                        .height(136.dp),
+                        .heightIn(min = 136.dp),
                 )
             }
         }
@@ -179,13 +181,14 @@ private fun RecordsHeader(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        IconButton(onClick = onGoals) {
+        FilledTonalIconButton(onClick = onGoals) {
             Icon(
                 imageVector = Icons.Outlined.Flag,
                 contentDescription = "Goals",
             )
         }
-        IconButton(onClick = onManage) {
+        Spacer(Modifier.width(4.dp))
+        FilledTonalIconButton(onClick = onManage) {
             Icon(
                 painter = painterResource(R.drawable.ic_settings_24),
                 contentDescription = "Manage records",
@@ -200,6 +203,7 @@ private fun RecordsSectionTitle(title: String) {
         text = title,
         color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
@@ -215,14 +219,16 @@ private fun QuickRecordCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, colors.container),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .heightIn(min = 72.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RecordItemInitial(name = item.name, size = 48.dp)
@@ -231,7 +237,7 @@ private fun QuickRecordCard(
                 Text(
                     text = displayRecordName(item.name),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -252,13 +258,14 @@ private fun QuickRecordCard(
             ) {
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
+                    color = colors.accent,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "today",
+                    text = "Today",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
@@ -274,23 +281,35 @@ private fun RecordsMessage(
     actionLabel: String,
     onAction: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onAction,
-            modifier = Modifier.fillMaxWidth(),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = TemplateStyle.cardShape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
         ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_records_24),
-                contentDescription = null,
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
             )
-            Spacer(Modifier.width(8.dp))
-            Text(actionLabel)
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onAction,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_records_24),
+                    contentDescription = null,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(actionLabel)
+            }
         }
     }
 }

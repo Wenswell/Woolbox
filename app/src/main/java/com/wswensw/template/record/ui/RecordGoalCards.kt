@@ -77,6 +77,7 @@ private fun DailyGoalCard(
     modifier: Modifier,
 ) {
     val target = checkNotNull(item.goalValue)
+    val itemColors = recordItemColors(item.name)
     val progress by animateFloatAsState(
         targetValue = goalProgressFraction(cumulative, target),
         animationSpec = spring(),
@@ -87,7 +88,7 @@ private fun DailyGoalCard(
         targetValue = if (reached) {
             MaterialTheme.colorScheme.tertiaryContainer
         } else {
-            MaterialTheme.colorScheme.primaryContainer
+            itemColors.container
         },
         label = "DailyGoalContainer",
     )
@@ -95,9 +96,17 @@ private fun DailyGoalCard(
         targetValue = if (reached) {
             MaterialTheme.colorScheme.onTertiaryContainer
         } else {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            itemColors.onContainer
         },
         label = "DailyGoalContent",
+    )
+    val progressColor by animateColorAsState(
+        targetValue = if (reached) {
+            MaterialTheme.colorScheme.tertiary
+        } else {
+            itemColors.accent
+        },
+        label = "DailyGoalProgressColor",
     )
 
     Card(
@@ -115,14 +124,14 @@ private fun DailyGoalCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DailyGoalMedallion(
                 item = item,
                 progress = progress,
                 reached = reached,
-                color = contentColor,
+                progressColor = progressColor,
                 size = if (featured) 76.dp else 68.dp,
             )
             Spacer(Modifier.width(14.dp))
@@ -130,7 +139,7 @@ private fun DailyGoalCard(
                 Text(
                     text = "Daily goal",
                     style = MaterialTheme.typography.labelLarge,
-                    color = contentColor.copy(alpha = 0.78f),
+                    color = contentColor.copy(alpha = 0.8f),
                 )
                 Text(
                     text = displayRecordName(item.name),
@@ -150,7 +159,7 @@ private fun DailyGoalCard(
                     progress = progress,
                     reached = reached,
                     periodLabel = "today",
-                    color = contentColor,
+                    color = progressColor,
                 )
             }
         }
@@ -166,6 +175,7 @@ private fun WeeklyGoalCard(
     modifier: Modifier,
 ) {
     val target = checkNotNull(item.goalValue)
+    val itemColors = recordItemColors(item.name)
     val progress by animateFloatAsState(
         targetValue = goalProgressFraction(cumulative, target),
         animationSpec = spring(),
@@ -176,7 +186,7 @@ private fun WeeklyGoalCard(
         targetValue = if (reached) {
             MaterialTheme.colorScheme.tertiaryContainer
         } else {
-            MaterialTheme.colorScheme.secondaryContainer
+            itemColors.container
         },
         label = "WeeklyGoalContainer",
     )
@@ -184,9 +194,17 @@ private fun WeeklyGoalCard(
         targetValue = if (reached) {
             MaterialTheme.colorScheme.onTertiaryContainer
         } else {
-            MaterialTheme.colorScheme.onSecondaryContainer
+            itemColors.onContainer
         },
         label = "WeeklyGoalContent",
+    )
+    val progressColor by animateColorAsState(
+        targetValue = if (reached) {
+            MaterialTheme.colorScheme.tertiary
+        } else {
+            itemColors.accent
+        },
+        label = "WeeklyGoalProgressColor",
     )
 
     Card(
@@ -204,19 +222,19 @@ private fun WeeklyGoalCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RecordItemInitial(
                     name = item.name,
                     size = if (featured) 48.dp else 44.dp,
                 )
-                Spacer(Modifier.width(if (featured) 12.dp else 14.dp))
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Weekly goal",
                         style = MaterialTheme.typography.labelLarge,
-                        color = contentColor.copy(alpha = 0.78f),
+                        color = contentColor.copy(alpha = 0.8f),
                     )
                     Text(
                         text = displayRecordName(item.name),
@@ -233,24 +251,24 @@ private fun WeeklyGoalCard(
                     )
                 }
             }
-            Spacer(Modifier.height(if (featured) 8.dp else 12.dp))
+            Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(7.dp)
+                    .height(8.dp)
                     .clip(CircleShape),
-                color = contentColor,
-                trackColor = contentColor.copy(alpha = 0.16f),
+                color = progressColor,
+                trackColor = progressColor.copy(alpha = 0.18f),
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )
-            Spacer(Modifier.height(if (featured) 4.dp else 7.dp))
+            Spacer(Modifier.height(6.dp))
             GoalStatus(
                 progress = progress,
                 reached = reached,
                 periodLabel = "this week",
-                color = contentColor,
+                color = progressColor,
             )
         }
     }
@@ -261,7 +279,7 @@ private fun DailyGoalMedallion(
     item: RecordItem,
     progress: Float,
     reached: Boolean,
-    color: Color,
+    progressColor: Color,
     size: Dp,
 ) {
     Box(
@@ -271,9 +289,9 @@ private fun DailyGoalMedallion(
         CircularProgressIndicator(
             progress = { progress },
             modifier = Modifier.fillMaxSize(),
-            color = color,
+            color = progressColor,
             strokeWidth = if (size > 72.dp) 8.dp else 7.dp,
-            trackColor = color.copy(alpha = 0.16f),
+            trackColor = progressColor.copy(alpha = 0.18f),
             gapSize = 0.dp,
         )
         RecordItemInitial(
@@ -284,7 +302,7 @@ private fun DailyGoalMedallion(
             Icon(
                 imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = null,
-                tint = color,
+                tint = progressColor,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .size(if (size > 72.dp) 26.dp else 22.dp),
@@ -301,7 +319,7 @@ private fun GoalStatus(
     color: Color,
 ) {
     Row(
-        modifier = Modifier.padding(top = 3.dp),
+        modifier = Modifier.padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
@@ -320,7 +338,7 @@ private fun GoalStatus(
                 "${(progress * 100).roundToInt()}% $periodLabel"
             },
             style = MaterialTheme.typography.labelMedium,
-            color = color.copy(alpha = if (reached) 1f else 0.78f),
+            color = color,
             maxLines = 1,
         )
     }
@@ -340,6 +358,11 @@ internal fun GoalProgressPanel(
     )
     val reached = cumulative >= target
     val colors = recordItemColors(item.name)
+    val progressColor = if (reached) {
+        MaterialTheme.colorScheme.tertiary
+    } else {
+        colors.accent
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -348,48 +371,38 @@ internal fun GoalProgressPanel(
     ) {
         when (checkNotNull(item.goalPeriod)) {
             GoalPeriod.DAY -> Row(
-                modifier = Modifier.padding(14.dp),
+                modifier = Modifier.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier.size(60.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxSize(),
-                        color = colors.accent,
-                        strokeWidth = 7.dp,
-                        trackColor = colors.container,
-                        gapSize = 0.dp,
-                    )
-                    Text(
-                        text = "${(progress * 100).roundToInt()}%",
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
+                DailyGoalMedallion(
+                    item = item,
+                    progress = progress,
+                    reached = reached,
+                    progressColor = progressColor,
+                    size = 64.dp,
+                )
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Daily goal", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = "Daily goal",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(
                         text = goalValueLabel(cumulative, target, item.unit),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    if (reached) {
-                        Text(
-                            text = "Goal reached",
-                            color = MaterialTheme.colorScheme.tertiary,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
+                    GoalStatus(
+                        progress = progress,
+                        reached = reached,
+                        periodLabel = "today",
+                        color = progressColor,
+                    )
                 }
             }
-            GoalPeriod.WEEK -> Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            GoalPeriod.WEEK -> Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Weekly goal",
                         style = MaterialTheme.typography.titleSmall,
@@ -408,20 +421,16 @@ internal fun GoalProgressPanel(
                         .fillMaxWidth()
                         .height(8.dp)
                         .clip(CircleShape),
-                    color = colors.accent,
-                    trackColor = colors.container,
+                    color = progressColor,
+                    trackColor = progressColor.copy(alpha = 0.18f),
                     gapSize = 0.dp,
                     drawStopIndicator = {},
                 )
-                Text(
-                    text = if (reached) "Goal reached" else "${(progress * 100).roundToInt()}% this week",
-                    color = if (reached) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(top = 6.dp),
+                GoalStatus(
+                    progress = progress,
+                    reached = reached,
+                    periodLabel = "this week",
+                    color = progressColor,
                 )
             }
         }

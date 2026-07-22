@@ -11,6 +11,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,22 +27,38 @@ internal data class RecordItemColors(
 
 @Composable
 internal fun recordItemColors(name: String): RecordItemColors {
-    val colorIndex = Math.floorMod(firstRecordCharacter(name).hashCode(), 3)
+    val scheme = MaterialTheme.colorScheme
+    val colorIndex = Math.floorMod(firstRecordCharacter(name).hashCode(), 6)
     return when (colorIndex) {
         0 -> RecordItemColors(
-            accent = MaterialTheme.colorScheme.primary,
-            container = MaterialTheme.colorScheme.primaryContainer,
-            onContainer = MaterialTheme.colorScheme.onPrimaryContainer,
+            accent = scheme.primary,
+            container = scheme.primaryContainer,
+            onContainer = scheme.onPrimaryContainer,
         )
         1 -> RecordItemColors(
-            accent = MaterialTheme.colorScheme.secondary,
-            container = MaterialTheme.colorScheme.secondaryContainer,
-            onContainer = MaterialTheme.colorScheme.onSecondaryContainer,
+            accent = scheme.secondary,
+            container = scheme.secondaryContainer,
+            onContainer = scheme.onSecondaryContainer,
+        )
+        2 -> RecordItemColors(
+            accent = scheme.tertiary,
+            container = scheme.tertiaryContainer,
+            onContainer = scheme.onTertiaryContainer,
+        )
+        3 -> RecordItemColors(
+            accent = scheme.primary,
+            container = scheme.surfaceContainerHighest,
+            onContainer = scheme.primary,
+        )
+        4 -> RecordItemColors(
+            accent = scheme.secondary,
+            container = scheme.surfaceContainerHighest,
+            onContainer = scheme.secondary,
         )
         else -> RecordItemColors(
-            accent = MaterialTheme.colorScheme.tertiary,
-            container = MaterialTheme.colorScheme.tertiaryContainer,
-            onContainer = MaterialTheme.colorScheme.onTertiaryContainer,
+            accent = scheme.tertiary,
+            container = scheme.surfaceContainerHighest,
+            onContainer = scheme.tertiary,
         )
     }
 }
@@ -67,6 +84,7 @@ internal fun RecordItemInitial(
             } else {
                 MaterialTheme.typography.titleMedium
             },
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Clip,
         )

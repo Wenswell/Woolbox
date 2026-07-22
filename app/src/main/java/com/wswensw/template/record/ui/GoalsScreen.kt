@@ -12,6 +12,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -132,22 +133,30 @@ private fun GoalPageMessage(
     actionLabel: String,
     onAction: () -> Unit,
 ) {
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
+        shape = TemplateStyle.cardShape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onAction,
-            modifier = Modifier.fillMaxWidth(),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
         ) {
-            Text(actionLabel)
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onAction,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(actionLabel)
+            }
         }
     }
 }
