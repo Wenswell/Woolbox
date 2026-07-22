@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -100,7 +99,7 @@ fun RecordsScreen(
             }
             else -> {
                 val orderedItems = orderedRecordItems(state.activeItems)
-                val focusGoals = focusGoalItems(orderedItems)
+                val focusGoals = goalItems(orderedItems)
                 val todayValues = todayRecordValues(state.entries)
 
                 if (focusGoals.isNotEmpty()) {
@@ -138,7 +137,7 @@ private fun FocusGoalsRow(
     onRecordItem: (RecordItem) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val cardWidth = if (goals.size == 1) maxWidth else (maxWidth * 0.88f).coerceAtMost(360.dp)
+        val cardWidth = (maxWidth * 0.8f).coerceAtMost(300.dp)
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -151,7 +150,7 @@ private fun FocusGoalsRow(
                     onClick = { onRecordItem(goal) },
                     modifier = Modifier
                         .width(cardWidth)
-                        .height(148.dp),
+                        .height(136.dp),
                 )
             }
         }
@@ -214,11 +213,9 @@ private fun QuickRecordCard(
     val colors = recordItemColors(item.name)
     Card(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 80.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, colors.container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -309,15 +306,8 @@ internal fun goalItems(items: List<RecordItem>, period: GoalPeriod? = null): Lis
         item.goalValue != null && item.goalPeriod != null && (period == null || item.goalPeriod == period)
     }
 
-internal fun focusGoalItems(items: List<RecordItem>, limit: Int = MAX_FOCUS_GOALS): List<RecordItem> {
-    require(limit > 0)
-    return goalItems(items).take(limit)
-}
-
 internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =
     entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) -> itemEntries.sumOf(RecordEntry::value) }
 
 internal fun recordsDateLabel(date: LocalDate): String =
     date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH))
-
-private const val MAX_FOCUS_GOALS = 3

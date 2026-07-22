@@ -115,7 +115,7 @@ private fun DailyGoalCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (featured) 20.dp else 14.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DailyGoalMedallion(
@@ -123,9 +123,9 @@ private fun DailyGoalCard(
                 progress = progress,
                 reached = reached,
                 color = contentColor,
-                size = if (featured) 84.dp else 68.dp,
+                size = if (featured) 76.dp else 68.dp,
             )
-            Spacer(Modifier.width(if (featured) 18.dp else 14.dp))
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Daily goal",
@@ -134,11 +134,7 @@ private fun DailyGoalCard(
                 )
                 Text(
                     text = displayRecordName(item.name),
-                    style = if (featured) {
-                        MaterialTheme.typography.titleLarge
-                    } else {
-                        MaterialTheme.typography.titleMedium
-                    },
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -197,7 +193,7 @@ private fun WeeklyGoalCard(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (featured) 140.dp else 108.dp),
+            .heightIn(min = if (featured) 132.dp else 108.dp),
         shape = TemplateStyle.cardShape,
         colors = CardDefaults.cardColors(
             containerColor = containerColor,
@@ -208,14 +204,14 @@ private fun WeeklyGoalCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(if (featured) 16.dp else 14.dp),
+                .padding(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RecordItemInitial(
                     name = item.name,
-                    size = if (featured) 52.dp else 44.dp,
+                    size = if (featured) 48.dp else 44.dp,
                 )
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(if (featured) 12.dp else 14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Weekly goal",
@@ -224,11 +220,7 @@ private fun WeeklyGoalCard(
                     )
                     Text(
                         text = displayRecordName(item.name),
-                        style = if (featured) {
-                            MaterialTheme.typography.titleLarge
-                        } else {
-                            MaterialTheme.typography.titleMedium
-                        },
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -241,19 +233,19 @@ private fun WeeklyGoalCard(
                     )
                 }
             }
-            Spacer(Modifier.height(if (featured) 10.dp else 12.dp))
+            Spacer(Modifier.height(if (featured) 8.dp else 12.dp))
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (featured) 8.dp else 7.dp)
+                    .height(7.dp)
                     .clip(CircleShape),
                 color = contentColor,
                 trackColor = contentColor.copy(alpha = 0.16f),
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )
-            Spacer(Modifier.height(if (featured) 5.dp else 7.dp))
+            Spacer(Modifier.height(if (featured) 4.dp else 7.dp))
             GoalStatus(
                 progress = progress,
                 reached = reached,

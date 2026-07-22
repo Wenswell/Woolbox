@@ -137,12 +137,6 @@ class RecordsViewModel(
         }
     }
 
-    fun loadEntryCount(itemId: Long, onResult: (Int) -> Unit) {
-        viewModelScope.launch {
-            runCatching { repository.entryCount(itemId) }.onSuccess(onResult)
-        }
-    }
-
     class Factory(context: Context) : ViewModelProvider.Factory {
         private val applicationContext = context.applicationContext
 

@@ -107,18 +107,6 @@ class RecordRepository(context: Context) {
         ).getJSONObject("item").getLong("id")
     }
 
-    suspend fun entryCount(itemId: Long): Int = withContext(Dispatchers.IO) {
-        request(
-            "GET",
-            "entries",
-            query = mapOf(
-                "startDate" to "0001-01-01",
-                "endDate" to "9999-12-31",
-                "itemId" to itemId.toString(),
-            ),
-        ).getJSONArray("entries").length()
-    }
-
     suspend fun createEntry(itemId: Long, value: Double, occurredAt: Long): Long =
         withContext(Dispatchers.IO) {
             if (!value.isFinite() || value <= 0) {

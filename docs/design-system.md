@@ -105,15 +105,15 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn`，顶部以紧凑标题显示 `Today`、当前日期、`Goals` 旗帜图标和 `Manage` 设置图标。未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`。正常状态依次显示 `Focus` 和 `Records`：焦点区按优先级最多取三个目标，单项占满宽度，多项使用等高横向卡片并露出下一项；快速记录区按优先级降序、名称升序显示全部活跃项。
+Records 根页面使用 `LazyColumn`，顶部以紧凑标题显示 `Today`、当前日期、`Goals` 旗帜图标和 `Manage` 设置图标。未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`。正常状态依次显示 `Focus` 和 `Records`：焦点区按优先级和名称横向展示全部目标，等高卡片使用可用宽度的 `80%` 且不超过 `300dp`，单项也保持该宽度；快速记录区按优先级降序、名称升序显示全部活跃项。
 
 目标周期使用不同构图。日目标卡片以首字符圆形图标和圆形进度强调当天完成度；周目标卡片以首字符图标、横向进度和 `this week` 文案表达周期累计。达到目标时容器色变化，并同时显示完成图标与 `Goal reached`，颜色不是唯一状态提示。独立 `Goals` 路由按 `Daily`、`Weekly` 分组显示全部当前目标；后续新增周期时提供对应周期构图，不把所有目标压缩为同一种卡片。
 
-快速记录卡片使用 `surfaceContainerLow`、主题色细边框和按首字符稳定分配的主题色图标。标题显示去掉首个 Unicode 字符并清理分隔空白后的名称，尾部只显示今日累计 `值 单位`，不重复目标进度。焦点目标、目标列表项和快速记录卡片整块可点击并打开项目专属 Sheet。根 `Scaffold` 不显示 FAB。
+快速记录卡片使用 `surface`、主题色细边框和按首字符稳定分配的主题色图标，由内容和对称的 `12dp` 垂直内边距决定高度。标题显示去掉首个 Unicode 字符并清理分隔空白后的名称，尾部只显示今日累计 `值 单位`，不重复目标进度。焦点目标、目标列表项和快速记录卡片整块可点击并打开项目专属 Sheet。根 `Scaffold` 不显示 FAB。
 
-点击项目打开该项目专属单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。Sheet 显示项目名、今日累计、说明和与周期一致的目标组件；日目标使用圆形进度，周目标使用横向进度。数值输入预填默认值，单位作为后缀，减号/加号使用 tonal 图标按钮，底部使用全宽确认按钮；`Today` 流水每行只显示时刻与数值。确认成功后执行一次系统确认触感、关闭 Sheet，并在当前页面显示短时 `Snackbar`，仅提供 `Undo` 删除刚创建的流水。错误在 Sheet 内显示，失败时不关闭 Sheet。
+点击项目打开该项目专属单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。Sheet 标题使用项目名称首字符图标和裁剪后的名称，不显示今日累计摘要；目标信息只在与周期一致的目标组件中展示一次，日目标使用圆形进度，周目标使用横向进度。数值输入预填默认值，单位作为后缀，减号/加号使用 tonal 图标按钮，底部使用全宽确认按钮；`Today` 流水每行只显示时刻与数值。确认成功后执行一次系统确认触感、关闭 Sheet，并在当前页面显示短时 `Snackbar`，仅提供 `Undo` 删除刚创建的流水。错误在 Sheet 内显示，失败时不关闭 Sheet。
 
-`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
+`Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。编辑页首帧即禁用类型与单位控件，新建页保持可配置。
 
 `Records connection` 使用独立路由，只显示固定服务地址、用户名和密码；保存成功后返回上一页。Android Records 只呈现今天流水和活跃项目标进度，不显示归档项。
 

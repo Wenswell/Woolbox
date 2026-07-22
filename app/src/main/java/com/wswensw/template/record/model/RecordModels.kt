@@ -58,8 +58,3 @@ data class RecordEntry(
     val itemUnit: String,
     val itemValueType: RecordValueType,
 )
-
-data class RecordItemStats(
-    val item: RecordItem,
-    val entryCount: Int,
-)

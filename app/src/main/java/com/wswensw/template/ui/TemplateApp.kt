@@ -352,15 +352,11 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
             ) { entry ->
                 val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
-                var measurementLocked by remember(itemId) { mutableStateOf(false) }
-                LaunchedEffect(itemId) {
-                    recordsViewModel.loadEntryCount(itemId) { count -> measurementLocked = count > 0 }
-                }
                 RecordItemFormScreen(
                     item = recordsState.findItem(itemId),
                     editing = true,
                     loading = recordsState.isLoading,
-                    measurementLocked = measurementLocked,
+                    measurementLocked = true,
                     onBack = { navController.popBackStack() },
                     onSave = { draft, onResult ->
                         recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->

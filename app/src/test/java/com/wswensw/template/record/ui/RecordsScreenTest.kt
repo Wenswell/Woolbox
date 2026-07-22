@@ -56,8 +56,8 @@ class RecordsScreenTest {
     }
 
     @Test
-    fun focusGoalsUsePriorityLimitAndIgnoreItemsWithoutGoals() {
-        val focus = focusGoalItems(
+    fun focusGoalsUsePriorityAndIncludeAllConfiguredGoals() {
+        val focus = goalItems(
             listOf(
                 recordItem(id = 1, name = "A", priority = 100, period = null),
                 recordItem(id = 2, name = "B", priority = 20, period = GoalPeriod.WEEK),
@@ -67,7 +67,7 @@ class RecordsScreenTest {
             ),
         )
 
-        assertEquals(listOf(3L, 4L, 2L), focus.map(RecordItem::id))
+        assertEquals(listOf(3L, 4L, 2L, 5L), focus.map(RecordItem::id))
     }
 
     @Test
