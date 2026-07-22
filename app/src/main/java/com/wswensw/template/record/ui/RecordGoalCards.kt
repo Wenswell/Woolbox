@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,8 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.record.model.GoalPeriod
-import com.wswensw.template.record.model.ItemStreak
-import com.wswensw.template.record.model.streakLabel
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.ui.TemplateStyle
 import kotlin.math.roundToInt
@@ -52,7 +49,6 @@ internal fun GoalCard(
     featured: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    streak: ItemStreak? = null,
 ) {
     checkNotNull(item.goalValue)
     when (checkNotNull(item.goalPeriod)) {
@@ -60,7 +56,6 @@ internal fun GoalCard(
             item = item,
             cumulative = cumulative,
             featured = featured,
-            streak = streak,
             onClick = onClick,
             modifier = modifier,
         )
@@ -68,7 +63,6 @@ internal fun GoalCard(
             item = item,
             cumulative = cumulative,
             featured = featured,
-            streak = streak,
             onClick = onClick,
             modifier = modifier,
         )
@@ -80,7 +74,6 @@ private fun DailyGoalCard(
     item: RecordItem,
     cumulative: Double,
     featured: Boolean,
-    streak: ItemStreak?,
     onClick: () -> Unit,
     modifier: Modifier,
 ) {
@@ -169,7 +162,6 @@ private fun DailyGoalCard(
                     periodLabel = "today",
                     color = progressColor,
                 )
-                StreakChip(streak = streak, color = progressColor)
             }
         }
     }
@@ -180,7 +172,6 @@ private fun WeeklyGoalCard(
     item: RecordItem,
     cumulative: Double,
     featured: Boolean,
-    streak: ItemStreak?,
     onClick: () -> Unit,
     modifier: Modifier,
 ) {
@@ -280,7 +271,6 @@ private fun WeeklyGoalCard(
                 periodLabel = "this week",
                 color = progressColor,
             )
-            StreakChip(streak = streak, color = progressColor)
         }
     }
 }
@@ -382,34 +372,6 @@ private fun GoalStatus(
     }
 }
 
-
-@Composable
-private fun StreakChip(
-    streak: ItemStreak?,
-    color: Color,
-) {
-    val label = streak?.let(::streakLabel) ?: return
-    Row(
-        modifier = Modifier.padding(top = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.LocalFireDepartment,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(14.dp),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 @Composable
 internal fun GoalProgressPanel(

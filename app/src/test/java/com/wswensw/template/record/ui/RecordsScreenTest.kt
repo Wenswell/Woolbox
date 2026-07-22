@@ -141,15 +141,6 @@ class RecordsScreenTest {
         assertEquals(false, crossedGoalThreshold(0.0, 1.0, null))
     }
 
-    @Test
-    fun quickRecordSubtitlePrefersGoalAndDescription() {
-        val withDescription = recordItem(id = 1, name = "A", priority = 1, period = GoalPeriod.DAY, goalValue = 5.0, description = "Read")
-        assertEquals("Goal reached", quickRecordSubtitle(withDescription, hasLoggedToday = true, goalReached = true))
-        assertEquals("Read", quickRecordSubtitle(withDescription, hasLoggedToday = false, goalReached = false))
-        val plain = recordItem(id = 2, name = "B", priority = 1, period = null, goalValue = null)
-        assertEquals("Logged today", quickRecordSubtitle(plain, hasLoggedToday = true, goalReached = false))
-        assertEquals("Tap to log", quickRecordSubtitle(plain, hasLoggedToday = false, goalReached = false))
-    }
 
     private fun recordItem(
         id: Long,

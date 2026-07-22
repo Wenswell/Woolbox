@@ -118,20 +118,15 @@ fun RecordsScreen(
                 val orderedItems = orderedRecordItems(state.activeItems)
                 val focusGoals = goalItems(orderedItems)
                 val todayValues = todayRecordValues(state.entries)
-                val completion = focusGoalCompletion(focusGoals, state.goalValues)
 
                 if (focusGoals.isNotEmpty()) {
                     item {
-                        RecordsSectionTitle(
-                            title = "Focus",
-                            trailing = "${completion.done}/${completion.total}",
-                        )
+                        RecordsSectionTitle(title = "Focus")
                     }
                     item(key = "focus-goals") {
                         FocusGoalsRow(
                             goals = focusGoals,
                             values = state.goalValues,
-                            streaks = state.streaks,
                             onRecordItem = onRecordItem,
                         )
                     }
@@ -144,7 +139,6 @@ fun RecordsScreen(
                     QuickRecordCard(
                         item = item,
                         todayValue = todayValues[item.id] ?: 0.0,
-                        goalCumulative = state.goalValues[item.id],
                         streak = state.streaks[item.id],
                         onClick = { onRecordItem(item) },
                     )
@@ -158,7 +152,6 @@ fun RecordsScreen(
 private fun FocusGoalsRow(
     goals: List<RecordItem>,
     values: Map<Long, Double>,
-    streaks: Map<Long, ItemStreak>,
     onRecordItem: (RecordItem) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -172,7 +165,6 @@ private fun FocusGoalsRow(
                 GoalCard(
                     item = goal,
                     cumulative = values[goal.id] ?: 0.0,
-                    streak = streaks[goal.id],
                     featured = true,
                     onClick = { onRecordItem(goal) },
                     modifier = Modifier
@@ -345,34 +337,18 @@ private fun RecordsSectionTitle(
 private fun QuickRecordCard(
     item: RecordItem,
     todayValue: Double,
-    goalCumulative: Double?,
     streak: ItemStreak?,
     onClick: () -> Unit,
 ) {
     val colors = recordItemColors(item.name)
     val hasLoggedToday = todayValue > 0.0
-    val target = item.goalValue
-    val cumulative = goalCumulative ?: todayValue
-    val goalProgress = if (target != null && target > 0.0) {
-        goalProgressFraction(cumulative, target)
-    } else {
-        null
-    }
-    val goalReached = target != null && cumulative >= target
     val container by animateColorAsState(
-        targetValue = when {
-            goalReached -> MaterialTheme.colorScheme.tertiaryContainer
-            hasLoggedToday -> colors.container
-            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        targetValue = if (hasLoggedToday) {
+            colors.container
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
         },
         label = "QuickRecordContainer",
-    )
-    val valueColor by animateColorAsState(
-        targetValue = when {
-            goalReached -> MaterialTheme.colorScheme.tertiary
-            else -> colors.accent
-        },
-        label = "QuickRecordValue",
     )
 
     Card(
@@ -385,16 +361,11 @@ private fun QuickRecordCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 76.dp)
+                .heightIn(min = 72.dp)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            QuickRecordLeading(
-                name = item.name,
-                progress = goalProgress,
-                reached = goalReached,
-                progressColor = valueColor,
-            )
+            RecordItemInitial(name = item.name, size = 48.dp)
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -404,22 +375,24 @@ private fun QuickRecordCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = quickRecordSubtitle(item, hasLoggedToday, goalReached),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (item.description.isNotEmpty()) {
+                    Text(
+                        text = item.description,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(
-                modifier = Modifier.widthIn(max = 132.dp),
+                modifier = Modifier.widthIn(max = 140.dp),
                 horizontalAlignment = Alignment.End,
             ) {
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
-                    color = valueColor,
+                    color = colors.accent,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -434,63 +407,19 @@ private fun QuickRecordCard(
                         Icon(
                             imageVector = Icons.Rounded.LocalFireDepartment,
                             contentDescription = null,
-                            tint = valueColor,
+                            tint = colors.accent,
                             modifier = Modifier.size(14.dp),
                         )
                         Text(
                             text = streakText,
-                            color = valueColor,
+                            color = colors.accent,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                } else {
-                    Text(
-                        text = if (goalReached) "Done" else "Today",
-                        color = if (goalReached) valueColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun QuickRecordLeading(
-    name: String,
-    progress: Float?,
-    reached: Boolean,
-    progressColor: androidx.compose.ui.graphics.Color,
-) {
-    if (progress == null) {
-        RecordItemInitial(name = name, size = 48.dp)
-        return
-    }
-    Box(
-        modifier = Modifier.size(48.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxSize(),
-            color = progressColor,
-            strokeWidth = 3.5.dp,
-            trackColor = progressColor.copy(alpha = 0.16f),
-            gapSize = 0.dp,
-        )
-        RecordItemInitial(name = name, size = 34.dp)
-        if (reached) {
-            Icon(
-                imageVector = Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = progressColor,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(16.dp),
-            )
         }
     }
 }
@@ -569,17 +498,6 @@ internal fun crossedGoalThreshold(
     return previous < target && current >= target
 }
 
-internal fun quickRecordSubtitle(
-    item: RecordItem,
-    hasLoggedToday: Boolean,
-    goalReached: Boolean,
-): String = when {
-    goalReached -> "Goal reached"
-    item.description.isNotEmpty() -> item.description
-    hasLoggedToday -> "Logged today"
-    item.goalValue != null -> "Tap to log"
-    else -> "Tap to log"
-}
 
 internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
     items.sortedWith(

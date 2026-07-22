@@ -106,11 +106,20 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn` 与 `16dp` 块间距。顶部标题区显示 `Today`、当前日期，以及 tonal 的 `Goals`/`Manage` 图标按钮；当存在活跃目标时，标题下增加日进度条横幅：文案为 `N of M goals done` 或 `All goals done`，进度为完成数/目标数，全完成时使用 `tertiaryContainer` 与完成图标。未配置凭据、远端失败或无活跃项时，使用 `surfaceContainerLow` 空状态卡和全宽主操作（`Configure connection`/`Retry`/`Create record item`）。正常状态依次显示 `Focus` 与 `Records`：`Focus` 标题右侧显示 `done/total`；焦点卡横向展示全部目标，宽度约可用宽度 `82%` 且不超过 `300dp`，行间距 `12dp`；快速记录区按优先级降序、名称升序显示全部活跃项。
+Records 根页面使用 `LazyColumn` 与 `16dp` 块间距。信息分区职责：
 
-项目色由名称首字符稳定映射到 6 档 Material 角色，在头像、目标卡、今日数值和 Sheet 进度中共用。日目标用圆形进度勋章（达标时略放大并显示完成勾），周目标用 `10dp` 横向进度与 `this week` 文案。未完成目标卡用项目 `container`；达标后改为 `tertiaryContainer`，状态以完成图标与 `Goal reached` 胶囊同时表达。独立 `Goals` 路由按 `Daily`、`Weekly` 分组。
+| 区域 | 唯一职责 |
+| --- | --- |
+| 标题 + 日进度横幅 | 日期导航；有目标时只在此汇总完成数/总数与总进度（`N of M goals done` / `All goals done`） |
+| `Focus` | 各项目标进度与达标态；横向卡宽约 `82%`、上限 `300dp` |
+| `Records` | 快速记账：首字符、名称、说明、今日累计；连击只在此展示 |
+| Sheet | 单次目标进度、今日流水、数值输入 |
 
-快速记录卡：未记录用 `surfaceContainerLow`；今日已记用项目 `container`；目标达标用 `tertiaryContainer`。有目标时前导为迷你进度环 + 首字符；达标时显示完成勾与尾部 `Done`。副文案优先 `Goal reached`，否则描述、`Logged today` 或 `Tap to log`。Focus 与快速卡在 current≥1 时显示火焰图标与连击文案（`N day(s)`，best 更大时附 `· best M`）。焦点目标、目标列表与快速卡整块点击打开 Sheet。根 `Scaffold` 不显示 FAB。
+未配置凭据、远端失败或无活跃项时，使用 `surfaceContainerLow` 空状态卡和全宽主操作。
+
+项目色由名称首字符稳定映射到 6 档 Material 角色。日目标圆形进度、周目标横向进度；达标用 `tertiaryContainer` + 完成图标 + `Goal reached`。`Goals` 路由按 `Daily`/`Weekly` 分组，卡上不再附连击。
+
+快速记录卡不重复目标进度或达标文案；未记 `surfaceContainerLow`，今日已记项目 `container`；`current≥1` 时尾部火焰 + `N day(s)`（`best` 更大时 `· best M`）。整卡点击打开 Sheet。根 `Scaffold` 不显示 FAB。
 
 点击项目打开单个 `ModalBottomSheet`。Sheet 标题用首字符图标与裁剪名称；目标信息只在 `GoalProgressPanel` 展示一次。确认成功后关闭 Sheet：若本次记录使该项目从「未达标」跨到「达标」，触感用 `LongPress`，Snackbar 为 `Goal reached · 名称`；否则触感 `Confirm`，Snackbar 为 `Recorded 名称.`。Snackbar 均提供短时 `Undo`。错误留在 Sheet 内。
 
