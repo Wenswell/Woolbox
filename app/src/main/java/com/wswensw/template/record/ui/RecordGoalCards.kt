@@ -3,6 +3,7 @@ package com.wswensw.template.record.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +31,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,7 +84,7 @@ private fun DailyGoalCard(
     val target = checkNotNull(item.goalValue)
     val itemColors = recordItemColors(item.name)
     val progress by animateFloatAsState(
-        targetValue = goalProgressFraction(cumulative, target),
+        targetValue = goalProgressRatio(cumulative, target).toFloat(),
         animationSpec = spring(),
         label = "DailyGoalProgress",
     )
@@ -178,7 +182,7 @@ private fun WeeklyGoalCard(
     val target = checkNotNull(item.goalValue)
     val itemColors = recordItemColors(item.name)
     val progress by animateFloatAsState(
-        targetValue = goalProgressFraction(cumulative, target),
+        targetValue = goalProgressRatio(cumulative, target).toFloat(),
         animationSpec = spring(),
         label = "WeeklyGoalProgress",
     )
@@ -288,6 +292,8 @@ internal fun DailyGoalMedallion(
         animationSpec = spring(),
         label = "DailyGoalMedallionScale",
     )
+    val stroke = if (size > 72.dp) 9.dp else 7.5.dp
+    val ratio = progress.coerceAtLeast(0f).toDouble()
     Box(
         modifier = Modifier
             .size(size)
@@ -297,14 +303,46 @@ internal fun DailyGoalMedallion(
             },
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxSize(),
-            color = progressColor,
-            strokeWidth = if (size > 72.dp) 9.dp else 7.5.dp,
-            trackColor = progressColor.copy(alpha = 0.18f),
-            gapSize = 0.dp,
-        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = stroke.toPx()
+            val inset = strokeWidth / 2f
+            val arcSize = Size(size.toPx() - strokeWidth, size.toPx() - strokeWidth)
+            val topLeft = Offset(inset, inset)
+            val track = progressColor.copy(alpha = 0.18f)
+            drawArc(
+                color = track,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+            if (ratio >= 1.0) {
+                // Completed first lap (dimmer full ring under the overflow lap).
+                drawArc(
+                    color = progressColor.copy(alpha = 0.42f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                )
+            }
+            val lap = goalProgressLapFraction(ratio)
+            if (lap > 0f) {
+                drawArc(
+                    color = progressColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * lap,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                )
+            }
+        }
         RecordItemInitial(
             name = item.name,
             size = size - if (size > 72.dp) 26.dp else 22.dp,
@@ -329,6 +367,7 @@ private fun GoalStatus(
     periodLabel: String,
     color: Color,
 ) {
+    val percent = goalProgressPercent(progress.toDouble())
     if (reached) {
         Surface(
             modifier = Modifier.padding(top = 6.dp),
@@ -347,7 +386,11 @@ private fun GoalStatus(
                     modifier = Modifier.size(14.dp),
                 )
                 Text(
-                    text = "Goal reached",
+                    text = if (percent > 100) {
+                        "Goal reached · $percent%"
+                    } else {
+                        "Goal reached"
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = color,
                     fontWeight = FontWeight.SemiBold,
@@ -363,7 +406,7 @@ private fun GoalStatus(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(
-            text = "${(progress * 100).roundToInt()}% $periodLabel",
+            text = "$percent% $periodLabel",
             style = MaterialTheme.typography.labelMedium,
             color = color,
             fontWeight = FontWeight.SemiBold,
@@ -381,7 +424,7 @@ internal fun GoalProgressPanel(
 ) {
     val target = checkNotNull(item.goalValue)
     val progress by animateFloatAsState(
-        targetValue = goalProgressFraction(cumulative, target),
+        targetValue = goalProgressRatio(cumulative, target).toFloat(),
         animationSpec = spring(),
         label = "SheetGoalProgress",
     )
@@ -407,7 +450,7 @@ internal fun GoalProgressPanel(
         if (item.goalPeriod == GoalPeriod.WEEK) {
             Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp)
@@ -427,9 +470,27 @@ internal fun GoalProgressPanel(
     }
 }
 
+/** Uncapped cumulative/target ratio (0+). Used for multi-lap rings and percent labels. */
+internal fun goalProgressRatio(cumulative: Double, target: Double): Double {
+    require(target > 0.0)
+    if (cumulative <= 0.0) return 0.0
+    return cumulative / target
+}
+
+/** 0..1 fill for the current lap; exact whole multiples count as a full lap. */
+internal fun goalProgressLapFraction(ratio: Double): Float {
+    if (ratio <= 0.0) return 0f
+    val remainder = ratio % 1.0
+    return if (remainder <= 1e-9) 1f else remainder.toFloat()
+}
+
+internal fun goalProgressPercent(ratio: Double): Int =
+    (ratio.coerceAtLeast(0.0) * 100.0).roundToInt()
+
+/** Clamped 0..1 for linear bars that cannot overflow visually. */
 internal fun goalProgressFraction(cumulative: Double, target: Double): Float {
     require(target > 0.0)
-    return (cumulative / target).coerceIn(0.0, 1.0).toFloat()
+    return goalProgressRatio(cumulative, target).coerceIn(0.0, 1.0).toFloat()
 }
 
 internal fun goalValueLabel(cumulative: Double, target: Double, unit: String): String =

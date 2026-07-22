@@ -114,7 +114,7 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Foc
 
 未配置凭据、远端失败或无活跃项时，使用空状态卡与全宽主操作。
 
-列表卡：无目标用首字符；有目标用进度环；达标 `tertiaryContainer` + `Goal reached`；今日已记用项目 `container`；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 路由仍按 `Daily`/`Weekly` 分组全宽目标卡。
+项目色由名称**首个 Unicode 字符**的 hash 稳定映射到 6 档 Material 角色（primary/secondary/tertiary 及其 surface 强调档），同名同色，非随机。日目标环支持超过 100% 的叠圈：第一圈完成后以半透明铺满，当前圈以实色从顶点再扫；百分比文案不封顶。列表卡：无目标用首字符；有目标用进度环；达标 `tertiaryContainer` + `Goal reached`；今日已记用项目 `container`；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 路由仍按 `Daily`/`Weekly` 分组全宽目标卡。
 
 Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 

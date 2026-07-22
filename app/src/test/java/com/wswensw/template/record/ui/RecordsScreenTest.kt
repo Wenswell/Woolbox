@@ -104,6 +104,18 @@ class RecordsScreenTest {
     }
 
     @Test
+    fun goalProgressRatioAndLapSupportOverflow() {
+        assertEquals(0.0, goalProgressRatio(0.0, 10.0), 0.0)
+        assertEquals(0.5, goalProgressRatio(5.0, 10.0), 0.0)
+        assertEquals(1.5, goalProgressRatio(15.0, 10.0), 0.0)
+        assertEquals(0.5f, goalProgressLapFraction(0.5), 0f)
+        assertEquals(1f, goalProgressLapFraction(1.0), 0f)
+        assertEquals(0.5f, goalProgressLapFraction(1.5), 0f)
+        assertEquals(1f, goalProgressLapFraction(2.0), 0f)
+        assertEquals(150, goalProgressPercent(1.5))
+    }
+
+    @Test
     fun todayRecordValuesSumEntriesByItem() {
         val values = todayRecordValues(
             listOf(

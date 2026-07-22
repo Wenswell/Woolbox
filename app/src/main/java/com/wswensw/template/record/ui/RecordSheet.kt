@@ -165,7 +165,7 @@ private fun RecordSheetIdentity(
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0 && period != null
     val progress = if (hasGoal) {
-        goalProgressFraction(cumulative, checkNotNull(target))
+        goalProgressRatio(cumulative, checkNotNull(target)).toFloat()
     } else {
         0f
     }

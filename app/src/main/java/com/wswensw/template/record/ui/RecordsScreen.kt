@@ -192,7 +192,7 @@ private fun QuickRecordCard(
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0.0 && period != null
     val cumulative = goalCumulative ?: todayValue
-    val progress = if (hasGoal) goalProgressFraction(cumulative, checkNotNull(target)) else 0f
+    val progress = if (hasGoal) goalProgressRatio(cumulative, checkNotNull(target)).toFloat() else 0f
     val goalReached = hasGoal && cumulative >= checkNotNull(target)
     val progressColor = if (goalReached) {
         MaterialTheme.colorScheme.tertiary
@@ -258,7 +258,7 @@ private fun QuickRecordCard(
                 if (hasGoal && period == GoalPeriod.WEEK && !goalReached) {
                     Spacer(Modifier.height(6.dp))
                     LinearProgressIndicator(
-                        progress = { progress },
+                        progress = { progress.coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(4.dp)
@@ -396,7 +396,7 @@ internal fun quickRecordSupportingText(
     hasGoal -> {
         val target = checkNotNull(item.goalValue)
         val period = if (item.goalPeriod == GoalPeriod.DAY) "today" else "this week"
-        "${goalValueLabel(cumulative, target, item.unit)} · ${(progress * 100).toInt()}% $period"
+        "${goalValueLabel(cumulative, target, item.unit)} · ${goalProgressPercent(progress.toDouble())}% $period"
     }
     item.description.isNotEmpty() -> item.description
     else -> "Today"
