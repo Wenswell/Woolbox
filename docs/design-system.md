@@ -140,7 +140,7 @@ PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期
 
 ## 覆盖层交互
 
-Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四周必须能辨认目标应用。面板消费 `safeDrawing`/`ime` insets，键盘展开时内容收缩到输入法上方。会话默认进入编辑页并开启 `Reading order`；顶部使用 `Close` 图标按钮，底部使用带复制图标和 `Copy` 文案的全宽主按钮，空白草稿时禁用。
+Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四周必须能辨认目标应用。面板消费 `safeDrawing`/`ime` insets；编辑区用固定最小高度文本框 + 可滚动中部 + 底栏，避免输入框随键盘逐帧缩放。会话默认进入编辑页并开启 `Reading order`；顶部使用 `Close` 图标按钮，底部使用带复制图标和 `Copy` 文案的全宽主按钮，空白草稿时禁用。
 
 编辑页使用整行可点击的 `Reading order` Switch、明确的 `Select text` 次级操作和占满剩余空间的文本框。选择页使用 `Back` 图标按钮与 `Select all`/`Clear` 纯图标动作；历史编辑顶栏 `Delete`/`Save` 同为纯图标。文本块行使用 `48dp` 复选框与整行点击，正文以 `captureOrder` 显示从 `0` 开始的序号并允许四行，副文本只显示 `source · left,top-right,bottom`。
 

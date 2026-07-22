@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -41,7 +43,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -51,7 +52,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -188,9 +188,6 @@ internal fun CopySessionPanel(
 ) {
     val selectedCount = state.selectedIds.size
     val isSelectingText = state.screen == CopySessionScreen.TEXT_SELECTION
-    val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val outerVertical = if (imeBottom > 0) 8.dp else 32.dp
 
     Box(
         modifier = Modifier
@@ -198,108 +195,136 @@ internal fun CopySessionPanel(
             .background(OverlayScrim)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .imePadding()
-            .padding(horizontal = 12.dp, vertical = outerVertical),
+            .padding(horizontal = 12.dp, vertical = 24.dp),
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(16.dp),
             shadowElevation = 8.dp,
         ) {
-            Scaffold(
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                topBar = {
-                    TopAppBar(
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
-                        title = {
-                            Text(
-                                text = if (isSelectingText) "Select text" else title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+            Column(modifier = Modifier.fillMaxSize()) {
+                TopAppBar(
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    title = {
+                        Text(
+                            text = if (isSelectingText) "Select text" else title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = if (isSelectingText) onBack else onClose) {
+                            Icon(
+                                painter = painterResource(
+                                    if (isSelectingText) {
+                                        R.drawable.ic_arrow_back_24
+                                    } else {
+                                        R.drawable.ic_close_24
+                                    },
+                                ),
+                                contentDescription = if (isSelectingText) "Back" else "Close",
                             )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = if (isSelectingText) onBack else onClose) {
+                        }
+                    },
+                    actions = {
+                        if (isSelectingText) {
+                            val allSelected =
+                                selectedCount == state.blocks.size && state.blocks.isNotEmpty()
+                            IconButton(onClick = onToggleAll) {
                                 Icon(
-                                    painter = painterResource(
-                                        if (isSelectingText) {
-                                            R.drawable.ic_arrow_back_24
-                                        } else {
-                                            R.drawable.ic_close_24
-                                        },
-                                    ),
-                                    contentDescription = if (isSelectingText) "Back" else "Close",
+                                    imageVector = if (allSelected) {
+                                        Icons.Outlined.Deselect
+                                    } else {
+                                        Icons.Outlined.SelectAll
+                                    },
+                                    contentDescription = if (allSelected) "Clear" else "Select all",
                                 )
                             }
-                        },
-                        actions = {
-                            if (isSelectingText) {
-                                val allSelected = selectedCount == state.blocks.size && state.blocks.isNotEmpty()
-                                IconButton(onClick = onToggleAll) {
+                        } else {
+                            if (onDelete != null) {
+                                IconButton(onClick = onDelete) {
                                     Icon(
-                                        imageVector = if (allSelected) {
-                                            Icons.Outlined.Deselect
-                                        } else {
-                                            Icons.Outlined.SelectAll
-                                        },
-                                        contentDescription = if (allSelected) "Clear" else "Select all",
+                                        painter = painterResource(R.drawable.ic_delete_24),
+                                        contentDescription = "Delete",
                                     )
                                 }
-                            } else {
-                                if (onDelete != null) {
-                                    IconButton(onClick = onDelete) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_delete_24),
-                                            contentDescription = "Delete",
-                                        )
-                                    }
-                                }
-                                if (onSave != null) {
-                                    IconButton(
-                                        enabled = saveEnabled,
-                                        onClick = onSave,
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Check,
-                                            contentDescription = "Save",
-                                        )
-                                    }
+                            }
+                            if (onSave != null) {
+                                IconButton(
+                                    enabled = saveEnabled,
+                                    onClick = onSave,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = "Save",
+                                    )
                                 }
                             }
-                        },
-                    )
-                },
-                bottomBar = {
-                    if (!isSelectingText) {
-                        CopyBottomBar(
-                            enabled = state.currentDraftText.isNotBlank(),
-                            onCopy = onCopy,
-                        )
-                    }
-                },
-            ) { innerPadding ->
+                        }
+                    },
+                )
+
                 if (isSelectingText) {
                     CopyTextSelectionList(
                         blocks = state.blocks,
                         selectedIds = state.selectedIds,
                         onToggle = onToggle,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
+                            .weight(1f)
+                            .fillMaxWidth(),
                     )
                 } else {
-                    CopyTextEditor(
-                        draftText = state.currentDraftText,
-                        selectedCount = selectedCount,
-                        useReadingOrder = state.useReadingOrder,
-                        onDraftChange = onDraftChange,
-                        onReadingOrderChange = onReadingOrderChange,
-                        onOpenTextSelection = onOpenTextSelection,
+                    // Stable field height + scroll; only the middle region reflows with IME.
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = state.useReadingOrder,
+                                    role = Role.Switch,
+                                    onValueChange = onReadingOrderChange,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Reading order",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Switch(
+                                checked = state.useReadingOrder,
+                                onCheckedChange = null,
+                            )
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onOpenTextSelection,
+                        ) {
+                            Text("Select text ($selectedCount)")
+                        }
+                        OutlinedTextField(
+                            value = state.currentDraftText,
+                            onValueChange = onDraftChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 180.dp),
+                            label = { Text("Text") },
+                            minLines = 6,
+                        )
+                    }
+                    CopyBottomBar(
+                        enabled = state.currentDraftText.isNotBlank(),
+                        onCopy = onCopy,
                     )
                 }
             }
@@ -327,58 +352,6 @@ private fun CopyBottomBar(
             Spacer(Modifier.width(8.dp))
             Text("Copy")
         }
-    }
-}
-
-@Composable
-private fun CopyTextEditor(
-    draftText: String,
-    selectedCount: Int,
-    useReadingOrder: Boolean,
-    onDraftChange: (String) -> Unit,
-    onReadingOrderChange: (Boolean) -> Unit,
-    onOpenTextSelection: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .toggleable(
-                    value = useReadingOrder,
-                    role = Role.Switch,
-                    onValueChange = onReadingOrderChange,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Reading order",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Switch(
-                checked = useReadingOrder,
-                onCheckedChange = null,
-            )
-        }
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onOpenTextSelection,
-        ) {
-            Text("Select text ($selectedCount)")
-        }
-        OutlinedTextField(
-            value = draftText,
-            onValueChange = onDraftChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true),
-            label = { Text("Text") },
-            minLines = 3,
-        )
     }
 }
 
