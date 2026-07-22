@@ -44,7 +44,7 @@ TemplateTheme
 
 | 骨架 | 适用场景 | 结构契约 |
 | --- | --- | --- |
-| `TemplateSurface` | 根页面 | `Scaffold` 处理 safe drawing、底栏及可选 FAB 和 Snackbar。 |
+| `TemplateSurface` | 根页面 | `Scaffold` 处理 safe drawing 及底栏。 |
 | `TemplatePage` | Home、Setting | 标题、说明、纵向滚动内容和底部留白。 |
 | `TemplateRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回动作、可选标题动作和滚动内容；滚动超过 `8px` 显示分隔线。 |
 | `TemplateLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
@@ -58,7 +58,7 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplatePageHeader` | 根页面标题与说明 | 标题最多两行；右侧只放页面级动作。 |
 | `TemplateSection` | 设置分组 | 显示分组标题与一个 `surfaceContainerLow` 内容容器。 |
-| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 列表前导统一显示项目名称首个 Unicode 字符，流水时间置于尾部。 |
+| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 项目行前导统一显示项目名称首个 Unicode 字符。 |
 | `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
 | `TemplateDivider` | 同组列表项分隔 | 从卡片左侧 `16dp` 开始，不贴容器边缘。 |
 | `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
@@ -103,9 +103,9 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn`，顶部不显示页面标题和描述，只保留右侧 `Manage` 操作；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则先显示独立的 `Goals` 区域，再显示 `Today` 分组。`Goals` 区域为可横向滑动的圆环进度行，每个目标渲染为 `84dp` 圆环：主环显示 `0-100%` 进度，超出 `100%` 的部分以内层第二环呈现，中心显示百分比，环下显示项目名称与累计值；日目标累计当天值，周目标累计周一至周日值，进度变化使用 Compose 动画。今天流水为单行条目，左侧前导显示项目名称首个 Unicode 字符（支持文字、单码点 emoji 和组合字符），名称裁掉首字符后显示，随后显示数值、单位和记录时刻，时间置于尾部。管理与选择列表前导同样使用项目名称首个字符。今天流水切换使用 `180ms` 淡入和 `90ms` 淡出。只有存在活跃记录项时，根 `Scaffold` 才显示带图标和 `Record` 文案的扩展 FAB。
+Records 根页面使用 `LazyColumn`，顶部不显示页面标题和描述，只保留右上角 `Manage` 图标按钮；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则以项目为中心列出活跃项（按优先级降序、名称升序）。每行前导显示项目名称首个 Unicode 字符（支持文字、单码点 emoji 和组合字符），标题行显示完整项目名与今日累计 `值 单位`；有目标的项目在标题行下方渲染线性进度条与 `累计 / 目标 单位 · today|this week`，日目标累计当天值，周目标累计周一至周日值。整行点击打开项目专属 Sheet。根 `Scaffold` 不再显示 FAB。
 
-`Record` 打开单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。第一阶段使用搜索框和无卡片列表选择记录项，空搜索标题为 `Suggested now` 且最多显示五项；第二阶段显示记录项名称、说明、已配置目标、数值输入、单位、步进提示以及减号/加号图标按钮，底部使用全宽确认按钮。
+点击项目行打开该项目专属单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。Sheet 直接显示项目名、说明与目标进度（线性进度条与累计/目标文案）；`Today` 列出今日该项目流水，每行显示时刻与数值，右侧删除图标即时删除并刷新。数值输入预填默认值，单位作为后缀，步进提示与减号/加号图标按钮，底部全宽确认按钮；确认后 Sheet 保持打开，新流水即时出现在列表顶部，输入框重置为默认值。错误在 Sheet 内显示，无全局 Snackbar。
 
 `Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
 

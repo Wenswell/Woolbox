@@ -8,7 +8,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线量化记�
 | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
 | `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Template，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
-| `Records` | 创建量化记录项，按当前时间搜索或推荐，并记录今天的数值或时长。 | `Records` 底栏；右下角 `Record`。 |
+| `Records` | 创建量化记录项，并记录今天的数值或时长。 | `Records` 底栏；项目行。 |
 
 `Global Copy` 与 OLED 的跨应用模式共用 `Template tools` 无障碍服务。OLED 没有服务时可在 Template 内直接使用；服务连接后，页面入口会先把 Template 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。
 
@@ -27,7 +27,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线量化记�
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
-量化记录从 `Records` 进入；首次使用先在 `Setting` 配置服务端 Basic Auth 凭据，再创建记录项并通过 `Record` 选择项目确认数值。
+量化记录从 `Records` 进入；首次使用先在 `Setting` 配置服务端 Basic Auth 凭据，再创建记录项并点击项目行确认数值。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 

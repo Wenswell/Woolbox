@@ -18,12 +18,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,7 +28,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -55,6 +50,7 @@ import androidx.navigation.navArgument
 import com.wswensw.template.R
 import com.wswensw.template.record.ui.ManageRecordsScreen
 import com.wswensw.template.record.ui.RecordItemFormScreen
+import com.wswensw.template.record.ui.RecordSheet
 import com.wswensw.template.record.ui.RecordsConnectionScreen
 import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
@@ -67,7 +63,6 @@ import com.wswensw.template.tool.trigger.ToolTile
 import com.wswensw.template.tool.ui.ToolViewModel
 import com.wswensw.template.tool.ui.CopyHistoryScreen
 import com.wswensw.template.tool.ui.CopyHistoryViewModel
-import kotlinx.coroutines.launch
 
 private enum class MainTab(
     val labelRes: Int,
@@ -95,10 +90,8 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
-    var showRecordSheet by rememberSaveable { mutableStateOf(false) }
+    var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -140,26 +133,11 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 }
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
-                                    showRecordSheet = false
+                                    recordSheetItemId = null
                                 }
                             },
                         )
                     },
-                    floatingActionButton = {
-                        if (selectedTab == MainTab.RECORDS && recordsState.activeItems.isNotEmpty()) {
-                            ExtendedFloatingActionButton(
-                                onClick = { showRecordSheet = true },
-                                icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_add_24),
-                                        contentDescription = null,
-                                    )
-                                },
-                                text = { Text("Record") },
-                            )
-                        }
-                    },
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
                 ) { innerPadding: PaddingValues ->
                     AnimatedContent(
                         targetState = selectedTab,
@@ -184,37 +162,18 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
                                 onManage = {
-                                    showRecordSheet = false
+                                    recordSheetItemId = null
                                     navController.navigate(TemplateRoutes.MANAGE_RECORDS)
                                 },
                                 onCreateItem = {
-                                    showRecordSheet = false
+                                    recordSheetItemId = null
                                     navController.navigate(TemplateRoutes.RECORD_ITEM_NEW)
                                 },
                                 onConfigureConnection = {
                                     navController.navigate(TemplateRoutes.RECORDS_CONNECTION)
                                 },
                                 onRetry = recordsViewModel::refresh,
-                                showRecordSheet = showRecordSheet,
-                                onDismissRecordSheet = { showRecordSheet = false },
-                                onRecord = { item, value, onResult ->
-                                    recordsViewModel.createEntry(item.id, value) { entryId, error ->
-                                        onResult(error)
-                                        if (entryId != null) {
-                                            showRecordSheet = false
-                                            coroutineScope.launch {
-                                                val result = snackbarHostState.showSnackbar(
-                                                    message = "Recorded ${item.name}.",
-                                                    actionLabel = "Undo",
-                                                    withDismissAction = true,
-                                                )
-                                                if (result == SnackbarResult.ActionPerformed) {
-                                                    recordsViewModel.deleteEntry(entryId)
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
+                                onRecordItem = { recordSheetItemId = it.id },
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -383,6 +342,25 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                 )
             }
+            }
+
+            recordSheetItemId?.let { itemId ->
+                val item = recordsState.activeItems.firstOrNull { it.id == itemId }
+                if (item != null) {
+                    RecordSheet(
+                        item = item,
+                        entries = recordsState.entries.filter { it.itemId == itemId },
+                        onDismiss = { recordSheetItemId = null },
+                        onRecord = { recordedItem, value, onResult ->
+                            recordsViewModel.createEntry(recordedItem.id, value) { _, error ->
+                                onResult(error)
+                            }
+                        },
+                        onDeleteEntry = { entryId ->
+                            recordsViewModel.deleteEntry(entryId)
+                        },
+                    )
+                }
             }
 
             if (showInAppOledShield) {
