@@ -19,8 +19,8 @@ TemplateTheme
    │     │     ├─ Global Copy entry
    │     │     └─ OLED shield entry
    │     ├─ Records
-   │     │  ├─ Record cards
-   │     │  └─ Record sheet
+   │     │  ├─ Tasks ──> Task detail
+   │     │  └─ Trackers ──> Record / measurement detail
    │     └─ Setting
    │        ├─ Theme entry
    │        └─ Records connection ──> Credentials form
@@ -105,23 +105,27 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Focus 分区。
+Records 根页面以 `Tasks` / `Trackers` 两个固定页签组织，默认 `Tasks`。每个页签使用独立 `LazyColumn` 与 `16dp` 块间距；切换页签不改变底栏入口或当前操作语义。
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| 标题区 | 日期；有目标时一行汇总 `N of M goals done` / `All goals done` |
-| 记录列表 | 有目标项优先（再按优先级、名称）；有目标项前导进度环 + 进度文案，周目标附细进度条；尾部今日累计与连击 |
-| Sheet | 身份与进度合并为同一标题行；下方仅数值输入与今日流水 |
+| `Tasks` | 顶部加号、新建待办、未完成列表和已完成折叠区。列表行包含复选框、标题；有子事项时显示 `N / M` 和细进度条。 |
+| `Task detail` | 标题、完成复选框、一级子事项和删除操作；子事项行提供复选框、编辑与删除。 |
+| `Trackers` | 保留 `Goals`、`Manage` 与记录项卡片。累计项显示目标/累计/连击，测量项显示最新值和时间。 |
+| `Measurement detail` | 返回、编辑、四档范围切换、原始时间序列图表、流水列表和新增动作。 |
+| 累计记录 Sheet | 身份与进度合并为同一标题行；下方仅数值输入与今日流水。 |
 
-未配置凭据、远端失败或无活跃项时，使用空状态卡与全宽主操作。
+未配置凭据、远端失败或对应列表为空时，使用空状态卡与全宽主操作。
 
 项目色由名称**首个 Unicode 字符**的 hash 稳定映射到 3 档色相（primary / secondary / tertiary 的 container），同名同色，非随机；禁止 `surfaceContainer*` 灰底。日目标环支持超过 100% 的叠圈：第一圈完成后以半透明铺满，当前圈以实色从顶点再扫；百分比文案不封顶。列表与管理卡统一用项目 `container` 色底（不用灰底）；达标 `tertiaryContainer`；中性块（空态、连接、Sheet 流水）用 `surface` + `outlineVariant` 描边；表单 `TemplateSection` 无外框。有目标前导进度环，无目标首字符；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 仍按 `Daily`/`Weekly` 全宽目标卡。
 
-Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。数值须为正数才可 `Record`/`Done`；保存中禁用步进与输入。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
+累计记录 Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。数值须为正数才可 `Record`/`Done`；保存中禁用步进与输入。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
+
+测量记录使用独立值/时间编辑路由，不复用累计 Sheet。详情图表使用 Vico 的 Material 3 主题和默认标记，横轴按真实发生时间显示；范围只提供 `24 h`、`7 d`、`30 d`、`All`。流水行点击或编辑图标进入编辑，删除使用确认对话框。
 
 `Manage records` 使用标准路由骨架（返回 + 标题 + 顶栏加号图标 + 列表内容）；列表卡同主页。空态复用 `RecordsStatusCard`。
 
-记录项表单同标准路由骨架，顶栏勾选保存图标（合法且未保存中才可用）；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关整行 `toggleable`；字段错误用 `isError`/`supportingText`；Priority 数字键盘；保存中禁用编辑控件；时间 TimePicker。编辑页锁定类型与单位。
+记录项表单同标准路由骨架，顶栏勾选保存图标（合法且未保存中才可用）；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。模式、类型、时长单位和目标周期用 segmented control；测量模式隐藏 Goal 与 Recommendation，且固定 `Number`；字段错误用 `isError`/`supportingText`；Priority 数字键盘；保存中禁用编辑控件；时间 TimePicker。编辑页锁定类型与单位。
 
 `Goals` 空/错误态复用 `RecordsStatusCard`，分区标题与主页一致。
 

@@ -45,7 +45,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 组合今天流水、目标累计与项目日连击，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。刷新时单次拉取含今天共 90 天 entries，派生今日列表、周目标累计与连击。 |
+| `RecordsViewModel` / `RecordRepository` | 组合待办、记录项、今天流水、最新测量值、目标累计和项目日连击，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。刷新时拉取待办、活跃/归档项、近 90 天流水和每项最新流水；详情按范围单独拉取测量流水。 |
 
 ## 命令状态机
 
@@ -134,16 +134,18 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 | 表 | 关键字段与约束 |
 | --- | --- |
-| `record_items` | 名称使用 `NOCASE` 唯一索引；保存计量类型、默认值、步进、单位、目标、优先级、归档状态和时间戳。 |
+| `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值、步进、单位、目标、优先级、归档状态和时间戳。 |
 | `record_windows` | 保存记录项推荐区间的起止分钟；`itemId` 建索引并随父项级联删除。 |
-| `record_entries` | 保存发生时刻、固化本地日期/分钟和正数值；索引 `itemId` 与 `(localDate, localMinute)`，并随父项级联删除。 |
-| `record_audit_logs` | 保存对象类型、对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表，删除业务数据后审计历史仍保留。 |
+| `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
+| `todo_tasks` | 保存待办标题、完成时间、创建/更新时间；按创建时间索引。 |
+| `todo_steps` | 保存待办的一级子事项、完成时间、创建/更新时间；`taskId` 外键级联删除，并按 `(taskId, createdAt)` 索引。 |
+| `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TASK`、`STEP` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表，删除业务数据后审计历史仍保留。 |
 
-服务端在事务内校验并写入记录项及完整时间段集合。名称在活跃和归档项中忽略大小写唯一；已有流水后，计量类型和单位必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。每个成功写操作在同一事务插入一条审计日志；日志以 `id` 倒序、每页 `100` 条游标查询。App 不再创建 `RecordDatabase`、Room DAO 或本地记录文件。
+服务端在事务内校验并写入记录项及完整时间段集合。累计记录使用正数流水、可选目标与推荐时间段；测量记录固定为数字、禁止目标和推荐时间段，并允许任意有限数值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型和单位必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。每个成功写操作在同一事务插入一条审计日志；日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。
 
-新增或编辑流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、单位和类型联表展示。Android 刷新时额外查询本周流水，仅用于周目标累计；日目标使用当天流水。
+新增或编辑流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、模式、单位和类型联表展示。Android 刷新时从近 90 天流水派生今天列表、周目标累计和累计记录连击，并用最新流水显示测量卡片。
 
-服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和四张表。
+待办与子事项的完成切换在一个事务内完成：父项切换会同步全部子事项；全部子事项完成时父项完成，重开任一子事项时父项重开。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
 
 ## OLED 配置
 
