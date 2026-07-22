@@ -1,14 +1,23 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordEntryUpdateInput, RecordItemInput } from "./domain.js";
+import type { RecordEntryInput, RecordEntryUpdateInput, RecordItemInput, TaskInput } from "./domain.js";
 import { ApiError } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
-import { recordAuditLogs, recordEntries, recordItems, recordWindows } from "./schema.js";
+import {
+  recordAuditLogs,
+  recordEntries,
+  recordItems,
+  recordWindows,
+  todoSteps,
+  todoTasks,
+} from "./schema.js";
 
 const AuditLogPageSize = 100;
 
 type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordWindowRow = typeof recordWindows.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
+type TodoTaskRow = typeof todoTasks.$inferSelect;
+type TodoStepRow = typeof todoSteps.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
 
 type AuditAction =
@@ -19,7 +28,17 @@ type AuditAction =
   | "ITEM_DELETED"
   | "ENTRY_CREATED"
   | "ENTRY_UPDATED"
-  | "ENTRY_DELETED";
+  | "ENTRY_DELETED"
+  | "TASK_CREATED"
+  | "TASK_UPDATED"
+  | "TASK_COMPLETED"
+  | "TASK_REOPENED"
+  | "TASK_DELETED"
+  | "STEP_CREATED"
+  | "STEP_UPDATED"
+  | "STEP_COMPLETED"
+  | "STEP_REOPENED"
+  | "STEP_DELETED";
 
 interface ItemAuditSnapshot {
   id: number;
@@ -48,11 +67,26 @@ interface EntryAuditSnapshot {
   value: number;
 }
 
-type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot;
+interface TaskAuditSnapshot {
+  id: number;
+  title: string;
+  completedAt: number | null;
+  stepCount?: number;
+}
+
+interface StepAuditSnapshot {
+  id: number;
+  taskId: number;
+  taskTitle: string;
+  title: string;
+  completedAt: number | null;
+}
+
+type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot;
 
 interface AuditWrite {
   action: AuditAction;
-  entityType: "ITEM" | "ENTRY";
+  entityType: "ITEM" | "ENTRY" | "TASK" | "STEP";
   entityId: number;
   before?: AuditSnapshot;
   after?: AuditSnapshot;
@@ -333,6 +367,203 @@ export class RecordsService {
     return ids.map((id) => byId.get(id)!);
   }
 
+  listTasks() {
+    const tasks = this.db
+      .select()
+      .from(todoTasks)
+      .orderBy(asc(todoTasks.createdAt), asc(todoTasks.id))
+      .all();
+    return this.attachSteps(tasks);
+  }
+
+  getTask(id: number) {
+    const task = this.db.select().from(todoTasks).where(eq(todoTasks.id, id)).get();
+    if (!task) throw new ApiError(404, "Task not found.");
+    return this.attachSteps([task])[0]!;
+  }
+
+  getStep(id: number) {
+    const step = this.db.select().from(todoSteps).where(eq(todoSteps.id, id)).get();
+    if (!step) throw new ApiError(404, "Step not found.");
+    return step;
+  }
+
+  createTask(input: TaskInput) {
+    const id = this.db.transaction((tx) => {
+      const now = this.now();
+      const task = tx
+        .insert(todoTasks)
+        .values({ title: input.title, completedAt: null, createdAt: now, updatedAt: now })
+        .returning({ id: todoTasks.id })
+        .get();
+      this.writeAudit(tx, {
+        action: "TASK_CREATED",
+        entityType: "TASK",
+        entityId: task.id,
+        after: taskSnapshot({ id: task.id, title: input.title, completedAt: null }),
+        createdAt: now,
+      });
+      return task.id;
+    });
+    return this.getTask(id);
+  }
+
+  updateTask(id: number, input: TaskInput) {
+    this.db.transaction((tx) => {
+      const current = this.requireTask(tx, id);
+      const now = this.now();
+      const updated = { ...current, title: input.title, updatedAt: now };
+      tx.update(todoTasks).set({ title: input.title, updatedAt: now }).where(eq(todoTasks.id, id)).run();
+      this.writeAudit(tx, {
+        action: "TASK_UPDATED",
+        entityType: "TASK",
+        entityId: id,
+        before: taskSnapshot(current),
+        after: taskSnapshot(updated),
+        createdAt: now,
+      });
+    });
+    return this.getTask(id);
+  }
+
+  setTaskCompleted(id: number, completed: boolean) {
+    this.db.transaction((tx) => {
+      const task = this.requireTask(tx, id);
+      const now = this.now();
+      const steps = tx
+        .select()
+        .from(todoSteps)
+        .where(eq(todoSteps.taskId, id))
+        .orderBy(asc(todoSteps.createdAt), asc(todoSteps.id))
+        .all();
+      for (const step of steps) {
+        if ((step.completedAt !== null) === completed) continue;
+        const updated = { ...step, completedAt: completed ? now : null, updatedAt: now };
+        tx.update(todoSteps)
+          .set({ completedAt: updated.completedAt, updatedAt: now })
+          .where(eq(todoSteps.id, step.id))
+          .run();
+        this.writeAudit(tx, {
+          action: completed ? "STEP_COMPLETED" : "STEP_REOPENED",
+          entityType: "STEP",
+          entityId: step.id,
+          before: stepSnapshot(step, task.title),
+          after: stepSnapshot(updated, task.title),
+          createdAt: now,
+        });
+      }
+      this.setTaskCompletion(tx, task, completed, now);
+    });
+    return this.getTask(id);
+  }
+
+  deleteTask(id: number) {
+    return this.db.transaction((tx) => {
+      const task = this.requireTask(tx, id);
+      const stepCount = tx
+        .select({ value: count() })
+        .from(todoSteps)
+        .where(eq(todoSteps.taskId, id))
+        .get()!.value;
+      this.writeAudit(tx, {
+        action: "TASK_DELETED",
+        entityType: "TASK",
+        entityId: id,
+        before: { ...taskSnapshot(task), stepCount },
+        createdAt: this.now(),
+      });
+      tx.delete(todoTasks).where(eq(todoTasks.id, id)).run();
+      return task;
+    });
+  }
+
+  createStep(taskId: number, input: TaskInput) {
+    const id = this.db.transaction((tx) => {
+      const task = this.requireTask(tx, taskId);
+      const now = this.now();
+      const step = tx
+        .insert(todoSteps)
+        .values({ taskId, title: input.title, completedAt: null, createdAt: now, updatedAt: now })
+        .returning({ id: todoSteps.id })
+        .get();
+      this.writeAudit(tx, {
+        action: "STEP_CREATED",
+        entityType: "STEP",
+        entityId: step.id,
+        after: stepSnapshot({ id: step.id, taskId, title: input.title, completedAt: null }, task.title),
+        createdAt: now,
+      });
+      this.setTaskCompletion(tx, task, false, now);
+      return step.id;
+    });
+    return this.getStep(id);
+  }
+
+  updateStep(id: number, input: TaskInput) {
+    this.db.transaction((tx) => {
+      const step = this.requireStep(tx, id);
+      const task = this.requireTask(tx, step.taskId);
+      const now = this.now();
+      const updated = { ...step, title: input.title, updatedAt: now };
+      tx.update(todoSteps).set({ title: input.title, updatedAt: now }).where(eq(todoSteps.id, id)).run();
+      this.writeAudit(tx, {
+        action: "STEP_UPDATED",
+        entityType: "STEP",
+        entityId: id,
+        before: stepSnapshot(step, task.title),
+        after: stepSnapshot(updated, task.title),
+        createdAt: now,
+      });
+    });
+    return this.getStep(id);
+  }
+
+  setStepCompleted(id: number, completed: boolean) {
+    this.db.transaction((tx) => {
+      const step = this.requireStep(tx, id);
+      const task = this.requireTask(tx, step.taskId);
+      const now = this.now();
+      if ((step.completedAt !== null) !== completed) {
+        const updated = { ...step, completedAt: completed ? now : null, updatedAt: now };
+        tx.update(todoSteps)
+          .set({ completedAt: updated.completedAt, updatedAt: now })
+          .where(eq(todoSteps.id, id))
+          .run();
+        this.writeAudit(tx, {
+          action: completed ? "STEP_COMPLETED" : "STEP_REOPENED",
+          entityType: "STEP",
+          entityId: id,
+          before: stepSnapshot(step, task.title),
+          after: stepSnapshot(updated, task.title),
+          createdAt: now,
+        });
+      }
+      this.reconcileTaskCompletion(tx, task, now);
+    });
+    return this.getStep(id);
+  }
+
+  deleteStep(id: number) {
+    return this.db.transaction((tx) => {
+      const step = this.requireStep(tx, id);
+      const task = this.requireTask(tx, step.taskId);
+      const now = this.now();
+      this.writeAudit(tx, {
+        action: "STEP_DELETED",
+        entityType: "STEP",
+        entityId: id,
+        before: stepSnapshot(step, task.title),
+        createdAt: now,
+      });
+      tx.delete(todoSteps).where(eq(todoSteps.id, id)).run();
+      const remaining = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
+      if (remaining.length > 0) {
+        this.setTaskCompletion(tx, task, remaining.every((candidate) => candidate.completedAt !== null), now);
+      }
+      return step;
+    });
+  }
+
   listAuditLogs(beforeId?: number) {
     const query = this.db.select().from(recordAuditLogs);
     const rows = (beforeId === undefined ? query : query.where(lt(recordAuditLogs.id, beforeId)))
@@ -359,6 +590,65 @@ export class RecordsService {
       .all();
     const grouped = groupWindows(windows);
     return rows.map((row) => ({ ...row, windows: grouped.get(row.id) ?? [] }));
+  }
+
+  private attachSteps(tasks: TodoTaskRow[]) {
+    if (tasks.length === 0) return [];
+    const steps = this.db
+      .select()
+      .from(todoSteps)
+      .where(inArray(todoSteps.taskId, tasks.map((task) => task.id)))
+      .orderBy(asc(todoSteps.taskId), asc(todoSteps.createdAt), asc(todoSteps.id))
+      .all();
+    const stepsByTask = new Map<number, TodoStepRow[]>();
+    for (const step of steps) {
+      const taskSteps = stepsByTask.get(step.taskId) ?? [];
+      taskSteps.push(step);
+      stepsByTask.set(step.taskId, taskSteps);
+    }
+    return tasks.map((task) => ({ ...task, steps: stepsByTask.get(task.id) ?? [] }));
+  }
+
+  private requireTask(tx: RecordsTransaction, id: number) {
+    const task = tx.select().from(todoTasks).where(eq(todoTasks.id, id)).get();
+    if (!task) throw new ApiError(404, "Task not found.");
+    return task;
+  }
+
+  private requireStep(tx: RecordsTransaction, id: number) {
+    const step = tx.select().from(todoSteps).where(eq(todoSteps.id, id)).get();
+    if (!step) throw new ApiError(404, "Step not found.");
+    return step;
+  }
+
+  private reconcileTaskCompletion(tx: RecordsTransaction, task: TodoTaskRow, now: number) {
+    const steps = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
+    if (steps.length > 0) {
+      this.setTaskCompletion(tx, task, steps.every((step) => step.completedAt !== null), now);
+    }
+  }
+
+  private setTaskCompletion(
+    tx: RecordsTransaction,
+    task: TodoTaskRow,
+    completed: boolean,
+    now: number,
+  ) {
+    if ((task.completedAt !== null) === completed) return task;
+    const updated = { ...task, completedAt: completed ? now : null, updatedAt: now };
+    tx.update(todoTasks)
+      .set({ completedAt: updated.completedAt, updatedAt: now })
+      .where(eq(todoTasks.id, task.id))
+      .run();
+    this.writeAudit(tx, {
+      action: completed ? "TASK_COMPLETED" : "TASK_REOPENED",
+      entityType: "TASK",
+      entityId: task.id,
+      before: taskSnapshot(task),
+      after: taskSnapshot(updated),
+      createdAt: now,
+    });
+    return updated;
   }
 
   private entryQuery() {
@@ -441,6 +731,29 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
     localDate: entry.localDate,
     localMinute: entry.localMinute,
     value: entry.value,
+  };
+}
+
+function taskSnapshot(
+  task: Pick<TodoTaskRow, "id" | "title" | "completedAt">,
+): TaskAuditSnapshot {
+  return {
+    id: task.id,
+    title: task.title,
+    completedAt: task.completedAt,
+  };
+}
+
+function stepSnapshot(
+  step: Pick<TodoStepRow, "id" | "taskId" | "title" | "completedAt">,
+  taskTitle: string,
+): StepAuditSnapshot {
+  return {
+    id: step.id,
+    taskId: step.taskId,
+    taskTitle,
+    title: step.title,
+    completedAt: step.completedAt,
   };
 }
 

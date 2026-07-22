@@ -234,6 +234,67 @@ describe("Records API", () => {
     expect(invalid.statusCode).toBe(400);
   });
 
+  it("manages tasks and first-level steps atomically", async () => {
+    const created = await createTask({ title: "  Prepare trip  " });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().task).toMatchObject({ id: 1, title: "Prepare trip", completedAt: null, steps: [] });
+
+    const directComplete = await setTaskCompleted(1, true);
+    expect(directComplete.statusCode).toBe(200);
+    expect(directComplete.json().task).toMatchObject({ completedAt: 1_700_000_000_000 });
+
+    const firstStep = await createStep(1, { title: "Book train" });
+    expect(firstStep.statusCode).toBe(201);
+    expect(firstStep.json().step).toMatchObject({ id: 1, taskId: 1, title: "Book train", completedAt: null });
+    expect((await getTasks())[0]).toMatchObject({ completedAt: null });
+
+    await createStep(1, { title: "Pack bag" });
+    expect((await setStepCompleted(1, true)).statusCode).toBe(200);
+    expect((await getTasks())[0]).toMatchObject({ completedAt: null });
+
+    const childDerivedComplete = await setStepCompleted(2, true);
+    expect(childDerivedComplete.statusCode).toBe(200);
+    expect((await getTasks())[0]).toMatchObject({
+      completedAt: 1_700_000_000_000,
+      steps: [
+        { id: 1, completedAt: 1_700_000_000_000 },
+        { id: 2, completedAt: 1_700_000_000_000 },
+      ],
+    });
+
+    await setStepCompleted(1, false);
+    const parentComplete = await setTaskCompleted(1, true);
+    expect(parentComplete.json().task.steps).toEqual([
+      expect.objectContaining({ id: 1, completedAt: 1_700_000_000_000 }),
+      expect.objectContaining({ id: 2, completedAt: 1_700_000_000_000 }),
+    ]);
+
+    await setStepCompleted(1, false);
+    const deleted = await app.inject({ method: "DELETE", url: "/api/steps/1" });
+    expect(deleted.statusCode).toBe(200);
+    expect((await getTasks())[0]).toMatchObject({
+      completedAt: 1_700_000_000_000,
+      steps: [expect.objectContaining({ id: 2, completedAt: 1_700_000_000_000 })],
+    });
+
+    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey" } });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json().task.title).toBe("Prepare journey");
+    expect((await getAuditLogs()).map((log) => log.action)).toContain("TASK_COMPLETED");
+    expect((await getAuditLogs()).map((log) => log.action)).toContain("STEP_REOPENED");
+  });
+
+  it("rejects empty task titles and does not write partial task data", async () => {
+    const task = await createTask({ title: " " });
+    expect(task.statusCode).toBe(400);
+    expect(await getTasks()).toEqual([]);
+
+    const step = await createStep(1, { title: "Missing parent" });
+    expect(step.statusCode).toBe(404);
+    expect(await getTasks()).toEqual([]);
+    expect(await getAuditLogs()).toEqual([]);
+  });
+
   it("batch deletes entries atomically and returns deleted resources", async () => {
     await createItem(itemInput());
     await createEntry(entryInput({ value: 1 }));
@@ -275,6 +336,28 @@ describe("Records API", () => {
     const response = await app.inject({ method: "GET", url: "/api/entries?startDate=2026-07-01&endDate=2026-07-31" });
     expect(response.statusCode).toBe(200);
     return response.json().entries;
+  }
+
+  async function createTask(payload: Record<string, unknown>) {
+    return app.inject({ method: "POST", url: "/api/tasks", payload });
+  }
+
+  async function getTasks(): Promise<Array<Record<string, unknown>>> {
+    const response = await app.inject({ method: "GET", url: "/api/tasks" });
+    expect(response.statusCode).toBe(200);
+    return response.json().tasks;
+  }
+
+  async function createStep(taskId: number, payload: Record<string, unknown>) {
+    return app.inject({ method: "POST", url: `/api/tasks/${taskId}/steps`, payload });
+  }
+
+  async function setTaskCompleted(taskId: number, completed: boolean) {
+    return app.inject({ method: "PUT", url: `/api/tasks/${taskId}/completion`, payload: { completed } });
+  }
+
+  async function setStepCompleted(stepId: number, completed: boolean) {
+    return app.inject({ method: "PUT", url: `/api/steps/${stepId}/completion`, payload: { completed } });
   }
 
   async function getAuditLogs(): Promise<Array<Record<string, unknown>>> {

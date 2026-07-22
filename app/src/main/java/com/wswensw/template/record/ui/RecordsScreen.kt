@@ -17,24 +17,33 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
@@ -49,6 +58,7 @@ import com.wswensw.template.record.model.streakLabel
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordMode
+import com.wswensw.template.record.model.TodoTask
 import com.wswensw.template.ui.TemplateStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -65,8 +75,13 @@ fun RecordsScreen(
     onRecordItem: (RecordItem) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
     onAddMeasurement: (RecordItem) -> Unit,
+    onCreateTask: () -> Unit,
+    onOpenTask: (TodoTask) -> Unit,
+    onToggleTask: (TodoTask, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var selectedTab by rememberSaveable { mutableStateOf(RecordsRootTab.TASKS) }
+    var completedTasksExpanded by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -78,76 +93,311 @@ fun RecordsScreen(
         verticalArrangement = Arrangement.spacedBy(TemplateStyle.spacing.block),
     ) {
         item {
-            val orderedItems = orderedRecordItems(state.activeItems)
-            val focusGoals = goalItems(orderedItems)
-            val completion = focusGoalCompletion(focusGoals, state.goalValues)
-            RecordsHeader(
-                date = state.selectedDate,
-                completion = completion,
-                onGoals = onGoals,
-                onManage = onManage,
-            )
-        }
-
-        when {
-            state.isLoading -> item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-            state.error != null -> item {
-                RecordsStatusCard(
-                    message = state.error,
-                    actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
-                    onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
-                )
-            }
-            state.activeItems.isEmpty() -> item {
-                RecordsStatusCard(
-                    message = "No record items yet.",
-                    actionLabel = "Create record item",
-                    onAction = onCreateItem,
-                )
-            }
-            else -> {
-                val accumulateItems = orderedRecordItems(state.activeItems)
-                    .filter { it.mode == RecordMode.ACCUMULATE }
-                val measurementItems = state.activeItems
-                    .filter { it.mode == RecordMode.MEASUREMENT }
-                    .sortedBy { it.name.lowercase(Locale.ROOT) }
-                val todayValues = todayRecordValues(state.entries)
-                items(accumulateItems, key = RecordItem::id) { item ->
-                    QuickRecordCard(
-                        item = item,
-                        todayValue = todayValues[item.id] ?: 0.0,
-                        goalCumulative = state.goalValues[item.id],
-                        streak = state.streaks[item.id],
-                        onClick = { onRecordItem(item) },
+            PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+                RecordsRootTab.entries.forEach { tab ->
+                    Tab(
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        text = { Text(tab.label) },
                     )
                 }
-                if (measurementItems.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Measurements",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 8.dp),
+            }
+        }
+
+        if (selectedTab == RecordsRootTab.TASKS) {
+            taskListItems(
+                state = state,
+                completedExpanded = completedTasksExpanded,
+                onCompletedExpandedChange = { completedTasksExpanded = it },
+                onCreateTask = onCreateTask,
+                onOpenTask = onOpenTask,
+                onToggleTask = onToggleTask,
+                onConfigureConnection = onConfigureConnection,
+                onRetry = onRetry,
+            )
+        } else {
+            trackerListItems(
+                state = state,
+                onGoals = onGoals,
+                onManage = onManage,
+                onCreateItem = onCreateItem,
+                onConfigureConnection = onConfigureConnection,
+                onRetry = onRetry,
+                onRecordItem = onRecordItem,
+                onOpenMeasurement = onOpenMeasurement,
+                onAddMeasurement = onAddMeasurement,
+            )
+        }
+    }
+}
+
+private enum class RecordsRootTab(val label: String) {
+    TASKS("Tasks"),
+    TRACKERS("Trackers"),
+}
+
+private fun LazyListScope.taskListItems(
+    state: RecordsUiState,
+    completedExpanded: Boolean,
+    onCompletedExpandedChange: (Boolean) -> Unit,
+    onCreateTask: () -> Unit,
+    onOpenTask: (TodoTask) -> Unit,
+    onToggleTask: (TodoTask, Boolean) -> Unit,
+    onConfigureConnection: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    item {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Tasks",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            FilledTonalIconButton(onClick = onCreateTask) {
+                Icon(imageVector = Icons.Rounded.Add, contentDescription = "New task")
+            }
+        }
+    }
+    when {
+        state.isLoading -> item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        state.error != null -> item {
+            RecordsStatusCard(
+                message = state.error,
+                actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
+                onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
+            )
+        }
+        else -> {
+            val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
+            val completedTasks = state.tasks
+                .filter(TodoTask::isCompleted)
+                .sortedByDescending(TodoTask::completedAt)
+            if (openTasks.isEmpty()) {
+                item {
+                    RecordsStatusCard(
+                        message = "No open tasks.",
+                        actionLabel = "Create task",
+                        onAction = onCreateTask,
+                    )
+                }
+            } else {
+                items(openTasks, key = TodoTask::id) { task ->
+                    TaskCard(
+                        task = task,
+                        onOpen = { onOpenTask(task) },
+                        onToggle = { completed -> onToggleTask(task, completed) },
+                    )
+                }
+            }
+            if (completedTasks.isNotEmpty()) {
+                item {
+                    CompletedTasksHeader(
+                        count = completedTasks.size,
+                        expanded = completedExpanded,
+                        onToggle = { onCompletedExpandedChange(!completedExpanded) },
+                    )
+                }
+                if (completedExpanded) {
+                    items(completedTasks, key = TodoTask::id) { task ->
+                        TaskCard(
+                            task = task,
+                            onOpen = { onOpenTask(task) },
+                            onToggle = { completed -> onToggleTask(task, completed) },
                         )
                     }
-                    items(measurementItems, key = RecordItem::id) { item ->
-                        MeasurementCard(
-                            item = item,
-                            latest = state.latestEntries[item.id],
-                            onOpen = { onOpenMeasurement(item) },
-                            onAdd = { onAddMeasurement(item) },
-                        )
-                    }
+                }
+            }
+        }
+    }
+}
+
+private fun LazyListScope.trackerListItems(
+    state: RecordsUiState,
+    onGoals: () -> Unit,
+    onManage: () -> Unit,
+    onCreateItem: () -> Unit,
+    onConfigureConnection: () -> Unit,
+    onRetry: () -> Unit,
+    onRecordItem: (RecordItem) -> Unit,
+    onOpenMeasurement: (RecordItem) -> Unit,
+    onAddMeasurement: (RecordItem) -> Unit,
+) {
+    item {
+        val orderedItems = orderedRecordItems(state.activeItems)
+        val focusGoals = goalItems(orderedItems)
+        val completion = focusGoalCompletion(focusGoals, state.goalValues)
+        RecordsHeader(
+            date = state.selectedDate,
+            completion = completion,
+            onGoals = onGoals,
+            onManage = onManage,
+        )
+    }
+    when {
+        state.isLoading -> item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        state.error != null -> item {
+            RecordsStatusCard(
+                message = state.error,
+                actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
+                onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
+            )
+        }
+        state.activeItems.isEmpty() -> item {
+            RecordsStatusCard(
+                message = "No record items yet.",
+                actionLabel = "Create record item",
+                onAction = onCreateItem,
+            )
+        }
+        else -> {
+            val accumulateItems = orderedRecordItems(state.activeItems)
+                .filter { it.mode == RecordMode.ACCUMULATE }
+            val measurementItems = state.activeItems
+                .filter { it.mode == RecordMode.MEASUREMENT }
+                .sortedBy { it.name.lowercase(Locale.ROOT) }
+            val todayValues = todayRecordValues(state.entries)
+            items(accumulateItems, key = RecordItem::id) { item ->
+                QuickRecordCard(
+                    item = item,
+                    todayValue = todayValues[item.id] ?: 0.0,
+                    goalCumulative = state.goalValues[item.id],
+                    streak = state.streaks[item.id],
+                    onClick = { onRecordItem(item) },
+                )
+            }
+            if (measurementItems.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Measurements",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                items(measurementItems, key = RecordItem::id) { item ->
+                    MeasurementCard(
+                        item = item,
+                        latest = state.latestEntries[item.id],
+                        onOpen = { onOpenMeasurement(item) },
+                        onAdd = { onAddMeasurement(item) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompletedTasksHeader(
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Completed ($count)",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        FilledTonalIconButton(onClick = onToggle) {
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) "Collapse completed tasks" else "Expand completed tasks",
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskCard(
+    task: TodoTask,
+    onOpen: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+) {
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        shape = TemplateStyle.cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = if (task.isCompleted) {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            },
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(
+                checked = task.isCompleted,
+                onCheckedChange = { checked -> onToggle(checked) },
+            )
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = task.title,
+                    color = if (task.isCompleted) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (task.steps.isNotEmpty()) {
+                    val completed = task.completedStepCount
+                    Text(
+                        text = "$completed / ${task.steps.size}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    LinearProgressIndicator(
+                        progress = { completed.toFloat() / task.steps.size },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .height(3.dp)
+                            .clip(CircleShape),
+                        gapSize = 0.dp,
+                        drawStopIndicator = {},
+                    )
                 }
             }
         }

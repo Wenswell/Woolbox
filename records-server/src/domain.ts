@@ -40,6 +40,10 @@ export interface RecordEntryUpdateInput {
   value: number;
 }
 
+export interface TaskInput {
+  title: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -106,6 +110,18 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
 
 export function parseEntryUpdateInput(value: unknown): RecordEntryUpdateInput {
   return parseEntryFields(objectInput(value));
+}
+
+export function parseTaskInput(value: unknown): TaskInput {
+  const title = stringField(objectInput(value), "title").trim();
+  requireRule(title.length > 0, "Title is required.");
+  return { title };
+}
+
+export function parseCompleted(value: unknown): boolean {
+  const input = objectInput(value);
+  requireRule(typeof input.completed === "boolean", "Completed must be a boolean.");
+  return input.completed;
 }
 
 function parseEntryFields(input: Record<string, unknown>): RecordEntryUpdateInput {

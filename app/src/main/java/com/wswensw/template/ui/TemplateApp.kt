@@ -68,6 +68,8 @@ import com.wswensw.template.record.ui.displayRecordName
 import com.wswensw.template.record.ui.RecordsConnectionScreen
 import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
+import com.wswensw.template.record.ui.TaskCreateScreen
+import com.wswensw.template.record.ui.TaskDetailScreen
 import com.wswensw.template.tool.service.ExternalToolCommand
 import com.wswensw.template.tool.service.ToolLaunchResult
 import com.wswensw.template.tool.overlay.InAppOledShield
@@ -204,6 +206,15 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 },
                                 onAddMeasurement = { item ->
                                     navController.navigate(TemplateRoutes.measurementEntryNew(item.id))
+                                },
+                                onCreateTask = {
+                                    navController.navigate(TemplateRoutes.TASK_NEW)
+                                },
+                                onOpenTask = { task ->
+                                    navController.navigate(TemplateRoutes.taskDetail(task.id))
+                                },
+                                onToggleTask = { task, completed ->
+                                    recordsViewModel.setTaskCompleted(task.id, completed)
                                 },
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -366,6 +377,49 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     state = recordsState,
                     onBack = { navController.popBackStack() },
                     onSave = recordsViewModel::configureCredentials,
+                )
+            }
+            composable(TemplateRoutes.TASK_NEW) {
+                TaskCreateScreen(
+                    onBack = { navController.popBackStack() },
+                    onCreate = { title, onResult ->
+                        recordsViewModel.createTask(title) { taskId, error ->
+                            onResult(error)
+                            if (taskId != null) navController.popBackStack()
+                        }
+                    },
+                )
+            }
+            composable(
+                route = TemplateRoutes.TASK_DETAIL,
+                arguments = listOf(navArgument(TemplateRoutes.TASK_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val taskId = entry.arguments?.getLong(TemplateRoutes.TASK_ID) ?: return@composable
+                TaskDetailScreen(
+                    task = recordsState.findTask(taskId),
+                    loading = recordsState.isLoading,
+                    onBack = { navController.popBackStack() },
+                    onSaveTitle = { title, onResult ->
+                        recordsViewModel.updateTask(taskId, title, onResult)
+                    },
+                    onToggleTask = { completed ->
+                        recordsViewModel.setTaskCompleted(taskId, completed)
+                    },
+                    onCreateStep = { title, onResult ->
+                        recordsViewModel.createStep(taskId, title, onResult)
+                    },
+                    onUpdateStep = { step, title, onResult ->
+                        recordsViewModel.updateStep(step.id, title, onResult)
+                    },
+                    onToggleStep = { step, completed ->
+                        recordsViewModel.setStepCompleted(step.id, completed)
+                    },
+                    onDeleteStep = { step, onResult ->
+                        recordsViewModel.deleteStep(step.id, onResult)
+                    },
+                    onDeleteTask = { onResult ->
+                        recordsViewModel.deleteTask(taskId, onResult)
+                    },
                 )
             }
             composable(TemplateRoutes.RECORD_ITEM_NEW) {
@@ -626,6 +680,9 @@ private object TemplateRoutes {
     const val RECORD_GOALS = "record-goals"
     const val MANAGE_RECORDS = "manage-records"
     const val RECORDS_CONNECTION = "records-connection"
+    const val TASK_NEW = "task/new"
+    const val TASK_ID = "taskId"
+    const val TASK_DETAIL = "task/{$TASK_ID}"
     const val RECORD_ITEM_NEW = "record-item/new"
     const val RECORD_ITEM_ID = "recordItemId"
     const val RECORD_ITEM_EDIT = "record-item/{$RECORD_ITEM_ID}"
@@ -635,6 +692,7 @@ private object TemplateRoutes {
     const val MEASUREMENT_ENTRY_EDIT = "measurement/{$RECORD_ITEM_ID}/entry/{$RECORD_ENTRY_ID}"
 
     fun recordItemEdit(itemId: Long) = "record-item/$itemId"
+    fun taskDetail(taskId: Long) = "task/$taskId"
     fun measurementDetail(itemId: Long) = "measurement/$itemId"
     fun measurementEntryNew(itemId: Long) = "measurement/$itemId/entry/new"
     fun measurementEntryEdit(itemId: Long, entryId: Long) = "measurement/$itemId/entry/$entryId"

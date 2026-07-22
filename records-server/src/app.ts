@@ -5,6 +5,7 @@ import { openRecordsDatabase } from "./database.js";
 import {
   ApiError,
   parseArchived,
+  parseCompleted,
   parseEntryInput,
   parseEntryUpdateInput,
   parseId,
@@ -12,6 +13,7 @@ import {
   parseIsoDate,
   parseItemInput,
   parseOptionalId,
+  parseTaskInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
 
@@ -84,6 +86,57 @@ export function buildApp(options: BuildAppOptions) {
     const item = records.deleteArchivedItem(parseId((request.params as { id?: unknown }).id));
     return { item };
   });
+
+  app.get("/api/tasks", () => ({ tasks: records.listTasks() }));
+
+  app.post("/api/tasks", (request, reply) => {
+    const task = records.createTask(parseTaskInput(request.body));
+    return reply.status(201).send({ task });
+  });
+
+  app.put("/api/tasks/:id", (request) => ({
+    task: records.updateTask(
+      parseId((request.params as { id?: unknown }).id, "Task ID"),
+      parseTaskInput(request.body),
+    ),
+  }));
+
+  app.put("/api/tasks/:id/completion", (request) => ({
+    task: records.setTaskCompleted(
+      parseId((request.params as { id?: unknown }).id, "Task ID"),
+      parseCompleted(request.body),
+    ),
+  }));
+
+  app.delete("/api/tasks/:id", (request) => ({
+    task: records.deleteTask(parseId((request.params as { id?: unknown }).id, "Task ID")),
+  }));
+
+  app.post("/api/tasks/:id/steps", (request, reply) => {
+    const step = records.createStep(
+      parseId((request.params as { id?: unknown }).id, "Task ID"),
+      parseTaskInput(request.body),
+    );
+    return reply.status(201).send({ step });
+  });
+
+  app.put("/api/steps/:id", (request) => ({
+    step: records.updateStep(
+      parseId((request.params as { id?: unknown }).id, "Step ID"),
+      parseTaskInput(request.body),
+    ),
+  }));
+
+  app.put("/api/steps/:id/completion", (request) => ({
+    step: records.setStepCompleted(
+      parseId((request.params as { id?: unknown }).id, "Step ID"),
+      parseCompleted(request.body),
+    ),
+  }));
+
+  app.delete("/api/steps/:id", (request) => ({
+    step: records.deleteStep(parseId((request.params as { id?: unknown }).id, "Step ID")),
+  }));
 
   app.get("/api/audit-logs", (request) => {
     const query = request.query as Record<string, unknown>;

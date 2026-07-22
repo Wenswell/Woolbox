@@ -12,11 +12,14 @@ import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValidationException
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
+import com.wswensw.template.record.model.TodoStep
+import com.wswensw.template.record.model.TodoTask
 import com.wswensw.template.record.model.ItemStreak
 import com.wswensw.template.record.model.STREAK_LOOKBACK_DAYS
 import com.wswensw.template.record.model.goalValues
 import com.wswensw.template.record.model.itemStreaks
 import com.wswensw.template.record.model.validated
+import com.wswensw.template.record.model.validatedTaskTitle
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.time.Instant
@@ -53,6 +56,7 @@ class RecordRepository(context: Context) {
     private val _archivedItems = MutableStateFlow<List<RecordItem>>(emptyList())
     private val _entries = MutableStateFlow<List<RecordEntry>>(emptyList())
     private val _latestEntries = MutableStateFlow<Map<Long, RecordEntry>>(emptyMap())
+    private val _tasks = MutableStateFlow<List<TodoTask>>(emptyList())
     private val _goalValues = MutableStateFlow<Map<Long, Double>>(emptyMap())
     private val _streaks = MutableStateFlow<Map<Long, ItemStreak>>(emptyMap())
     private val _connection = MutableStateFlow(credentialStore.connection())
@@ -61,6 +65,7 @@ class RecordRepository(context: Context) {
     val archivedItems: StateFlow<List<RecordItem>> = _archivedItems
     val entries: StateFlow<List<RecordEntry>> = _entries
     val latestEntries: StateFlow<Map<Long, RecordEntry>> = _latestEntries
+    val tasks: StateFlow<List<TodoTask>> = _tasks
     val goalValues: StateFlow<Map<Long, Double>> = _goalValues
     val streaks: StateFlow<Map<Long, ItemStreak>> = _streaks
     val connection: StateFlow<RecordsConnection> = _connection
@@ -76,6 +81,7 @@ class RecordRepository(context: Context) {
             query = mapOf("startDate" to lookbackStart, "endDate" to localDate),
         )
         val latest = request("GET", "entries/latest")
+        val tasks = request("GET", "tasks")
         val activeItems = active.getJSONArray("items").mapObjects(::parseItem)
         val rangeEntries = range.getJSONArray("entries").mapObjects(::parseEntry)
         val todayEntries = rangeEntries.filter { it.localDate == localDate }
@@ -88,6 +94,7 @@ class RecordRepository(context: Context) {
         _latestEntries.value = latest.getJSONArray("entries")
             .mapObjects(::parseEntry)
             .associateBy(RecordEntry::itemId)
+        _tasks.value = tasks.getJSONArray("tasks").mapObjects(::parseTask)
         _goalValues.value = goalValues(activeItems, date, todayEntries, weekEntries)
         _streaks.value = itemStreaks(
             itemIds = activeItems
@@ -160,6 +167,60 @@ class RecordRepository(context: Context) {
 
     suspend fun deleteEntry(entryId: Long) = withContext(Dispatchers.IO) {
         request("DELETE", "entries/$entryId")
+        Unit
+    }
+
+    suspend fun createTask(title: String): Long = withContext(Dispatchers.IO) {
+        request(
+            "POST",
+            "tasks",
+            body = JSONObject().put("title", validatedTaskTitle(title)),
+        ).getJSONObject("task").getLong("id")
+    }
+
+    suspend fun updateTask(taskId: Long, title: String) = withContext(Dispatchers.IO) {
+        request(
+            "PUT",
+            "tasks/$taskId",
+            body = JSONObject().put("title", validatedTaskTitle(title)),
+        )
+        Unit
+    }
+
+    suspend fun setTaskCompleted(taskId: Long, completed: Boolean) = withContext(Dispatchers.IO) {
+        request("PUT", "tasks/$taskId/completion", body = JSONObject().put("completed", completed))
+        Unit
+    }
+
+    suspend fun deleteTask(taskId: Long) = withContext(Dispatchers.IO) {
+        request("DELETE", "tasks/$taskId")
+        Unit
+    }
+
+    suspend fun createStep(taskId: Long, title: String): Long = withContext(Dispatchers.IO) {
+        request(
+            "POST",
+            "tasks/$taskId/steps",
+            body = JSONObject().put("title", validatedTaskTitle(title)),
+        ).getJSONObject("step").getLong("id")
+    }
+
+    suspend fun updateStep(stepId: Long, title: String) = withContext(Dispatchers.IO) {
+        request(
+            "PUT",
+            "steps/$stepId",
+            body = JSONObject().put("title", validatedTaskTitle(title)),
+        )
+        Unit
+    }
+
+    suspend fun setStepCompleted(stepId: Long, completed: Boolean) = withContext(Dispatchers.IO) {
+        request("PUT", "steps/$stepId/completion", body = JSONObject().put("completed", completed))
+        Unit
+    }
+
+    suspend fun deleteStep(stepId: Long) = withContext(Dispatchers.IO) {
+        request("DELETE", "steps/$stepId")
         Unit
     }
 
@@ -254,6 +315,24 @@ private fun parseEntry(value: JSONObject) = RecordEntry(
     itemValueType = RecordValueType.valueOf(value.getString("itemValueType")),
 )
 
+private fun parseTask(value: JSONObject) = TodoTask(
+    id = value.getLong("id"),
+    title = value.getString("title"),
+    completedAt = value.nullableLong("completedAt"),
+    createdAt = value.getLong("createdAt"),
+    updatedAt = value.getLong("updatedAt"),
+    steps = value.getJSONArray("steps").mapObjects(::parseStep),
+)
+
+private fun parseStep(value: JSONObject) = TodoStep(
+    id = value.getLong("id"),
+    taskId = value.getLong("taskId"),
+    title = value.getString("title"),
+    completedAt = value.nullableLong("completedAt"),
+    createdAt = value.getLong("createdAt"),
+    updatedAt = value.getLong("updatedAt"),
+)
+
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =
     (0 until length()).map { index -> transform(getJSONObject(index)) }
 
@@ -263,6 +342,9 @@ private fun JSONObject.putNullable(key: String, value: Any?) {
 
 private fun JSONObject.nullableDouble(key: String): Double? =
     if (isNull(key)) null else getDouble(key)
+
+private fun JSONObject.nullableLong(key: String): Long? =
+    if (isNull(key)) null else getLong(key)
 
 private fun JSONObject.nullableString(key: String): String? =
     if (isNull(key)) null else getString(key)

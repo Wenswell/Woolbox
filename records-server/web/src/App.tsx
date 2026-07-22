@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type RowSelectionState } from "@tanstack/react-table";
 import { api } from "./api";
-import type { EntryAuditSnapshot, ItemAuditSnapshot, ItemInput, RecordAuditLog, RecordEntry, RecordItem, RecordMode, ValueType } from "./types";
+import type { EntryAuditSnapshot, ItemAuditSnapshot, ItemInput, RecordAuditLog, RecordEntry, RecordItem, RecordMode, StepAuditSnapshot, TaskAuditSnapshot, ValueType } from "./types";
 
 const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 type View = "entries" | "items" | "logs";
@@ -114,16 +114,24 @@ function parseWindows(value: string) { return value.split(/\n|,/).map((item) => 
 function timeMinute(value: string) { const [hour, minuteValue] = value.split(":").map(Number); return hour * 60 + minuteValue; }
 function message(reason: unknown) { return reason instanceof Error ? reason.message : "Request failed."; }
 function formatDateTime(epoch: number) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(epoch); }
-function auditSubject(log: RecordAuditLog) { const snapshot = log.after ?? log.before; return !snapshot ? `${log.entityType} #${log.entityId}` : "name" in snapshot ? `Record item: ${snapshot.name}` : `Entry: ${snapshot.itemName}`; }
-function actionLabel(action: RecordAuditLog["action"]) { return ({ ITEM_CREATED: "Created item", ITEM_UPDATED: "Updated item", ITEM_ARCHIVED: "Archived item", ITEM_RESTORED: "Restored item", ITEM_DELETED: "Deleted item", ENTRY_CREATED: "Created entry", ENTRY_UPDATED: "Updated entry", ENTRY_DELETED: "Deleted entry" })[action]; }
+function auditSubject(log: RecordAuditLog) { const snapshot = log.after ?? log.before; if (!snapshot) return `${log.entityType} #${log.entityId}`; if ("name" in snapshot) return `Record item: ${snapshot.name}`; if ("itemName" in snapshot) return `Entry: ${snapshot.itemName}`; return "taskTitle" in snapshot ? `Subtask: ${snapshot.taskTitle}` : `Task: ${snapshot.title}`; }
+function actionLabel(action: RecordAuditLog["action"]) { return ({ ITEM_CREATED: "Created item", ITEM_UPDATED: "Updated item", ITEM_ARCHIVED: "Archived item", ITEM_RESTORED: "Restored item", ITEM_DELETED: "Deleted item", ENTRY_CREATED: "Created entry", ENTRY_UPDATED: "Updated entry", ENTRY_DELETED: "Deleted entry", TASK_CREATED: "Created task", TASK_UPDATED: "Updated task", TASK_COMPLETED: "Completed task", TASK_REOPENED: "Reopened task", TASK_DELETED: "Deleted task", STEP_CREATED: "Created subtask", STEP_UPDATED: "Updated subtask", STEP_COMPLETED: "Completed subtask", STEP_REOPENED: "Reopened subtask", STEP_DELETED: "Deleted subtask" })[action]; }
 function auditChanges(log: RecordAuditLog) {
   const before = log.before;
   const after = log.after;
   if (log.action === "ITEM_CREATED" && after && "name" in after) return itemDescription(after);
   if (log.action === "ITEM_DELETED" && before && "name" in before) return itemDescription(before);
-  if (log.action === "ENTRY_CREATED" && after && !("name" in after)) return entryDescription(after);
-  if (log.action === "ENTRY_DELETED" && before && !("name" in before)) return entryDescription(before);
-  if (log.action === "ENTRY_UPDATED" && before && after && !("name" in before) && !("name" in after)) return `${entryDescription(before)} to ${entryDescription(after)}`;
+  if (log.action === "ENTRY_CREATED" && after && isEntrySnapshot(after)) return entryDescription(after);
+  if (log.action === "ENTRY_DELETED" && before && isEntrySnapshot(before)) return entryDescription(before);
+  if (log.action === "ENTRY_UPDATED" && before && after && isEntrySnapshot(before) && isEntrySnapshot(after)) return `${entryDescription(before)} to ${entryDescription(after)}`;
+  if (log.action === "TASK_CREATED" && after && isTaskSnapshot(after)) return taskDescription(after);
+  if (log.action === "TASK_DELETED" && before && isTaskSnapshot(before)) return taskDescription(before);
+  if (log.action === "STEP_CREATED" && after && isStepSnapshot(after)) return stepDescription(after);
+  if (log.action === "STEP_DELETED" && before && isStepSnapshot(before)) return stepDescription(before);
+  if ((log.action === "TASK_COMPLETED" || log.action === "TASK_REOPENED") && after && isTaskSnapshot(after)) return after.completedAt === null ? "Status: Open" : "Status: Completed";
+  if ((log.action === "STEP_COMPLETED" || log.action === "STEP_REOPENED") && after && isStepSnapshot(after)) return after.completedAt === null ? "Status: Open" : "Status: Completed";
+  if (log.action === "TASK_UPDATED" && before && after && isTaskSnapshot(before) && isTaskSnapshot(after)) return fieldChange("Title", before.title, after.title) ?? "No visible field changes.";
+  if (log.action === "STEP_UPDATED" && before && after && isStepSnapshot(before) && isStepSnapshot(after)) return fieldChange("Title", before.title, after.title) ?? "No visible field changes.";
   if (log.action === "ITEM_ARCHIVED") return "Status: Active to Archived";
   if (log.action === "ITEM_RESTORED") return "Status: Archived to Active";
   if (!before || !after || !("name" in before) || !("name" in after)) return "No details.";
@@ -132,6 +140,11 @@ function auditChanges(log: RecordAuditLog) {
 }
 function itemDescription(item: ItemAuditSnapshot) { return `${item.name}; ${itemGoal(item)}; step ${item.stepValue} ${item.unit}`; }
 function entryDescription(entry: EntryAuditSnapshot) { return `${entry.itemName}; ${entry.localDate} ${minute(entry.localMinute)}; ${entry.value}`; }
+function taskDescription(task: TaskAuditSnapshot) { return task.stepCount === undefined ? task.title : `${task.title}; ${task.stepCount} subtasks`; }
+function stepDescription(step: StepAuditSnapshot) { return `${step.taskTitle}; ${step.title}`; }
+function isEntrySnapshot(snapshot: NonNullable<RecordAuditLog["before"]>): snapshot is EntryAuditSnapshot { return "itemName" in snapshot; }
+function isTaskSnapshot(snapshot: NonNullable<RecordAuditLog["before"]>): snapshot is TaskAuditSnapshot { return "title" in snapshot && !("taskTitle" in snapshot) && !("name" in snapshot); }
+function isStepSnapshot(snapshot: NonNullable<RecordAuditLog["before"]>): snapshot is StepAuditSnapshot { return "taskTitle" in snapshot; }
 function itemGoal(item: ItemAuditSnapshot) { return item.goalValue === null ? "No target" : `Target ${item.goalValue} ${item.unit} / ${item.goalPeriod === "DAY" ? "day" : "week"}`; }
 function itemWindows(item: ItemAuditSnapshot) { return item.windows.map((window) => `${minute(window.startMinute)}-${minute(window.endMinute)}`).join(", ") || "None"; }
 function fieldChange(label: string, before: unknown, after: unknown) { return String(before) === String(after) ? null : `${label}: ${String(before)} to ${String(after)}`; }

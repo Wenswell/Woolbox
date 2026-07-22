@@ -11,6 +11,7 @@ import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
 import com.wswensw.template.record.model.MeasurementRange
+import com.wswensw.template.record.model.TodoTask
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +35,7 @@ data class RecordsUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
+    val tasks: List<TodoTask> = emptyList(),
     val goalValues: Map<Long, Double> = emptyMap(),
     val streaks: Map<Long, ItemStreak> = emptyMap(),
     val error: String? = null,
@@ -41,6 +43,8 @@ data class RecordsUiState(
 ) {
     fun findItem(id: Long): RecordItem? =
         activeItems.firstOrNull { it.id == id } ?: archivedItems.firstOrNull { it.id == id }
+
+    fun findTask(id: Long): TodoTask? = tasks.firstOrNull { it.id == id }
 }
 
 data class MeasurementDetailUiState(
@@ -80,13 +84,15 @@ class RecordsViewModel(
         },
         repository.latestEntries,
         repository.streaks,
-    ) { content, latestEntries, streaks ->
+        repository.tasks,
+    ) { content, latestEntries, streaks, tasks ->
         RecordsUiState(
             activeItems = content.activeItems,
             archivedItems = content.archivedItems,
             selectedDate = content.selectedDate,
             entries = content.entries,
             latestEntries = latestEntries,
+            tasks = tasks,
             goalValues = content.goalValues,
             streaks = streaks,
         )
@@ -198,6 +204,68 @@ class RecordsViewModel(
         }
     }
 
+    fun createTask(title: String, onResult: (taskId: Long?, error: String?) -> Unit) {
+        viewModelScope.launch {
+            runCatching {
+                val taskId = repository.createTask(title)
+                repository.refresh(selectedDate.value.toString())
+                taskId
+            }.fold(
+                onSuccess = { taskId -> onResult(taskId, null) },
+                onFailure = { error -> onResult(null, error.message ?: "Unable to create task.") },
+            )
+        }
+    }
+
+    fun updateTask(taskId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to update task.",
+    ) {
+        repository.updateTask(taskId, title)
+    }
+
+    fun setTaskCompleted(taskId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to update task.",
+    ) {
+        repository.setTaskCompleted(taskId, completed)
+    }
+
+    fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to delete task.",
+    ) {
+        repository.deleteTask(taskId)
+    }
+
+    fun createStep(taskId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to add subtask.",
+    ) {
+        repository.createStep(taskId, title)
+    }
+
+    fun updateStep(stepId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to update subtask.",
+    ) {
+        repository.updateStep(stepId, title)
+    }
+
+    fun setStepCompleted(stepId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to update subtask.",
+    ) {
+        repository.setStepCompleted(stepId, completed)
+    }
+
+    fun deleteStep(stepId: Long, onResult: (String?) -> Unit) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to delete subtask.",
+    ) {
+        repository.deleteStep(stepId)
+    }
+
     fun loadMeasurementEntries(itemId: Long, range: MeasurementRange) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -235,6 +303,29 @@ class RecordsViewModel(
         val detail = _measurementDetail.value
         if (detail.itemId == itemId) {
             loadMeasurementEntries(itemId, detail.range)
+        }
+    }
+
+    private fun runTaskAction(
+        onResult: (String?) -> Unit,
+        failureMessage: String,
+        action: suspend () -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                action()
+                repository.refresh(selectedDate.value.toString())
+            }.fold(
+                onSuccess = {
+                    error.value = null
+                    onResult(null)
+                },
+                onFailure = { failure ->
+                    val message = failure.message ?: failureMessage
+                    error.value = message
+                    onResult(message)
+                },
+            )
         }
     }
 

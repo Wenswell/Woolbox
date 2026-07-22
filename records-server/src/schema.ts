@@ -55,12 +55,39 @@ export const recordEntries = sqliteTable(
   ],
 );
 
+export const todoTasks = sqliteTable(
+  "todo_tasks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull(),
+    completedAt: integer("completed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [index("todo_tasks_created_at_index").on(table.createdAt)],
+);
+
+export const todoSteps = sqliteTable(
+  "todo_steps",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => todoTasks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    completedAt: integer("completed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [index("todo_steps_task_created_at_index").on(table.taskId, table.createdAt)],
+);
+
 export const recordAuditLogs = sqliteTable(
   "record_audit_logs",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     action: text("action").notNull(),
-    entityType: text("entity_type", { enum: ["ITEM", "ENTRY"] }).notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "TASK", "STEP"] }).notNull(),
     entityId: integer("entity_id").notNull(),
     beforeJson: text("before_json"),
     afterJson: text("after_json"),
