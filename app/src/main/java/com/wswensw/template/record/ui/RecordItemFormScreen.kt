@@ -364,7 +364,7 @@ fun RecordItemFormScreen(
                 onValueChange = { priority = it },
                 label = { Text("Priority") },
                 supportingText = { Text("Higher values appear first.") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 singleLine = true,
                 modifier = Modifier.formField(),
             )

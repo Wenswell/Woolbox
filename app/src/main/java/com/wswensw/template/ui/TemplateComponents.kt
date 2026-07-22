@@ -317,9 +317,9 @@ fun TemplateSection(
 fun TemplateListItem(
     title: String,
     subtitle: String,
+    modifier: Modifier = Modifier,
     @DrawableRes iconRes: Int? = null,
     leadingContent: (@Composable () -> Unit)? = null,
-    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
@@ -401,20 +401,21 @@ fun TemplateListLeadingIcon(
 fun TemplateAppIcon(
     bitmap: Bitmap?,
     @DrawableRes fallbackIconRes: Int,
+    modifier: Modifier = Modifier,
     contentDescription: String? = null,
-    modifier: Modifier = Modifier.size(40.dp),
 ) {
+    val iconModifier = modifier.size(40.dp)
     if (bitmap == null) {
         Icon(
             painter = painterResource(fallbackIconRes),
             contentDescription = contentDescription,
-            modifier = modifier,
+            modifier = iconModifier,
         )
     } else {
         Image(
             bitmap = remember(bitmap) { bitmap.asImageBitmap() },
             contentDescription = contentDescription,
-            modifier = modifier.clip(RoundedCornerShape(8.dp)),
+            modifier = iconModifier.clip(RoundedCornerShape(8.dp)),
         )
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -247,7 +249,13 @@ private fun ValueInput(
             onValueChange = onValueChange,
             label = { Text("Value") },
             suffix = { Text(item.unit) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Decimal,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { if (!saving) onConfirm() },
+            ),
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
