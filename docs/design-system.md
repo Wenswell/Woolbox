@@ -118,9 +118,9 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Foc
 
 Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 
-`Manage records` 使用标准路由骨架（返回 + 标题 + 顶栏 `New` + 列表内容）；列表卡同主页。空态复用 `RecordsStatusCard`。
+`Manage records` 使用标准路由骨架（返回 + 标题 + 顶栏加号图标 + 列表内容）；列表卡同主页。空态复用 `RecordsStatusCard`。
 
-记录项表单同标准路由骨架，顶栏 `Save`；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关 Switch；时间 TimePicker。编辑页锁定类型与单位。
+记录项表单同标准路由骨架，顶栏勾选保存图标；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关 Switch；时间 TimePicker。编辑页锁定类型与单位。
 
 `Goals` 空/错误态复用 `RecordsStatusCard`，分区标题与主页一致。
 

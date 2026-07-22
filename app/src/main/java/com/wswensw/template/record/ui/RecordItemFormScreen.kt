@@ -25,7 +25,9 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -155,11 +157,14 @@ fun RecordItemFormScreen(
         onBack = onBack,
         modifier = modifier,
         actions = {
-            TextButton(
+            FilledTonalIconButton(
                 onClick = ::submit,
                 enabled = !saving,
             ) {
-                Text(if (saving) "Saving" else "Save")
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = if (saving) "Saving" else "Save",
+                )
             }
         },
     ) {
