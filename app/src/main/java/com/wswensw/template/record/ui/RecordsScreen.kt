@@ -1,8 +1,6 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,10 +19,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,7 +28,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -183,122 +177,46 @@ private fun RecordsHeader(
     onGoals: () -> Unit,
     onManage: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Today",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = recordsDateLabel(date),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            FilledTonalIconButton(onClick = onGoals) {
-                Icon(
-                    imageVector = Icons.Outlined.Flag,
-                    contentDescription = "Goals",
-                )
-            }
-            Spacer(Modifier.width(4.dp))
-            FilledTonalIconButton(onClick = onManage) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_settings_24),
-                    contentDescription = "Manage records",
-                )
-            }
-        }
-
-        if (completion.total > 0) {
-            DayProgressBanner(completion = completion)
-        }
-    }
-}
-
-@Composable
-private fun DayProgressBanner(completion: FocusGoalCompletion) {
-    val progress by animateFloatAsState(
-        targetValue = completion.fraction,
-        animationSpec = spring(),
-        label = "DayGoalProgress",
-    )
-    val allDone = completion.done == completion.total
-    val container by animateColorAsState(
-        targetValue = if (allDone) {
-            MaterialTheme.colorScheme.tertiaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        },
-        label = "DayProgressContainer",
-    )
-    val content by animateColorAsState(
-        targetValue = if (allDone) {
-            MaterialTheme.colorScheme.onTertiaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        },
-        label = "DayProgressContent",
-    )
-    val barColor = if (allDone) {
-        MaterialTheme.colorScheme.tertiary
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = TemplateStyle.cardShape,
-        color = container,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Today",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = recordsDateLabel(date),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (completion.total > 0) {
                 Text(
                     text = dayStatusLabel(completion),
-                    modifier = Modifier.weight(1f),
-                    color = content,
-                    style = MaterialTheme.typography.titleSmall,
+                    color = if (completion.done >= completion.total) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
-                if (allDone) {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = barColor,
-                        modifier = Modifier.size(20.dp),
-                    )
-                } else {
-                    Text(
-                        text = "${(progress * 100).toInt()}%",
-                        color = content.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
             }
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
-                color = barColor,
-                trackColor = barColor.copy(alpha = 0.16f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
+        }
+        FilledTonalIconButton(onClick = onGoals) {
+            Icon(
+                imageVector = Icons.Outlined.Flag,
+                contentDescription = "Goals",
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        FilledTonalIconButton(onClick = onManage) {
+            Icon(
+                painter = painterResource(R.drawable.ic_settings_24),
+                contentDescription = "Manage records",
             )
         }
     }

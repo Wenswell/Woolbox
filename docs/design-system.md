@@ -19,7 +19,6 @@ TemplateTheme
    │     │     ├─ Global Copy entry
    │     │     └─ OLED shield entry
    │     ├─ Records
-   │     │  ├─ Day progress banner
    │     │  ├─ Focus goals
    │     │  ├─ Quick record cards
    │     │  └─ Record sheet
@@ -110,7 +109,7 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距。信息分区职责�
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| 标题 + 日进度横幅 | 日期导航；有目标时只在此汇总完成数/总数与总进度（`N of M goals done` / `All goals done`） |
+| 标题区 | 日期导航；有目标时在日期下用一行文案汇总完成数（`N of M goals done` / `All goals done`），无独立进度卡 |
 | `Focus` | 各项目标进度与达标态；横向卡宽约 `82%`、上限 `300dp` |
 | `Records` | 快速记账：首字符、名称、说明、今日累计；连击只在此展示 |
 | Sheet | 单次目标进度、今日流水、数值输入 |
