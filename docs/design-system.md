@@ -47,7 +47,7 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplateSurface` | 根页面 | `Scaffold` 处理 safe drawing 及底栏。 |
 | `TemplatePage` | Home、Setting | 标题、说明、纵向滚动内容和底部留白。 |
-| `TemplateRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线；输入法展开时将 IME 底部空间纳入滚动内容，焦点输入框与页面末尾控件可滚动到输入法上方。 |
+| `TemplateRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线；输入法展开时用 IME Insets 约束滚动视口，聚焦输入框自动滚动到输入法上方，页面末尾仍可手动滚动访问。 |
 | `TemplateLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
 | `ComposeOverlayWindow` | 跨应用工具 | 独立 Compose composition 与生命周期，不嵌入应用页面。 |
 

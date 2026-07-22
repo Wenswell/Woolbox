@@ -146,8 +146,8 @@ fun TemplateRouteScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(contentScrollState)
                 .imePadding()
+                .verticalScroll(contentScrollState)
                 .padding(bottom = TemplateStyle.spacing.pageBottom),
         ) {
             Spacer(Modifier.height(12.dp))
