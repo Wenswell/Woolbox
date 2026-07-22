@@ -43,17 +43,20 @@ class CopyHistoryViewModel(application: Application) : AndroidViewModel(applicat
         )
     val selectedHistory = mutableSelectedHistory.asStateFlow()
 
-    fun open(historyId: Long, onError: (String) -> Unit) {
+    fun open(historyId: Long, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             runCatching { repository.get(historyId) }
                 .onSuccess { entry ->
                     if (entry == null) {
-                        onError("Copy history entry no longer exists.")
+                        onResult("Copy history entry no longer exists.")
                     } else {
                         mutableSelectedHistory.value = entry
+                        onResult(null)
                     }
                 }
-                .onFailure { error -> onError(error.message ?: "Unable to open copy history.") }
+                .onFailure { error ->
+                    onResult(error.message ?: "Unable to open copy history.")
+                }
         }
     }
 

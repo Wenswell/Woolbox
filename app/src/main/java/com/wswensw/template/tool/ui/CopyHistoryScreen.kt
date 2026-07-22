@@ -2,13 +2,16 @@ package com.wswensw.template.tool.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,13 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import android.view.WindowManager
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.wswensw.template.R
 import com.wswensw.template.tool.model.CopyHistoryEntry
 import com.wswensw.template.tool.model.CopySessionScreen
@@ -42,17 +38,9 @@ import java.util.Locale
 @Composable
 fun CopyHistoryScreen(
     history: List<CopyHistorySummaryUi>,
-    selectedHistory: CopyHistoryEntry?,
     onBack: () -> Unit,
     onOpen: (Long) -> Unit,
-    onCloseEditor: () -> Unit,
-    onSave: (Long, CopySessionUiState, (String?) -> Unit) -> Unit,
-    onCopy: (String) -> Unit,
-    onDelete: (Long, (String?) -> Unit) -> Unit,
-    onError: (String) -> Unit,
 ) {
-    var pendingDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
-
     TemplateLazyRouteScaffold(
         title = "Copy history",
         onBack = onBack,
@@ -87,56 +75,97 @@ fun CopyHistoryScreen(
                     subtitleMaxLines = 2,
                     onClick = { onOpen(summary.id) },
                 )
-                // 40dp app icon leading: 16 + 40 + 16
                 TemplateDivider(start = 72.dp)
             }
         }
     }
+}
 
-    pendingDeleteId?.let { historyId ->
+@Composable
+fun CopyHistoryEditorScreen(
+    historyId: Long,
+    entry: CopyHistoryEntry?,
+    onLoad: (Long, (String?) -> Unit) -> Unit,
+    onClose: () -> Unit,
+    onSave: (Long, CopySessionUiState, (String?) -> Unit) -> Unit,
+    onCopy: (String) -> Unit,
+    onDelete: (Long, (String?) -> Unit) -> Unit,
+    onError: (String) -> Unit,
+) {
+    var loadError by rememberSaveable(historyId) { mutableStateOf<String?>(null) }
+    var pendingDelete by rememberSaveable(historyId) { mutableStateOf(false) }
+
+    LaunchedEffect(historyId) {
+        if (entry?.id != historyId) {
+            onLoad(historyId) { error ->
+                if (error != null) {
+                    loadError = error
+                    onError(error)
+                    onClose()
+                }
+            }
+        }
+    }
+
+    when {
+        loadError != null -> Unit
+        entry == null || entry.id != historyId -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        else -> {
+            CopyHistoryEditorContent(
+                entry = entry,
+                onClose = onClose,
+                onSave = onSave,
+                onCopy = onCopy,
+                onRequestDelete = { pendingDelete = true },
+                onError = onError,
+            )
+        }
+    }
+
+    if (pendingDelete) {
         AlertDialog(
-            onDismissRequest = { pendingDeleteId = null },
+            onDismissRequest = { pendingDelete = false },
             title = { Text("Delete copy history?") },
             text = { Text("This captured text and its saved edits will be removed.") },
             confirmButton = {
                 TextButton(
                     onClick = {
+                        pendingDelete = false
                         onDelete(historyId) { error ->
-                            if (error != null) onError(error)
+                            if (error != null) {
+                                onError(error)
+                            } else {
+                                onClose()
+                            }
                         }
-                        pendingDeleteId = null
                     },
                 ) {
                     Text("Delete")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeleteId = null }) {
+                TextButton(onClick = { pendingDelete = false }) {
                     Text("Cancel")
                 }
             },
         )
     }
-
-    selectedHistory?.let { entry ->
-        CopyHistoryEditorDialog(
-            entry = entry,
-            onDismiss = onCloseEditor,
-            onSave = onSave,
-            onCopy = onCopy,
-            onDelete = { pendingDeleteId = entry.id },
-            onError = onError,
-        )
-    }
 }
 
 @Composable
-private fun CopyHistoryEditorDialog(
+private fun CopyHistoryEditorContent(
     entry: CopyHistoryEntry,
-    onDismiss: () -> Unit,
+    onClose: () -> Unit,
     onSave: (Long, CopySessionUiState, (String?) -> Unit) -> Unit,
     onCopy: (String) -> Unit,
-    onDelete: () -> Unit,
+    onRequestDelete: () -> Unit,
     onError: (String) -> Unit,
 ) {
     var editorState by remember(entry.id, entry.session) { mutableStateOf(entry.session) }
@@ -148,56 +177,39 @@ private fun CopyHistoryEditorDialog(
         if (editorState.screen == CopySessionScreen.TEXT_SELECTION) {
             editorState = editorState.copy(screen = CopySessionScreen.EDITOR)
         } else {
-            onDismiss()
+            onClose()
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = false,
-            dismissOnClickOutside = false,
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
-    ) {
-        val dialogView = LocalView.current
-        SideEffect {
-            val window = (dialogView.parent as? DialogWindowProvider)?.window ?: return@SideEffect
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            // Deliver IME as WindowInsets so CopySessionPanel imePadding can shrink content.
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
-        }
-        CopySessionPanel(
-            state = editorState,
-            onToggle = { id -> editorState = editorState.toggleSelection(id) },
-            onToggleAll = { editorState = editorState.toggleAll() },
-            onCopy = { onCopy(editorState.currentDraftText.trim()) },
-            onOpenTextSelection = {
-                editorState = editorState.copy(screen = CopySessionScreen.TEXT_SELECTION)
-            },
-            onDraftChange = { text -> editorState = editorState.updateCurrentDraft(text) },
-            onReadingOrderChange = { enabled ->
-                editorState = editorState.copy(useReadingOrder = enabled)
-            },
-            onBack = { editorState = editorState.copy(screen = CopySessionScreen.EDITOR) },
-            onClose = onDismiss,
-            onSave = {
-                isSaving = true
-                onSave(entry.id, editorState) { error ->
-                    isSaving = false
-                    if (error == null) {
-                        savedState = editorState.persistedState()
-                    } else {
-                        onError(error)
-                    }
+    CopySessionPanel(
+        state = editorState,
+        onToggle = { id -> editorState = editorState.toggleSelection(id) },
+        onToggleAll = { editorState = editorState.toggleAll() },
+        onCopy = { onCopy(editorState.currentDraftText.trim()) },
+        onOpenTextSelection = {
+            editorState = editorState.copy(screen = CopySessionScreen.TEXT_SELECTION)
+        },
+        onDraftChange = { text -> editorState = editorState.updateCurrentDraft(text) },
+        onReadingOrderChange = { enabled ->
+            editorState = editorState.copy(useReadingOrder = enabled)
+        },
+        onBack = { editorState = editorState.copy(screen = CopySessionScreen.EDITOR) },
+        onClose = onClose,
+        onSave = {
+            isSaving = true
+            onSave(entry.id, editorState) { error ->
+                isSaving = false
+                if (error == null) {
+                    savedState = editorState.persistedState()
+                } else {
+                    onError(error)
                 }
-            },
-            saveEnabled = hasChanges && !isSaving,
-            onDelete = onDelete,
-            title = "Copy history",
-        )
-    }
+            }
+        },
+        saveEnabled = hasChanges && !isSaving,
+        onDelete = onRequestDelete,
+        title = "Copy history",
+    )
 }
 
 private fun historySubtitle(summary: CopyHistorySummaryUi): String {

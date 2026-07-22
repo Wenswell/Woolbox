@@ -30,7 +30,7 @@ TemplateTheme
    │  ├─ primary action
    │  ├─ accessibility state
    │  ├─ Tile request
-   │  └─ History entry ──> Copy history
+   │  └─ History entry ──> Copy history ──> History editor
    └─ OLED shield
       ├─ primary action
       ├─ accessibility state
@@ -148,7 +148,7 @@ Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四�
 
 `Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
-历史列表按时间倒序复用 `TemplateListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行打开编辑 Dialog（`decorFitsSystemWindows=false`，IME 以 WindowInsets 传递）；面板用 `safeDrawing` + `imePadding` 收缩，键盘展开时外圈垂直边距收为 `8dp`，底部 Copy 与文本区留在输入法上方。删除入口在编辑顶栏删除图标，确认 Dialog 后移除。编辑页保存图标仅在状态改变时可用；复用文本选择、阅读顺序、编辑和 Copy。
+历史列表按时间倒序复用 `TemplateListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行进入编辑路由（`global-copy/history/{id}`），与 Activity `adjustResize` 及面板 `safeDrawing`/`imePadding` 共用 IME 适配，不再使用全屏 Dialog。删除入口在编辑顶栏删除图标，确认 Dialog 后返回列表。编辑页保存图标仅在状态改变时可用；复用 `CopySessionPanel` 文本选择、阅读顺序、编辑和 Copy。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；关闭图标只关面板，隐藏图标关闭整个工具，保存图标写入配置（无障碍模式按应用，应用内模式为默认）。详情页默认配置保存同为纯图标。
 

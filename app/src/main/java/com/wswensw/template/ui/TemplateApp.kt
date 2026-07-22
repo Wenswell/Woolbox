@@ -70,6 +70,7 @@ import com.wswensw.template.tool.overlay.InAppOledShield
 import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
 import com.wswensw.template.tool.trigger.ToolTile
+import com.wswensw.template.tool.ui.CopyHistoryEditorScreen
 import com.wswensw.template.tool.ui.CopyHistoryScreen
 import com.wswensw.template.tool.ui.CopyHistoryViewModel
 import com.wswensw.template.tool.ui.ToolViewModel
@@ -233,17 +234,38 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 )
             }
             composable(TemplateRoutes.COPY_HISTORY) {
-                val context = LocalContext.current
                 CopyHistoryScreen(
                     history = copyHistory,
-                    selectedHistory = selectedCopyHistory,
                     onBack = { navController.popBackStack() },
                     onOpen = { historyId ->
-                        copyHistoryViewModel.open(historyId, context::showMessage)
+                        navController.navigate(TemplateRoutes.copyHistoryEdit(historyId))
                     },
-                    onCloseEditor = copyHistoryViewModel::closeEditor,
-                    onSave = { historyId, state, onResult ->
-                        copyHistoryViewModel.save(historyId, state) { error ->
+                )
+            }
+            composable(
+                route = TemplateRoutes.COPY_HISTORY_EDIT,
+                arguments = listOf(
+                    navArgument(TemplateRoutes.COPY_HISTORY_ID) { type = NavType.LongType },
+                ),
+            ) { entry ->
+                val context = LocalContext.current
+                val historyId = entry.arguments?.getLong(TemplateRoutes.COPY_HISTORY_ID)
+                    ?: return@composable
+                DisposableEffect(historyId) {
+                    onDispose { copyHistoryViewModel.closeEditor() }
+                }
+                CopyHistoryEditorScreen(
+                    historyId = historyId,
+                    entry = selectedCopyHistory?.takeIf { it.id == historyId },
+                    onLoad = { id, onResult ->
+                        copyHistoryViewModel.open(id, onResult)
+                    },
+                    onClose = {
+                        copyHistoryViewModel.closeEditor()
+                        navController.popBackStack()
+                    },
+                    onSave = { id, state, onResult ->
+                        copyHistoryViewModel.save(id, state) { error ->
                             if (error == null) context.showMessage("Copy history saved.")
                             onResult(error)
                         }
@@ -251,10 +273,13 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onCopy = { text ->
                         context.copyToClipboard(text)
                         copyHistoryViewModel.closeEditor()
+                        navController.popBackStack()
                     },
-                    onDelete = { historyId, onResult ->
-                        copyHistoryViewModel.delete(historyId) { error ->
-                            if (error == null) context.showMessage("Copy history deleted.")
+                    onDelete = { id, onResult ->
+                        copyHistoryViewModel.delete(id) { error ->
+                            if (error == null) {
+                                context.showMessage("Copy history deleted.")
+                            }
                             onResult(error)
                         }
                     },
@@ -517,7 +542,11 @@ private object TemplateRoutes {
     const val ROOT = "root"
     const val GLOBAL_COPY = "global-copy"
     const val COPY_HISTORY = "global-copy/history"
+    const val COPY_HISTORY_ID = "historyId"
+    const val COPY_HISTORY_EDIT = "global-copy/history/{$COPY_HISTORY_ID}"
     const val OLED_SHIELD = "oled-shield"
+
+    fun copyHistoryEdit(historyId: Long) = "global-copy/history/$historyId"
     const val RECORD_GOALS = "record-goals"
     const val MANAGE_RECORDS = "manage-records"
     const val RECORDS_CONNECTION = "records-connection"
