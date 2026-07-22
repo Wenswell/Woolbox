@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -47,6 +46,7 @@ import com.wswensw.template.record.model.RecordItemDraft
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
 import com.wswensw.template.ui.TemplateRouteScaffold
+import com.wswensw.template.ui.TemplateSection
 import com.wswensw.template.ui.TemplateStyle
 import java.util.Locale
 
@@ -125,170 +125,172 @@ fun RecordItemFormScreen(
         onBack = onBack,
         modifier = modifier,
     ) {
-        FormHeading("Details")
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Name") },
-            singleLine = true,
-            modifier = Modifier.formField(),
-        )
-        OutlinedTextField(
-            value = description,
-            onValueChange = { description = it },
-            label = { Text("Description") },
-            minLines = 2,
-            maxLines = 4,
-            modifier = Modifier.formField(),
-        )
+        TemplateSection(title = "Details") {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                singleLine = true,
+                modifier = Modifier.formField(),
+            )
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Description") },
+                minLines = 2,
+                maxLines = 4,
+                modifier = Modifier.formField(),
+            )
+        }
 
-        FormHeading("Measurement")
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
-            RecordValueType.entries.forEachIndexed { index, type ->
-                SegmentedButton(
-                    selected = valueType == type,
-                    onClick = {
-                        valueTypeName = type.name
-                        if (type == RecordValueType.NUMBER) {
-                            defaultValue = "1"
-                            unit = DEFAULT_NUMBER_UNIT
-                        } else {
-                            defaultValue = "30"
-                            unit = DEFAULT_DURATION_UNIT
-                        }
-                    },
-                    enabled = !measurementLocked,
-                    shape = SegmentedButtonDefaults.itemShape(index, RecordValueType.entries.size),
-                    label = { Text(if (type == RecordValueType.NUMBER) "Number" else "Duration") },
+        TemplateSection(title = "Measurement") {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
+                RecordValueType.entries.forEachIndexed { index, type ->
+                    SegmentedButton(
+                        selected = valueType == type,
+                        onClick = {
+                            valueTypeName = type.name
+                            if (type == RecordValueType.NUMBER) {
+                                defaultValue = "1"
+                                unit = DEFAULT_NUMBER_UNIT
+                            } else {
+                                defaultValue = "30"
+                                unit = DEFAULT_DURATION_UNIT
+                            }
+                        },
+                        enabled = !measurementLocked,
+                        shape = SegmentedButtonDefaults.itemShape(index, RecordValueType.entries.size),
+                        label = { Text(if (type == RecordValueType.NUMBER) "Number" else "Duration") },
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.formField(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedTextField(
+                    value = defaultValue,
+                    onValueChange = { defaultValue = it },
+                    label = { Text("Default") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = stepValue,
+                    onValueChange = { stepValue = it },
+                    label = { Text("Step") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
                 )
             }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = TemplateStyle.spacing.pageHorizontal),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedTextField(
-                value = defaultValue,
-                onValueChange = { defaultValue = it },
-                label = { Text("Default") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = stepValue,
-                onValueChange = { stepValue = it },
-                label = { Text("Step") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (valueType == RecordValueType.NUMBER) {
-            OutlinedTextField(
-                value = unit,
-                onValueChange = { unit = it },
-                enabled = !measurementLocked,
-                label = { Text("Unit") },
-                singleLine = true,
-                modifier = Modifier.formField(),
-            )
-        } else {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
-                DURATION_UNITS.forEachIndexed { index, option ->
-                    SegmentedButton(
-                        selected = unit == option,
-                        onClick = { unit = option },
-                        enabled = !measurementLocked,
-                        shape = SegmentedButtonDefaults.itemShape(index, DURATION_UNITS.size),
-                        label = { Text(option) },
-                    )
+            if (valueType == RecordValueType.NUMBER) {
+                OutlinedTextField(
+                    value = unit,
+                    onValueChange = { unit = it },
+                    enabled = !measurementLocked,
+                    label = { Text("Unit") },
+                    singleLine = true,
+                    modifier = Modifier.formField(),
+                )
+            } else {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
+                    DURATION_UNITS.forEachIndexed { index, option ->
+                        SegmentedButton(
+                            selected = unit == option,
+                            onClick = { unit = option },
+                            enabled = !measurementLocked,
+                            shape = SegmentedButtonDefaults.itemShape(index, DURATION_UNITS.size),
+                            label = { Text(option) },
+                        )
+                    }
                 }
             }
         }
 
-        FormHeading("Goal")
-        Row(
-            modifier = Modifier.formField(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Track a goal", style = MaterialTheme.typography.bodyLarge)
-            Switch(
-                checked = goalEnabled,
-                onCheckedChange = { goalEnabled = it },
-            )
-        }
-        if (goalEnabled) {
-            OutlinedTextField(
-                value = goalValue,
-                onValueChange = { goalValue = it },
-                label = { Text("Goal value") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.formField(),
-            )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
-                GoalPeriod.entries.forEachIndexed { index, period ->
-                    SegmentedButton(
-                        selected = goalPeriod == period,
-                        onClick = { goalPeriodName = period.name },
-                        shape = SegmentedButtonDefaults.itemShape(index, GoalPeriod.entries.size),
-                        label = { Text(if (period == GoalPeriod.DAY) "Day" else "Week") },
-                    )
-                }
-            }
-        }
-
-        FormHeading("Recommendation")
-        parsedWindows.forEachIndexed { index, window ->
+        TemplateSection(title = "Goal") {
             Row(
                 modifier = Modifier.formField(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                OutlinedButton(
-                    onClick = { timeEditTarget = TimeEditTarget(index, start = true) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(formatMinute(window.startMinute))
-                }
-                Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(
-                    onClick = { timeEditTarget = TimeEditTarget(index, start = false) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(formatMinute(window.endMinute))
-                }
-                IconButton(onClick = { windows = windows.toMutableList().also { it.removeAt(index) } }) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_close_24),
-                        contentDescription = "Remove suggested time",
-                    )
+                Text("Track a goal", style = MaterialTheme.typography.bodyLarge)
+                Switch(
+                    checked = goalEnabled,
+                    onCheckedChange = { goalEnabled = it },
+                )
+            }
+            if (goalEnabled) {
+                OutlinedTextField(
+                    value = goalValue,
+                    onValueChange = { goalValue = it },
+                    label = { Text("Goal value") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.formField(),
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
+                    GoalPeriod.entries.forEachIndexed { index, period ->
+                        SegmentedButton(
+                            selected = goalPeriod == period,
+                            onClick = { goalPeriodName = period.name },
+                            shape = SegmentedButtonDefaults.itemShape(index, GoalPeriod.entries.size),
+                            label = { Text(if (period == GoalPeriod.DAY) "Day" else "Week") },
+                        )
+                    }
                 }
             }
         }
-        OutlinedButton(
-            onClick = {
-                val start = parsedWindows.lastOrNull()?.endMinute ?: 9 * 60
-                val end = (start + 60) % (24 * 60)
-                windows = windows + "$start,$end"
-            },
-            modifier = Modifier.formField(),
-        ) {
-            Text("Add suggested time")
+
+        TemplateSection(title = "Recommendation") {
+            parsedWindows.forEachIndexed { index, window ->
+                Row(
+                    modifier = Modifier.formField(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { timeEditTarget = TimeEditTarget(index, start = true) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(formatMinute(window.startMinute))
+                    }
+                    Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(
+                        onClick = { timeEditTarget = TimeEditTarget(index, start = false) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(formatMinute(window.endMinute))
+                    }
+                    IconButton(onClick = { windows = windows.toMutableList().also { it.removeAt(index) } }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close_24),
+                            contentDescription = "Remove suggested time",
+                        )
+                    }
+                }
+            }
+            OutlinedButton(
+                onClick = {
+                    val start = parsedWindows.lastOrNull()?.endMinute ?: 9 * 60
+                    val end = (start + 60) % (24 * 60)
+                    windows = windows + "$start,$end"
+                },
+                modifier = Modifier.formField(),
+            ) {
+                Text("Add suggested time")
+            }
+            OutlinedTextField(
+                value = priority,
+                onValueChange = { priority = it },
+                label = { Text("Priority") },
+                supportingText = { Text("Higher values appear first.") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.formField(),
+            )
         }
-        OutlinedTextField(
-            value = priority,
-            onValueChange = { priority = it },
-            label = { Text("Priority") },
-            supportingText = { Text("Higher values appear first.") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            modifier = Modifier.formField(),
-        )
 
         errorMessage?.let { message ->
             Text(
@@ -352,23 +354,6 @@ fun RecordItemFormScreen(
     }
 }
 
-@Composable
-private fun FormHeading(text: String) {
-    Text(
-        text = text,
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = TemplateStyle.spacing.pageHorizontal,
-                end = TemplateStyle.spacing.pageHorizontal,
-                top = 12.dp,
-                bottom = 4.dp,
-            ),
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RecordTimePickerDialog(
@@ -399,7 +384,7 @@ private fun RecordTimePickerDialog(
 }
 
 private fun Modifier.formField(): Modifier =
-    fillMaxWidth().padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 6.dp)
+    fillMaxWidth().padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp)
 
 private fun decodeWindow(value: String): RecordWindow {
     val parts = value.split(',', limit = 2)
