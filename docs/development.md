@@ -87,7 +87,7 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化与正数校验、推荐排序、跨午夜时间段和十进制步进。 |
-| `RecordsScreenTest` | Records 页面项目首个文字、emoji、组合字符和空名称的前导展示规则。 |
+| `RecordsScreenTest` | Records 页面项目首个文字、emoji、组合字符和空名称的前导与标题裁剪规则。 |
 | `records-server/test/api.test.ts` | 空库迁移、服务端数据规则、审计快照、事务、筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志和记录项归档/恢复。 |
 
@@ -111,7 +111,7 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 凭据，创建记录项；点击项目行打开单阶段 Sheet，记录正数值后确认 Sheet 保持打开且新流水即时出现，Sheet 内逐条删除只移除该条远端流水；断网失败后 Sheet 内显示错误且服务端数据不变，恢复网络后重新记录成功。
+15. 配置 Records 凭据，创建记录项；点击项目行打开单阶段 Sheet，记录正数值后确认 Sheet 关闭且页面底部短时显示 `Undo`，点击后只删除刚创建的流水；确认 Sheet 的今日流水无删除按钮；断网失败后 Sheet 保持打开并显示错误，服务端数据不变，恢复网络后重新记录成功。
 16. 在 Home 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 17. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 18. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
@@ -155,6 +155,7 @@ adb exec-out uiautomator dump /dev/tty
 | Global Copy 没有会话 | 节点是否有效，或 `copy_history.db` 写入是否失败。 | 空快照直接结束；非空快照保存成功后才显示会话。 |
 | OLED 参数未恢复 | `profiles` 是否包含包名，profile 六个字段是否完整。 | 应用 profile 不存在时读取当前默认值。 |
 | 打开 Template 后覆盖层关闭 | 本应用是否成为活动或焦点 `TYPE_APPLICATION` 窗口。 | 这是产品关闭规则；仅覆盖层事件不能触发关闭。 |
+| Records 返回 `iconKey is invalid` | 运行中的服务端是否仍为删除固定图标前的版本。 | 部署当前 `records-server` 并执行 `0003_drop_record_item_icons.sql`；客户端不恢复旧字段。 |
 
 ## 参考旧应用
 

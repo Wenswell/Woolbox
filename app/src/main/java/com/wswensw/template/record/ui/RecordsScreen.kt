@@ -145,7 +145,7 @@ private fun RecordItemRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = item.name,
+                    text = dropFirstRecordCharacter(item.name),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

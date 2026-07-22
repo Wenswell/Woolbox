@@ -103,9 +103,9 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页面使用 `LazyColumn`，顶部不显示页面标题和描述，只保留右上角 `Manage` 图标按钮；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则以项目为中心列出活跃项（按优先级降序、名称升序）。每行前导显示项目名称首个 Unicode 字符（支持文字、单码点 emoji 和组合字符），标题行显示完整项目名与今日累计 `值 单位`；有目标的项目在标题行下方渲染线性进度条与 `累计 / 目标 单位 · today|this week`，日目标累计当天值，周目标累计周一至周日值。整行点击打开项目专属 Sheet。根 `Scaffold` 不再显示 FAB。
+Records 根页面使用 `LazyColumn`，顶部不显示页面标题和描述，只保留右上角 `Manage` 图标按钮；未配置凭据或远端读取失败时显示错误与 `Configure connection`/`Retry` 主操作，没有活跃记录项时显示 `Create record item`，否则以项目为中心列出活跃项（按优先级降序、名称升序）。每行前导显示项目名称首个 Unicode 字符（支持文字、单码点 emoji 和组合字符），标题行显示去掉该字符后的名称与今日累计 `值 单位`；有目标的项目在标题行下方渲染线性进度条与 `累计 / 目标 单位 · today|this week`，日目标累计当天值，周目标累计周一至周日值。整行点击打开项目专属 Sheet。根 `Scaffold` 不再显示 FAB。
 
-点击项目行打开该项目专属单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。Sheet 直接显示项目名、说明与目标进度（线性进度条与累计/目标文案）；`Today` 列出今日该项目流水，每行显示时刻与数值，右侧删除图标即时删除并刷新。数值输入预填默认值，单位作为后缀，步进提示与减号/加号图标按钮，底部全宽确认按钮；确认后 Sheet 保持打开，新流水即时出现在列表顶部，输入框重置为默认值。错误在 Sheet 内显示，无全局 Snackbar。
+点击项目行打开该项目专属单个 `ModalBottomSheet`，不叠加第二个 Sheet 或 Dialog。Sheet 直接显示项目名、说明与目标进度（线性进度条与累计/目标文案）；`Today` 列出今日该项目流水，每行只显示时刻与数值。数值输入预填默认值，单位作为后缀，步进提示与减号/加号图标按钮，底部全宽确认按钮；确认成功后关闭 Sheet，根页面显示短时 `Snackbar`，仅提供 `Undo` 删除刚创建的流水。错误在 Sheet 内显示，失败时不关闭 Sheet。
 
 `Manage records` 使用独立路由，顶部 `New` 动作创建记录项，`Active` 分组中的行进入编辑并显示已配置目标。记录项表单按 Details、Measurement、Goal、Recommendation 分段；类型、时长单位和目标周期使用 segmented control，目标开关使用 Switch，时间使用 TimePicker，增删时间段使用明确按钮。已有流水时类型与单位控件禁用。
 

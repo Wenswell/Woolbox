@@ -23,4 +23,24 @@ class RecordsScreenTest {
     fun firstRecordCharacterHandlesEmptyName() {
         assertEquals("", firstRecordCharacter(""))
     }
+
+    @Test
+    fun dropFirstRecordCharacterRemovesTextCharacter() {
+        assertEquals("读", dropFirstRecordCharacter("阅读"))
+    }
+
+    @Test
+    fun dropFirstRecordCharacterRemovesEmojiCharacter() {
+        assertEquals(" Water", dropFirstRecordCharacter("💧 Water"))
+    }
+
+    @Test
+    fun dropFirstRecordCharacterRemovesCombiningCharacterSequence() {
+        assertEquals(" Accent", dropFirstRecordCharacter("e\u0301 Accent"))
+    }
+
+    @Test
+    fun dropFirstRecordCharacterHandlesEmptyName() {
+        assertEquals("", dropFirstRecordCharacter(""))
+    }
 }

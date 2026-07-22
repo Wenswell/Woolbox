@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -28,6 +32,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -60,9 +65,10 @@ import com.wswensw.template.tool.overlay.InAppOledShield
 import com.wswensw.template.tool.trigger.TileRequestManager
 import com.wswensw.template.tool.trigger.TileRequestResult
 import com.wswensw.template.tool.trigger.ToolTile
-import com.wswensw.template.tool.ui.ToolViewModel
 import com.wswensw.template.tool.ui.CopyHistoryScreen
 import com.wswensw.template.tool.ui.CopyHistoryViewModel
+import com.wswensw.template.tool.ui.ToolViewModel
+import kotlinx.coroutines.launch
 
 private enum class MainTab(
     val labelRes: Int,
@@ -92,6 +98,8 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -138,6 +146,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             },
                         )
                     },
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
                 ) { innerPadding: PaddingValues ->
                     AnimatedContent(
                         targetState = selectedTab,
@@ -352,12 +361,22 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         entries = recordsState.entries.filter { it.itemId == itemId },
                         onDismiss = { recordSheetItemId = null },
                         onRecord = { recordedItem, value, onResult ->
-                            recordsViewModel.createEntry(recordedItem.id, value) { _, error ->
+                            recordsViewModel.createEntry(recordedItem.id, value) { entryId, error ->
                                 onResult(error)
+                                if (entryId != null) {
+                                    recordSheetItemId = null
+                                    coroutineScope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Recorded ${recordedItem.name}.",
+                                            actionLabel = "Undo",
+                                            duration = SnackbarDuration.Short,
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            recordsViewModel.deleteEntry(entryId)
+                                        }
+                                    }
+                                }
                             }
-                        },
-                        onDeleteEntry = { entryId ->
-                            recordsViewModel.deleteEntry(entryId)
                         },
                     )
                 }

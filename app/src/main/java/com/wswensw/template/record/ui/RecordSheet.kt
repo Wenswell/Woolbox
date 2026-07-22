@@ -48,7 +48,6 @@ fun RecordSheet(
     entries: List<RecordEntry>,
     onDismiss: () -> Unit,
     onRecord: (RecordItem, Double, (String?) -> Unit) -> Unit,
-    onDeleteEntry: (Long) -> Unit,
 ) {
     var valueText by rememberSaveable(item.id) {
         mutableStateOf(item.defaultValue?.let(::formatValue).orEmpty())
@@ -97,7 +96,7 @@ fun RecordSheet(
                 Spacer(Modifier.height(4.dp))
                 LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                     items(entries, key = { it.id }) { entry ->
-                        EntryRow(entry = entry, onDelete = { onDeleteEntry(entry.id) })
+                        EntryRow(entry = entry)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -147,7 +146,7 @@ private fun GoalProgress(item: RecordItem, cumulative: Double, goal: Double) {
 }
 
 @Composable
-private fun EntryRow(entry: RecordEntry, onDelete: () -> Unit) {
+private fun EntryRow(entry: RecordEntry) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -168,12 +167,6 @@ private fun EntryRow(entry: RecordEntry, onDelete: () -> Unit) {
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onDelete) {
-            Icon(
-                painter = painterResource(R.drawable.ic_delete_24),
-                contentDescription = "Delete entry",
-            )
-        }
     }
 }
 
