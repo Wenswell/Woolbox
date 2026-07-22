@@ -45,7 +45,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 组合今天流水和记录项状态，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。 |
+| `RecordsViewModel` / `RecordRepository` | 组合今天流水、目标累计与项目日连击，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。刷新时单次拉取含今天共 90 天 entries，派生今日列表、周目标累计与连击。 |
 
 ## 命令状态机
 

@@ -11,7 +11,10 @@ import com.wswensw.template.record.model.RecordItemDraft
 import com.wswensw.template.record.model.RecordValidationException
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.record.model.RecordWindow
+import com.wswensw.template.record.model.ItemStreak
+import com.wswensw.template.record.model.STREAK_LOOKBACK_DAYS
 import com.wswensw.template.record.model.goalValues
+import com.wswensw.template.record.model.itemStreaks
 import com.wswensw.template.record.model.validated
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
@@ -49,37 +52,41 @@ class RecordRepository(context: Context) {
     private val _archivedItems = MutableStateFlow<List<RecordItem>>(emptyList())
     private val _entries = MutableStateFlow<List<RecordEntry>>(emptyList())
     private val _goalValues = MutableStateFlow<Map<Long, Double>>(emptyMap())
+    private val _streaks = MutableStateFlow<Map<Long, ItemStreak>>(emptyMap())
     private val _connection = MutableStateFlow(credentialStore.connection())
 
     val activeItems: StateFlow<List<RecordItem>> = _activeItems
     val archivedItems: StateFlow<List<RecordItem>> = _archivedItems
     val entries: StateFlow<List<RecordEntry>> = _entries
     val goalValues: StateFlow<Map<Long, Double>> = _goalValues
+    val streaks: StateFlow<Map<Long, ItemStreak>> = _streaks
     val connection: StateFlow<RecordsConnection> = _connection
 
     suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
         val active = request("GET", "items", query = mapOf("archived" to "false"))
         val archived = request("GET", "items", query = mapOf("archived" to "true"))
-        val entries = request(
+        val date = LocalDate.parse(localDate)
+        val lookbackStart = date.minusDays((STREAK_LOOKBACK_DAYS - 1).toLong()).toString()
+        val range = request(
             "GET",
             "entries",
-            query = mapOf("startDate" to localDate, "endDate" to localDate),
+            query = mapOf("startDate" to lookbackStart, "endDate" to localDate),
         )
         val activeItems = active.getJSONArray("items").mapObjects(::parseItem)
-        val todayEntries = entries.getJSONArray("entries").mapObjects(::parseEntry)
-        val date = LocalDate.parse(localDate)
-        val weekEntries = if (activeItems.any { it.goalPeriod == GoalPeriod.WEEK && it.goalValue != null }) {
-            val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
-            val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
-            request("GET", "entries", query = mapOf("startDate" to weekStart, "endDate" to weekEnd))
-                .getJSONArray("entries").mapObjects(::parseEntry)
-        } else {
-            emptyList()
-        }
+        val rangeEntries = range.getJSONArray("entries").mapObjects(::parseEntry)
+        val todayEntries = rangeEntries.filter { it.localDate == localDate }
+        val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
+        val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
+        val weekEntries = rangeEntries.filter { it.localDate in weekStart..weekEnd }
         _activeItems.value = activeItems
         _archivedItems.value = archived.getJSONArray("items").mapObjects(::parseItem)
         _entries.value = todayEntries
         _goalValues.value = goalValues(activeItems, date, todayEntries, weekEntries)
+        _streaks.value = itemStreaks(
+            itemIds = activeItems.map(RecordItem::id),
+            entries = rangeEntries,
+            today = date,
+        )
     }
 
     suspend fun saveItem(itemId: Long?, input: RecordItemDraft): Long = withContext(Dispatchers.IO) {

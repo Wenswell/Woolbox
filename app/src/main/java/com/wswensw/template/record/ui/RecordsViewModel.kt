@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.wswensw.template.record.data.RecordRepository
+import com.wswensw.template.record.model.ItemStreak
 import com.wswensw.template.record.data.RecordsConnection
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
@@ -17,6 +18,14 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+private data class RecordsContent(
+    val activeItems: List<RecordItem>,
+    val archivedItems: List<RecordItem>,
+    val selectedDate: LocalDate,
+    val entries: List<RecordEntry>,
+    val goalValues: Map<Long, Double>,
+)
+
 data class RecordsUiState(
     val isLoading: Boolean = true,
     val activeItems: List<RecordItem> = emptyList(),
@@ -24,6 +33,7 @@ data class RecordsUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
     val goalValues: Map<Long, Double> = emptyMap(),
+    val streaks: Map<Long, ItemStreak> = emptyMap(),
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
@@ -40,18 +50,30 @@ class RecordsViewModel(
     private val isLoading = MutableStateFlow(true)
 
     private val contentState = combine(
-        repository.activeItems,
-        repository.archivedItems,
-        selectedDate,
-        selectedEntries,
-        repository.goalValues,
-    ) { activeItems, archivedItems, date, entries, goalValues ->
+        combine(
+            repository.activeItems,
+            repository.archivedItems,
+            selectedDate,
+            selectedEntries,
+            repository.goalValues,
+        ) { activeItems, archivedItems, date, entries, goalValues ->
+            RecordsContent(
+                activeItems = activeItems,
+                archivedItems = archivedItems,
+                selectedDate = date,
+                entries = entries,
+                goalValues = goalValues,
+            )
+        },
+        repository.streaks,
+    ) { content, streaks ->
         RecordsUiState(
-            activeItems = activeItems,
-            archivedItems = archivedItems,
-            selectedDate = date,
-            entries = entries,
-            goalValues = goalValues,
+            activeItems = content.activeItems,
+            archivedItems = content.archivedItems,
+            selectedDate = content.selectedDate,
+            entries = content.entries,
+            goalValues = content.goalValues,
+            streaks = streaks,
         )
     }
 

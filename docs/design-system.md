@@ -110,7 +110,7 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距。顶部标题区显�
 
 项目色由名称首字符稳定映射到 6 档 Material 角色，在头像、目标卡、今日数值和 Sheet 进度中共用。日目标用圆形进度勋章（达标时略放大并显示完成勾），周目标用 `10dp` 横向进度与 `this week` 文案。未完成目标卡用项目 `container`；达标后改为 `tertiaryContainer`，状态以完成图标与 `Goal reached` 胶囊同时表达。独立 `Goals` 路由按 `Daily`、`Weekly` 分组。
 
-快速记录卡：未记录用 `surfaceContainerLow`；今日已记用项目 `container`；目标达标用 `tertiaryContainer`。有目标时前导为迷你进度环 + 首字符；达标时显示完成勾与尾部 `Done`。副文案优先 `Goal reached`，否则描述、`Logged today` 或 `Tap to log`。焦点目标、目标列表与快速卡整块点击打开 Sheet。根 `Scaffold` 不显示 FAB。
+快速记录卡：未记录用 `surfaceContainerLow`；今日已记用项目 `container`；目标达标用 `tertiaryContainer`。有目标时前导为迷你进度环 + 首字符；达标时显示完成勾与尾部 `Done`。副文案优先 `Goal reached`，否则描述、`Logged today` 或 `Tap to log`。Focus 与快速卡在 current≥1 时显示火焰图标与连击文案（`N day(s)`，best 更大时附 `· best M`）。焦点目标、目标列表与快速卡整块点击打开 Sheet。根 `Scaffold` 不显示 FAB。
 
 点击项目打开单个 `ModalBottomSheet`。Sheet 标题用首字符图标与裁剪名称；目标信息只在 `GoalProgressPanel` 展示一次。确认成功后关闭 Sheet：若本次记录使该项目从「未达标」跨到「达标」，触感用 `LongPress`，Snackbar 为 `Goal reached · 名称`；否则触感 `Confirm`，Snackbar 为 `Recorded 名称.`。Snackbar 均提供短时 `Undo`。错误留在 Sheet 内。
 

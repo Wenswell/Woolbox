@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,6 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.R
 import com.wswensw.template.record.model.GoalPeriod
+import com.wswensw.template.record.model.ItemStreak
+import com.wswensw.template.record.model.streakLabel
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.ui.TemplateStyle
@@ -128,6 +131,7 @@ fun RecordsScreen(
                         FocusGoalsRow(
                             goals = focusGoals,
                             values = state.goalValues,
+                            streaks = state.streaks,
                             onRecordItem = onRecordItem,
                         )
                     }
@@ -141,6 +145,7 @@ fun RecordsScreen(
                         item = item,
                         todayValue = todayValues[item.id] ?: 0.0,
                         goalCumulative = state.goalValues[item.id],
+                        streak = state.streaks[item.id],
                         onClick = { onRecordItem(item) },
                     )
                 }
@@ -153,6 +158,7 @@ fun RecordsScreen(
 private fun FocusGoalsRow(
     goals: List<RecordItem>,
     values: Map<Long, Double>,
+    streaks: Map<Long, ItemStreak>,
     onRecordItem: (RecordItem) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -166,6 +172,7 @@ private fun FocusGoalsRow(
                 GoalCard(
                     item = goal,
                     cumulative = values[goal.id] ?: 0.0,
+                    streak = streaks[goal.id],
                     featured = true,
                     onClick = { onRecordItem(goal) },
                     modifier = Modifier
@@ -339,6 +346,7 @@ private fun QuickRecordCard(
     item: RecordItem,
     todayValue: Double,
     goalCumulative: Double?,
+    streak: ItemStreak?,
     onClick: () -> Unit,
 ) {
     val colors = recordItemColors(item.name)
@@ -417,12 +425,34 @@ private fun QuickRecordCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = if (goalReached) "Done" else "Today",
-                    color = if (goalReached) valueColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                )
+                val streakText = streak?.let(::streakLabel)
+                if (streakText != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = valueColor,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = streakText,
+                            color = valueColor,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = if (goalReached) "Done" else "Today",
+                        color = if (goalReached) valueColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

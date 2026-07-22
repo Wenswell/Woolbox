@@ -85,6 +85,7 @@ fun GoalsScreen(
                         GoalCard(
                             item = item,
                             cumulative = state.goalValues[item.id] ?: 0.0,
+                            streak = state.streaks[item.id],
                             featured = false,
                             onClick = { onRecordItem(item) },
                             modifier = Modifier
@@ -99,6 +100,7 @@ fun GoalsScreen(
                         GoalCard(
                             item = item,
                             cumulative = state.goalValues[item.id] ?: 0.0,
+                            streak = state.streaks[item.id],
                             featured = false,
                             onClick = { onRecordItem(item) },
                             modifier = Modifier
