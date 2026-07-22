@@ -57,6 +57,7 @@ fun HomeScreen(
                 title = "Global Copy",
                 subtitle = state.globalCopyStatus(),
                 iconRes = R.drawable.ic_content_copy_24,
+                navigate = true,
                 onClick = onOpenGlobalCopy,
             )
             TemplateDivider()
@@ -64,6 +65,7 @@ fun HomeScreen(
                 title = "OLED shield",
                 subtitle = state.oledStatus(),
                 iconRes = R.drawable.ic_oled_shield_24,
+                navigate = true,
                 onClick = onOpenOledShield,
             )
         }

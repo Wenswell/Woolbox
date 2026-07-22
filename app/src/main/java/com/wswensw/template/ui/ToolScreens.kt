@@ -108,6 +108,7 @@ fun GlobalCopyRoute(
                 leadingContent = {
                     TemplateListLeadingIcon(imageVector = Icons.Outlined.History)
                 },
+                navigate = true,
                 onClick = onOpenHistory,
             )
         }

@@ -60,6 +60,11 @@ fun RecordSheet(
     }
     var saving by rememberSaveable { mutableStateOf(false) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    val parsedValue = valueText.trim().toDoubleOrNull()
+    val canConfirm = !saving &&
+        parsedValue != null &&
+        parsedValue.isFinite() &&
+        parsedValue > 0
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -77,8 +82,12 @@ fun RecordSheet(
                 item = item,
                 valueText = valueText,
                 saving = saving,
+                canConfirm = canConfirm,
                 errorMessage = errorMessage,
-                onValueChange = { valueText = it },
+                onValueChange = {
+                    valueText = it
+                    errorMessage = null
+                },
                 onConfirm = {
                     val value = valueText.trim().toDoubleOrNull()
                     if (value == null || !value.isFinite() || value <= 0) {
@@ -227,16 +236,19 @@ private fun ValueInput(
     item: RecordItem,
     valueText: String,
     saving: Boolean,
+    canConfirm: Boolean,
     errorMessage: String?,
     onValueChange: (String) -> Unit,
     onConfirm: () -> Unit,
 ) {
+    val editable = !saving
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         FilledTonalIconButton(
+            enabled = editable,
             onClick = { onValueChange(stepRecordValue(valueText, item.stepValue, -1)) },
         ) {
             Icon(
@@ -247,6 +259,8 @@ private fun ValueInput(
         OutlinedTextField(
             value = valueText,
             onValueChange = onValueChange,
+            enabled = editable,
+            isError = errorMessage != null,
             label = { Text("Value") },
             suffix = { Text(item.unit) },
             keyboardOptions = KeyboardOptions(
@@ -254,12 +268,13 @@ private fun ValueInput(
                 imeAction = ImeAction.Done,
             ),
             keyboardActions = KeyboardActions(
-                onDone = { if (!saving) onConfirm() },
+                onDone = { if (canConfirm) onConfirm() },
             ),
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
         FilledTonalIconButton(
+            enabled = editable,
             onClick = { onValueChange(stepRecordValue(valueText, item.stepValue, 1)) },
         ) {
             Icon(
@@ -288,7 +303,7 @@ private fun ValueInput(
     Spacer(Modifier.height(16.dp))
     Button(
         onClick = onConfirm,
-        enabled = !saving,
+        enabled = canConfirm,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp),

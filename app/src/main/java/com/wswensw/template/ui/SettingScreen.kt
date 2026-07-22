@@ -46,6 +46,7 @@ fun SettingScreen(
                 leadingContent = {
                     TemplateListLeadingIcon(imageVector = Icons.Outlined.Link)
                 },
+                navigate = true,
                 onClick = onOpenRecordsConnection,
             )
         }

@@ -59,9 +59,9 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplatePageHeader` | 根页面标题与说明 | 标题 `headlineMedium` SemiBold，说明 `bodyMedium`；标题最多两行；右侧只放页面级动作。 |
 | `TemplateSection` | 设置/表单分组 | 仅分组标题 + 内容，无外框卡片。 |
-| `TemplateListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`；图标优先语义化 Material icon（`TemplateListLeadingIcon`，primary 色），可用 `iconRes`；有动作时整行可点击。 |
+| `TemplateListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`；图标 24dp，优先语义化 Material icon（`TemplateListLeadingIcon`，primary 色），可用 `iconRes`；有动作时整行可点击并声明 `Role.Button`；`navigate=true` 时 trailing chevron 表示进入下级；禁用时标题/图标 0.38 透明，副文案保持可读。 |
 | `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
-| `TemplateDivider` | 同组列表项分隔 | 从卡片左侧 `16dp` 开始，不贴容器边缘。 |
+| `TemplateDivider` | 同组列表项分隔 | 从左侧 `56dp` 起划，对齐列表文字列，不切 leading icon。 |
 | `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
 | `TemplateInfoDialog` | 简短说明 | 只承载当前任务需要的信息和关闭动作。 |
 
@@ -76,14 +76,15 @@ TemplateTheme
 | 页面底部留白 | `96dp` |
 | 内容块间距 | `16dp` |
 | 列表行最小高度 | `56dp` |
-| 设置分组圆角 | `16dp` |
+| 列表分隔线 inset | 从左侧 `56dp`（对齐 leading 后文字列） |
+| 内容卡片圆角（`cardShape`） | `16dp` |
 | OLED 控制面板圆角 | `12dp` |
 | OLED 控制面板最大宽度 | `360dp` |
 | Global Copy 面板外边距 | 水平 `12dp`、垂直 `32dp` |
 | Global Copy 面板圆角 | `16dp` |
 
 - 页面背景使用 `surface`。
-- 设置/表单分组仅用标题分区，无外框。
+- 设置/表单分组仅用标题分区，无外框；圆角仅用于内容卡（Records 项目卡、空态/流水中性块）与菜单。
 - OLED 控制面板使用 `surfaceContainerHigh` 和 `8dp` 阴影。
 - 分组标题使用 `primary`；正文使用 `onSurface`，说明和次要状态使用 `onSurfaceVariant`。
 - 应用主题支持 `Follow system`、`Light`、`Dark`；覆盖层关闭动态色，保证跨应用显示稳定。
@@ -116,15 +117,15 @@ Records 根页面使用 `LazyColumn` 与 `16dp` 块间距，**单列表**无 Foc
 
 项目色由名称**首个 Unicode 字符**的 hash 稳定映射到 3 档色相（primary / secondary / tertiary 的 container），同名同色，非随机；禁止 `surfaceContainer*` 灰底。日目标环支持超过 100% 的叠圈：第一圈完成后以半透明铺满，当前圈以实色从顶点再扫；百分比文案不封顶。列表与管理卡统一用项目 `container` 色底（不用灰底）；达标 `tertiaryContainer`；中性块（空态、连接、Sheet 流水）用 `surface` + `outlineVariant` 描边；表单 `TemplateSection` 无外框。有目标前导进度环，无目标首字符；连击 `current≥1` 时火焰 + `N day(s)`（可附 `best`）。`Goals` 仍按 `Daily`/`Weekly` 全宽目标卡。
 
-Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。数值键盘使用 `Done` 提交当前值。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
+Sheet：日目标以进度环作标题前导，右侧为名称、说明与数值/状态（不再单独放第二套图标标题）；周目标前导为首字符，进度条在文案下。数值须为正数才可 `Record`/`Done`；保存中禁用步进与输入。确认成功：首次达标 `LongPress` + `Goal reached · 名称`，否则 `Confirm` + `Recorded 名称.`，均短时 `Undo`。错误留在 Sheet。
 
 `Manage records` 使用标准路由骨架（返回 + 标题 + 顶栏加号图标 + 列表内容）；列表卡同主页。空态复用 `RecordsStatusCard`。
 
-记录项表单同标准路由骨架，顶栏勾选保存图标；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关 Switch；时间 TimePicker。编辑页锁定类型与单位。
+记录项表单同标准路由骨架，顶栏勾选保存图标（合法且未保存中才可用）；内容按 Details、Measurement、Goal、Recommendation 分段（无分组外框）。名称非空时顶部预览卡同步主页身份色。类型、时长单位和目标周期用 segmented control；目标开关整行 `toggleable`；字段错误用 `isError`/`supportingText`；Priority 数字键盘；保存中禁用编辑控件；时间 TimePicker。编辑页锁定类型与单位。
 
 `Goals` 空/错误态复用 `RecordsStatusCard`，分区标题与主页一致。
 
-`Records connection` 无分组外框：分区标题 + 明文服务地址 + 凭据输入 + 全宽连接按钮；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交；保存成功后返回。
+`Records connection` 使用 `TemplateSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
 PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期范围和记录项筛选、可选择表格与批量删除，不提供编辑入口；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复；Logs 使用只读表格显示操作时间、对象、动作和变更摘要，并可加载更早日志。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
 

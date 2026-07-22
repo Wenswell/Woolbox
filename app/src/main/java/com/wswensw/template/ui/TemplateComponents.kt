@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
@@ -321,6 +323,7 @@ fun TemplateListItem(
     @DrawableRes iconRes: Int? = null,
     leadingContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    navigate: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -337,16 +340,30 @@ fun TemplateListItem(
                 enabled = enabled,
                 interactionSource = interactionSource,
                 indication = androidx.compose.material3.ripple(),
+                role = Role.Button,
                 onClick = onClick,
             )
     }
 
-    val contentAlpha = if (enabled) 1f else 0.38f
+    // Keep supporting text readable when disabled so guidance remains usable.
+    val titleAlpha = if (enabled) 1f else 0.38f
+    val subtitleAlpha = 1f
+    val trailingContent = trailing ?: if (navigate) {
+        {
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = titleAlpha),
+            )
+        }
+    } else {
+        null
+    }
     ListItem(
         headlineContent = {
             Text(
                 text = title,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = titleAlpha),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -356,7 +373,7 @@ fun TemplateListItem(
         supportingContent = {
             Text(
                 text = subtitle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = subtitleAlpha),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -367,16 +384,17 @@ fun TemplateListItem(
                 Icon(
                     painter = painterResource(resource),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = titleAlpha),
+                    modifier = Modifier.size(24.dp),
                 )
             }
         },
-        trailingContent = trailing,
+        trailingContent = trailingContent,
         modifier = rowModifier,
         colors = ListItemDefaults.colors(
             containerColor = Color.Transparent,
-            leadingIconColor = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
-            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+            leadingIconColor = MaterialTheme.colorScheme.primary.copy(alpha = titleAlpha),
+            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = titleAlpha),
         ),
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
@@ -447,7 +465,8 @@ fun TemplatePrimaryAction(
 fun TemplateDivider() {
     HorizontalDivider(
         color = MaterialTheme.colorScheme.outlineVariant,
-        modifier = Modifier.padding(start = TemplateStyle.spacing.pageHorizontal),
+        // Align with list text after leading icon column (16 + 24 + 16).
+        modifier = Modifier.padding(start = 56.dp),
     )
 }
 

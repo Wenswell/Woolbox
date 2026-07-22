@@ -1,6 +1,7 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -121,32 +123,88 @@ fun RecordItemFormScreen(
     }
     var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var nameError by rememberSaveable { mutableStateOf<String?>(null) }
+    var defaultError by rememberSaveable { mutableStateOf<String?>(null) }
+    var stepError by rememberSaveable { mutableStateOf<String?>(null) }
+    var unitError by rememberSaveable { mutableStateOf<String?>(null) }
+    var goalError by rememberSaveable { mutableStateOf<String?>(null) }
+    var priorityError by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
 
     val valueType = RecordValueType.valueOf(valueTypeName)
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
     val parsedWindows = windows.map(::decodeWindow)
 
+    fun clearFieldErrors() {
+        nameError = null
+        defaultError = null
+        stepError = null
+        unitError = null
+        goalError = null
+        priorityError = null
+    }
+
+    fun validateFields(): Boolean {
+        clearFieldErrors()
+        var valid = true
+        if (name.isBlank()) {
+            nameError = "Name is required."
+            valid = false
+        }
+        if (unit.isBlank()) {
+            unitError = "Unit is required."
+            valid = false
+        }
+        runCatching { parseOptionalPositive(defaultValue, "Default value") }
+            .onFailure {
+                defaultError = it.message
+                valid = false
+            }
+        runCatching { parsePositive(stepValue, "Step") }
+            .onFailure {
+                stepError = it.message
+                valid = false
+            }
+        if (goalEnabled) {
+            runCatching { parsePositive(goalValue, "Goal") }
+                .onFailure {
+                    goalError = it.message
+                    valid = false
+                }
+        }
+        if (priority.toIntOrNull() == null) {
+            priorityError = "Priority must be an integer."
+            valid = false
+        }
+        return valid
+    }
+
+    val formValid = name.isNotBlank() &&
+        unit.isNotBlank() &&
+        runCatching { parseOptionalPositive(defaultValue, "Default value") }.isSuccess &&
+        runCatching { parsePositive(stepValue, "Step") }.isSuccess &&
+        (!goalEnabled || runCatching { parsePositive(goalValue, "Goal") }.isSuccess) &&
+        priority.toIntOrNull() != null
+
     fun submit() {
-        val draft = runCatching {
-            RecordItemDraft(
-                name = name,
-                description = description,
-                valueType = valueType,
-                defaultValue = parseOptionalPositive(defaultValue, "Default value"),
-                stepValue = parsePositive(stepValue, "Step"),
-                unit = unit,
-                goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
-                goalPeriod = goalPeriod.takeIf { goalEnabled },
-                priority = priority.toIntOrNull() ?: error("Priority must be an integer."),
-                windows = parsedWindows,
-            )
-        }.getOrElse { error ->
-            errorMessage = error.message ?: "Check the form values."
+        errorMessage = null
+        if (!validateFields()) {
+            errorMessage = "Check the highlighted fields."
             return
         }
+        val draft = RecordItemDraft(
+            name = name,
+            description = description,
+            valueType = valueType,
+            defaultValue = parseOptionalPositive(defaultValue, "Default value"),
+            stepValue = parsePositive(stepValue, "Step"),
+            unit = unit,
+            goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
+            goalPeriod = goalPeriod.takeIf { goalEnabled },
+            priority = checkNotNull(priority.toIntOrNull()),
+            windows = parsedWindows,
+        )
         saving = true
-        errorMessage = null
         onSave(draft) { error ->
             saving = false
             errorMessage = error
@@ -160,7 +218,7 @@ fun RecordItemFormScreen(
         actions = {
             FilledTonalIconButton(
                 onClick = ::submit,
-                enabled = !saving,
+                enabled = !saving && formValid,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
@@ -206,14 +264,23 @@ fun RecordItemFormScreen(
         TemplateSection(title = "Details") {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = {
+                    name = it
+                    nameError = null
+                },
+                enabled = !saving,
                 label = { Text("Name") },
+                isError = nameError != null,
+                supportingText = nameError?.let { message ->
+                    { Text(message) }
+                },
                 singleLine = true,
                 modifier = Modifier.formField(),
             )
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
+                enabled = !saving,
                 label = { Text("Description") },
                 minLines = 2,
                 maxLines = 4,
@@ -236,7 +303,7 @@ fun RecordItemFormScreen(
                                 unit = DEFAULT_DURATION_UNIT
                             }
                         },
-                        enabled = !measurementLocked,
+                        enabled = !measurementLocked && !saving,
                         shape = SegmentedButtonDefaults.itemShape(index, RecordValueType.entries.size),
                         label = { Text(if (type == RecordValueType.NUMBER) "Number" else "Duration") },
                     )
@@ -248,16 +315,32 @@ fun RecordItemFormScreen(
             ) {
                 OutlinedTextField(
                     value = defaultValue,
-                    onValueChange = { defaultValue = it },
+                    onValueChange = {
+                        defaultValue = it
+                        defaultError = null
+                    },
+                    enabled = !saving,
                     label = { Text("Default") },
+                    isError = defaultError != null,
+                    supportingText = defaultError?.let { message ->
+                        { Text(message) }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
                     value = stepValue,
-                    onValueChange = { stepValue = it },
+                    onValueChange = {
+                        stepValue = it
+                        stepError = null
+                    },
+                    enabled = !saving,
                     label = { Text("Step") },
+                    isError = stepError != null,
+                    supportingText = stepError?.let { message ->
+                        { Text(message) }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
@@ -266,9 +349,16 @@ fun RecordItemFormScreen(
             if (valueType == RecordValueType.NUMBER) {
                 OutlinedTextField(
                     value = unit,
-                    onValueChange = { unit = it },
-                    enabled = !measurementLocked,
+                    onValueChange = {
+                        unit = it
+                        unitError = null
+                    },
+                    enabled = !measurementLocked && !saving,
                     label = { Text("Unit") },
+                    isError = unitError != null,
+                    supportingText = unitError?.let { message ->
+                        { Text(message) }
+                    },
                     singleLine = true,
                     modifier = Modifier.formField(),
                 )
@@ -278,7 +368,7 @@ fun RecordItemFormScreen(
                         SegmentedButton(
                             selected = unit == option,
                             onClick = { unit = option },
-                            enabled = !measurementLocked,
+                            enabled = !measurementLocked && !saving,
                             shape = SegmentedButtonDefaults.itemShape(index, DURATION_UNITS.size),
                             label = { Text(option) },
                         )
@@ -289,21 +379,37 @@ fun RecordItemFormScreen(
 
         TemplateSection(title = "Goal") {
             Row(
-                modifier = Modifier.formField(),
+                modifier = Modifier
+                    .formField()
+                    .toggleable(
+                        value = goalEnabled,
+                        enabled = !saving,
+                        role = Role.Switch,
+                        onValueChange = { goalEnabled = it },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("Track a goal", style = MaterialTheme.typography.bodyLarge)
                 Switch(
                     checked = goalEnabled,
-                    onCheckedChange = { goalEnabled = it },
+                    onCheckedChange = null,
+                    enabled = !saving,
                 )
             }
             if (goalEnabled) {
                 OutlinedTextField(
                     value = goalValue,
-                    onValueChange = { goalValue = it },
+                    onValueChange = {
+                        goalValue = it
+                        goalError = null
+                    },
+                    enabled = !saving,
                     label = { Text("Goal value") },
+                    isError = goalError != null,
+                    supportingText = goalError?.let { message ->
+                        { Text(message) }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.formField(),
@@ -313,6 +419,7 @@ fun RecordItemFormScreen(
                         SegmentedButton(
                             selected = goalPeriod == period,
                             onClick = { goalPeriodName = period.name },
+                            enabled = !saving,
                             shape = SegmentedButtonDefaults.itemShape(index, GoalPeriod.entries.size),
                             label = { Text(if (period == GoalPeriod.DAY) "Day" else "Week") },
                         )
@@ -330,6 +437,7 @@ fun RecordItemFormScreen(
                 ) {
                     OutlinedButton(
                         onClick = { timeEditTarget = TimeEditTarget(index, start = true) },
+                        enabled = !saving,
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(formatMinute(window.startMinute))
@@ -337,11 +445,15 @@ fun RecordItemFormScreen(
                     Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton(
                         onClick = { timeEditTarget = TimeEditTarget(index, start = false) },
+                        enabled = !saving,
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(formatMinute(window.endMinute))
                     }
-                    IconButton(onClick = { windows = windows.toMutableList().also { it.removeAt(index) } }) {
+                    IconButton(
+                        enabled = !saving,
+                        onClick = { windows = windows.toMutableList().also { it.removeAt(index) } },
+                    ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_close_24),
                             contentDescription = "Remove suggested time",
@@ -355,16 +467,24 @@ fun RecordItemFormScreen(
                     val end = (start + 60) % (24 * 60)
                     windows = windows + "$start,$end"
                 },
+                enabled = !saving,
                 modifier = Modifier.formField(),
             ) {
                 Text("Add suggested time")
             }
             OutlinedTextField(
                 value = priority,
-                onValueChange = { priority = it },
+                onValueChange = {
+                    priority = it
+                    priorityError = null
+                },
+                enabled = !saving,
                 label = { Text("Priority") },
-                supportingText = { Text("Higher values appear first.") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                isError = priorityError != null,
+                supportingText = {
+                    Text(priorityError ?: "Higher values appear first.")
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.formField(),
             )
