@@ -212,6 +212,8 @@ private fun TemplateRouteTopBar(
             title = {
                 Text(
                     text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -268,6 +270,7 @@ fun TemplatePageHeader(
                 text = title,
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f, fill = false),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -335,11 +338,14 @@ fun TemplateListItem(
             )
     }
 
+    val contentAlpha = if (enabled) 1f else 0.38f
     ListItem(
         headlineContent = {
             Text(
                 text = title,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -347,7 +353,8 @@ fun TemplateListItem(
         supportingContent = {
             Text(
                 text = subtitle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -357,6 +364,7 @@ fun TemplateListItem(
                 Icon(
                     painter = painterResource(resource),
                     contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
                 )
             }
         },
@@ -364,13 +372,27 @@ fun TemplateListItem(
         modifier = rowModifier,
         colors = ListItemDefaults.colors(
             containerColor = Color.Transparent,
-            leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
-            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+            leadingIconColor = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
+            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
         ),
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     )
 }
+
+@Composable
+fun TemplateListLeadingIcon(
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean = true,
+) {
+    Icon(
+        imageVector = imageVector,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.38f),
+        modifier = Modifier.size(24.dp),
+    )
+}
+
 
 @Composable
 fun TemplateAppIcon(

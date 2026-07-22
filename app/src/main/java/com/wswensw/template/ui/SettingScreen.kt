@@ -1,5 +1,9 @@
 package com.wswensw.template.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7,7 +11,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.wswensw.template.BuildConfig
-import com.wswensw.template.R
 
 @Composable
 fun SettingScreen(
@@ -29,7 +32,9 @@ fun SettingScreen(
             TemplateListItem(
                 title = "Theme",
                 subtitle = themeMode.label,
-                iconRes = R.drawable.ic_color_lens_24,
+                leadingContent = {
+                    TemplateListLeadingIcon(imageVector = Icons.Outlined.Palette)
+                },
                 onClick = { showThemeDialog = true },
             )
         }
@@ -38,7 +43,9 @@ fun SettingScreen(
             TemplateListItem(
                 title = "Connection",
                 subtitle = recordsConnection,
-                iconRes = R.drawable.ic_records_24,
+                leadingContent = {
+                    TemplateListLeadingIcon(imageVector = Icons.Outlined.Link)
+                },
                 onClick = onOpenRecordsConnection,
             )
         }
@@ -47,7 +54,9 @@ fun SettingScreen(
             TemplateListItem(
                 title = "Version",
                 subtitle = BuildConfig.VERSION_NAME,
-                iconRes = R.drawable.ic_info_24,
+                leadingContent = {
+                    TemplateListLeadingIcon(imageVector = Icons.Outlined.Info)
+                },
                 onClick = { showVersionDialog = true },
             )
         }

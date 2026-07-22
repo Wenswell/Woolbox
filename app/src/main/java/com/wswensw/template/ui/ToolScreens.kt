@@ -1,5 +1,12 @@
 package com.wswensw.template.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.AddToHomeScreen
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,25 +65,37 @@ fun GlobalCopyRoute(
                 } else {
                     state.accessibilityStatus()
                 },
-                iconRes = R.drawable.ic_content_copy_24,
+                leadingContent = {
+                    TemplateListLeadingIcon(
+                        imageVector = Icons.Outlined.PlayArrow,
+                        enabled = state.isServiceConnected,
+                    )
+                },
                 enabled = state.isServiceConnected,
                 onClick = onLaunchTool,
             )
         }
 
-        Spacer(Modifier.height(12.dp))
 
         TemplateSection(title = "Quick settings") {
             TemplateListItem(
                 title = "Global Copy tile",
-                subtitle = state.globalCopyStatus(),
-                iconRes = R.drawable.ic_content_copy_24,
+                subtitle = if (tileRequestAvailable) {
+                    "Add a Quick Settings tile"
+                } else {
+                    "Add from system Quick Settings editor"
+                },
+                leadingContent = {
+                    TemplateListLeadingIcon(
+                        imageVector = Icons.AutoMirrored.Outlined.AddToHomeScreen,
+                        enabled = tileRequestAvailable,
+                    )
+                },
                 enabled = tileRequestAvailable,
                 onClick = onRequestTile,
             )
         }
 
-        Spacer(Modifier.height(12.dp))
 
         TemplateSection(title = "History") {
             TemplateListItem(
@@ -86,7 +105,9 @@ fun GlobalCopyRoute(
                     1 -> "1 capture"
                     else -> "$historyCount captures"
                 },
-                iconRes = R.drawable.ic_content_copy_24,
+                leadingContent = {
+                    TemplateListLeadingIcon(imageVector = Icons.Outlined.History)
+                },
                 onClick = onOpenHistory,
             )
         }
@@ -117,29 +138,41 @@ fun OledShieldRoute(
             TemplateListItem(
                 title = "Show shield",
                 subtitle = state.oledStatus(),
-                iconRes = R.drawable.ic_oled_shield_24,
+                leadingContent = {
+                    TemplateListLeadingIcon(imageVector = Icons.Outlined.DarkMode)
+                },
                 onClick = onLaunchTool,
             )
         }
 
-        Spacer(Modifier.height(12.dp))
 
         TemplateSection(title = "Quick settings") {
             TemplateListItem(
                 title = "OLED shield tile",
-                subtitle = state.oledStatus(),
-                iconRes = R.drawable.ic_oled_shield_24,
+                subtitle = if (tileRequestAvailable) {
+                    "Add a Quick Settings tile"
+                } else {
+                    "Add from system Quick Settings editor"
+                },
+                leadingContent = {
+                    TemplateListLeadingIcon(
+                        imageVector = Icons.AutoMirrored.Outlined.AddToHomeScreen,
+                        enabled = tileRequestAvailable,
+                    )
+                },
                 enabled = tileRequestAvailable,
                 onClick = onRequestTile,
             )
         }
 
-        Spacer(Modifier.height(12.dp))
 
         TemplateSection(title = "Default shield") {
             Column(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(
+                    horizontal = TemplateStyle.spacing.pageHorizontal,
+                    vertical = 8.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OledDefaultSlider(
                     label = "Opacity",
@@ -173,7 +206,6 @@ fun OledShieldRoute(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
 
         TemplateSection(title = "Saved apps") {
             if (profiles.isEmpty()) {
@@ -309,10 +341,17 @@ private fun OledDefaultSlider(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 text = "$value%",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
         Slider(

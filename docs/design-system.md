@@ -57,9 +57,9 @@ TemplateTheme
 
 | 组件 | 职责 | 使用规则 |
 | --- | --- | --- |
-| `TemplatePageHeader` | 根页面标题与说明 | 标题最多两行；右侧只放页面级动作。 |
+| `TemplatePageHeader` | 根页面标题与说明 | 标题 `headlineMedium` SemiBold，说明 `bodyMedium`；标题最多两行；右侧只放页面级动作。 |
 | `TemplateSection` | 设置/表单分组 | 仅分组标题 + 内容，无外框卡片。 |
-| `TemplateListItem` | 导航、状态或设置行 | 资源图标或自定义前导内容、单行标题、最多两行说明、可选尾部控件和禁用状态；有动作时整行可点击。Records 项目行前导统一显示项目名称首个 Unicode 字符。 |
+| `TemplateListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`；图标优先语义化 Material icon（`TemplateListLeadingIcon`，primary 色），可用 `iconRes`；有动作时整行可点击。 |
 | `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
 | `TemplateDivider` | 同组列表项分隔 | 从卡片左侧 `16dp` 开始，不贴容器边缘。 |
 | `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
