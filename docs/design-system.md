@@ -142,15 +142,15 @@ PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期
 
 Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四周必须能辨认目标应用。会话默认进入编辑页并开启 `Reading order`；顶部使用 `Close` 图标按钮，底部使用带复制图标和 `Copy` 文案的全宽主按钮，空白草稿时禁用。
 
-编辑页使用整行可点击的 `Reading order` Switch、明确的 `Select text` 次级操作和占满剩余空间的文本框。选择页使用 `Back` 图标按钮与 `Clear`/`Select all` 文字动作；文本块行使用 `48dp` 复选框与整行点击，正文以 `captureOrder` 显示从 `0` 开始的序号并允许四行，副文本只显示 `source · left,top-right,bottom`。
+编辑页使用整行可点击的 `Reading order` Switch、明确的 `Select text` 次级操作和占满剩余空间的文本框。选择页使用 `Back` 图标按钮与 `Select all`/`Clear` 纯图标动作；历史编辑顶栏 `Delete`/`Save` 同为纯图标。文本块行使用 `48dp` 复选框与整行点击，正文以 `captureOrder` 显示从 `0` 开始的序号并允许四行，副文本只显示 `source · left,top-right,bottom`。
 
-`Close` 与 `Back` 图标按钮保持至少 `48dp` 触控区域，并分别提供 `Close`、`Back` 无障碍说明。文本选择即时更新草稿；两种顺序草稿的编辑结果分别保留。
+紧凑动作（顶栏、面板关闭/隐藏/保存、列表 trailing）一律纯图标 + `contentDescription`，触控区域至少 `48dp`。全宽主操作与 Dialog 确认/取消保留文案。文本选择即时更新草稿；两种顺序草稿的编辑结果分别保留。
 
 `Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
-历史列表按时间倒序复用 `TemplateListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行打开编辑 Dialog；删除入口在编辑顶栏 `Delete`，确认 Dialog 后移除。编辑页 `Save` 仅在状态改变时可用；复用文本选择、阅读顺序、编辑和 Copy。
+历史列表按时间倒序复用 `TemplateListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行打开编辑 Dialog；删除入口在编辑顶栏删除图标，确认 Dialog 后移除。编辑页保存图标仅在状态改变时可用；复用文本选择、阅读顺序、编辑和 Copy。
 
-OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具。无障碍模式的 `Save` 保存当前应用配置，应用内模式的 `Save` 保存默认配置。
+OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；关闭图标只关面板，隐藏图标关闭整个工具，保存图标写入配置（无障碍模式按应用，应用内模式为默认）。详情页默认配置保存同为纯图标。
 
 覆盖层交互的业务语义归 [产品说明](product.md)，窗口参数和生命周期归 [系统架构](architecture.md)。
 

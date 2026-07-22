@@ -14,19 +14,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.wswensw.template.R
 import com.wswensw.template.tool.model.OledShieldConfig
 import com.wswensw.template.tool.storage.OledShieldConfigRepository
 import com.wswensw.template.ui.TemplateTheme
@@ -299,8 +306,11 @@ internal fun OledControlPanel(
                     text = "OLED shield",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                TextButton(onClick = onClosePanel) {
-                    Text("Close")
+                IconButton(onClick = onClosePanel) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close_24),
+                        contentDescription = "Close",
+                    )
                 }
             }
             OledSliderRow(
@@ -323,11 +333,17 @@ internal fun OledControlPanel(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onHideShield) {
-                    Text("Hide shield")
+                IconButton(onClick = onHideShield) {
+                    Icon(
+                        imageVector = Icons.Outlined.VisibilityOff,
+                        contentDescription = "Hide shield",
+                    )
                 }
-                Button(onClick = onSave) {
-                    Text("Save")
+                FilledTonalIconButton(onClick = onSave) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = "Save",
+                    )
                 }
             }
         }

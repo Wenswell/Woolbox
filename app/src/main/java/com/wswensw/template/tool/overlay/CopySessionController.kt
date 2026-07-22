@@ -24,6 +24,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +41,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -218,21 +221,35 @@ internal fun CopySessionPanel(
                         },
                         actions = {
                             if (isSelectingText) {
-                                TextButton(onClick = onToggleAll) {
-                                    Text(if (selectedCount == state.blocks.size) "Clear" else "Select all")
+                                val allSelected = selectedCount == state.blocks.size && state.blocks.isNotEmpty()
+                                IconButton(onClick = onToggleAll) {
+                                    Icon(
+                                        imageVector = if (allSelected) {
+                                            Icons.Outlined.Deselect
+                                        } else {
+                                            Icons.Outlined.SelectAll
+                                        },
+                                        contentDescription = if (allSelected) "Clear" else "Select all",
+                                    )
                                 }
                             } else {
                                 if (onDelete != null) {
-                                    TextButton(onClick = onDelete) {
-                                        Text("Delete")
+                                    IconButton(onClick = onDelete) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_delete_24),
+                                            contentDescription = "Delete",
+                                        )
                                     }
                                 }
                                 if (onSave != null) {
-                                    TextButton(
+                                    IconButton(
                                         enabled = saveEnabled,
                                         onClick = onSave,
                                     ) {
-                                        Text("Save")
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = "Save",
+                                        )
                                     }
                                 }
                             }
