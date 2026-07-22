@@ -324,6 +324,7 @@ fun TemplateListItem(
     leadingContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
     navigate: Boolean = false,
+    subtitleMaxLines: Int = 2,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
@@ -375,7 +376,7 @@ fun TemplateListItem(
                 text = subtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = subtitleAlpha),
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
+                maxLines = subtitleMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         },
@@ -462,11 +463,13 @@ fun TemplatePrimaryAction(
 }
 
 @Composable
-fun TemplateDivider() {
+fun TemplateDivider(
+    start: Dp = 56.dp,
+) {
     HorizontalDivider(
         color = MaterialTheme.colorScheme.outlineVariant,
-        // Align with list text after leading icon column (16 + 24 + 16).
-        modifier = Modifier.padding(start = 56.dp),
+        // Default aligns with 24dp leading icons (16 + 24 + 16).
+        modifier = Modifier.padding(start = start),
     )
 }
 

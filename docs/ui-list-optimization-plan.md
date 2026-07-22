@@ -1,7 +1,7 @@
 # UI 列表与可点击条目优化计划
 
-状态：包1+包2 已落地；包3 未做  
-范围：Home / 工具详情 / Setting / Records 可点击行与表单交互  
+状态：包1+包2+包3 已落地
+范围：Home / 工具详情 / Setting / Records 可点击行与表单交互
 目标：对齐 Material 3 与常见工具/设置应用做法；不扩大功能范围
 
 ## 结论摘要
@@ -54,7 +54,7 @@
 
 ### 包 1：组件与导航一致性（推荐优先）
 
-含 A1–A4、A8。  
+含 A1–A4、A8。
 验收：
 
 - 禁用 Tile 行仍可读到系统手动添加说明
@@ -65,7 +65,7 @@
 
 ### 包 2：表单反模式
 
-含 A5–A7、B3–B4。  
+含 A5–A7、B3–B4。
 验收：
 
 - Priority 数字键盘
@@ -76,7 +76,7 @@
 
 ### 包 3：列表行收敛
 
-含 B1–B2。  
+含 B1–B2。
 验收：
 
 - History / Saved apps 触控目标与字阶对齐设计系统
@@ -90,10 +90,10 @@
 
 ## 实施顺序
 
-1. 确认包与 C 项决策  
-2. 包 1 → 验证  
-3. 包 2 → 验证  
-4. 包 3（可选）→ 验证  
+1. 确认包与 C 项决策
+2. 包 1 → 验证
+3. 包 2 → 验证
+4. 包 3（可选）→ 验证
 5. 提交 commit；长期规则并入 design-system；删除本计划
 
 ## 验证
@@ -119,4 +119,4 @@ git diff --check
 - Sheet：正数才可 Record；saving 禁步进/输入。
 - Connection：`TemplateSection`；saving 禁输入。
 - design-system 已同步。
-- 包3（History 侧滑删除、OLED/History 行组件收敛）未做。
+- 包3：History 列表仅打开；删除移入编辑顶栏 + 确认 Dialog；History/OLED 行复用 `TemplateListItem`；OLED 无服务行内提示。

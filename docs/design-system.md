@@ -59,9 +59,9 @@ TemplateTheme
 | --- | --- | --- |
 | `TemplatePageHeader` | 根页面标题与说明 | 标题 `headlineMedium` SemiBold，说明 `bodyMedium`；标题最多两行；右侧只放页面级动作。 |
 | `TemplateSection` | 设置/表单分组 | 仅分组标题 + 内容，无外框卡片。 |
-| `TemplateListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`；图标 24dp，优先语义化 Material icon（`TemplateListLeadingIcon`，primary 色），可用 `iconRes`；有动作时整行可点击并声明 `Role.Button`；`navigate=true` 时 trailing chevron 表示进入下级；禁用时标题/图标 0.38 透明，副文案保持可读。 |
+| `TemplateListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`（`subtitleMaxLines` 默认 2）；图标 24dp，优先语义化 Material icon（`TemplateListLeadingIcon`，primary 色），可用 `iconRes` 或自定义 `leadingContent`（应用图标 40dp）；有动作时整行可点击并声明 `Role.Button`；`navigate=true` 时 trailing chevron 表示进入下级；禁用时标题/图标 0.38 透明，副文案保持可读。 |
 | `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
-| `TemplateDivider` | 同组列表项分隔 | 从左侧 `56dp` 起划，对齐列表文字列，不切 leading icon。 |
+| `TemplateDivider` | 同组列表项分隔 | 默认从左侧 `56dp` 起划（24dp icon）；应用图标行用 `72dp`。 |
 | `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
 | `TemplateInfoDialog` | 简短说明 | 只承载当前任务需要的信息和关闭动作。 |
 
@@ -101,7 +101,7 @@ TemplateTheme
 
 Quick Settings 行在 Android 13 及以上整行执行系统添加请求，不再显示右侧 `Add` 按钮；Android 12/12L 整行禁用，由系统快捷设置编辑页负责添加。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
-Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，每行显示应用图标、名称、三项百分比、记录时间以及 Enable/Delete 图标操作；参数在窄屏可自然换行，不截断隐藏。
+Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，复用 `TemplateListItem`：40dp 应用图标、名称、状态/参数/时间副文案、Enable/Delete 图标操作；无服务时副文案提示 `Accessibility required`，应用不可用时提示 `Unavailable`。
 
 ## Records 组合
 
@@ -148,7 +148,7 @@ Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四�
 
 `Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
-历史列表按时间倒序使用无卡片列表行，显示目标应用图标、名称、文本块数量、时间和两行预览，不显示包名。点击后打开全屏 Dialog，并复用文本选择、阅读顺序、编辑和 Copy 内容；编辑页顶部增加 `Save`，只有状态改变时可用。删除使用确认 Dialog。
+历史列表按时间倒序复用 `TemplateListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行打开编辑 Dialog；删除入口在编辑顶栏 `Delete`，确认 Dialog 后移除。编辑页 `Save` 仅在状态改变时可用；复用文本选择、阅读顺序、编辑和 Copy。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；`Close` 只关闭面板，`Hide shield` 关闭整个工具。无障碍模式的 `Save` 保存当前应用配置，应用内模式的 `Save` 保存默认配置。
 

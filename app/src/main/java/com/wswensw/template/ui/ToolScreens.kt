@@ -213,17 +213,22 @@ fun OledShieldRoute(
                 Text(
                     text = "No saved apps yet.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 20.dp),
+                    modifier = Modifier.padding(
+                        horizontal = TemplateStyle.spacing.pageHorizontal,
+                        vertical = 20.dp,
+                    ),
                 )
             } else {
                 profiles.forEachIndexed { index, profile ->
                     OledProfileRow(
                         profile = profile,
-                        enableAvailable = state.isServiceConnected && profile.isLaunchable,
+                        serviceConnected = state.isServiceConnected,
                         onEnable = { onEnableProfile(profile) },
                         onDelete = { pendingDelete = profile.profile.packageName },
                     )
-                    if (index != profiles.lastIndex) TemplateDivider()
+                    if (index != profiles.lastIndex) {
+                        TemplateDivider(start = 72.dp)
+                    }
                 }
             }
         }
@@ -259,44 +264,35 @@ fun OledShieldRoute(
 @Composable
 private fun OledProfileRow(
     profile: OledShieldProfileUi,
-    enableAvailable: Boolean,
+    serviceConnected: Boolean,
     onEnable: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val config = profile.profile.config
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    val enableAvailable = serviceConnected && profile.isLaunchable
+    val subtitle = buildString {
+        when {
+            !profile.isLaunchable -> appendLine("Unavailable")
+            !serviceConnected -> appendLine("Accessibility required")
+        }
+        appendLine(
+            "Opacity ${config.opacityPercent}% · Width ${config.widthPercent}% · Height ${config.heightPercent}%",
+        )
+        append("Recorded ${formatProfileTime(profile.profile.recordedAt)}")
+    }.trimEnd()
+
+    TemplateListItem(
+        title = profile.appName,
+        subtitle = subtitle,
+        leadingContent = {
             TemplateAppIcon(
                 bitmap = profile.appIcon,
                 fallbackIconRes = R.drawable.ic_oled_shield_24,
                 contentDescription = null,
             )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp),
-            ) {
-                Text(
-                    text = profile.appName,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                if (!profile.isLaunchable) {
-                    Text(
-                        text = "Unavailable",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
+        },
+        subtitleMaxLines = 3,
+        trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     enabled = enableAvailable,
@@ -314,20 +310,8 @@ private fun OledProfileRow(
                     )
                 }
             }
-        }
-        Text(
-            text = "Opacity ${config.opacityPercent}% | Width ${config.widthPercent}% | Height ${config.heightPercent}%",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 52.dp, end = 12.dp),
-        )
-        Text(
-            text = "Recorded ${formatProfileTime(profile.profile.recordedAt)}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(start = 52.dp, end = 12.dp),
-        )
-    }
+        },
+    )
 }
 
 @Composable

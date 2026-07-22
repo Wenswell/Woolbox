@@ -174,6 +174,7 @@ internal fun CopySessionPanel(
     onClose: () -> Unit,
     onSave: (() -> Unit)? = null,
     saveEnabled: Boolean = true,
+    onDelete: (() -> Unit)? = null,
     title: String = "Global Copy",
 ) {
     val selectedCount = state.selectedIds.size
@@ -220,12 +221,19 @@ internal fun CopySessionPanel(
                                 TextButton(onClick = onToggleAll) {
                                     Text(if (selectedCount == state.blocks.size) "Clear" else "Select all")
                                 }
-                            } else if (onSave != null) {
-                                TextButton(
-                                    enabled = saveEnabled,
-                                    onClick = onSave,
-                                ) {
-                                    Text("Save")
+                            } else {
+                                if (onDelete != null) {
+                                    TextButton(onClick = onDelete) {
+                                        Text("Delete")
+                                    }
+                                }
+                                if (onSave != null) {
+                                    TextButton(
+                                        enabled = saveEnabled,
+                                        onClick = onSave,
+                                    ) {
+                                        Text("Save")
+                                    }
                                 }
                             }
                         },
