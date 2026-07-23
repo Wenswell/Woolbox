@@ -182,12 +182,8 @@ private fun RecordSheetIdentity(
         0f
     }
     val reached = hasGoal && cumulative >= checkNotNull(target)
-    val colors = recordItemColors(item.name)
-    val progressColor = if (reached) {
-        MaterialTheme.colorScheme.tertiary
-    } else {
-        colors.accent
-    }
+    val colors = recordProgressColors(progress = progress, completed = reached)
+    val progressColor = colors.accent
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (hasGoal && period == GoalPeriod.DAY) {
@@ -197,9 +193,10 @@ private fun RecordSheetIdentity(
                 reached = reached,
                 progressColor = progressColor,
                 size = 56.dp,
+                colors = colors,
             )
         } else {
-            RecordItemInitial(name = item.name, size = 52.dp)
+            RecordItemInitial(name = item.name, size = 52.dp, colors = colors)
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {

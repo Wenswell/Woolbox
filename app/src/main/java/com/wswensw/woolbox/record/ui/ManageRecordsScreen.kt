@@ -131,7 +131,7 @@ private fun ManageRecordCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = recordItemColors(item.name)
+    val colors = recordProgressColors(progress = 0f)
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -149,7 +149,7 @@ private fun ManageRecordCard(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RecordItemInitial(name = item.name, size = 40.dp)
+            RecordItemInitial(name = item.name, size = 40.dp, colors = colors)
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

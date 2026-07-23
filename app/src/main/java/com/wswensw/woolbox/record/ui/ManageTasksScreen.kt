@@ -99,7 +99,10 @@ private fun TaskManageCard(
     val completed = task.completedStepCount
     val total = task.steps.size
     val progress = if (total <= 0) 0f else completed.toFloat() / total.toFloat()
-    val colors = recordItemColors(task.title)
+    val colors = recordProgressColors(
+        progress = taskColorProgress(task),
+        completed = task.isCompleted,
+    )
     val contentColor = colors.onContainer.copy(
         alpha = if (task.isCompleted) 0.72f else 1f,
     )

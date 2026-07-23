@@ -52,7 +52,9 @@ internal fun DailyGoalMedallion(
     reached: Boolean,
     progressColor: Color,
     size: Dp,
+    colors: RecordItemColors? = null,
 ) {
+    val resolvedColors = colors ?: recordProgressColors(progress = progress, completed = reached)
     val context = LocalContext.current
     val reduceMotion = remember(context) {
         Settings.Global.getFloat(
@@ -125,6 +127,7 @@ internal fun DailyGoalMedallion(
         RecordItemInitial(
             name = item.name,
             size = size - if (size > 72.dp) 26.dp else 22.dp,
+            colors = resolvedColors,
         )
         if (reached) {
             Icon(
@@ -208,12 +211,8 @@ internal fun GoalProgressPanel(
         label = "SheetGoalProgress",
     )
     val reached = cumulative >= target
-    val colors = recordItemColors(item.name)
-    val progressColor = if (reached) {
-        MaterialTheme.colorScheme.tertiary
-    } else {
-        colors.accent
-    }
+    val colors = recordProgressColors(progress = progress, completed = reached)
+    val progressColor = colors.accent
     val periodLabel = when (checkNotNull(item.goalPeriod)) {
         GoalPeriod.DAY -> "today"
         GoalPeriod.WEEK -> "this week"

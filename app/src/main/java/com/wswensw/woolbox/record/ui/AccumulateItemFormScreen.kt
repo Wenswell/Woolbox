@@ -223,7 +223,7 @@ fun AccumulateItemFormScreen(
                     .padding(horizontal = AppStyle.spacing.pageHorizontal)
                     .padding(bottom = 8.dp),
                 shape = AppStyle.cardShape,
-                color = recordItemColors(name).container,
+                color = recordProgressColors(progress = 0f).container,
             ) {
                 Row(
                     modifier = Modifier
@@ -231,7 +231,7 @@ fun AccumulateItemFormScreen(
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RecordItemInitial(name = name, size = 48.dp)
+                    RecordItemInitial(name = name, size = 48.dp, colors = recordProgressColors(progress = 0f))
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

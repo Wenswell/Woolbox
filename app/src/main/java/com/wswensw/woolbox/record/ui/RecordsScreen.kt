@@ -350,7 +350,10 @@ private fun TaskProgressCard(
         label = "TaskProgress",
     )
     val nextStepTitle = nextTaskStepTitle(task)
-    val colors = recordItemColors(task.title)
+    val colors = recordProgressColors(
+        progress = taskColorProgress(task),
+        completed = task.isCompleted,
+    )
     val cardContentColor = colors.onContainer.copy(
         alpha = if (task.isCompleted) 0.78f else 1f,
     )
@@ -458,31 +461,27 @@ private fun AccumulateRailCard(
     streak: ItemStreak?,
     onClick: () -> Unit,
 ) {
-    val colors = recordItemColors(item.name)
     val target = item.goalValue
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0.0 && period != null
     val cumulative = goalCumulative ?: todayValue
     val progress = if (hasGoal) goalProgressRatio(cumulative, checkNotNull(target)).toFloat() else 0f
     val goalReached = hasGoal && cumulative >= checkNotNull(target)
-    val progressColor = if (goalReached) {
-        MaterialTheme.colorScheme.tertiary
-    } else {
-        colors.accent
-    }
+    val colors = recordProgressColors(
+        progress = accumulateColorProgress(
+            item = item,
+            cumulative = cumulative,
+            todayValue = todayValue,
+            streak = streak,
+        ),
+        completed = goalReached,
+    )
+    val progressColor = colors.accent
     val container by animateColorAsState(
-        targetValue = if (goalReached) {
-            MaterialTheme.colorScheme.tertiaryContainer
-        } else {
-            colors.container
-        },
+        targetValue = colors.container,
         label = "AccumulateRailContainer",
     )
-    val contentColor = if (goalReached) {
-        MaterialTheme.colorScheme.onTertiaryContainer
-    } else {
-        colors.onContainer
-    }
+    val contentColor = colors.onContainer
 
     Card(
         onClick = onClick,
@@ -509,6 +508,7 @@ private fun AccumulateRailCard(
                 reached = goalReached,
                 progressColor = progressColor,
                 size = 64.dp,
+                colors = colors,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -586,7 +586,7 @@ private fun MeasurementRailCard(
     latest: RecordEntry?,
     onOpen: () -> Unit,
 ) {
-    val colors = recordItemColors(item.name)
+    val colors = recordProgressColors(progress = measurementColorProgress(item.minValue, item.maxValue, latest?.value))
     Card(
         onClick = onOpen,
         modifier = Modifier
@@ -610,7 +610,7 @@ private fun MeasurementRailCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                RecordItemInitial(name = item.name, size = 40.dp)
+                RecordItemInitial(name = item.name, size = 40.dp, colors = colors)
                 Text(
                     text = displayRecordName(item.name),
                     color = colors.onContainer,

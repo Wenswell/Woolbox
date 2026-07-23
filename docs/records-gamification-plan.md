@@ -19,7 +19,7 @@
 - Tasks：`N / M`、线性进度、色相卡、`Next ·`
 - Accumulate：`64dp` 目标环、火苗目标/连击（`ItemStreak`）
 - Measurement：最新值 + 时间、色相身份
-- 色相：`recordItemColors(name)` 已统一
+- 色相：`recordProgressColors(progress)` 按进度档位
 
 缺口：根页无「今日总览」；进度变化几乎无动效/触觉；完成与达标态与进行中态区分弱。
 

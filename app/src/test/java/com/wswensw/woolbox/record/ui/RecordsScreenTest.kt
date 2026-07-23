@@ -323,6 +323,41 @@ class RecordsScreenTest {
         assertEquals(false, crossedGoalThreshold(previous = 1.0, current = 2.0, target = null))
     }
 
+
+    @Test
+    fun progressColorStageMapsThresholds() {
+        assertEquals(ProgressColorStage.IDLE, progressColorStage(0f))
+        assertEquals(ProgressColorStage.EARLY, progressColorStage(0.2f))
+        assertEquals(ProgressColorStage.MID, progressColorStage(0.5f))
+        assertEquals(ProgressColorStage.LATE, progressColorStage(0.8f))
+        assertEquals(ProgressColorStage.DONE, progressColorStage(1f))
+        assertEquals(ProgressColorStage.DONE, progressColorStage(0.2f, completed = true))
+    }
+
+    @Test
+    fun streakQuantityProgressUsesTiers() {
+        assertEquals(0f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 0), 0f)
+        assertEquals(1f / 6f, streakQuantityProgress(todayValue = 1.0, streakCurrent = 0), 0f)
+        assertEquals(1f / 3f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 2), 0f)
+        assertEquals(2f / 3f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 5), 0f)
+        assertEquals(1f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 7), 0f)
+    }
+
+    @Test
+    fun measurementColorProgressUsesRange() {
+        assertEquals(0f, measurementColorProgress(0.0, 100.0, null), 0f)
+        assertEquals(0.5f, measurementColorProgress(0.0, 100.0, 50.0), 0f)
+        assertEquals(1f, measurementColorProgress(0.0, 100.0, 150.0), 0f)
+        assertEquals(1f / 3f, measurementColorProgress(null, null, 12.0), 0f)
+    }
+
+    @Test
+    fun taskColorProgressUsesStepRatio() {
+        val task = todoTask(id = 1, completedSteps = 1, totalSteps = 4)
+        assertEquals(0.25f, taskColorProgress(task), 0f)
+        assertEquals(1f, taskColorProgress(todoTask(id = 2, completedSteps = 2, totalSteps = 2)), 0f)
+    }
+
 }
 
 
