@@ -149,6 +149,26 @@ class RecordsScreenTest {
     }
 
     @Test
+    fun quickRecordSupportingTextShowsOnlyGoalTarget() {
+        val item = recordItem(
+            id = 1,
+            name = "Steps",
+            priority = 1,
+            period = GoalPeriod.DAY,
+            goalValue = 6000.0,
+        )
+
+        assertEquals(
+            "Daily target · 6000 count",
+            quickRecordSupportingText(item, hasGoal = true, goalReached = false),
+        )
+        assertEquals(
+            "Goal reached",
+            quickRecordSupportingText(item, hasGoal = true, goalReached = true),
+        )
+    }
+
+    @Test
     fun recordsDateLabelIsStableEnglishText() {
         assertEquals("Wednesday, July 22", recordsDateLabel(LocalDate.of(2026, 7, 22)))
     }

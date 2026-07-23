@@ -60,7 +60,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val RailCardWidth = 240.dp
-private val RailCardHeight = 164.dp
+private val RailCardHeight = 136.dp
 private val RailCardSpacing = 12.dp
 
 @Composable
@@ -311,16 +311,21 @@ private fun TaskProgressCard(
 ) {
     val completed = task.completedStepCount
     val progress = completed.toFloat() / task.steps.size.toFloat()
+    val colors = recordItemColors(task.title)
+    val cardContentColor = colors.onContainer.copy(
+        alpha = if (task.isCompleted) 0.72f else 1f,
+    )
     Card(
         onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (task.isCompleted) {
-                MaterialTheme.colorScheme.surfaceContainerLow
+                colors.container.copy(alpha = 0.72f)
             } else {
-                MaterialTheme.colorScheme.surfaceContainer
+                colors.container
             },
+            contentColor = cardContentColor,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -338,12 +343,8 @@ private fun TaskProgressCard(
                 CircularProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxSize(),
-                    color = if (task.isCompleted) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    color = colors.accent,
+                    trackColor = colors.accent.copy(alpha = 0.18f),
                     strokeWidth = 5.dp,
                     gapSize = 0.dp,
                 )
@@ -357,11 +358,7 @@ private fun TaskProgressCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
-                    color = if (task.isCompleted) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
+                    color = cardContentColor,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 2,
@@ -369,7 +366,7 @@ private fun TaskProgressCard(
                 )
                 Text(
                     text = "$completed / ${task.steps.size} subtasks",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = cardContentColor.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -377,7 +374,7 @@ private fun TaskProgressCard(
                     task.completedAt?.let { completedAt ->
                         Text(
                             text = taskCompletedAtLabel(completedAt),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = cardContentColor.copy(alpha = 0.72f),
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(top = 2.dp),
                         )
@@ -416,6 +413,11 @@ private fun AccumulateRailCard(
         },
         label = "AccumulateRailContainer",
     )
+    val contentColor = if (goalReached) {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    } else {
+        colors.onContainer
+    }
 
     Card(
         onClick = onClick,
@@ -423,7 +425,10 @@ private fun AccumulateRailCard(
             .width(RailCardWidth)
             .height(RailCardHeight),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = container),
+        colors = CardDefaults.cardColors(
+            containerColor = container,
+            contentColor = contentColor,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
@@ -438,7 +443,7 @@ private fun AccumulateRailCard(
                 progress = progress,
                 reached = goalReached,
                 progressColor = progressColor,
-                size = 88.dp,
+                size = 76.dp,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -448,7 +453,7 @@ private fun AccumulateRailCard(
                     text = displayRecordName(item.name),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
@@ -464,11 +469,9 @@ private fun AccumulateRailCard(
                         text = quickRecordSupportingText(
                             item = item,
                             hasGoal = true,
-                            cumulative = cumulative,
                             goalReached = goalReached,
-                            progress = progress,
                         ),
-                        color = if (goalReached) progressColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (goalReached) progressColor else contentColor.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -476,7 +479,7 @@ private fun AccumulateRailCard(
                 } else if (item.description.isNotEmpty()) {
                     Text(
                         text = item.description,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = contentColor.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -521,7 +524,10 @@ private fun MeasurementRailCard(
             .width(RailCardWidth)
             .height(RailCardHeight),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = colors.container),
+        colors = CardDefaults.cardColors(
+            containerColor = colors.container,
+            contentColor = colors.onContainer,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -533,14 +539,15 @@ private fun MeasurementRailCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                RecordItemInitial(name = item.name, size = 40.dp)
+                RecordItemInitial(name = item.name, size = 48.dp)
                 Text(
                     text = displayRecordName(item.name),
-                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onContainer,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
@@ -549,15 +556,15 @@ private fun MeasurementRailCard(
                 Text(
                     text = latest?.let { "${formatValue(it.value)} ${item.unit}" } ?: "--",
                     color = colors.accent,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = latest?.let { measurementDateTimeLabel(it.occurredAt) } ?: "No measurements yet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onContainer.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -648,15 +655,13 @@ internal fun crossedGoalThreshold(
 internal fun quickRecordSupportingText(
     item: RecordItem,
     hasGoal: Boolean,
-    cumulative: Double,
     goalReached: Boolean,
-    progress: Float,
 ): String = when {
     goalReached -> "Goal reached"
     hasGoal -> {
         val target = checkNotNull(item.goalValue)
-        val period = if (item.goalPeriod == GoalPeriod.DAY) "today" else "this week"
-        "${goalValueLabel(cumulative, target, item.unit)} · ${goalProgressPercent(progress.toDouble())}% $period"
+        val period = if (item.goalPeriod == GoalPeriod.DAY) "Daily" else "Weekly"
+        "$period target · ${formatValue(target)} ${item.unit}"
     }
     item.description.isNotEmpty() -> item.description
     else -> "Today"
