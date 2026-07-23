@@ -260,6 +260,42 @@ describe("Records API", () => {
     expect(invalid.statusCode).toBe(400);
   });
 
+  it("returns the active Records root-page projection in one request", async () => {
+    await createItem(itemInput({ name: "Water" }));
+    await createItem(itemInput({
+      name: "Temperature",
+      mode: "MEASUREMENT",
+      defaultValue: null,
+      minValue: 0,
+      maxValue: 10,
+      unit: "°C",
+      windows: [],
+    }));
+    await createItem(itemInput({ name: "Archived" }));
+    await archiveItems([3], true);
+    await createTask({ title: "Pack", steps: ["Bag"] });
+    await createEntry(entryInput({ itemId: 1, localDate: "2026-07-19", value: 2 }));
+    await createEntry(entryInput({ itemId: 2, occurredAt: 20, value: 3 }));
+    await createEntry(entryInput({ itemId: 2, occurredAt: 30, value: 4 }));
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/overview?startDate=2026-07-19&endDate=2026-07-20",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      items: [
+        { id: 2, name: "Temperature", archived: false },
+        { id: 1, name: "Water", archived: false },
+      ],
+      tasks: [{ id: 1, title: "Pack", steps: [{ title: "Bag" }] }],
+      accumulateEntries: [{ itemId: 1, value: 2, itemMode: "ACCUMULATE" }],
+      latestMeasurementEntries: [{ itemId: 2, value: 4, itemMode: "MEASUREMENT" }],
+    });
+    expect(response.json().items).not.toContainEqual(expect.objectContaining({ name: "Archived" }));
+  });
+
   it("creates tasks with subtasks atomically and derives completion from them", async () => {
     const created = await createTask({ title: "  Prepare trip  ", steps: [" Book train ", "Pack bag"] });
     expect(created.statusCode).toBe(201);

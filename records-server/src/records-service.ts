@@ -112,6 +112,19 @@ export class RecordsService {
     return this.attachWindows(rows);
   }
 
+  overview(startDate: string, endDate: string) {
+    if (startDate > endDate) throw new ApiError(400, "Start date must not be after end date.");
+    const items = this.listItems(false);
+    const tasks = this.listTasks();
+    const accumulateEntries = this.listEntries(startDate, endDate, undefined, "ACCUMULATE");
+    return {
+      items,
+      tasks,
+      accumulateEntries,
+      latestMeasurementEntries: this.listLatestEntries(),
+    };
+  }
+
   getItem(id: number) {
     const row = this.db.select().from(recordItems).where(eq(recordItems.id, id)).get();
     if (!row) throw new ApiError(404, "Record item not found.");
@@ -268,22 +281,34 @@ export class RecordsService {
   }
 
   listLatestEntries() {
-    const activeItems = this.db
+    const rows = this.db
       .select()
       .from(recordItems)
       .where(and(eq(recordItems.archived, false), eq(recordItems.mode, "MEASUREMENT")))
       .orderBy(sql`${recordItems.name} COLLATE NOCASE`)
       .all();
-    return activeItems.map((item) => {
-      const entry = this.db
-        .select()
-        .from(recordEntries)
-        .where(eq(recordEntries.itemId, item.id))
-        .orderBy(desc(recordEntries.occurredAt), desc(recordEntries.id))
-        .limit(1)
-        .get();
-      return entry === undefined ? undefined : entryResponse(entry, item);
-    }).filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
+    if (rows.length === 0) return [];
+    const itemsById = new Map(rows.map((item) => [item.id, item]));
+    const itemIds = sql.join(rows.map((item) => sql`${item.id}`));
+    const entries = this.db.all<RecordEntryRow>(sql`
+      SELECT entry.id, entry.item_id AS itemId, entry.occurred_at AS occurredAt,
+             entry.local_date AS localDate, entry.local_minute AS localMinute,
+             entry.value, entry.created_at AS createdAt
+      FROM record_entries AS entry
+      WHERE entry.item_id IN (${itemIds})
+        AND NOT EXISTS (
+          SELECT 1
+          FROM record_entries AS newer
+          WHERE newer.item_id = entry.item_id
+            AND (
+              newer.occurred_at > entry.occurred_at
+              OR (newer.occurred_at = entry.occurred_at AND newer.id > entry.id)
+            )
+        )
+    `);
+    return entries
+      .map((entry) => entryResponse(entry, itemsById.get(entry.itemId)!))
+      .sort((left, right) => left.itemName.localeCompare(right.itemName));
   }
 
   createEntry(input: RecordEntryInput) {

@@ -90,6 +90,14 @@ export function buildApp(options: BuildAppOptions) {
 
   app.get("/api/tasks", () => ({ tasks: records.listTasks() }));
 
+  app.get("/api/overview", (request) => {
+    const query = request.query as Record<string, unknown>;
+    return records.overview(
+      parseIsoDate(query.startDate, "Start date"),
+      parseIsoDate(query.endDate, "End date"),
+    );
+  });
+
   app.post("/api/tasks", (request, reply) => {
     const task = records.createTask(parseTaskCreateInput(request.body));
     return reply.status(201).send({ task });
