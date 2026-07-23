@@ -75,7 +75,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 
 ## 目标窗口选择
 
-候选只包含具有 root 和包名的 `TYPE_APPLICATION` 窗口，并排除 `com.android.systemui` 与 `com.wswensw.template`。
+候选只包含具有 root 和包名的 `TYPE_APPLICATION` 窗口，并排除 `com.android.systemui` 与 `com.wswensw.woolbox`。
 
 选择顺序：
 
@@ -88,12 +88,12 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 ## 生命周期
 
 - 服务连接：重建两个控制器、附加弱引用、发布连接状态并刷新目标与 Tile。
-- Template 前台：取消待执行命令、关闭工具并清空目标包名。
+- Woolbox 前台：取消待执行命令、关闭工具并清空目标包名。
 - 外部目标包名变化：关闭活动工具，再发布新目标。
 - 找不到外部目标：关闭活动工具并清空目标。
 - `onUnbind` 或 `onDestroy`：通过同一幂等清理移除回调、命令、窗口、弱引用和活动状态。
 
-覆盖层可能产生包名为本应用的无障碍事件。只有本应用的 `TYPE_APPLICATION` 窗口实际处于活动或焦点状态时，才按“Template 前台”处理；本应用的 `TYPE_ACCESSIBILITY_OVERLAY` 事件不能关闭自身。
+覆盖层可能产生包名为本应用的无障碍事件。只有本应用的 `TYPE_APPLICATION` 窗口实际处于活动或焦点状态时，才按“Woolbox 前台”处理；本应用的 `TYPE_ACCESSIBILITY_OVERLAY` 事件不能关闭自身。
 
 ## 覆盖层窗口契约
 

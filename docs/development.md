@@ -24,8 +24,8 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | 路径 | 修改入口 |
 | --- | --- |
 | `MainActivity.kt` | 普通入口退到后台、指定应用启动和 `onStop` 命令提交。 |
-| `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records 三分区、管理页和 Sheet 接线。 |
-| `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
+| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records 三分区、管理页和 Sheet 接线。 |
+| `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、任务/测量预览 Sheet、管理页、记录 Sheet 和记录项表单。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
@@ -71,7 +71,7 @@ pnpm typecheck && pnpm test && pnpm test:web && pnpm build
 
 ```bash
 ./gradlew :app:installDebug
-adb shell am start -n com.wswensw.template/.MainActivity
+adb shell am start -n com.wswensw.woolbox/.MainActivity
 ```
 
 Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick settings` 行保持禁用；在系统快捷设置编辑页手动添加两个 Tile。
@@ -98,23 +98,23 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 
 涉及入口、服务、窗口或覆盖层的修改，至少执行：
 
-1. 启用 `Template tools`，确认两个详情页为 `Connected`，主操作可用。
-2. 从一个包含可访问文本的目标应用进入 Template，点击 `Start Global Copy`；确认目标应用恢复、会话显示且服务未断开。
+1. 启用 `Woolbox tools`，确认两个详情页为 `Connected`，主操作可用。
+2. 从一个包含可访问文本的目标应用进入 Woolbox，点击 `Start Global Copy`；确认目标应用恢复、会话显示且服务未断开。
 3. 确认主面板左右 `12dp`、上下 `32dp` 留白；首屏为编辑页，`Reading order` 默认开启且草稿符合视觉阅读顺序。
 4. 编辑两种顺序草稿并往返切换，确认修改分别保留；进入 `Select text` 验证逐项选择、全选、清空和返回后的草稿。
 5. 确认 `Close`/`Back`、输入法和空白禁用；复制后检查历史新增，重开后验证 Save、Copy 和 Delete。
-6. 关闭无障碍服务，在 OLED 页面点击 `Show shield`；确认遮罩留在 Template 内，长按后可调整、保存默认值和关闭，且不新增 Saved apps。
-7. 启用无障碍服务后返回 Template，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开，顶部遮罩覆盖状态栏和显示刘海区域。
+6. 关闭无障碍服务，在 OLED 页面点击 `Show shield`；确认遮罩留在 Woolbox 内，长按后可调整、保存默认值和关闭，且不新增 Saved apps。
+7. 启用无障碍服务后返回 Woolbox，点击 `Show shield`；确认目标应用恢复、遮罩显示且服务未断开，顶部遮罩覆盖状态栏和显示刘海区域。
 8. 验证长按面板、三个 Slider、拖动、`Save`、`Close`、`Hide shield`，并检查 Saved apps 的图标、参数和时间。
 9. 从 Saved apps 执行 Enable/Delete，确认只对指定应用显示记录参数；再验证两个 Tile 仍作用于原目标。
 10. 在 `Preparing` 和 `Active` 状态分别连续触发同类 Tile，确认命令取消或活动工具关闭，且没有重复窗口。
 11. 依次快速触发两个不同 Tile，确认前一个工具关闭，最终只显示后触发的工具。
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
-13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
+13. 工具活动时切换应用、重新打开 Woolbox、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Tasks，创建标题和至少两个子事项并用箭头调整顺序；依次在进度 Sheet 勾选、重开子事项，确认完成时间、父项状态和已完成折叠区正确。进入 Manage tasks / Edit task，确认标题编辑、子事项增删排序和最后一项不能删除；刷新后服务端顺序一致。
+15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Records 根页 Tasks，创建标题和至少两个子事项并用箭头调整顺序；依次在进度 Sheet 勾选、重开子事项，确认完成时间、父项状态和已完成折叠区正确。进入 Manage tasks / Edit task，确认标题编辑、子事项增删排序和最后一项不能删除；刷新后服务端顺序一致。
 16. 在同一 Records 根页创建累计记录后确认目标圆环、快速记录、`Undo` 与断网错误行为；创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`。点卡确认预览 Sheet 显示 24 小时原始点位和流水，Slider 只能选择配置步进，录入后值和当前设备时间更新，短时 `Undo` 可删除该条流水；检查浅色与深色的可读性。
-17. 在 Home 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
+17. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 19. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
 
@@ -124,13 +124,13 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 
 ```bash
 adb shell dumpsys accessibility \
-  | rg "Bound services|Enabled services|Binding services|Crashed services|Template tools"
+  | rg "Bound services|Enabled services|Binding services|Crashed services|Woolbox tools"
 ```
 
 应用崩溃栈：
 
 ```bash
-adb logcat -d -b crash | rg -n -C 20 "com.wswensw.template|FATAL EXCEPTION"
+adb logcat -d -b crash | rg -n -C 20 "com.wswensw.woolbox|FATAL EXCEPTION"
 ```
 
 当前前台 Activity：
@@ -156,7 +156,7 @@ adb exec-out uiautomator dump /dev/tty
 | Tile 长时间 `Preparing` | 当前 root 是否仍为 System UI，是否存在外部 `TYPE_APPLICATION` 窗口。 | 目标在面板收起后实时解析，命令两秒超时。 |
 | Global Copy 没有会话 | 节点是否有效，或 `copy_history.db` 写入是否失败。 | 空快照直接结束；非空快照保存成功后才显示会话。 |
 | OLED 参数未恢复 | `profiles` 是否包含包名，profile 六个字段是否完整。 | 应用 profile 不存在时读取当前默认值。 |
-| 打开 Template 后覆盖层关闭 | 本应用是否成为活动或焦点 `TYPE_APPLICATION` 窗口。 | 这是产品关闭规则；仅覆盖层事件不能触发关闭。 |
+| 打开 Woolbox 后覆盖层关闭 | 本应用是否成为活动或焦点 `TYPE_APPLICATION` 窗口。 | 这是产品关闭规则；仅覆盖层事件不能触发关闭。 |
 | Records 返回 `iconKey is invalid` | 运行中的服务端是否仍为删除固定图标前的版本。 | 部署当前 `records-server` 并执行 `0003_drop_record_item_icons.sql`；客户端不恢复旧字段。 |
 
 ## 参考旧应用

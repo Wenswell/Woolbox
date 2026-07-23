@@ -1,4 +1,4 @@
-# Template
+# Woolbox
 
 Android Compose 工具应用，提供跨应用无障碍工具与在线 Records，用真实场景沉淀页面结构、通用组件、持久化和覆盖层能力。
 
@@ -7,23 +7,23 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | 工具 | 用途 | 启动方式 |
 | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
-| `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Template，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
+| `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Woolbox，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
 | `Records` | 单人在线待办（含一级子事项）和量化记录；记录项可累计或按任意时间录入测量值。 | `Records` 底栏；分区与独立路由。 |
 
-`Global Copy` 与 OLED 的跨应用模式共用 `Template tools` 无障碍服务。OLED 没有服务时可在 Template 内直接使用；服务连接后，页面入口会先把 Template 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。
+`Global Copy` 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。OLED 没有服务时可在 Woolbox 内直接使用；服务连接后，页面入口会先把 Woolbox 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。
 
 ## 使用前提
 
 - Android `12` 或更高版本。
-- 在系统无障碍设置中启用 `Template tools`。
+- 在系统无障碍设置中启用 `Woolbox tools`。
 - Global Copy 只能读取目标应用通过无障碍节点公开的文本。
 - `Global Copy` 与 OLED 的跨应用模式使用 `TYPE_ACCESSIBILITY_OVERLAY`，无需悬浮窗权限；OLED 的应用内模式不需要额外权限。
 
 ## 快速使用
 
-1. 打开 Template，在首页选择 `Accessibility service` 并启用服务。
+1. 打开 Woolbox（默认 `Records`），切到 `Tools` 选择 `Accessibility service` 并启用服务。
 2. 进入 `Global Copy` 或 `OLED shield` 详情页。
-3. 直接选择页面顶部的主操作；Template 进入后台后，工具作用于恢复的应用。
+3. 直接选择页面顶部的主操作；Woolbox 进入后台后，工具作用于恢复的应用。
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
@@ -35,10 +35,10 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 
 | 项目 | 当前值 |
 | --- | --- |
-| App 名 | `Template` |
-| 包名 | `com.wswensw.template` |
+| App 名 | `Woolbox` |
+| 包名 | `com.wswensw.woolbox` |
 | 技术栈 | Kotlin、Jetpack Compose、Material 3 |
-| 导航 | `Home`、`Records`、`Setting` 底栏；工具与记录管理使用独立路由 |
+| 导航 | `Records`、`Tools`、`Setting` 底栏；工具与记录管理使用独立路由 |
 | 系统能力 | `AccessibilityService`、`TYPE_ACCESSIBILITY_OVERLAY`、Quick Settings Tile |
 | `compileSdk` | Android `36.1` |
 | `minSdk` | Android `31` |
@@ -49,7 +49,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 ## 目录
 
 ```text
-app/src/main/java/com/wswensw/template/
+app/src/main/java/com/wswensw/woolbox/
 ├─ record/             记录领域规则、网络 Repository 和 Compose 页面
 ├─ ui/                 应用页面、主题和模板组件
 └─ tool/

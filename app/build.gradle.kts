@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.wswensw.template"
+    namespace = "com.wswensw.woolbox"
 
     compileSdk {
         version = release(36) {
@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.wswensw.template"
+        applicationId = "com.wswensw.woolbox"
         minSdk {
             version = release(31)
         }

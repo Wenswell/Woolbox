@@ -2,27 +2,27 @@
 
 ## 设计目标
 
-Template 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、历史和配置；跨应用会话使用系统覆盖层，OLED 无服务时在 Activity 顶层复用同一遮罩交互，Global Copy 历史在应用内复用同一编辑面板。
+Woolbox 是高频工具应用，界面应安静、直接、便于扫描。应用页面负责启动、授权、历史和配置；跨应用会话使用系统覆盖层，OLED 无服务时在 Activity 顶层复用同一遮罩交互，Global Copy 历史在应用内复用同一编辑面板。
 
 基础技术为 Material 3、动态色和 edge-to-edge。组件优先表达操作层级，不使用装饰性卡片、营销式区块或与功能无关的视觉元素。
 
 ## 页面层级
 
 ```text
-TemplateTheme
+AppTheme
 └─ NavHost
    ├─ root
-   │  └─ TemplateSurface
-   │     ├─ Home
-   │     │  ├─ Access / Accessibility service entry
-   │     │  └─ Available
-   │     │     ├─ Global Copy entry
-   │     │     └─ OLED shield entry
+   │  └─ AppSurface
    │     ├─ Records
    │     │  ├─ page header (title + date)
    │     │  ├─ Tasks ──> Task progress Sheet ──> Manage tasks ──> Edit task
    │     │  ├─ Accumulate ──> Record Sheet
    │     │  └─ Measurement ──> Measurement preview Sheet
+   │     ├─ Tools
+   │     │  ├─ Access / Accessibility service entry
+   │     │  └─ Available
+   │     │     ├─ Global Copy entry
+   │     │     └─ OLED shield entry
    │     └─ Setting
    │        ├─ Theme entry
    │        └─ Records connection ──> Credentials form
@@ -42,16 +42,16 @@ TemplateTheme
       └─ saved apps
 ```
 
-根页面固定显示 `Home`、`Records`、`Setting` 底栏。工具详情页和记录管理页不显示底栏，使用顶部返回栏和独立滚动内容。
+根页面固定显示 `Records`、`Tools`、`Setting` 底栏。工具详情页和记录管理页不显示底栏，使用顶部返回栏和独立滚动内容。
 
 ## 页面骨架
 
 | 骨架 | 适用场景 | 结构契约 |
 | --- | --- | --- |
-| `TemplateSurface` | 根页面 | `Scaffold` 处理 safe drawing 及底栏。 |
-| `TemplatePage` | Home、Setting | 标题、说明、纵向滚动内容和底部留白。 |
-| `TemplateRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线；输入法展开时用 IME Insets 约束滚动视口，聚焦输入框自动滚动到输入法上方，页面末尾仍可手动滚动访问。 |
-| `TemplateLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
+| `AppSurface` | 根页面 | `Scaffold` 处理 safe drawing 及底栏。 |
+| `AppPage` | Tools、Setting | 标题、说明、纵向滚动内容和底部留白。 |
+| `AppRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线；输入法展开时用 IME Insets 约束滚动视口，聚焦输入框自动滚动到输入法上方，页面末尾仍可手动滚动访问。 |
+| `AppLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
 | `ComposeOverlayWindow` | 跨应用工具 | 独立 Compose composition 与生命周期，不嵌入应用页面。 |
 
 路由和底栏切换均使用 `220ms` 水平滑动。顺序向后时内容向左，返回或顺序向前时内容向右。
@@ -60,15 +60,15 @@ TemplateTheme
 
 | 组件 | 职责 | 使用规则 |
 | --- | --- | --- |
-| `TemplatePageHeader` | 根页面标题与说明 | 标题 `headlineMedium` SemiBold，说明 `bodyMedium`；标题最多两行；右侧只放页面级动作。 |
-| `TemplateSection` | 设置/表单分组 | 仅分组标题 + 内容，无外框卡片。 |
-| `TemplateListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`（`subtitleMaxLines` 默认 2）；图标 24dp，优先语义化 Material icon（`TemplateListLeadingIcon`，primary 色），可用 `iconRes` 或自定义 `leadingContent`（应用图标 40dp）；有动作时整行可点击并声明 `Role.Button`；`navigate=true` 时 trailing chevron 表示进入下级；禁用时标题/图标 0.38 透明，副文案保持可读。 |
-| `TemplatePrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
-| `TemplateDivider` | 同组列表项分隔 | 默认从左侧 `56dp` 起划（24dp icon）；应用图标行用 `72dp`。 |
-| `TemplateSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
-| `TemplateInfoDialog` | 简短说明 | 只承载当前任务需要的信息和关闭动作。 |
+| `AppPageHeader` | 根页面标题与说明 | 标题 `headlineMedium` SemiBold，说明 `bodyMedium`；标题最多两行；右侧只放页面级动作。 |
+| `AppSection` | 设置/表单分组 | 仅分组标题 + 内容，无外框卡片。 |
+| `AppListItem` | 导航、状态或设置行 | 标题 `titleMedium` SemiBold，说明 `bodySmall`（`subtitleMaxLines` 默认 2）；图标 24dp，优先语义化 Material icon（`AppListLeadingIcon`，primary 色），可用 `iconRes` 或自定义 `leadingContent`（应用图标 40dp）；有动作时整行可点击并声明 `Role.Button`；`navigate=true` 时 trailing chevron 表示进入下级；禁用时标题/图标 0.38 透明，副文案保持可读。 |
+| `AppPrimaryAction` | 突出页面主命令 | 全宽 filled button、图标和明确动词；只在需要突出主命令的页面使用。 |
+| `AppDivider` | 同组列表项分隔 | 默认从左侧 `56dp` 起划（24dp icon）；应用图标行用 `72dp`。 |
+| `AppSingleChoiceDialog` | 单选设置 | 使用 RadioButton；选择后立即应用并关闭。 |
+| `AppInfoDialog` | 简短说明 | 只承载当前任务需要的信息和关闭动作。 |
 
-新增应用页面能力先判断能否由这些组件组合完成。只有出现第二个稳定使用场景或现有组件职责明显不足时，才扩展 `TemplateComponents.kt`。
+新增应用页面能力先判断能否由这些组件组合完成。只有出现第二个稳定使用场景或现有组件职责明显不足时，才扩展 `AppComponents.kt`。
 
 ## 尺寸与颜色
 
@@ -100,15 +100,15 @@ TemplateTheme
 2. `Quick settings` Tile 添加入口。
 3. 工具专属配置。
 
-工具操作使用带图标、状态说明和整行点击的 `TemplateListItem`：`Start Global Copy` 在 `isServiceConnected == false` 时禁用；`Show shield` 始终可用，无服务时显示应用内遮罩，有服务时启动跨应用遮罩。授权入口只在 Home 的 `Access` 区域显示。
+工具操作使用带图标、状态说明和整行点击的 `AppListItem`：`Start Global Copy` 在 `isServiceConnected == false` 时禁用；`Show shield` 始终可用，无服务时显示应用内遮罩，有服务时启动跨应用遮罩。授权入口只在 Tools 的 `Access` 区域显示。
 
 Quick Settings 行在 Android 13 及以上整行执行系统添加请求，不再显示右侧 `Add` 按钮；Android 12/12L 整行禁用，由系统快捷设置编辑页负责添加。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
-Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，复用 `TemplateListItem`：40dp 应用图标、名称、状态/参数/时间副文案、Enable/Delete 图标操作；无服务时副文案提示 `Accessibility required`，应用不可用时提示 `Unavailable`。
+Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，复用 `AppListItem`：40dp 应用图标、名称、状态/参数/时间副文案、Enable/Delete 图标操作；无服务时副文案提示 `Accessibility required`，应用不可用时提示 `Unavailable`。
 
 ## Records 组合
 
-Records 根页：`TemplatePageHeader`（`Records` + 当日英文日期）后接三分区（同一 `LazyColumn`），顺序 **Tasks → Accumulate → Measurement**，无页签。区内间距 `8dp`，区间 `20dp`（`8 + 12` spacer）。
+Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分区（同一 `LazyColumn`），顺序 **Tasks → Accumulate → Measurement**，无页签。区内间距 `8dp`，区间 `20dp`（`8 + 12` spacer）。
 
 | 区域 | 唯一职责 |
 | --- | --- |
@@ -140,7 +140,7 @@ Records 根页：`TemplatePageHeader`（`Records` + 当日英文日期）后接�
 
 Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删排序和删除任务只在 `Edit task`。`New task` 同样可调整子事项顺序。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
 
-`Records connection` 使用 `TemplateSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
+`Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
 PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期范围和记录项筛选、可选择表格与批量删除，不提供编辑入口；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复；Logs 使用只读表格显示操作时间、对象、动作和变更摘要，并可加载更早日志。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
 
@@ -149,8 +149,8 @@ PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期
 
 页面只显示 [产品说明](product.md#状态语义) 定义的六个状态词，不在不同页面创建同义文案。
 
-- 服务授权状态只显示在 Home 的 `Access` 区域；详情页不重复显示权限行。
-- 工具状态显示在 Home 工具行和对应 Tile 行。
+- 服务授权状态只显示在 Tools 的 `Access` 区域；详情页不重复显示权限行。
+- 工具状态显示在 Tools 工具行和对应 Tile 行。
 - `Preparing` 与 `Active` 反映服务状态机，不由页面自行推断。
 - 状态变化不得改变列表行、主操作或 Tile 行的稳定尺寸。
 
@@ -164,7 +164,7 @@ Global Copy 使用全屏透明窗口承载半透明 scrim 和内缩面板，四�
 
 `Copy` 写入剪贴板后显示 `Copied to clipboard.`，随后关闭会话。`Close`、目标变化和共同关闭事件也会结束会话。
 
-历史列表按时间倒序复用 `TemplateListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行进入编辑路由（`global-copy/history/{id}`），与 Activity `adjustResize` 及面板 `safeDrawing`/`imePadding` 共用 IME 适配，不再使用全屏 Dialog。删除入口在编辑顶栏删除图标，确认 Dialog 后返回列表。编辑页保存图标仅在状态改变时可用；复用 `CopySessionPanel` 文本选择、阅读顺序、编辑和 Copy。
+历史列表按时间倒序复用 `AppListItem`：目标应用图标、名称、块数/时间与预览副文案，不显示包名。整行进入编辑路由（`global-copy/history/{id}`），与 Activity `adjustResize` 及面板 `safeDrawing`/`imePadding` 共用 IME 适配，不再使用全屏 Dialog。删除入口在编辑顶栏删除图标，确认 Dialog 后返回列表。编辑页保存图标仅在状态改变时可用；复用 `CopySessionPanel` 文本选择、阅读顺序、编辑和 Copy。
 
 OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区域负责拖动；关闭图标只关面板，隐藏图标关闭整个工具，保存图标写入配置（无障碍模式按应用，应用内模式为默认）。详情页默认配置保存同为纯图标。
 

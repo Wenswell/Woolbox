@@ -1,12 +1,12 @@
 # UI 列表与可点击条目优化计划
 
 状态：包1+包2+包3 已落地
-范围：Home / 工具详情 / Setting / Records 可点击行与表单交互
+范围：Tools / 工具详情 / Setting / Records 可点击行与表单交互
 目标：对齐 Material 3 与常见工具/设置应用做法；不扩大功能范围
 
 ## 结论摘要
 
-整体结构合理：设置/工具用 `TemplateSection` + `TemplateListItem`，Records 用色卡整卡入口，与设计系统分层一致。
+整体结构合理：设置/工具用 `AppSection` + `AppListItem`，Records 用色卡整卡入口，与设计系统分层一致。
 
 需要优化的不是“整行可点”本身，而是：
 
@@ -23,13 +23,13 @@
 
 | ID | 问题 | 位置 | 推荐 |
 | --- | --- | --- | --- |
-| A1 | 可点击 `TemplateListItem` 未声明 `Role` / disabled 语义 | `TemplateComponents.kt` | `Role.Button`；禁用时 `semantics { disabled() }` |
+| A1 | 可点击 `AppListItem` 未声明 `Role` / disabled 语义 | `AppComponents.kt` | `Role.Button`；禁用时 `semantics { disabled() }` |
 | A2 | 禁用行副文案与图标同步 0.38 透明，说明不可读 | Tile 等 `enabled=false` 行 | 副文案保持可读；仅降低标题/图标或去掉点击 |
-| A3 | `TemplateDivider` 从 16dp 起划，易切 leading icon | Home Available 等 | inset 对齐文字列（约 56dp） |
-| A4 | 导航 affordance 双标准：Manage 有 chevron，Home/Setting/History 无 | 多页 | 导航进下级的行统一 trailing chevron；即时动作行不加 |
+| A3 | `AppDivider` 从 16dp 起划，易切 leading icon | Tools Available 等 | inset 对齐文字列（约 56dp） |
+| A4 | 导航 affordance 双标准：Manage 有 chevron，Tools/Setting/History 无 | 多页 | 导航进下级的行统一 trailing chevron；即时动作行不加 |
 | A5 | Priority 用文本键盘 | `RecordItemFormScreen` | `KeyboardType.Number` |
 | A6 | Goal Switch 点文案不切换 | 表单 | 整行 `toggleable` + `Role.Switch` |
-| A7 | Connection 手写 section，未复用 `TemplateSection` | `RecordsConnectionScreen` | 改用 `TemplateSection` |
+| A7 | Connection 手写 section，未复用 `AppSection` | `RecordsConnectionScreen` | 改用 `AppSection` |
 | A8 | 文档：设置分组“卡片/圆角”与实现不符 | `design-system.md` | 同步为无外框；Divider 对齐规则 |
 
 ### B. 建议修（交互形态变化，语义可保留）
@@ -37,7 +37,7 @@
 | ID | 问题 | 推荐 | 产品影响 |
 | --- | --- | --- | --- |
 | B1 | Copy history 整行点击 + 尾部删除 IconButton 嵌套 | 侧滑删除，或删除移入编辑 Dialog | 删除入口位置变 |
-| B2 | OLED / History 自建行与 `TemplateListItem` 分叉 | 扩展统一行组件（40dp app icon、trailing actions） | 无业务变化 |
+| B2 | OLED / History 自建行与 `AppListItem` 分叉 | 扩展统一行组件（40dp app icon、trailing actions） | 无业务变化 |
 | B3 | Sheet / Connection / 表单：提交启用与 saving 规则不统一 | 校验通过才启用主操作；saving 禁编辑 | 反馈时机统一 |
 | B4 | 表单错误只在页底 | 字段 `isError` + supportingText | 否 |
 
@@ -70,7 +70,7 @@
 
 - Priority 数字键盘
 - Goal 开关整行可切换
-- Connection 使用 `TemplateSection`
+- Connection 使用 `AppSection`
 - 主操作仅在合法输入时可用；saving 时控件禁用
 - 字段错误就近显示
 
@@ -84,7 +84,7 @@
 
 ### 不做
 
-- 不把 Records 色卡改成 `TemplateListItem`
+- 不把 Records 色卡改成 `AppListItem`
 - 不改工具主操作为 filled 按钮（除非确认 C2）
 - 不扩大 Records 业务能力
 
@@ -112,11 +112,11 @@ git diff --check
 ## 落地记录
 
 - 范围：包1 + 包2；授权已启用行保持 Toast；导航行统一 chevron。
-- `TemplateListItem`：`Role.Button`、`navigate` chevron、禁用副文案可读、iconRes 24dp。
-- `TemplateDivider` inset `56dp`。
-- Home 工具入口、History、Connection：`navigate=true`。
+- `AppListItem`：`Role.Button`、`navigate` chevron、禁用副文案可读、iconRes 24dp。
+- `AppDivider` inset `56dp`。
+- Tools 工具入口、History、Connection：`navigate=true`。
 - 表单：Priority 数字键盘、Goal 整行 Switch、字段错误、合法才可保存、saving 禁编辑。
 - Sheet：正数才可 Record；saving 禁步进/输入。
-- Connection：`TemplateSection`；saving 禁输入。
+- Connection：`AppSection`；saving 禁输入。
 - design-system 已同步。
-- 包3：History 列表仅打开；删除移入编辑顶栏 + 确认 Dialog；History/OLED 行复用 `TemplateListItem`；OLED 无服务行内提示。
+- 包3：History 列表仅打开；删除移入编辑顶栏 + 确认 Dialog；History/OLED 行复用 `AppListItem`；OLED 无服务行内提示。
