@@ -44,7 +44,6 @@ import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.stepRecordValue
 import com.wswensw.template.ui.TemplateStyle
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -316,10 +315,3 @@ private fun ValueInput(
         Text(if (saving) "Saving" else "Record")
     }
 }
-
-private fun formatMinute(minute: Int): String = String.format(
-    Locale.ROOT,
-    "%02d:%02d",
-    minute / 60,
-    minute % 60,
-)

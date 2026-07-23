@@ -1,20 +1,20 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,12 +26,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,9 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -54,31 +48,24 @@ import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
 import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
-import com.wswensw.template.record.model.RecordWindow
 import com.wswensw.template.ui.TemplateRouteScaffold
 import com.wswensw.template.ui.TemplateSection
 import com.wswensw.template.ui.TemplateStyle
-import java.util.Locale
-
-private data class TimeEditTarget(
-    val index: Int,
-    val start: Boolean,
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecordItemFormScreen(
+fun AccumulateItemFormScreen(
     item: RecordItem?,
     editing: Boolean,
     loading: Boolean,
-    measurementLocked: Boolean,
+    fieldsLocked: Boolean,
     onBack: () -> Unit,
     onSave: (RecordItemDraft, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (editing && item == null) {
         TemplateRouteScaffold(
-            title = "Edit record item",
+            title = "Edit accumulate",
             onBack = onBack,
             modifier = modifier,
         ) {
@@ -99,9 +86,6 @@ fun RecordItemFormScreen(
 
     var name by rememberSaveable(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var description by rememberSaveable(item?.id) { mutableStateOf(item?.description.orEmpty()) }
-    var modeName by rememberSaveable(item?.id) {
-        mutableStateOf((item?.mode ?: RecordMode.ACCUMULATE).name)
-    }
     var valueTypeName by rememberSaveable(item?.id) {
         mutableStateOf((item?.valueType ?: RecordValueType.NUMBER).name)
     }
@@ -136,7 +120,6 @@ fun RecordItemFormScreen(
     var saving by rememberSaveable { mutableStateOf(false) }
 
     val valueType = RecordValueType.valueOf(valueTypeName)
-    val mode = RecordMode.valueOf(modeName)
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
     val parsedWindows = windows.map(::decodeWindow)
 
@@ -160,13 +143,7 @@ fun RecordItemFormScreen(
             unitError = "Unit is required."
             valid = false
         }
-        runCatching {
-            if (mode == RecordMode.ACCUMULATE) {
-                parseOptionalPositive(defaultValue, "Default value")
-            } else {
-                parseOptionalFinite(defaultValue, "Default value")
-            }
-        }
+        runCatching { parseOptionalPositive(defaultValue, "Default value") }
             .onFailure {
                 defaultError = it.message
                 valid = false
@@ -176,7 +153,7 @@ fun RecordItemFormScreen(
                 stepError = it.message
                 valid = false
             }
-        if (mode == RecordMode.ACCUMULATE && goalEnabled) {
+        if (goalEnabled) {
             runCatching { parsePositive(goalValue, "Goal") }
                 .onFailure {
                     goalError = it.message
@@ -192,15 +169,9 @@ fun RecordItemFormScreen(
 
     val formValid = name.isNotBlank() &&
         unit.isNotBlank() &&
-        runCatching {
-            if (mode == RecordMode.ACCUMULATE) {
-                parseOptionalPositive(defaultValue, "Default value")
-            } else {
-                parseOptionalFinite(defaultValue, "Default value")
-            }
-        }.isSuccess &&
+        runCatching { parseOptionalPositive(defaultValue, "Default value") }.isSuccess &&
         runCatching { parsePositive(stepValue, "Step") }.isSuccess &&
-        (mode != RecordMode.ACCUMULATE || !goalEnabled || runCatching { parsePositive(goalValue, "Goal") }.isSuccess) &&
+        (!goalEnabled || runCatching { parsePositive(goalValue, "Goal") }.isSuccess) &&
         priority.toIntOrNull() != null
 
     fun submit() {
@@ -212,23 +183,15 @@ fun RecordItemFormScreen(
         val draft = RecordItemDraft(
             name = name,
             description = description,
-            mode = mode,
+            mode = RecordMode.ACCUMULATE,
             valueType = valueType,
-            defaultValue = if (mode == RecordMode.ACCUMULATE) {
-                parseOptionalPositive(defaultValue, "Default value")
-            } else {
-                parseOptionalFinite(defaultValue, "Default value")
-            },
+            defaultValue = parseOptionalPositive(defaultValue, "Default value"),
             stepValue = parsePositive(stepValue, "Step"),
             unit = unit,
-            goalValue = if (mode == RecordMode.ACCUMULATE && goalEnabled) {
-                parsePositive(goalValue, "Goal")
-            } else {
-                null
-            },
-            goalPeriod = goalPeriod.takeIf { mode == RecordMode.ACCUMULATE && goalEnabled },
+            goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
+            goalPeriod = goalPeriod.takeIf { goalEnabled },
             priority = checkNotNull(priority.toIntOrNull()),
-            windows = if (mode == RecordMode.ACCUMULATE) parsedWindows else emptyList(),
+            windows = parsedWindows,
         )
         saving = true
         onSave(draft) { error ->
@@ -238,7 +201,7 @@ fun RecordItemFormScreen(
     }
 
     TemplateRouteScaffold(
-        title = if (editing) "Edit record item" else "New record item",
+        title = if (editing) "Edit accumulate" else "New accumulate",
         onBack = onBack,
         modifier = modifier,
         actions = {
@@ -278,7 +241,7 @@ fun RecordItemFormScreen(
                             maxLines = 1,
                         )
                         Text(
-                            text = if (editing) "Editing record item" else "New record item",
+                            text = if (editing) "Editing accumulate" else "New accumulate",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -316,31 +279,6 @@ fun RecordItemFormScreen(
 
         TemplateSection(title = "Measurement") {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
-                RecordMode.entries.forEachIndexed { index, option ->
-                    SegmentedButton(
-                        selected = mode == option,
-                        onClick = {
-                            modeName = option.name
-                            if (option == RecordMode.MEASUREMENT) {
-                                valueTypeName = RecordValueType.NUMBER.name
-                                defaultValue = ""
-                                unit = DEFAULT_NUMBER_UNIT
-                                goalEnabled = false
-                                goalValue = ""
-                                windows = emptyList()
-                                priority = "0"
-                            }
-                        },
-                        enabled = !measurementLocked && !saving,
-                        shape = SegmentedButtonDefaults.itemShape(index, RecordMode.entries.size),
-                        label = {
-                            Text(if (option == RecordMode.ACCUMULATE) "Accumulate" else "Measure")
-                        },
-                    )
-                }
-            }
-            if (mode == RecordMode.ACCUMULATE) {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
                 RecordValueType.entries.forEachIndexed { index, type ->
                     SegmentedButton(
                         selected = valueType == type,
@@ -354,12 +292,11 @@ fun RecordItemFormScreen(
                                 unit = DEFAULT_DURATION_UNIT
                             }
                         },
-                        enabled = !measurementLocked && !saving,
+                        enabled = !fieldsLocked && !saving,
                         shape = SegmentedButtonDefaults.itemShape(index, RecordValueType.entries.size),
                         label = { Text(if (type == RecordValueType.NUMBER) "Number" else "Duration") },
                     )
                 }
-            }
             }
             Row(
                 modifier = Modifier.formField(),
@@ -372,7 +309,7 @@ fun RecordItemFormScreen(
                         defaultError = null
                     },
                     enabled = !saving,
-                    label = { Text(if (mode == RecordMode.MEASUREMENT) "Default (optional)" else "Default") },
+                    label = { Text("Default") },
                     isError = defaultError != null,
                     supportingText = defaultError?.let { message ->
                         { Text(message) }
@@ -405,7 +342,7 @@ fun RecordItemFormScreen(
                         unit = it
                         unitError = null
                     },
-                    enabled = !measurementLocked && !saving,
+                    enabled = !fieldsLocked && !saving,
                     label = { Text("Unit") },
                     isError = unitError != null,
                     supportingText = unitError?.let { message ->
@@ -420,7 +357,7 @@ fun RecordItemFormScreen(
                         SegmentedButton(
                             selected = unit == option,
                             onClick = { unit = option },
-                            enabled = !measurementLocked && !saving,
+                            enabled = !fieldsLocked && !saving,
                             shape = SegmentedButtonDefaults.itemShape(index, DURATION_UNITS.size),
                             label = { Text(option) },
                         )
@@ -429,7 +366,7 @@ fun RecordItemFormScreen(
             }
         }
 
-        if (mode == RecordMode.ACCUMULATE) TemplateSection(title = "Goal") {
+        TemplateSection(title = "Goal") {
             Row(
                 modifier = Modifier
                     .formField()
@@ -480,7 +417,7 @@ fun RecordItemFormScreen(
             }
         }
 
-        if (mode == RecordMode.ACCUMULATE) TemplateSection(title = "Recommendation") {
+        TemplateSection(title = "Recommendation") {
             parsedWindows.forEachIndexed { index, window ->
                 Row(
                     modifier = Modifier.formField(),
@@ -570,67 +507,4 @@ fun RecordItemFormScreen(
             },
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RecordTimePickerDialog(
-    initialMinute: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
-) {
-    val state = rememberTimePickerState(
-        initialHour = initialMinute / 60,
-        initialMinute = initialMinute % 60,
-        is24Hour = true,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Suggested time") },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) {
-                Text("Done")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
-}
-
-private fun Modifier.formField(): Modifier =
-    fillMaxWidth().padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp)
-
-private fun decodeWindow(value: String): RecordWindow {
-    val parts = value.split(',', limit = 2)
-    return RecordWindow(
-        startMinute = parts[0].toInt(),
-        endMinute = parts[1].toInt(),
-    )
-}
-
-private fun formatMinute(minute: Int): String = String.format(
-    Locale.ROOT,
-    "%02d:%02d",
-    minute / 60,
-    minute % 60,
-)
-
-private fun parseOptionalPositive(value: String, label: String): Double? =
-    value.trim().takeIf(String::isNotEmpty)?.let { parsePositive(it, label) }
-
-private fun parseOptionalFinite(value: String, label: String): Double? =
-    value.trim().takeIf(String::isNotEmpty)?.let { raw ->
-        val parsed = raw.toDoubleOrNull()
-        check(parsed != null && parsed.isFinite()) { "$label must be a finite number." }
-        parsed
-    }
-
-private fun parsePositive(value: String, label: String): Double {
-    val parsed = value.trim().toDoubleOrNull()
-    check(parsed != null && parsed.isFinite() && parsed > 0) { "$label must be a positive number." }
-    return parsed
 }

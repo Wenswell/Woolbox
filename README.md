@@ -8,7 +8,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
 | `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Template，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
-| `Records` | 单人在线待办（含一级子事项）和量化记录；记录项可累计或按任意时间录入测量值。 | `Records` 底栏；页签内操作。 |
+| `Records` | 单人在线待办（含一级子事项）和量化记录；记录项可累计或按任意时间录入测量值。 | `Records` 底栏；分区与独立路由。 |
 
 `Global Copy` 与 OLED 的跨应用模式共用 `Template tools` 无障碍服务。OLED 没有服务时可在 Template 内直接使用；服务连接后，页面入口会先把 Template 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。
 
@@ -27,7 +27,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
-从 `Records` 进入后，`Tasks` 用于创建待办和一级子事项，`Trackers` 用于创建累计记录或测量记录。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
+从 `Records` 进入后，同一页按 Tasks、Accumulate、Measurement 分区展示：待办竖列表，累计与测量为横向卡片轨。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 

@@ -57,7 +57,7 @@ fun TaskDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     if (task == null) {
-        TemplateRouteScaffold(title = "Task", onBack = onBack, modifier = modifier) {
+        TemplateRouteScaffold(title = "Edit task", onBack = onBack, modifier = modifier) {
             if (loading) {
                 Box(
                     modifier = Modifier
@@ -102,8 +102,9 @@ fun TaskDetailScreen(
         }
     }
 
+    val titleDirty = title.trim() != task.title
     TemplateRouteScaffold(
-        title = "Task",
+        title = "Edit task",
         onBack = onBack,
         modifier = modifier,
         actions = {
@@ -111,15 +112,18 @@ fun TaskDetailScreen(
                 Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Delete task")
             }
             Spacer(Modifier.width(4.dp))
-            FilledTonalIconButton(onClick = ::saveTitle, enabled = !savingTitle) {
+            FilledTonalIconButton(
+                onClick = ::saveTitle,
+                enabled = !savingTitle && titleDirty && title.isNotBlank(),
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = if (savingTitle) "Saving" else "Save",
+                    contentDescription = if (savingTitle) "Saving" else "Save title",
                 )
             }
         },
     ) {
-        TemplateSection(title = "Task") {
+        TemplateSection(title = "Title") {
             OutlinedTextField(
                 value = title,
                 onValueChange = {

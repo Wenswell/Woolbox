@@ -61,7 +61,9 @@ import com.wswensw.template.record.ui.MeasurementDetailScreen
 import com.wswensw.template.record.ui.MeasurementEntryScreen
 import com.wswensw.template.record.ui.MeasurementDetailUiState
 import com.wswensw.template.record.model.MeasurementRange
-import com.wswensw.template.record.ui.RecordItemFormScreen
+import com.wswensw.template.record.model.RecordMode
+import com.wswensw.template.record.ui.AccumulateItemFormScreen
+import com.wswensw.template.record.ui.MeasurementItemFormScreen
 import com.wswensw.template.record.ui.RecordSheet
 import com.wswensw.template.record.ui.crossedGoalThreshold
 import com.wswensw.template.record.ui.displayRecordName
@@ -192,9 +194,13 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     recordSheetItemId = null
                                     navController.navigate(TemplateRoutes.MANAGE_RECORDS)
                                 },
-                                onCreateItem = {
+                                onCreateAccumulate = {
                                     recordSheetItemId = null
-                                    navController.navigate(TemplateRoutes.RECORD_ITEM_NEW)
+                                    navController.navigate(TemplateRoutes.RECORD_ITEM_ACCUMULATE_NEW)
+                                },
+                                onCreateMeasurement = {
+                                    recordSheetItemId = null
+                                    navController.navigate(TemplateRoutes.RECORD_ITEM_MEASUREMENT_NEW)
                                 },
                                 onConfigureConnection = {
                                     navController.navigate(TemplateRoutes.RECORDS_CONNECTION)
@@ -366,9 +372,19 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 ManageRecordsScreen(
                     state = recordsState,
                     onBack = { navController.popBackStack() },
-                    onNewItem = { navController.navigate(TemplateRoutes.RECORD_ITEM_NEW) },
+                    onNewAccumulate = {
+                        navController.navigate(TemplateRoutes.RECORD_ITEM_ACCUMULATE_NEW)
+                    },
+                    onNewMeasurement = {
+                        navController.navigate(TemplateRoutes.RECORD_ITEM_MEASUREMENT_NEW)
+                    },
                     onEditItem = { itemId ->
-                        navController.navigate(TemplateRoutes.recordItemEdit(itemId))
+                        val item = recordsState.findItem(itemId)
+                        val route = when (item?.mode) {
+                            RecordMode.MEASUREMENT -> TemplateRoutes.measurementItemEdit(itemId)
+                            else -> TemplateRoutes.accumulateItemEdit(itemId)
+                        }
+                        navController.navigate(route)
                     },
                 )
             }
@@ -422,12 +438,12 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                 )
             }
-            composable(TemplateRoutes.RECORD_ITEM_NEW) {
-                RecordItemFormScreen(
+            composable(TemplateRoutes.RECORD_ITEM_ACCUMULATE_NEW) {
+                AccumulateItemFormScreen(
                     item = null,
                     editing = false,
                     loading = false,
-                    measurementLocked = false,
+                    fieldsLocked = false,
                     onBack = { navController.popBackStack() },
                     onSave = { draft, onResult ->
                         recordsViewModel.saveItem(itemId = null, draft = draft) { error ->
@@ -440,15 +456,53 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 )
             }
             composable(
-                route = TemplateRoutes.RECORD_ITEM_EDIT,
+                route = TemplateRoutes.RECORD_ITEM_ACCUMULATE_EDIT,
                 arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
             ) { entry ->
                 val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
-                RecordItemFormScreen(
+                AccumulateItemFormScreen(
                     item = recordsState.findItem(itemId),
                     editing = true,
                     loading = recordsState.isLoading,
-                    measurementLocked = true,
+                    fieldsLocked = true,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->
+                            onResult(error)
+                            if (error == null) {
+                                navController.popBackStack()
+                            }
+                        }
+                    },
+                )
+            }
+            composable(TemplateRoutes.RECORD_ITEM_MEASUREMENT_NEW) {
+                MeasurementItemFormScreen(
+                    item = null,
+                    editing = false,
+                    loading = false,
+                    fieldsLocked = false,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveItem(itemId = null, draft = draft) { error ->
+                            onResult(error)
+                            if (error == null) {
+                                navController.popBackStack()
+                            }
+                        }
+                    },
+                )
+            }
+            composable(
+                route = TemplateRoutes.RECORD_ITEM_MEASUREMENT_EDIT,
+                arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
+                MeasurementItemFormScreen(
+                    item = recordsState.findItem(itemId),
+                    editing = true,
+                    loading = recordsState.isLoading,
+                    fieldsLocked = true,
                     onBack = { navController.popBackStack() },
                     onSave = { draft, onResult ->
                         recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->
@@ -474,7 +528,7 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     state = measurementDetailState.takeIf { it.itemId == itemId }
                         ?: MeasurementDetailUiState(itemId = itemId, isLoading = true),
                     onBack = { navController.popBackStack() },
-                    onEditItem = { navController.navigate(TemplateRoutes.recordItemEdit(itemId)) },
+                    onEditItem = { navController.navigate(TemplateRoutes.measurementItemEdit(itemId)) },
                     onAddEntry = { navController.navigate(TemplateRoutes.measurementEntryNew(itemId)) },
                     onRangeChange = { range -> recordsViewModel.loadMeasurementEntries(itemId, range) },
                 )
@@ -666,13 +720,18 @@ private object TemplateRoutes {
     const val TASK_NEW = "task/new"
     const val TASK_ID = "taskId"
     const val TASK_DETAIL = "task/{$TASK_ID}"
-    const val RECORD_ITEM_NEW = "record-item/new"
     const val RECORD_ITEM_ID = "recordItemId"
-    const val RECORD_ITEM_EDIT = "record-item/{$RECORD_ITEM_ID}"
+    const val RECORD_ITEM_ACCUMULATE_NEW = "record-item/accumulate/new"
+    const val RECORD_ITEM_ACCUMULATE_EDIT = "record-item/accumulate/{$RECORD_ITEM_ID}"
+    const val RECORD_ITEM_MEASUREMENT_NEW = "record-item/measurement/new"
+    const val RECORD_ITEM_MEASUREMENT_EDIT = "record-item/measurement/{$RECORD_ITEM_ID}"
     const val MEASUREMENT_DETAIL = "measurement/{$RECORD_ITEM_ID}"
     const val MEASUREMENT_ENTRY_NEW = "measurement/{$RECORD_ITEM_ID}/entry/new"
 
-    fun recordItemEdit(itemId: Long) = "record-item/$itemId"
+    fun accumulateItemNew() = RECORD_ITEM_ACCUMULATE_NEW
+    fun accumulateItemEdit(itemId: Long) = "record-item/accumulate/$itemId"
+    fun measurementItemNew() = RECORD_ITEM_MEASUREMENT_NEW
+    fun measurementItemEdit(itemId: Long) = "record-item/measurement/$itemId"
     fun taskDetail(taskId: Long) = "task/$taskId"
     fun measurementDetail(itemId: Long) = "measurement/$itemId"
     fun measurementEntryNew(itemId: Long) = "measurement/$itemId/entry/new"

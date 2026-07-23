@@ -53,7 +53,10 @@ fun TaskCreateScreen(
         onBack = onBack,
         modifier = modifier,
         actions = {
-            FilledTonalIconButton(onClick = ::submit, enabled = !saving) {
+            FilledTonalIconButton(
+                onClick = ::submit,
+                enabled = !saving && title.isNotBlank(),
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = if (saving) "Saving" else "Save",

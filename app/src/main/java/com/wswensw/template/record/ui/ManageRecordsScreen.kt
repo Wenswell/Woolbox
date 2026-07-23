@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,7 +39,8 @@ import com.wswensw.template.ui.TemplateStyle
 fun ManageRecordsScreen(
     state: RecordsUiState,
     onBack: () -> Unit,
-    onNewItem: () -> Unit,
+    onNewAccumulate: () -> Unit,
+    onNewMeasurement: () -> Unit,
     onEditItem: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,10 +49,16 @@ fun ManageRecordsScreen(
         onBack = onBack,
         modifier = modifier,
         actions = {
-            FilledTonalIconButton(onClick = onNewItem) {
+            FilledTonalIconButton(onClick = onNewAccumulate) {
                 Icon(
                     painter = painterResource(R.drawable.ic_add_24),
-                    contentDescription = "New record item",
+                    contentDescription = "New accumulate",
+                )
+            }
+            FilledTonalIconButton(onClick = onNewMeasurement) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ShowChart,
+                    contentDescription = "New measurement",
                 )
             }
         },
@@ -69,8 +77,8 @@ fun ManageRecordsScreen(
             state.activeItems.isEmpty() -> item {
                 RecordsStatusCard(
                     message = "No active items yet.",
-                    actionLabel = "Create record item",
-                    onAction = onNewItem,
+                    actionLabel = "Create accumulate",
+                    onAction = onNewAccumulate,
                     modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal),
                 )
             }

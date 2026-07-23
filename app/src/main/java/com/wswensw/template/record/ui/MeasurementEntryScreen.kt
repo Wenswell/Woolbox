@@ -59,7 +59,7 @@ fun MeasurementEntryScreen(
     }
 
     TemplateRouteScaffold(
-        title = "New measurement",
+        title = "Add measurement",
         onBack = onBack,
         modifier = modifier,
         actions = {
