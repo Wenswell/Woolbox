@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -99,23 +101,29 @@ private fun TaskManageCard(
     val completed = task.completedStepCount
     val total = task.steps.size
     val progress = if (total <= 0) 0f else completed.toFloat() / total.toFloat()
-    val colors = recordProgressColors(
+    val targetColors = recordProgressColors(
         progress = taskColorProgress(task),
         completed = task.isCompleted,
     )
-    val contentColor = colors.onContainer.copy(
-        alpha = if (task.isCompleted) 0.72f else 1f,
+    val container by animateColorAsState(
+        targetValue = targetColors.container,
+        label = "ManageTaskContainer",
     )
+    val accent by animateColorAsState(
+        targetValue = targetColors.accent,
+        label = "ManageTaskAccent",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = targetColors.onContainer,
+        label = "ManageTaskOnContainer",
+    )
+    val colors = targetColors.copy(accent = accent, container = container, onContainer = contentColor)
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) {
-                colors.container.copy(alpha = 0.72f)
-            } else {
-                colors.container
-            },
+            containerColor = container,
             contentColor = contentColor,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),

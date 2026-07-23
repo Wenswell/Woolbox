@@ -350,23 +350,29 @@ private fun TaskProgressCard(
         label = "TaskProgress",
     )
     val nextStepTitle = nextTaskStepTitle(task)
-    val colors = recordProgressColors(
+    val targetColors = recordProgressColors(
         progress = taskColorProgress(task),
         completed = task.isCompleted,
     )
-    val cardContentColor = colors.onContainer.copy(
-        alpha = if (task.isCompleted) 0.78f else 1f,
+    val container by animateColorAsState(
+        targetValue = targetColors.container,
+        label = "TaskCardContainer",
     )
+    val accent by animateColorAsState(
+        targetValue = targetColors.accent,
+        label = "TaskCardAccent",
+    )
+    val onContainer by animateColorAsState(
+        targetValue = targetColors.onContainer,
+        label = "TaskCardOnContainer",
+    )
+    val cardContentColor = onContainer
     Card(
         onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) {
-                colors.container.copy(alpha = 0.82f)
-            } else {
-                colors.container
-            },
+            containerColor = container,
             contentColor = cardContentColor,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -385,8 +391,8 @@ private fun TaskProgressCard(
                 CircularProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxSize(),
-                    color = colors.accent,
-                    trackColor = colors.accent.copy(alpha = 0.18f),
+                    color = accent,
+                    trackColor = accent.copy(alpha = 0.18f),
                     strokeWidth = 4.dp,
                     gapSize = 0.dp,
                 )
@@ -394,7 +400,7 @@ private fun TaskProgressCard(
                     Icon(
                         imageVector = Icons.Rounded.CheckCircle,
                         contentDescription = null,
-                        tint = colors.accent,
+                        tint = accent,
                         modifier = Modifier.size(22.dp),
                     )
                 } else {
@@ -402,7 +408,7 @@ private fun TaskProgressCard(
                         text = "$completed",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = colors.accent,
+                        color = accent,
                     )
                 }
             }
@@ -424,7 +430,7 @@ private fun TaskProgressCard(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "$completed/${task.steps.size}",
-                        color = colors.accent,
+                        color = accent,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -476,12 +482,18 @@ private fun AccumulateRailCard(
         ),
         completed = goalReached,
     )
-    val progressColor = colors.accent
+    val progressColor by animateColorAsState(
+        targetValue = colors.accent,
+        label = "AccumulateRailAccent",
+    )
     val container by animateColorAsState(
         targetValue = colors.container,
         label = "AccumulateRailContainer",
     )
-    val contentColor = colors.onContainer
+    val contentColor by animateColorAsState(
+        targetValue = colors.onContainer,
+        label = "AccumulateRailOnContainer",
+    )
 
     Card(
         onClick = onClick,
@@ -586,7 +598,22 @@ private fun MeasurementRailCard(
     latest: RecordEntry?,
     onOpen: () -> Unit,
 ) {
-    val colors = recordProgressColors(progress = measurementColorProgress(item.minValue, item.maxValue, latest?.value))
+    val targetColors = recordProgressColors(
+        progress = measurementColorProgress(item.minValue, item.maxValue, latest?.value),
+    )
+    val container by animateColorAsState(
+        targetValue = targetColors.container,
+        label = "MeasurementCardContainer",
+    )
+    val accent by animateColorAsState(
+        targetValue = targetColors.accent,
+        label = "MeasurementCardAccent",
+    )
+    val onContainer by animateColorAsState(
+        targetValue = targetColors.onContainer,
+        label = "MeasurementCardOnContainer",
+    )
+    val colors = targetColors.copy(accent = accent, container = container, onContainer = onContainer)
     Card(
         onClick = onOpen,
         modifier = Modifier
@@ -594,8 +621,8 @@ private fun MeasurementRailCard(
             .height(RailCardHeight),
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = colors.container,
-            contentColor = colors.onContainer,
+            containerColor = container,
+            contentColor = onContainer,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {

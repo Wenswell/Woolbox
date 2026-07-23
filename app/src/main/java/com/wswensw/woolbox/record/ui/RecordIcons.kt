@@ -11,6 +11,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -21,7 +22,7 @@ import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.TodoTask
 import java.text.BreakIterator
 import java.util.Locale
-import kotlin.math.floor
+import kotlin.math.pow
 
 /** Discrete progress stages used for Records card color. */
 internal enum class ProgressColorStage {
@@ -41,8 +42,11 @@ internal data class RecordItemColors(
 )
 
 /**
- * Colors from progress (0..1+, or completed), not item name.
- * Accent blends across stage stops; container follows the discrete stage.
+ * Progress colors: single primary ramp while in progress, fixed green when done.
+ * Never uses secondary/tertiary (often pink/rose under dynamic color).
+ *
+ * - IDLE → LATE: gray → primary deepens (container wash strengthens with progress)
+ * - DONE: success green, hue-distinct from LATE so "almost" ≠ "done"
  */
 @Composable
 internal fun recordProgressColors(
@@ -51,42 +55,36 @@ internal fun recordProgressColors(
 ): RecordItemColors {
     val scheme = MaterialTheme.colorScheme
     val stage = progressColorStage(progress = progress, completed = completed)
-    val t = colorProgressUnit(progress = progress, completed = completed)
+    val unit = colorProgressUnit(progress = progress, completed = completed)
+    val dark = scheme.background.luminance() < 0.5f
+    val primary = scheme.primary
+    val surface = scheme.surface
+    val idleAccent = scheme.onSurfaceVariant
 
-    val accentStops = listOf(
-        scheme.onSurfaceVariant,
-        scheme.primary,
-        scheme.secondary,
-        scheme.tertiary,
-        scheme.tertiary,
-    )
-    val accent = if (stage == ProgressColorStage.DONE) {
-        scheme.tertiary
+    if (stage == ProgressColorStage.DONE) {
+        return recordsDoneColors(dark = dark)
+    }
+
+    // Continuous primary strength 0..1 for incomplete work only.
+    val ramp = unit.pow(0.9f)
+    // Accent: stay readable; move clearly from muted → full primary by LATE.
+    val accent = when (stage) {
+        ProgressColorStage.IDLE -> idleAccent
+        else -> lerp(idleAccent, primary, 0.40f + 0.60f * ramp)
+    }
+    // Container wash: wide steps so deepening is obvious.
+    val wash = when (stage) {
+        ProgressColorStage.IDLE -> 0.06f
+        ProgressColorStage.EARLY -> 0.12f + 0.08f * stageLocalUnit(unit, 0f, 1f / 3f)
+        ProgressColorStage.MID -> 0.24f + 0.08f * stageLocalUnit(unit, 1f / 3f, 2f / 3f)
+        ProgressColorStage.LATE -> 0.36f + 0.10f * stageLocalUnit(unit, 2f / 3f, 1f)
+        ProgressColorStage.DONE -> 0f
+    }
+    val container = lerp(surface, primary, wash.coerceIn(0.06f, 0.48f))
+    val onContainer = if (container.luminance() > 0.5f) {
+        scheme.onSurface
     } else {
-        lerpColorStops(accentStops, t)
-    }
-
-    val (materialContainer, onContainer) = when (stage) {
-        ProgressColorStage.IDLE -> scheme.surfaceContainerHigh to scheme.onSurface
-        ProgressColorStage.EARLY -> scheme.primaryContainer to scheme.onPrimaryContainer
-        ProgressColorStage.MID -> scheme.secondaryContainer to scheme.onSecondaryContainer
-        ProgressColorStage.LATE -> scheme.tertiaryContainer to scheme.onTertiaryContainer
-        ProgressColorStage.DONE -> scheme.tertiaryContainer to scheme.onTertiaryContainer
-    }
-
-    val container = when {
-        stage == ProgressColorStage.DONE -> materialContainer
-        isNearNeutralSurface(materialContainer, scheme.surface) -> {
-            val tint = when (stage) {
-                ProgressColorStage.IDLE -> 0.10f
-                ProgressColorStage.EARLY -> 0.16f
-                ProgressColorStage.MID -> 0.20f
-                ProgressColorStage.LATE -> 0.24f
-                ProgressColorStage.DONE -> 0.28f
-            }
-            lerp(scheme.surface, accent, tint)
-        }
-        else -> materialContainer
+        scheme.surface
     }
 
     return RecordItemColors(
@@ -95,6 +93,31 @@ internal fun recordProgressColors(
         onContainer = onContainer,
         stage = stage,
     )
+}
+
+/** Fixed success green — independent of dynamic secondary/tertiary. */
+internal fun recordsDoneColors(dark: Boolean): RecordItemColors {
+    return if (dark) {
+        RecordItemColors(
+            accent = Color(0xFF5EDF96),
+            container = Color(0xFF143526),
+            onContainer = Color(0xFFD4F5E2),
+            stage = ProgressColorStage.DONE,
+        )
+    } else {
+        RecordItemColors(
+            accent = Color(0xFF0B7A43),
+            container = Color(0xFFC8F0D8),
+            onContainer = Color(0xFF0A3A22),
+            stage = ProgressColorStage.DONE,
+        )
+    }
+}
+
+/** 0..1 progress inside [start, end). */
+internal fun stageLocalUnit(unit: Float, start: Float, end: Float): Float {
+    if (end <= start) return 0f
+    return ((unit - start) / (end - start)).coerceIn(0f, 1f)
 }
 
 internal fun progressColorStage(
@@ -108,7 +131,7 @@ internal fun progressColorStage(
     return ProgressColorStage.LATE
 }
 
-/** Maps progress into 0f..1f for continuous accent blending. */
+/** Maps progress into 0f..1f for continuous blending (incomplete path only uses this). */
 internal fun colorProgressUnit(
     progress: Float,
     completed: Boolean = false,
@@ -161,29 +184,6 @@ internal fun streakQuantityProgress(
     if (streakCurrent >= 3) return 2f / 3f
     if (streakCurrent >= 1) return 1f / 3f
     return if (todayValue > 0.0) 1f / 6f else 0f
-}
-
-internal fun lerpColorStops(stops: List<Color>, unit: Float): Color {
-    require(stops.size >= 2)
-    val t = unit.coerceIn(0f, 1f)
-    if (t <= 0f) return stops.first()
-    if (t >= 1f) return stops.last()
-    val segments = stops.lastIndex
-    val scaled = t * segments
-    val index = floor(scaled.toDouble()).toInt().coerceIn(0, segments - 1)
-    val fraction = (scaled - index).coerceIn(0f, 1f)
-    return lerp(stops[index], stops[index + 1], fraction)
-}
-
-private fun isNearNeutralSurface(color: Color, surface: Color): Boolean {
-    fun channelDelta(a: Float, b: Float) = kotlin.math.abs(a - b)
-    val chroma =
-        maxOf(color.red, color.green, color.blue) - minOf(color.red, color.green, color.blue)
-    val nearSurface =
-        channelDelta(color.red, surface.red) < 0.04f &&
-            channelDelta(color.green, surface.green) < 0.04f &&
-            channelDelta(color.blue, surface.blue) < 0.04f
-    return chroma < 0.04f || nearSurface
 }
 
 @Composable

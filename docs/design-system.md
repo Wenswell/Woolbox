@@ -128,7 +128,7 @@ Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分
 ### Records 视觉规则
 
 - 字阶：section `titleSmall` primary；卡标题 `titleMedium` SemiBold；主值 `titleLarge` SemiBold + accent；次文案 `bodySmall`/`labelMedium` 且 `onContainer` 0.72。
-- 色：按进度档位 + 渐变，不用名称哈希。档位 `IDLE / EARLY / MID / LATE / DONE`（阈值 0、1/3、2/3、1）；accent 在档位色标间连续插值，container 取档位 Material container。Tasks 用子事项完成比；有目标的累计用累计/目标；无目标累计用今日是否有记录 + 连击档（1–2 / 3–6 / 7+）；Measurement 用最新值在 min–max 中的位置。Manage 列表无实时进度时固定 IDLE。
+- 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（container 洗色约 6%→46%）；`LATE` 仍为 primary 深色，**`DONE` 固定成功绿**（与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用今日记录 + 连击档；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 动作：新建 / 顶栏加号为 tonal；Manage 与完成折叠为普通 `IconButton`。
 - Accumulate 圆环表达进度；主值只显示当前累计；目标用火苗 + 目标值，不重复百分比或 `current / target`。
