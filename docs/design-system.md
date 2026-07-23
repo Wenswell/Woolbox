@@ -110,16 +110,26 @@ Records 根页为单页三分区（同一 `LazyColumn`，`16dp` 块间距），�
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Tasks` | 全宽进度卡；圆环显示 `N / M`，已完成折叠。section 旁 Manage、新建纯 icon；点卡打开子事项进度 Sheet。 |
+| `Tasks` | 全宽有色进度卡；圆环显示 `N / M`，已完成折叠。section 旁 Manage、新建纯 icon；点卡打开子事项进度 Sheet。 |
 | `Manage tasks` / `Edit task` | 管理页展示全部任务；独立编辑路由提供标题、一级子事项和删除，顶栏为删除/保存 icon。 |
-| `Accumulate` | section 旁 Manage、新建 icon；横向卡片轨（约 `240×164dp`）以目标圆环为主视觉，显示今日累计、目标和连击；点卡打开快速记录 Sheet。 |
+| `Accumulate` | section 旁 Manage、新建 icon；横向卡片轨（`240×136dp`）以目标圆环为主视觉，显示当前值、目标和连击；目标文案不重复当前值或百分比；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；无 mode 切换；Check 保存。 |
-| `Measurement` | section 旁 Manage、新建 icon；横向卡片轨显示最新值与时间；点卡打开预览 Sheet。 |
+| `Measurement` | section 旁 Manage、新建 icon；横向卡片轨（`240×136dp`）使用 `48dp` 记录图标，并按标题、最新值、时间分配层级；点卡打开预览 Sheet。 |
 | `New/Edit measurement` | 固定 `MEASUREMENT` 表单；字段为最小值、最大值、步进、单位和优先级，无默认值、目标/推荐时段；Check 保存。 |
 | Measurement preview Sheet | 标题、最新值、24 小时原始时间序列图表、流水和离散 Slider 录入。 |
 | 累计记录 Sheet | 身份与进度合并为同一标题行；下方仅数值输入与今日流水。 |
 
 未配置凭据、远端失败或对应列表为空时，使用空状态卡与主操作按钮；加载中显示居中进度指示。
+
+### Records 根页卡片视觉规则
+
+本轮只调整 Records 根页三类内容卡的视觉层级与冗余信息，不改变卡片点击、数据来源和记录流程。
+
+- Tasks 使用由任务标题稳定派生的有色容器；完成态沿用色相并降低内容强调，不使用灰色 `surfaceContainer` 作为卡片底色。
+- Accumulate 的圆环负责表达完成比例；主数值显示当前累计，目标只显示一次（`Daily target` 或 `Weekly target`），不再显示 `0% today` 或 `0 / target` 这类重复组合。
+- Measurement 使用更大的 `48dp` 记录图标；标题、最新值和时间按主次层级排列，卡片高度缩短后仍保持文本不裁剪、不重叠。
+
+验收标准：浅色与深色主题下，Tasks 不出现灰底；两类横向卡均为 `136dp` 高；Accumulate 卡片不出现百分比和当前/目标重复文案；Measurement 图标与文字在卡片内视觉平衡，长标题和长数值仍按既有省略规则显示。
 
 `Manage records` 使用标准路由骨架；顶栏分别新建累计与测量；编辑按 `item.mode` 进入对应表单。
 
