@@ -1,6 +1,5 @@
 package com.wswensw.template.record.ui
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -12,15 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -43,241 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.template.record.model.GoalPeriod
 import com.wswensw.template.record.model.RecordItem
-import com.wswensw.template.ui.TemplateStyle
 import kotlin.math.roundToInt
-
-@Composable
-internal fun GoalCard(
-    item: RecordItem,
-    cumulative: Double,
-    featured: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    checkNotNull(item.goalValue)
-    when (checkNotNull(item.goalPeriod)) {
-        GoalPeriod.DAY -> DailyGoalCard(
-            item = item,
-            cumulative = cumulative,
-            featured = featured,
-            onClick = onClick,
-            modifier = modifier,
-        )
-        GoalPeriod.WEEK -> WeeklyGoalCard(
-            item = item,
-            cumulative = cumulative,
-            featured = featured,
-            onClick = onClick,
-            modifier = modifier,
-        )
-    }
-}
-
-@Composable
-private fun DailyGoalCard(
-    item: RecordItem,
-    cumulative: Double,
-    featured: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    val target = checkNotNull(item.goalValue)
-    val itemColors = recordItemColors(item.name)
-    val progress by animateFloatAsState(
-        targetValue = goalProgressRatio(cumulative, target).toFloat(),
-        animationSpec = spring(),
-        label = "DailyGoalProgress",
-    )
-    val reached = cumulative >= target
-    val containerColor by animateColorAsState(
-        targetValue = if (reached) {
-            MaterialTheme.colorScheme.tertiaryContainer
-        } else {
-            itemColors.container
-        },
-        label = "DailyGoalContainer",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (reached) {
-            MaterialTheme.colorScheme.onTertiaryContainer
-        } else {
-            itemColors.onContainer
-        },
-        label = "DailyGoalContent",
-    )
-    val progressColor by animateColorAsState(
-        targetValue = if (reached) {
-            MaterialTheme.colorScheme.tertiary
-        } else {
-            itemColors.accent
-        },
-        label = "DailyGoalProgressColor",
-    )
-
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = if (featured) 132.dp else 96.dp),
-        shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DailyGoalMedallion(
-                item = item,
-                progress = progress,
-                reached = reached,
-                progressColor = progressColor,
-                size = if (featured) 76.dp else 68.dp,
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Daily goal",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = contentColor.copy(alpha = 0.8f),
-                )
-                Text(
-                    text = displayRecordName(item.name),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = goalValueLabel(cumulative, target, item.unit),
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                GoalStatus(
-                    progress = progress,
-                    reached = reached,
-                    periodLabel = "today",
-                    color = progressColor,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeeklyGoalCard(
-    item: RecordItem,
-    cumulative: Double,
-    featured: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    val target = checkNotNull(item.goalValue)
-    val itemColors = recordItemColors(item.name)
-    val progress by animateFloatAsState(
-        targetValue = goalProgressRatio(cumulative, target).toFloat(),
-        animationSpec = spring(),
-        label = "WeeklyGoalProgress",
-    )
-    val reached = cumulative >= target
-    val containerColor by animateColorAsState(
-        targetValue = if (reached) {
-            MaterialTheme.colorScheme.tertiaryContainer
-        } else {
-            itemColors.container
-        },
-        label = "WeeklyGoalContainer",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (reached) {
-            MaterialTheme.colorScheme.onTertiaryContainer
-        } else {
-            itemColors.onContainer
-        },
-        label = "WeeklyGoalContent",
-    )
-    val progressColor by animateColorAsState(
-        targetValue = if (reached) {
-            MaterialTheme.colorScheme.tertiary
-        } else {
-            itemColors.accent
-        },
-        label = "WeeklyGoalProgressColor",
-    )
-
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = if (featured) 132.dp else 108.dp),
-        shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RecordItemInitial(
-                    name = item.name,
-                    size = if (featured) 48.dp else 44.dp,
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Weekly goal",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = contentColor.copy(alpha = 0.8f),
-                    )
-                    Text(
-                        text = displayRecordName(item.name),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = goalValueLabel(cumulative, target, item.unit),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
-                color = progressColor,
-                trackColor = progressColor.copy(alpha = 0.18f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-            Spacer(Modifier.height(6.dp))
-            GoalStatus(
-                progress = progress,
-                reached = reached,
-                periodLabel = "this week",
-                color = progressColor,
-            )
-        }
-    }
-}
 
 @Composable
 internal fun DailyGoalMedallion(

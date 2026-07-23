@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,31 +33,29 @@ import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
 import com.wswensw.template.ui.TemplateLazyRouteScaffold
 import com.wswensw.template.ui.TemplateStyle
+import java.util.Locale
 
 @Composable
 fun ManageRecordsScreen(
     state: RecordsUiState,
+    mode: RecordMode,
     onBack: () -> Unit,
-    onNewAccumulate: () -> Unit,
-    onNewMeasurement: () -> Unit,
+    onNew: () -> Unit,
     onEditItem: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val copy = manageRecordsCopy(mode)
+    val items = managedRecordItems(state.activeItems, mode)
+
     TemplateLazyRouteScaffold(
-        title = "Manage records",
+        title = copy.title,
         onBack = onBack,
         modifier = modifier,
         actions = {
-            FilledTonalIconButton(onClick = onNewAccumulate) {
+            FilledTonalIconButton(onClick = onNew) {
                 Icon(
                     painter = painterResource(R.drawable.ic_add_24),
-                    contentDescription = "New accumulate",
-                )
-            }
-            FilledTonalIconButton(onClick = onNewMeasurement) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ShowChart,
-                    contentDescription = "New measurement",
+                    contentDescription = copy.newContentDescription,
                 )
             }
         },
@@ -74,39 +71,58 @@ fun ManageRecordsScreen(
                     CircularProgressIndicator()
                 }
             }
-            state.activeItems.isEmpty() -> item {
+            items.isEmpty() -> item {
                 RecordsStatusCard(
-                    message = "No active items yet.",
-                    actionLabel = "Create accumulate",
-                    onAction = onNewAccumulate,
+                    message = copy.emptyMessage,
+                    actionLabel = copy.actionLabel,
+                    onAction = onNew,
                     modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal),
                 )
             }
-            else -> {
-                item {
-                    Text(
-                        text = "Active",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(
-                            horizontal = TemplateStyle.spacing.pageHorizontal,
-                            vertical = 4.dp,
-                        ),
-                    )
-                }
-                items(orderedRecordItems(state.activeItems), key = RecordItem::id) { item ->
-                    ManageRecordCard(
-                        item = item,
-                        onClick = { onEditItem(item.id) },
-                        modifier = Modifier
-                            .padding(horizontal = TemplateStyle.spacing.pageHorizontal)
-                            .padding(bottom = 12.dp),
-                    )
-                }
+            else -> items(items, key = RecordItem::id) { item ->
+                ManageRecordCard(
+                    item = item,
+                    onClick = { onEditItem(item.id) },
+                    modifier = Modifier
+                        .padding(horizontal = TemplateStyle.spacing.pageHorizontal)
+                        .padding(bottom = 12.dp),
+                )
             }
         }
     }
+}
+
+private data class ManageRecordsCopy(
+    val title: String,
+    val emptyMessage: String,
+    val actionLabel: String,
+    val newContentDescription: String,
+)
+
+private fun manageRecordsCopy(mode: RecordMode): ManageRecordsCopy = when (mode) {
+    RecordMode.ACCUMULATE -> ManageRecordsCopy(
+        title = "Manage accumulates",
+        emptyMessage = "No accumulate items yet.",
+        actionLabel = "Create accumulate",
+        newContentDescription = "New accumulate",
+    )
+    RecordMode.MEASUREMENT -> ManageRecordsCopy(
+        title = "Manage measurements",
+        emptyMessage = "No measurement items yet.",
+        actionLabel = "Create measurement",
+        newContentDescription = "New measurement",
+    )
+}
+
+internal fun managedRecordItems(
+    items: List<RecordItem>,
+    mode: RecordMode,
+): List<RecordItem> = when (mode) {
+    RecordMode.ACCUMULATE -> orderedRecordItems(items)
+        .filter { it.mode == RecordMode.ACCUMULATE }
+    RecordMode.MEASUREMENT -> items
+        .filter { it.mode == RecordMode.MEASUREMENT }
+        .sortedBy { it.name.lowercase(Locale.ROOT) }
 }
 
 @Composable

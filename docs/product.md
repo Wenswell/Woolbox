@@ -107,8 +107,8 @@ Tile 用于不离开目标应用的快速启动。点击后系统面板收起，
 1. 首次使用在 Setting 的 `Records connection` 配置 Basic Auth 用户名和密码；凭据使用 Android Keystore 加密保存。
 2. 底栏选择 `Records` 进入单页根列表，顺序为 **Tasks → Accumulate → Measurement**（无 Tasks/Trackers 页签）。
 3. **Tasks**：全宽进度卡；未完成按创建顺序，已完成收在折叠区并按完成时间倒序。顶部纯图标分别进入 `Manage tasks` 和 `New task`；点卡打开子事项进度 Sheet，只能勾选子事项。低频标题、子事项和删除操作在管理页的 `Edit task` 完成。
-4. **Accumulate**：section 旁为 Manage 与加号（纯 icon）；内容为横向目标圆环卡片轨。点卡打开快速记录 Sheet；加号进入 `New accumulate`。Manage 按项 mode 进入对应编辑路由。
-5. **Measurement**：section 旁为 Manage 与加号；横向卡片显示最新值与时间。点卡打开 24 小时预览 Sheet，显示原始图表、流水和滑块录入；加号进入 `New measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
+4. **Accumulate**：section 旁为 Manage 与加号（纯 icon）；内容为横向目标圆环卡片轨。点卡打开快速记录 Sheet；加号进入 `New accumulate`；Manage 进入只列出累计项的 `Manage accumulates`，卡片只进入 `Edit accumulate`。
+5. **Measurement**：section 旁为 Manage 与加号；横向卡片显示最新值与时间。点卡打开 24 小时预览 Sheet，显示原始图表、流水和滑块录入；加号进入 `New measurement`；Manage 进入只列出测量项的 `Manage measurements`，卡片只进入 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
 6. 累计确认写入时提交当前设备时刻，成功关闭 Sheet 并短时 `Undo`；失败保持 Sheet 并显示错误。
 7. 新建/编辑均为独立全屏路由，顶栏 New/Edit + 纯 icon 保存；累计与测量表单分离，无 mode 切换。
 8. PC 管理页的 `Entries` 仅用于筛选和批量删除流水；`Record items` 可配置记录模式；`Logs` 显示每次成功写操作的对象、动作、时间和变更内容。

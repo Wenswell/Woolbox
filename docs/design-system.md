@@ -26,7 +26,8 @@ TemplateTheme
    │        ├─ Theme entry
    │        └─ Records connection ──> Credentials form
    ├─ Manage tasks ──> New / Edit task
-   ├─ Manage records ──> New / Edit accumulate | New / Edit measurement
+   ├─ Manage accumulates ──> New / Edit accumulate
+   └─ Manage measurements ──> New / Edit measurement
    ├─ Global Copy
    │  ├─ primary action
    │  ├─ accessibility state
@@ -110,9 +111,11 @@ Records 根页为单页三分区（同一 `LazyColumn`，`16dp` 块间距），�
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Tasks` | 全宽有色进度卡；圆环显示 `N / M`，已完成折叠。section 旁 Manage、新建纯 icon；点卡打开子事项进度 Sheet。 |
+| `Tasks` | 全宽有色进度卡；标题右侧显示 `N / M`，标题下显示首个未完成子事项的 `Next`；已完成折叠。section 旁 Manage、新建纯 icon；点卡打开子事项进度 Sheet。 |
 | `Manage tasks` / `Edit task` | 管理页展示全部任务；独立编辑路由提供标题、一级子事项和删除，顶栏为删除/保存 icon。 |
-| `Accumulate` | section 旁 Manage、新建 icon；横向卡片轨（`240×136dp`）以目标圆环为主视觉，显示当前值、目标和连击；目标文案不重复当前值或百分比；点卡打开快速记录 Sheet。 |
+| `Manage accumulates` | 只显示 `ACCUMULATE` 记录项；顶栏加号进入 `New accumulate`，卡片进入 `Edit accumulate`。 |
+| `Manage measurements` | 只显示 `MEASUREMENT` 记录项；顶栏加号进入 `New measurement`，卡片进入 `Edit measurement`。 |
+| `Accumulate` | section 旁 Manage、新建 icon；横向卡片轨（`240×136dp`）以目标圆环为主视觉，显示当前值、火苗图标+目标值和连击；不显示 `Daily target` 文本、百分比或当前/目标重复组合；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；无 mode 切换；Check 保存。 |
 | `Measurement` | section 旁 Manage、新建 icon；横向卡片轨（`240×136dp`）使用 `48dp` 记录图标，并按标题、最新值、时间分配层级；点卡打开预览 Sheet。 |
 | `New/Edit measurement` | 固定 `MEASUREMENT` 表单；字段为最小值、最大值、步进、单位和优先级，无默认值、目标/推荐时段；Check 保存。 |
@@ -123,15 +126,17 @@ Records 根页为单页三分区（同一 `LazyColumn`，`16dp` 块间距），�
 
 ### Records 根页卡片视觉规则
 
-本轮只调整 Records 根页三类内容卡的视觉层级与冗余信息，不改变卡片点击、数据来源和记录流程。
+本轮调整 Records 根页三类内容卡的视觉层级、冗余信息和两类记录项的独立管理入口，不改变卡片点击、数据来源和记录流程。
 
 - Tasks 使用由任务标题稳定派生的有色容器；完成态沿用色相并降低内容强调，不使用灰色 `surfaceContainer` 作为卡片底色。
-- Accumulate 的圆环负责表达完成比例；主数值显示当前累计，目标只显示一次（`Daily target` 或 `Weekly target`），不再显示 `0% today` 或 `0 / target` 这类重复组合。
+- Accumulate 的圆环负责表达完成比例；主数值显示当前累计，目标用火苗图标配目标值，只显示一次，不再显示 `Daily target`、`0% today` 或 `0 / target` 这类重复组合。
 - Measurement 使用更大的 `48dp` 记录图标；标题、最新值和时间按主次层级排列，卡片高度缩短后仍保持文本不裁剪、不重叠。
+- Accumulate 与 Measurement 的 Manage 分别进入独立列表；列表只含本模式记录项，顶栏只有本模式的新建入口，卡片只进入本模式编辑页。
+- Tasks 卡片将 `N / M` 放在标题右侧；标题下显示首个未完成子事项，使用 `Next · ...` 文案。
 
-验收标准：浅色与深色主题下，Tasks 不出现灰底；两类横向卡均为 `136dp` 高；Accumulate 卡片不出现百分比和当前/目标重复文案；Measurement 图标与文字在卡片内视觉平衡，长标题和长数值仍按既有省略规则显示。
+验收标准：浅色与深色主题下，Tasks 不出现灰底；两类横向卡均为 `136dp` 高；Accumulate 卡片用火苗图标表达目标且不出现 `Daily target`、百分比和当前/目标重复文案；两个 Manage 列表各只显示一种模式，且仅提供本模式的新建与编辑；Tasks 标题右侧显示进度，下面显示下一个未完成子事项；Measurement 图标与文字在卡片内视觉平衡，长标题和长数值仍按既有省略规则显示。
 
-`Manage records` 使用标准路由骨架；顶栏分别新建累计与测量；编辑按 `item.mode` 进入对应表单。
+`Manage accumulates` 与 `Manage measurements` 使用相同的标准路由骨架；每页顶栏仅提供本模式新建入口，编辑路由固定为本模式表单。
 
 Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删和删除任务只在 `Edit task`。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
 

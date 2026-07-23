@@ -5,6 +5,8 @@ import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
+import com.wswensw.template.record.model.TodoStep
+import com.wswensw.template.record.model.TodoTask
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -68,6 +70,25 @@ class RecordsScreenTest {
             ),
         )
         assertEquals(listOf(3L, 2L, 1L, 4L), ordered.map(RecordItem::id))
+    }
+
+    @Test
+    fun managedRecordItemsOnlyContainTheRequestedMode() {
+        val items = listOf(
+            recordItem(id = 1, name = "Water", priority = 1, period = GoalPeriod.DAY),
+            recordItem(id = 2, name = "Temperature", priority = 2, period = null)
+                .copy(mode = RecordMode.MEASUREMENT),
+            recordItem(id = 3, name = "Reading", priority = 3, period = GoalPeriod.WEEK),
+        )
+
+        assertEquals(
+            listOf(3L, 1L),
+            managedRecordItems(items, RecordMode.ACCUMULATE).map(RecordItem::id),
+        )
+        assertEquals(
+            listOf(2L),
+            managedRecordItems(items, RecordMode.MEASUREMENT).map(RecordItem::id),
+        )
     }
 
     @Test
@@ -149,22 +170,24 @@ class RecordsScreenTest {
     }
 
     @Test
-    fun quickRecordSupportingTextShowsOnlyGoalTarget() {
-        val item = recordItem(
+    fun nextTaskStepTitleReturnsFirstIncompleteStep() {
+        val task = TodoTask(
             id = 1,
-            name = "Steps",
-            priority = 1,
-            period = GoalPeriod.DAY,
-            goalValue = 6000.0,
+            title = "Plan",
+            completedAt = null,
+            createdAt = 0,
+            updatedAt = 0,
+            steps = listOf(
+                TodoStep(1, 1, "Done", completedAt = 1, createdAt = 0, updatedAt = 0),
+                TodoStep(2, 1, "Review", completedAt = null, createdAt = 0, updatedAt = 0),
+                TodoStep(3, 1, "Send", completedAt = null, createdAt = 0, updatedAt = 0),
+            ),
         )
 
+        assertEquals("Review", nextTaskStepTitle(task))
         assertEquals(
-            "Daily target · 6000 count",
-            quickRecordSupportingText(item, hasGoal = true, goalReached = false),
-        )
-        assertEquals(
-            "Goal reached",
-            quickRecordSupportingText(item, hasGoal = true, goalReached = true),
+            null,
+            nextTaskStepTitle(task.copy(steps = task.steps.map { it.copy(completedAt = 1) })),
         )
     }
 

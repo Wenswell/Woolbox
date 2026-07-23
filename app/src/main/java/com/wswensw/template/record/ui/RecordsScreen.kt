@@ -67,7 +67,8 @@ private val RailCardSpacing = 12.dp
 fun RecordsScreen(
     state: RecordsUiState,
     onManageTasks: () -> Unit,
-    onManageRecords: () -> Unit,
+    onManageAccumulates: () -> Unit,
+    onManageMeasurements: () -> Unit,
     onCreateAccumulate: () -> Unit,
     onCreateMeasurement: () -> Unit,
     onConfigureConnection: () -> Unit,
@@ -174,10 +175,10 @@ fun RecordsScreen(
                         onAdd = onCreateAccumulate,
                         addContentDescription = "New accumulate",
                         leadingActions = {
-                            FilledTonalIconButton(onClick = onManageRecords) {
+                            FilledTonalIconButton(onClick = onManageAccumulates) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_settings_24),
-                                    contentDescription = "Manage records",
+                                    contentDescription = "Manage accumulates",
                                 )
                             }
                         },
@@ -214,10 +215,10 @@ fun RecordsScreen(
                         onAdd = onCreateMeasurement,
                         addContentDescription = "New measurement",
                         leadingActions = {
-                            FilledTonalIconButton(onClick = onManageRecords) {
+                            FilledTonalIconButton(onClick = onManageMeasurements) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_settings_24),
-                                    contentDescription = "Manage records",
+                                    contentDescription = "Manage measurements",
                                 )
                             }
                         },
@@ -311,6 +312,7 @@ private fun TaskProgressCard(
 ) {
     val completed = task.completedStepCount
     val progress = completed.toFloat() / task.steps.size.toFloat()
+    val nextStepTitle = nextTaskStepTitle(task)
     val colors = recordItemColors(task.title)
     val cardContentColor = colors.onContainer.copy(
         alpha = if (task.isCompleted) 0.72f else 1f,
@@ -356,21 +358,37 @@ private fun TaskProgressCard(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = task.title,
-                    color = cardContentColor,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "$completed / ${task.steps.size} subtasks",
-                    color = cardContentColor.copy(alpha = 0.72f),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-                if (task.isCompleted) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = task.title,
+                        color = cardContentColor,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "$completed/${task.steps.size}",
+                        color = cardContentColor.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (nextStepTitle != null) {
+                    Text(
+                        text = "Next · $nextStepTitle",
+                        color = cardContentColor.copy(alpha = 0.72f),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                } else if (task.isCompleted) {
                     task.completedAt?.let { completedAt ->
                         Text(
                             text = taskCompletedAtLabel(completedAt),
@@ -464,19 +482,7 @@ private fun AccumulateRailCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (hasGoal) {
-                    Text(
-                        text = quickRecordSupportingText(
-                            item = item,
-                            hasGoal = true,
-                            goalReached = goalReached,
-                        ),
-                        color = if (goalReached) progressColor else contentColor.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else if (item.description.isNotEmpty()) {
+                if (!hasGoal && item.description.isNotEmpty()) {
                     Text(
                         text = item.description,
                         color = contentColor.copy(alpha = 0.72f),
@@ -486,10 +492,25 @@ private fun AccumulateRailCard(
                     )
                 }
                 val streakText = streak?.let(::streakLabel)
-                if (streakText != null) {
+                val summaryText = buildString {
+                    if (hasGoal) {
+                        append(formatValue(checkNotNull(target)))
+                        if (item.unit.isNotBlank()) {
+                            append(" ")
+                            append(item.unit)
+                        }
+                    }
+                    if (hasGoal && streakText != null) {
+                        append(" · ")
+                    }
+                    if (streakText != null) {
+                        append(streakText)
+                    }
+                }
+                if (summaryText.isNotEmpty()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.LocalFireDepartment,
@@ -498,11 +519,12 @@ private fun AccumulateRailCard(
                             modifier = Modifier.size(14.dp),
                         )
                         Text(
-                            text = streakText,
+                            text = summaryText,
                             color = progressColor,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -652,20 +674,8 @@ internal fun crossedGoalThreshold(
     return previous < target && current >= target
 }
 
-internal fun quickRecordSupportingText(
-    item: RecordItem,
-    hasGoal: Boolean,
-    goalReached: Boolean,
-): String = when {
-    goalReached -> "Goal reached"
-    hasGoal -> {
-        val target = checkNotNull(item.goalValue)
-        val period = if (item.goalPeriod == GoalPeriod.DAY) "Daily" else "Weekly"
-        "$period target · ${formatValue(target)} ${item.unit}"
-    }
-    item.description.isNotEmpty() -> item.description
-    else -> "Today"
-}
+internal fun nextTaskStepTitle(task: TodoTask): String? =
+    task.steps.firstOrNull { !it.isCompleted }?.title
 
 internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
     items.sortedWith(

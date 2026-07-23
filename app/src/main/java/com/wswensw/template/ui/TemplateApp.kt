@@ -193,9 +193,13 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     taskSheetId = null
                                     navController.navigate(TemplateRoutes.MANAGE_TASKS)
                                 },
-                                onManageRecords = {
+                                onManageAccumulates = {
                                     recordSheetItemId = null
-                                    navController.navigate(TemplateRoutes.MANAGE_RECORDS)
+                                    navController.navigate(TemplateRoutes.MANAGE_ACCUMULATES)
+                                },
+                                onManageMeasurements = {
+                                    measurementSheetItemId = null
+                                    navController.navigate(TemplateRoutes.MANAGE_MEASUREMENTS)
                                 },
                                 onCreateAccumulate = {
                                     recordSheetItemId = null
@@ -361,23 +365,29 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onEdit = { taskId -> navController.navigate(TemplateRoutes.taskDetail(taskId)) },
                 )
             }
-            composable(TemplateRoutes.MANAGE_RECORDS) {
+            composable(TemplateRoutes.MANAGE_ACCUMULATES) {
                 ManageRecordsScreen(
                     state = recordsState,
+                    mode = RecordMode.ACCUMULATE,
                     onBack = { navController.popBackStack() },
-                    onNewAccumulate = {
+                    onNew = {
                         navController.navigate(TemplateRoutes.RECORD_ITEM_ACCUMULATE_NEW)
                     },
-                    onNewMeasurement = {
+                    onEditItem = { itemId ->
+                        navController.navigate(TemplateRoutes.accumulateItemEdit(itemId))
+                    },
+                )
+            }
+            composable(TemplateRoutes.MANAGE_MEASUREMENTS) {
+                ManageRecordsScreen(
+                    state = recordsState,
+                    mode = RecordMode.MEASUREMENT,
+                    onBack = { navController.popBackStack() },
+                    onNew = {
                         navController.navigate(TemplateRoutes.RECORD_ITEM_MEASUREMENT_NEW)
                     },
                     onEditItem = { itemId ->
-                        val item = recordsState.findItem(itemId)
-                        val route = when (item?.mode) {
-                            RecordMode.MEASUREMENT -> TemplateRoutes.measurementItemEdit(itemId)
-                            else -> TemplateRoutes.accumulateItemEdit(itemId)
-                        }
-                        navController.navigate(route)
+                        navController.navigate(TemplateRoutes.measurementItemEdit(itemId))
                     },
                 )
             }
@@ -697,7 +707,8 @@ private object TemplateRoutes {
 
     fun copyHistoryEdit(historyId: Long) = "global-copy/history/$historyId"
     const val MANAGE_TASKS = "manage-tasks"
-    const val MANAGE_RECORDS = "manage-records"
+    const val MANAGE_ACCUMULATES = "manage-accumulates"
+    const val MANAGE_MEASUREMENTS = "manage-measurements"
     const val RECORDS_CONNECTION = "records-connection"
     const val TASK_NEW = "task/new"
     const val TASK_ID = "taskId"
