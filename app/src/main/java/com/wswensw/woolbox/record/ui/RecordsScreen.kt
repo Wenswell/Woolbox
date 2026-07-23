@@ -1,6 +1,9 @@
 package com.wswensw.woolbox.record.ui
 
+import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.LocalFireDepartment
@@ -36,10 +40,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
@@ -126,6 +132,17 @@ fun RecordsScreen(
                         title = "Records",
                         subtitle = recordsDateLabel(LocalDate.now()),
                     )
+                }
+                val dayOverview = recordsDayOverview(
+                    tasks = state.tasks,
+                    items = state.activeItems,
+                    goalValues = state.goalValues,
+                    streaks = state.streaks,
+                )
+                if (dayOverview.isVisible) {
+                    item {
+                        RecordsDayOverviewRow(overview = dayOverview)
+                    }
                 }
                 item {
                     RecordsSectionHeader(
@@ -321,11 +338,21 @@ private fun TaskProgressCard(
     onOpen: () -> Unit,
 ) {
     val completed = task.completedStepCount
-    val progress = completed.toFloat() / task.steps.size.toFloat()
+    val progress = if (task.steps.isEmpty()) {
+        0f
+    } else {
+        completed.toFloat() / task.steps.size.toFloat()
+    }
+    val reduceMotion = prefersReducedMotion()
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "TaskProgress",
+    )
     val nextStepTitle = nextTaskStepTitle(task)
     val colors = recordItemColors(task.title)
     val cardContentColor = colors.onContainer.copy(
-        alpha = if (task.isCompleted) 0.72f else 1f,
+        alpha = if (task.isCompleted) 0.78f else 1f,
     )
     Card(
         onClick = onOpen,
@@ -333,7 +360,7 @@ private fun TaskProgressCard(
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (task.isCompleted) {
-                colors.container.copy(alpha = 0.72f)
+                colors.container.copy(alpha = 0.82f)
             } else {
                 colors.container
             },
@@ -353,19 +380,28 @@ private fun TaskProgressCard(
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
-                    progress = { progress },
+                    progress = { animatedProgress },
                     modifier = Modifier.fillMaxSize(),
                     color = colors.accent,
                     trackColor = colors.accent.copy(alpha = 0.18f),
                     strokeWidth = 4.dp,
                     gapSize = 0.dp,
                 )
-                Text(
-                    text = "$completed",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.accent,
-                )
+                if (task.isCompleted) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = colors.accent,
+                        modifier = Modifier.size(22.dp),
+                    )
+                } else {
+                    Text(
+                        text = "$completed",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.accent,
+                    )
+                }
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -646,6 +682,69 @@ internal fun RecordsStatusCard(
             }
         }
     }
+}
+
+@Composable
+private fun RecordsDayOverviewRow(overview: RecordsDayOverview) {
+    Text(
+        text = overview.label,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun prefersReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+    }
+}
+
+internal data class RecordsDayOverview(
+    val taskDone: Int,
+    val taskTotal: Int,
+    val goalDone: Int,
+    val goalTotal: Int,
+    val activeStreaks: Int,
+) {
+    val isVisible: Boolean
+        get() = taskTotal > 0 || goalTotal > 0
+
+    val label: String
+        get() = buildList {
+            if (taskTotal > 0) add("Tasks $taskDone/$taskTotal")
+            if (goalTotal > 0) add("Goals $goalDone/$goalTotal")
+            if (activeStreaks > 0) add("Streaks $activeStreaks")
+        }.joinToString(" · ")
+}
+
+internal fun recordsDayOverview(
+    tasks: List<TodoTask>,
+    items: List<RecordItem>,
+    goalValues: Map<Long, Double>,
+    streaks: Map<Long, ItemStreak>,
+): RecordsDayOverview {
+    val goals = goalItems(items)
+    val goalCompletion = focusGoalCompletion(goals, goalValues)
+    val activeStreaks = items.count { item ->
+        item.mode == RecordMode.ACCUMULATE && (streaks[item.id]?.current ?: 0) > 0
+    }
+    return RecordsDayOverview(
+        taskDone = tasks.count(TodoTask::isCompleted),
+        taskTotal = tasks.size,
+        goalDone = goalCompletion.done,
+        goalTotal = goalCompletion.total,
+        activeStreaks = activeStreaks,
+    )
 }
 
 internal data class FocusGoalCompletion(

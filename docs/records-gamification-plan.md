@@ -1,6 +1,6 @@
 # Records 游戏化方案
 
-状态：待确认  
+状态：已落地（包 A/B/C）  
 范围：根页反馈增强（视觉与动效），不改数据模型、API、业务规则  
 目标：让 Tasks / Accumulate / Measurement 根页更有进度感与完成反馈，保持工具应用克制
 
@@ -110,10 +110,9 @@ Snackbar 与现有 Undo 冲突时：Undo 优先；庆祝文案可并入同一条
 4. 包 C
 5. `testDebugUnitTest` + `assembleDebug`，commit；同步 design-system / product
 
-## 开放确认点
+## 落地说明
 
-确认实现前只需拍板：
-
-1. 包 A 是否采用「单行派生总览」；若否，改为仅做 B+C。
-2. 包 C 的 Snackbar：要 / 只要触觉不要文案。
-3. 文案语言：与现有 UI 一致用英文（`done` / `goal met`）还是中文。
+- 包 A：单行 `Tasks a/b · Goals c/d · Streaks n`（无任务且无目标时隐藏）。
+- 包 B：任务环与累计环 `260ms` 进度动画；完成任务中心勾；达标环既有对勾/色相。
+- 包 C：子事项完成轻触觉；父项完成强触觉 + `{title} done`；累计写入触觉，达标文案沿用 `Goal reached ·` 且 Undo 优先。
+- 文案英文；系统动画缩放为 0 时关闭装饰动画。

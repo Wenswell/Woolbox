@@ -1,6 +1,7 @@
 package com.wswensw.woolbox.record.ui
 
 import com.wswensw.woolbox.record.model.GoalPeriod
+import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
@@ -269,5 +270,79 @@ class RecordsScreenTest {
         itemName = "Item",
         itemUnit = "count",
         itemValueType = RecordValueType.NUMBER,
+    )
+
+    @Test
+    fun recordsDayOverviewHidesWhenEmpty() {
+        val overview = recordsDayOverview(
+            tasks = emptyList(),
+            items = emptyList(),
+            goalValues = emptyMap(),
+            streaks = emptyMap(),
+        )
+        assertEquals(false, overview.isVisible)
+        assertEquals("", overview.label)
+    }
+
+    @Test
+    fun recordsDayOverviewSummarizesTasksGoalsAndStreaks() {
+        val tasks = listOf(
+            todoTask(id = 1, completedSteps = 2, totalSteps = 2),
+            todoTask(id = 2, completedSteps = 0, totalSteps = 1),
+        )
+        val items = listOf(
+            recordItem(id = 10, name = "Water", priority = 1, period = GoalPeriod.DAY)
+                .copy(goalValue = 8.0),
+            recordItem(id = 11, name = "Run", priority = 2, period = GoalPeriod.DAY)
+                .copy(goalValue = 5.0),
+            recordItem(id = 12, name = "Note", priority = 3, period = null),
+        )
+        val overview = recordsDayOverview(
+            tasks = tasks,
+            items = items,
+            goalValues = mapOf(10L to 8.0, 11L to 1.0),
+            streaks = mapOf(
+                10L to ItemStreak(current = 3, best = 5),
+                11L to ItemStreak(current = 0, best = 2),
+                12L to ItemStreak(current = 4, best = 4),
+            ),
+        )
+        assertEquals(true, overview.isVisible)
+        assertEquals(1, overview.taskDone)
+        assertEquals(2, overview.taskTotal)
+        assertEquals(1, overview.goalDone)
+        assertEquals(2, overview.goalTotal)
+        assertEquals(2, overview.activeStreaks)
+        assertEquals("Tasks 1/2 · Goals 1/2 · Streaks 2", overview.label)
+    }
+
+    @Test
+    fun crossedGoalThresholdOnlyOnRisingEdge() {
+        assertEquals(true, crossedGoalThreshold(previous = 7.0, current = 8.0, target = 8.0))
+        assertEquals(false, crossedGoalThreshold(previous = 8.0, current = 9.0, target = 8.0))
+        assertEquals(false, crossedGoalThreshold(previous = 1.0, current = 2.0, target = null))
+    }
+
+}
+
+
+private fun todoTask(id: Long, completedSteps: Int, totalSteps: Int): TodoTask {
+    val steps = (0 until totalSteps).map { index ->
+        TodoStep(
+            id = id * 10 + index,
+            taskId = id,
+            title = "Step $index",
+            completedAt = if (index < completedSteps) 1L else null,
+            createdAt = 1L,
+            updatedAt = 1L,
+        )
+    }
+    return TodoTask(
+        id = id,
+        title = "Task $id",
+        completedAt = if (completedSteps >= totalSteps && totalSteps > 0) 1L else null,
+        createdAt = 1L,
+        updatedAt = 1L,
+        steps = steps,
     )
 }

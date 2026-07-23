@@ -1,7 +1,9 @@
 package com.wswensw.woolbox.record.ui
 
+import android.provider.Settings
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +26,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -49,13 +53,26 @@ internal fun DailyGoalMedallion(
     progressColor: Color,
     size: Dp,
 ) {
+    val context = LocalContext.current
+    val reduceMotion = remember(context) {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+    }
     val scale by animateFloatAsState(
-        targetValue = if (reached) 1.06f else 1f,
-        animationSpec = spring(),
+        targetValue = if (reached && !reduceMotion) 1.06f else 1f,
+        animationSpec = if (reduceMotion) tween(0) else spring(),
         label = "DailyGoalMedallionScale",
     )
     val stroke = if (size > 72.dp) 9.dp else 7.5.dp
-    val ratio = progress.coerceAtLeast(0f).toDouble()
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceAtLeast(0f),
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "DailyGoalMedallionProgress",
+    )
+    val ratio = animatedProgress.toDouble()
     Box(
         modifier = Modifier
             .size(size)

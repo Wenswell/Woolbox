@@ -108,7 +108,7 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分区（同一 `LazyColumn`），顺序 **Tasks → Accumulate → Measurement**，无页签。区内间距 `8dp`，区间 `20dp`（`8 + 12` spacer）。
+Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分区（同一 `LazyColumn`），顺序 **Tasks → Accumulate → Measurement**，无页签。区内间距 `8dp`，区间 `20dp`（`8 + 12` spacer）。 标题与 Tasks 之间可出现只读总览行（`Tasks a/b · Goals c/d · Streaks n`）；无任务且无目标时隐藏。任务环与累计环进度变化使用短动画；系统关闭动画时瞬时到位。
 
 | 区域 | 唯一职责 |
 | --- | --- |
@@ -132,6 +132,8 @@ Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 动作：新建 / 顶栏加号为 tonal；Manage 与完成折叠为普通 `IconButton`。
 - Accumulate 圆环表达进度；主值只显示当前累计；目标用火苗 + 目标值，不重复百分比或 `current / target`。
+- 任务全完成：环心对勾、右侧仍显示 `N/M`；子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
+- 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。
 - Measurement 与 Accumulate 共用标题/主值字阶，避免横轨内字号分叉。
 
 验收：浅/深色 Tasks 与 Manage tasks 均非灰底；横轨高 `136dp`；字阶与色规则一致；点击与数据路径不变。

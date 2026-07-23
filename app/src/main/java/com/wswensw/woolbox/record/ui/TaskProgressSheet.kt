@@ -1,5 +1,8 @@
 package com.wswensw.woolbox.record.ui
 
+import android.provider.Settings
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -18,10 +21,12 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,7 +49,20 @@ fun TaskProgressSheet(
     var changingStepId by rememberSaveable(task.id) { mutableStateOf<Long?>(null) }
     var errorMessage by rememberSaveable(task.id) { mutableStateOf<String?>(null) }
     val completed = task.completedStepCount
-    val progress = completed.toFloat() / task.steps.size.toFloat()
+    val progress = if (task.steps.isEmpty()) 0f else completed.toFloat() / task.steps.size.toFloat()
+    val context = LocalContext.current
+    val reduceMotion = remember(context) {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+    }
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "TaskSheetProgress",
+    )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -67,7 +85,7 @@ fun TaskProgressSheet(
                 style = MaterialTheme.typography.labelLarge,
             )
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)

@@ -545,7 +545,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                         if (goalJustReached) {
                                             HapticFeedbackType.LongPress
                                         } else {
-                                            HapticFeedbackType.Confirm
+                                            HapticFeedbackType.ContextClick
                                         },
                                     )
                                     recordSheetItemId = null
@@ -577,7 +577,29 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         task = task,
                         onDismiss = { taskSheetId = null },
                         onToggleStep = { step, completed, onResult ->
-                            recordsViewModel.setStepCompleted(step.id, completed, onResult)
+                            val completing = completed && !step.isCompleted
+                            val parentCompleting = completing &&
+                                task.steps.all { it.id == step.id || it.isCompleted }
+                            recordsViewModel.setStepCompleted(step.id, completed) { error ->
+                                onResult(error)
+                                if (error == null && completing) {
+                                    hapticFeedback.performHapticFeedback(
+                                        if (parentCompleting) {
+                                            HapticFeedbackType.LongPress
+                                        } else {
+                                            HapticFeedbackType.ContextClick
+                                        },
+                                    )
+                                    if (parentCompleting) {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "${task.title} done",
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         },
                     )
                 }
