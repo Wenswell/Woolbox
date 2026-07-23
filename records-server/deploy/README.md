@@ -12,23 +12,9 @@ The service runs as `ravvss`, listens on `127.0.0.1:4320`, and stores data outsi
 
 The production runtime is the current Node 22 LTS installed at `~/.local/node`. This keeps native module installation independent from the host's non-LTS Node release.
 
-## Release
+## First-time setup
 
-From the app repository:
-
-```bash
-cd records-server
-pnpm install --frozen-lockfile
-pnpm test
-pnpm build
-
-rsync -a --delete \
-  --exclude node_modules \
-  --exclude '*.sqlite*' \
-  ./ cloud:/home/ravvss/records/
-```
-
-On the cloud server, install production dependencies and units:
+On the cloud server, create the data directories and install the user units:
 
 ```bash
 ssh cloud '
@@ -44,6 +30,17 @@ ssh cloud '
 ```
 
 The Caddy route is maintained by `debian-cloud-server`. Install and validate that route before exposing the service.
+
+## Release
+
+From the app repository, run:
+
+```bash
+cd records-server
+pnpm deploy
+```
+
+`pnpm deploy` runs type checking, API and Web tests, production build, release synchronization, production dependency installation, service restart, migration-schema verification, and a local API health check that waits up to 20 seconds. It targets the `cloud` SSH host and `/home/ravvss/records` release path.
 
 ## Verify
 

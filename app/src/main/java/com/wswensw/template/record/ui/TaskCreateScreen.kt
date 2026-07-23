@@ -1,11 +1,16 @@
 package com.wswensw.template.record.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,10 +31,11 @@ import com.wswensw.template.ui.TemplateStyle
 @Composable
 fun TaskCreateScreen(
     onBack: () -> Unit,
-    onCreate: (title: String, onResult: (String?) -> Unit) -> Unit,
+    onCreate: (title: String, stepTitles: List<String>, onResult: (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
+    var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -41,8 +47,12 @@ fun TaskCreateScreen(
             errorMessage = "Check the highlighted field."
             return
         }
+        val normalizedSteps = runCatching { stepTitles.map(::validatedTaskTitle) }.getOrElse { error ->
+            errorMessage = error.message ?: "Each subtask needs a title."
+            return
+        }
         saving = true
-        onCreate(normalizedTitle) { error ->
+        onCreate(normalizedTitle, normalizedSteps) { error ->
             saving = false
             errorMessage = error
         }
@@ -55,7 +65,7 @@ fun TaskCreateScreen(
         actions = {
             FilledTonalIconButton(
                 onClick = ::submit,
-                enabled = !saving && title.isNotBlank(),
+                enabled = !saving && title.isNotBlank() && stepTitles.all(String::isNotBlank),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
@@ -80,6 +90,52 @@ fun TaskCreateScreen(
                     .fillMaxWidth()
                     .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
+        }
+        TemplateSection(title = "Subtasks") {
+            stepTitles.forEachIndexed { index, stepTitle ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = stepTitle,
+                        onValueChange = { updated ->
+                            stepTitles = stepTitles.mapIndexed { itemIndex, value ->
+                                if (itemIndex == index) updated else value
+                            }
+                        },
+                        enabled = !saving,
+                        label = { Text("Subtask ${index + 1}") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (stepTitles.size > 1) {
+                        FilledTonalIconButton(
+                            onClick = { stepTitles = stepTitles.filterIndexed { itemIndex, _ -> itemIndex != index } },
+                            enabled = !saving,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "Remove subtask ${index + 1}",
+                            )
+                        }
+                    } else {
+                        Spacer(Modifier.width(48.dp))
+                    }
+                }
+            }
+            FilledTonalIconButton(
+                onClick = { stepTitles = stepTitles + "" },
+                enabled = !saving,
+                modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "Add subtask",
+                )
+            }
         }
         errorMessage?.let { message ->
             Text(

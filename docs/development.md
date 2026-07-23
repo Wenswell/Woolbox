@@ -24,10 +24,10 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | 路径 | 修改入口 |
 | --- | --- |
 | `MainActivity.kt` | 普通入口退到后台、指定应用启动和 `onStop` 命令提交。 |
-| `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records Tasks/Trackers、详情路由及页面接线。 |
+| `ui/TemplateApp.kt` | 三个底栏目的地、工具路由、Records 三分区、管理页和 Sheet 接线。 |
 | `ui/TemplateComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
-| `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、Tasks/Trackers 页面、测量图表、记录 Sheet 和记录项表单。 |
+| `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、任务/测量预览 Sheet、管理页、记录 Sheet 和记录项表单。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
 | `records-server/web/`、`deploy/` | PC 管理页、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
@@ -112,8 +112,8 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Template、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 `Tasks`，创建无子事项待办后可直接完成；创建含两个子事项的待办，依次勾选、重开父项和子事项，确认进度、父项状态和已完成折叠区正确；编辑和删除后刷新页面确认服务端状态一致。
-16. 切换到 `Trackers`，创建累计记录后确认原有目标、快速记录、`Undo` 与断网错误行为；创建 `Temperature` / `°C` 测量记录，录入 `0` 和负数，确认保存时间为当前设备时间、最新值、`24 h`/`7 d`/`30 d`/`All` 图表原始点位与标记正确。确认详情没有编辑或删除入口，保存后短时 `Undo` 能删除刚创建的流水，并在浅色与深色主题检查可读性。
+15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Tasks，创建标题和两个子事项；依次在进度 Sheet 勾选、重开子事项，确认完成时间、父项状态和已完成折叠区正确。进入 Manage tasks，确认标题编辑、子事项增删和最后一项不能删除；刷新后服务端状态一致。
+16. 在同一 Records 根页创建累计记录后确认目标圆环、快速记录、`Undo` 与断网错误行为；创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`。点卡确认预览 Sheet 显示 24 小时原始点位和流水，Slider 只能选择配置步进，录入后值和当前设备时间更新，短时 `Undo` 可删除该条流水；检查浅色与深色的可读性。
 17. 在 Home 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 19. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。

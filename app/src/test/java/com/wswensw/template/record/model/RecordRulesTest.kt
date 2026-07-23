@@ -32,17 +32,21 @@ class RecordRulesTest {
     }
 
     @Test
-    fun allowsSignedMeasurementDefaultsAndRejectsMeasurementOnlyConflicts() {
+    fun validatesSignedMeasurementBoundsAndRejectsMeasurementOnlyConflicts() {
         val result = draft(
             mode = RecordMode.MEASUREMENT,
-            defaultValue = -12.5,
+            defaultValue = null,
             goalValue = null,
             goalPeriod = null,
             windows = emptyList(),
+            minValue = -20.0,
+            maxValue = 20.0,
+            stepValue = 0.5,
         ).validated()
 
         assertEquals(RecordMode.MEASUREMENT, result.mode)
-        assertEquals(-12.5, result.defaultValue)
+        assertEquals(-20.0, result.minValue)
+        assertEquals(20.0, result.maxValue)
         assertThrows(RecordValidationException::class.java) {
             draft(
                 mode = RecordMode.MEASUREMENT,
@@ -92,9 +96,11 @@ class RecordRulesTest {
     }
 
     @Test
-    fun stepsSignedMeasurementValuesWithoutClamping() {
-        assertEquals("-0.2", stepMeasurementValue("0", 0.2, -1))
-        assertEquals("0", stepMeasurementValue("-0.2", 0.2, 1))
+    fun snapsSignedMeasurementValuesToConfiguredGrid() {
+        assertEquals(-0.2, snapMeasurementValue(-0.18, -1.0, 1.0, 0.2), 0.0)
+        assertEquals(1.0, snapMeasurementValue(1.1, -1.0, 1.0, 0.2), 0.0)
+        assertTrue(isMeasurementValueOnGrid(0.6, -1.0, 1.0, 0.2))
+        assertTrue(!isMeasurementValueOnGrid(0.5, -1.0, 1.0, 0.2))
     }
 
     @Test
@@ -128,6 +134,8 @@ class RecordRulesTest {
         goalPeriod: GoalPeriod? = null,
         priority: Int = 1,
         windows: List<RecordWindow> = emptyList(),
+        minValue: Double? = null,
+        maxValue: Double? = null,
     ) = RecordItemDraft(
         name = name,
         description = description,
@@ -140,6 +148,8 @@ class RecordRulesTest {
         goalPeriod = goalPeriod,
         priority = priority,
         windows = windows,
+        minValue = minValue,
+        maxValue = maxValue,
     )
 
     private fun item(id: Long, name: String, description: String, start: Int, end: Int) = RecordItem(

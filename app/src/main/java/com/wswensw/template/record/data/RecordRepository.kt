@@ -18,6 +18,8 @@ import com.wswensw.template.record.model.ItemStreak
 import com.wswensw.template.record.model.STREAK_LOOKBACK_DAYS
 import com.wswensw.template.record.model.goalValues
 import com.wswensw.template.record.model.itemStreaks
+import com.wswensw.template.record.model.isMeasurementValueOnGrid
+import com.wswensw.template.record.model.measurementStepCount
 import com.wswensw.template.record.model.validated
 import com.wswensw.template.record.model.validatedTaskTitle
 import java.nio.charset.StandardCharsets
@@ -117,6 +119,8 @@ class RecordRepository(context: Context) {
             put("mode", draft.mode.name)
             put("valueType", draft.valueType.name)
             putNullable("defaultValue", draft.defaultValue)
+            putNullable("minValue", draft.minValue)
+            putNullable("maxValue", draft.maxValue)
             put("stepValue", draft.stepValue)
             put("unit", draft.unit)
             putNullable("goalValue", draft.goalValue)
@@ -137,7 +141,7 @@ class RecordRepository(context: Context) {
 
     suspend fun createEntry(item: RecordItem, value: Double, occurredAt: Long): Long =
         withContext(Dispatchers.IO) {
-            requireEntryValue(item.mode, value)
+            requireEntryValue(item, value)
             val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
             val body = JSONObject()
                 .put("itemId", item.id)
@@ -162,11 +166,17 @@ class RecordRepository(context: Context) {
         Unit
     }
 
-    suspend fun createTask(title: String): Long = withContext(Dispatchers.IO) {
+    suspend fun createTask(title: String, stepTitles: List<String>): Long = withContext(Dispatchers.IO) {
+        val normalizedSteps = stepTitles.map(::validatedTaskTitle)
+        if (normalizedSteps.isEmpty()) {
+            throw RecordValidationException("At least one subtask is required.")
+        }
         request(
             "POST",
             "tasks",
-            body = JSONObject().put("title", validatedTaskTitle(title)),
+            body = JSONObject()
+                .put("title", validatedTaskTitle(title))
+                .put("steps", JSONArray(normalizedSteps)),
         ).getJSONObject("task").getLong("id")
     }
 
@@ -176,11 +186,6 @@ class RecordRepository(context: Context) {
             "tasks/$taskId",
             body = JSONObject().put("title", validatedTaskTitle(title)),
         )
-        Unit
-    }
-
-    suspend fun setTaskCompleted(taskId: Long, completed: Boolean) = withContext(Dispatchers.IO) {
-        request("PUT", "tasks/$taskId/completion", body = JSONObject().put("completed", completed))
         Unit
     }
 
@@ -269,29 +274,42 @@ class RecordRepository(context: Context) {
     }
 }
 
-private fun parseItem(value: JSONObject) = RecordItem(
-    id = value.getLong("id"),
-    name = value.getString("name"),
-    description = value.getString("description"),
-    mode = RecordMode.valueOf(value.getString("mode")),
-    valueType = RecordValueType.valueOf(value.getString("valueType")),
-    defaultValue = value.nullableDouble("defaultValue"),
-    stepValue = value.getDouble("stepValue"),
-    unit = value.getString("unit"),
-    goalValue = value.nullableDouble("goalValue"),
-    goalPeriod = value.nullableString("goalPeriod")?.let(GoalPeriod::valueOf),
-    priority = value.getInt("priority"),
-    archived = value.getBoolean("archived"),
-    windows = value.getJSONArray("windows").mapObjects { window ->
-        RecordWindow(
-            id = window.getLong("id"),
-            startMinute = window.getInt("startMinute"),
-            endMinute = window.getInt("endMinute"),
-        )
-    },
-    createdAt = value.getLong("createdAt"),
-    updatedAt = value.getLong("updatedAt"),
-)
+private fun parseItem(value: JSONObject): RecordItem {
+    val item = RecordItem(
+        id = value.getLong("id"),
+        name = value.getString("name"),
+        description = value.getString("description"),
+        mode = RecordMode.valueOf(value.getString("mode")),
+        valueType = RecordValueType.valueOf(value.getString("valueType")),
+        defaultValue = value.nullableDouble("defaultValue"),
+        minValue = value.nullableDouble("minValue"),
+        maxValue = value.nullableDouble("maxValue"),
+        stepValue = value.getDouble("stepValue"),
+        unit = value.getString("unit"),
+        goalValue = value.nullableDouble("goalValue"),
+        goalPeriod = value.nullableString("goalPeriod")?.let(GoalPeriod::valueOf),
+        priority = value.getInt("priority"),
+        archived = value.getBoolean("archived"),
+        windows = value.getJSONArray("windows").mapObjects { window ->
+            RecordWindow(
+                id = window.getLong("id"),
+                startMinute = window.getInt("startMinute"),
+                endMinute = window.getInt("endMinute"),
+            )
+        },
+        createdAt = value.getLong("createdAt"),
+        updatedAt = value.getLong("updatedAt"),
+    )
+    if (item.mode == RecordMode.MEASUREMENT) {
+        val minValue = item.minValue ?: throw RecordValidationException("Measurement minimum is missing from the server response.")
+        val maxValue = item.maxValue ?: throw RecordValidationException("Measurement maximum is missing from the server response.")
+        if (item.valueType != RecordValueType.NUMBER || item.defaultValue != null || item.goalValue != null || item.goalPeriod != null || item.windows.isNotEmpty()) {
+            throw RecordValidationException("Measurement configuration is invalid in the server response.")
+        }
+        measurementStepCount(minValue, maxValue, item.stepValue)
+    }
+    return item
+}
 
 private fun parseEntry(value: JSONObject) = RecordEntry(
     id = value.getLong("id"),
@@ -341,12 +359,19 @@ private fun JSONObject.nullableLong(key: String): Long? =
 private fun JSONObject.nullableString(key: String): String? =
     if (isNull(key)) null else getString(key)
 
-private fun requireEntryValue(mode: RecordMode, value: Double) {
+private fun requireEntryValue(item: RecordItem, value: Double) {
     if (!value.isFinite()) {
         throw RecordValidationException("Value must be a finite number.")
     }
-    if (mode == RecordMode.ACCUMULATE && value <= 0) {
+    if (item.mode == RecordMode.ACCUMULATE && value <= 0) {
         throw RecordValidationException("Value must be a positive number.")
+    }
+    if (item.mode == RecordMode.MEASUREMENT) {
+        val minValue = item.minValue ?: throw RecordValidationException("Measurement minimum is missing.")
+        val maxValue = item.maxValue ?: throw RecordValidationException("Measurement maximum is missing.")
+        if (!isMeasurementValueOnGrid(value, minValue, maxValue, item.stepValue)) {
+            throw RecordValidationException("Value must be within the configured measurement range and step.")
+        }
     }
 }
 

@@ -37,6 +37,8 @@ data class RecordItem(
     val windows: List<RecordWindow>,
     val createdAt: Long,
     val updatedAt: Long,
+    val minValue: Double? = null,
+    val maxValue: Double? = null,
 )
 
 data class RecordItemDraft(
@@ -51,6 +53,8 @@ data class RecordItemDraft(
     val goalPeriod: GoalPeriod?,
     val priority: Int,
     val windows: List<RecordWindow>,
+    val minValue: Double? = null,
+    val maxValue: Double? = null,
 )
 
 data class RecordEntry(

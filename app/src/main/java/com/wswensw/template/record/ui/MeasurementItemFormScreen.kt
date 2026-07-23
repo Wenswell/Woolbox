@@ -33,6 +33,7 @@ import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
 import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.RecordValueType
+import com.wswensw.template.record.model.measurementStepCount
 import com.wswensw.template.ui.TemplateRouteScaffold
 import com.wswensw.template.ui.TemplateSection
 import com.wswensw.template.ui.TemplateStyle
@@ -70,11 +71,8 @@ fun MeasurementItemFormScreen(
 
     var name by rememberSaveable(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var description by rememberSaveable(item?.id) { mutableStateOf(item?.description.orEmpty()) }
-    var defaultValue by rememberSaveable(item?.id) {
-        mutableStateOf(
-            if (item == null) "" else item.defaultValue?.let(::formatValue).orEmpty(),
-        )
-    }
+    var minValue by rememberSaveable(item?.id) { mutableStateOf(item?.minValue?.let(::formatValue).orEmpty()) }
+    var maxValue by rememberSaveable(item?.id) { mutableStateOf(item?.maxValue?.let(::formatValue).orEmpty()) }
     var stepValue by rememberSaveable(item?.id) {
         mutableStateOf(item?.stepValue?.let(::formatValue) ?: "1")
     }
@@ -82,7 +80,8 @@ fun MeasurementItemFormScreen(
     var priority by rememberSaveable(item?.id) { mutableStateOf(item?.priority?.toString() ?: "0") }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var nameError by rememberSaveable { mutableStateOf<String?>(null) }
-    var defaultError by rememberSaveable { mutableStateOf<String?>(null) }
+    var minError by rememberSaveable { mutableStateOf<String?>(null) }
+    var maxError by rememberSaveable { mutableStateOf<String?>(null) }
     var stepError by rememberSaveable { mutableStateOf<String?>(null) }
     var unitError by rememberSaveable { mutableStateOf<String?>(null) }
     var priorityError by rememberSaveable { mutableStateOf<String?>(null) }
@@ -90,7 +89,8 @@ fun MeasurementItemFormScreen(
 
     fun clearFieldErrors() {
         nameError = null
-        defaultError = null
+        minError = null
+        maxError = null
         stepError = null
         unitError = null
         priorityError = null
@@ -107,9 +107,14 @@ fun MeasurementItemFormScreen(
             unitError = "Unit is required."
             valid = false
         }
-        runCatching { parseOptionalFinite(defaultValue, "Default value") }
+        runCatching { parseRequiredFinite(minValue, "Minimum") }
             .onFailure {
-                defaultError = it.message
+                minError = it.message
+                valid = false
+            }
+        runCatching { parseRequiredFinite(maxValue, "Maximum") }
+            .onFailure {
+                maxError = it.message
                 valid = false
             }
         runCatching { parsePositive(stepValue, "Step") }
@@ -117,6 +122,19 @@ fun MeasurementItemFormScreen(
                 stepError = it.message
                 valid = false
             }
+        runCatching {
+            measurementStepCount(
+                minValue = parseRequiredFinite(minValue, "Minimum"),
+                maxValue = parseRequiredFinite(maxValue, "Maximum"),
+                stepValue = parsePositive(stepValue, "Step"),
+            )
+        }.onFailure {
+            val message = it.message
+            if (minError == null && maxError == null && stepError == null) {
+                maxError = message
+            }
+            valid = false
+        }
         if (priority.toIntOrNull() == null) {
             priorityError = "Priority must be an integer."
             valid = false
@@ -126,8 +144,13 @@ fun MeasurementItemFormScreen(
 
     val formValid = name.isNotBlank() &&
         unit.isNotBlank() &&
-        runCatching { parseOptionalFinite(defaultValue, "Default value") }.isSuccess &&
-        runCatching { parsePositive(stepValue, "Step") }.isSuccess &&
+        runCatching {
+            measurementStepCount(
+                minValue = parseRequiredFinite(minValue, "Minimum"),
+                maxValue = parseRequiredFinite(maxValue, "Maximum"),
+                stepValue = parsePositive(stepValue, "Step"),
+            )
+        }.isSuccess &&
         priority.toIntOrNull() != null
 
     fun submit() {
@@ -141,13 +164,15 @@ fun MeasurementItemFormScreen(
             description = description,
             mode = RecordMode.MEASUREMENT,
             valueType = RecordValueType.NUMBER,
-            defaultValue = parseOptionalFinite(defaultValue, "Default value"),
+            defaultValue = null,
             stepValue = parsePositive(stepValue, "Step"),
             unit = unit,
             goalValue = null,
             goalPeriod = null,
             priority = checkNotNull(priority.toIntOrNull()),
             windows = emptyList(),
+            minValue = parseRequiredFinite(minValue, "Minimum"),
+            maxValue = parseRequiredFinite(maxValue, "Maximum"),
         )
         saving = true
         onSave(draft) { error ->
@@ -239,15 +264,15 @@ fun MeasurementItemFormScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedTextField(
-                    value = defaultValue,
+                    value = minValue,
                     onValueChange = {
-                        defaultValue = it
-                        defaultError = null
+                        minValue = it
+                        minError = null
                     },
-                    enabled = !saving,
-                    label = { Text("Default (optional)") },
-                    isError = defaultError != null,
-                    supportingText = defaultError?.let { message ->
+                    enabled = !fieldsLocked && !saving,
+                    label = { Text("Minimum") },
+                    isError = minError != null,
+                    supportingText = minError?.let { message ->
                         { Text(message) }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -255,15 +280,15 @@ fun MeasurementItemFormScreen(
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
-                    value = stepValue,
+                    value = maxValue,
                     onValueChange = {
-                        stepValue = it
-                        stepError = null
+                        maxValue = it
+                        maxError = null
                     },
-                    enabled = !saving,
-                    label = { Text("Step") },
-                    isError = stepError != null,
-                    supportingText = stepError?.let { message ->
+                    enabled = !fieldsLocked && !saving,
+                    label = { Text("Maximum") },
+                    isError = maxError != null,
+                    supportingText = maxError?.let { message ->
                         { Text(message) }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -271,6 +296,22 @@ fun MeasurementItemFormScreen(
                     modifier = Modifier.weight(1f),
                 )
             }
+            OutlinedTextField(
+                value = stepValue,
+                onValueChange = {
+                    stepValue = it
+                    stepError = null
+                },
+                enabled = !fieldsLocked && !saving,
+                label = { Text("Step") },
+                isError = stepError != null,
+                supportingText = stepError?.let { message ->
+                    { Text(message) }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.formField(),
+            )
             OutlinedTextField(
                 value = unit,
                 onValueChange = {

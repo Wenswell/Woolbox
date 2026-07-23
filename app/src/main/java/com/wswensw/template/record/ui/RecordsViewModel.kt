@@ -10,7 +10,6 @@ import com.wswensw.template.record.data.RecordsConnection
 import com.wswensw.template.record.model.RecordEntry
 import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordItemDraft
-import com.wswensw.template.record.model.MeasurementRange
 import com.wswensw.template.record.model.TodoTask
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,9 +46,8 @@ data class RecordsUiState(
     fun findTask(id: Long): TodoTask? = tasks.firstOrNull { it.id == id }
 }
 
-data class MeasurementDetailUiState(
+data class MeasurementPreviewUiState(
     val itemId: Long? = null,
-    val range: MeasurementRange = MeasurementRange.LAST_24_HOURS,
     val entries: List<RecordEntry> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -62,9 +60,9 @@ class RecordsViewModel(
     private val selectedEntries = repository.entries
     private val error = MutableStateFlow<String?>(null)
     private val isLoading = MutableStateFlow(true)
-    private val _measurementDetail = MutableStateFlow(MeasurementDetailUiState())
+    private val _measurementPreview = MutableStateFlow(MeasurementPreviewUiState())
 
-    val measurementDetail: StateFlow<MeasurementDetailUiState> = _measurementDetail
+    val measurementPreview: StateFlow<MeasurementPreviewUiState> = _measurementPreview
 
     private val recordsContent = combine(
         combine(
@@ -165,7 +163,7 @@ class RecordsViewModel(
                 val entryId = repository.createEntry(item, value, occurredAt)
                 selectedDate.value = LocalDate.now()
                 repository.refresh(selectedDate.value.toString())
-                reloadMeasurementDetail(item.id)
+                reloadMeasurementPreview(item.id)
                 entryId
             }.fold(
                 onSuccess = { entryId -> onResult(entryId, null) },
@@ -176,20 +174,20 @@ class RecordsViewModel(
 
     fun deleteEntry(entryId: Long, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
-            val itemId = _measurementDetail.value.entries.firstOrNull { it.id == entryId }?.itemId
+            val itemId = _measurementPreview.value.entries.firstOrNull { it.id == entryId }?.itemId
             runCatching {
                 repository.deleteEntry(entryId)
                 repository.refresh(selectedDate.value.toString())
-                itemId?.let(::reloadMeasurementDetail)
+                itemId?.let(::reloadMeasurementPreview)
             }
                 .onFailure { error -> onError(error.message ?: "Unable to undo record.") }
         }
     }
 
-    fun createTask(title: String, onResult: (taskId: Long?, error: String?) -> Unit) {
+    fun createTask(title: String, stepTitles: List<String>, onResult: (taskId: Long?, error: String?) -> Unit) {
         viewModelScope.launch {
             runCatching {
-                val taskId = repository.createTask(title)
+                val taskId = repository.createTask(title, stepTitles)
                 repository.refresh(selectedDate.value.toString())
                 taskId
             }.fold(
@@ -204,13 +202,6 @@ class RecordsViewModel(
         failureMessage = "Unable to update task.",
     ) {
         repository.updateTask(taskId, title)
-    }
-
-    fun setTaskCompleted(taskId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(
-        onResult = onResult,
-        failureMessage = "Unable to update task.",
-    ) {
-        repository.setTaskCompleted(taskId, completed)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
@@ -248,32 +239,29 @@ class RecordsViewModel(
         repository.deleteStep(stepId)
     }
 
-    fun loadMeasurementEntries(itemId: Long, range: MeasurementRange) {
+    fun loadMeasurementPreview(itemId: Long) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            _measurementDetail.value = MeasurementDetailUiState(
+            _measurementPreview.value = MeasurementPreviewUiState(
                 itemId = itemId,
-                range = range,
                 isLoading = true,
             )
             runCatching {
                 repository.entriesForItem(
                     itemId = itemId,
-                    startDate = range.queryStartDate(now),
+                    startDate = LocalDate.now().minusDays(1).toString(),
                     endDate = LocalDate.now().toString(),
-                ).filter { entry -> range.contains(entry.occurredAt, now) }
+                ).filter { entry -> entry.occurredAt in (now - 24 * 60 * 60 * 1_000)..now }
             }.fold(
                 onSuccess = { entries ->
-                    _measurementDetail.value = MeasurementDetailUiState(
+                    _measurementPreview.value = MeasurementPreviewUiState(
                         itemId = itemId,
-                        range = range,
                         entries = entries,
                     )
                 },
                 onFailure = { failure ->
-                    _measurementDetail.value = MeasurementDetailUiState(
+                    _measurementPreview.value = MeasurementPreviewUiState(
                         itemId = itemId,
-                        range = range,
                         error = failure.message ?: "Unable to load measurements.",
                     )
                 },
@@ -281,10 +269,9 @@ class RecordsViewModel(
         }
     }
 
-    private fun reloadMeasurementDetail(itemId: Long) {
-        val detail = _measurementDetail.value
-        if (detail.itemId == itemId) {
-            loadMeasurementEntries(itemId, detail.range)
+    private fun reloadMeasurementPreview(itemId: Long) {
+        if (_measurementPreview.value.itemId == itemId) {
+            loadMeasurementPreview(itemId)
         }
     }
 

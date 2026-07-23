@@ -55,15 +55,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.wswensw.template.R
-import com.wswensw.template.record.ui.GoalsScreen
+import com.wswensw.template.record.ui.ManageTasksScreen
 import com.wswensw.template.record.ui.ManageRecordsScreen
-import com.wswensw.template.record.ui.MeasurementDetailScreen
-import com.wswensw.template.record.ui.MeasurementEntryScreen
-import com.wswensw.template.record.ui.MeasurementDetailUiState
-import com.wswensw.template.record.model.MeasurementRange
+import com.wswensw.template.record.ui.MeasurementPreviewUiState
 import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.ui.AccumulateItemFormScreen
 import com.wswensw.template.record.ui.MeasurementItemFormScreen
+import com.wswensw.template.record.ui.MeasurementPreviewSheet
 import com.wswensw.template.record.ui.RecordSheet
 import com.wswensw.template.record.ui.crossedGoalThreshold
 import com.wswensw.template.record.ui.displayRecordName
@@ -72,6 +70,7 @@ import com.wswensw.template.record.ui.RecordsScreen
 import com.wswensw.template.record.ui.RecordsViewModel
 import com.wswensw.template.record.ui.TaskCreateScreen
 import com.wswensw.template.record.ui.TaskDetailScreen
+import com.wswensw.template.record.ui.TaskProgressSheet
 import com.wswensw.template.tool.service.ExternalToolCommand
 import com.wswensw.template.tool.service.ToolLaunchResult
 import com.wswensw.template.tool.overlay.InAppOledShield
@@ -108,10 +107,12 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
-    val measurementDetailState by recordsViewModel.measurementDetail.collectAsStateWithLifecycle()
+    val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var themeMode by rememberSaveable { mutableStateOf(TemplateThemeMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var taskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -158,6 +159,8 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
                                     recordSheetItemId = null
+                                    taskSheetId = null
+                                    measurementSheetItemId = null
                                 }
                             },
                         )
@@ -186,11 +189,11 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
 
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
-                                onGoals = {
-                                    recordSheetItemId = null
-                                    navController.navigate(TemplateRoutes.RECORD_GOALS)
+                                onManageTasks = {
+                                    taskSheetId = null
+                                    navController.navigate(TemplateRoutes.MANAGE_TASKS)
                                 },
-                                onManage = {
+                                onManageRecords = {
                                     recordSheetItemId = null
                                     navController.navigate(TemplateRoutes.MANAGE_RECORDS)
                                 },
@@ -208,19 +211,14 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
                                 onOpenMeasurement = { item ->
-                                    navController.navigate(TemplateRoutes.measurementDetail(item.id))
-                                },
-                                onAddMeasurement = { item ->
-                                    navController.navigate(TemplateRoutes.measurementEntryNew(item.id))
+                                    measurementSheetItemId = item.id
+                                    recordsViewModel.loadMeasurementPreview(item.id)
                                 },
                                 onCreateTask = {
                                     navController.navigate(TemplateRoutes.TASK_NEW)
                                 },
                                 onOpenTask = { task ->
-                                    navController.navigate(TemplateRoutes.taskDetail(task.id))
-                                },
-                                onToggleTask = { task, completed ->
-                                    recordsViewModel.setTaskCompleted(task.id, completed)
+                                    taskSheetId = task.id
                                 },
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -355,17 +353,12 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                 )
             }
-            composable(TemplateRoutes.RECORD_GOALS) {
-                GoalsScreen(
+            composable(TemplateRoutes.MANAGE_TASKS) {
+                ManageTasksScreen(
                     state = recordsState,
                     onBack = { navController.popBackStack() },
-                    onManage = { navController.navigate(TemplateRoutes.MANAGE_RECORDS) },
-                    onConfigureConnection = {
-                        navController.navigate(TemplateRoutes.RECORDS_CONNECTION)
-                    },
-                    onRetry = recordsViewModel::refresh,
-                    onRecordItem = { recordSheetItemId = it.id },
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    onCreate = { navController.navigate(TemplateRoutes.TASK_NEW) },
+                    onEdit = { taskId -> navController.navigate(TemplateRoutes.taskDetail(taskId)) },
                 )
             }
             composable(TemplateRoutes.MANAGE_RECORDS) {
@@ -398,8 +391,8 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             composable(TemplateRoutes.TASK_NEW) {
                 TaskCreateScreen(
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, onResult ->
-                        recordsViewModel.createTask(title) { taskId, error ->
+                    onCreate = { title, stepTitles, onResult ->
+                        recordsViewModel.createTask(title, stepTitles) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -417,9 +410,6 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onBack = { navController.popBackStack() },
                     onSaveTitle = { title, onResult ->
                         recordsViewModel.updateTask(taskId, title, onResult)
-                    },
-                    onToggleTask = { completed ->
-                        recordsViewModel.setTaskCompleted(taskId, completed)
                     },
                     onCreateStep = { title, onResult ->
                         recordsViewModel.createStep(taskId, title, onResult)
@@ -514,54 +504,6 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                 )
             }
-            composable(
-                route = TemplateRoutes.MEASUREMENT_DETAIL,
-                arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
-                val item = recordsState.activeItems.firstOrNull { it.id == itemId } ?: return@composable
-                LaunchedEffect(itemId) {
-                    recordsViewModel.loadMeasurementEntries(itemId, MeasurementRange.LAST_24_HOURS)
-                }
-                MeasurementDetailScreen(
-                    item = item,
-                    state = measurementDetailState.takeIf { it.itemId == itemId }
-                        ?: MeasurementDetailUiState(itemId = itemId, isLoading = true),
-                    onBack = { navController.popBackStack() },
-                    onEditItem = { navController.navigate(TemplateRoutes.measurementItemEdit(itemId)) },
-                    onAddEntry = { navController.navigate(TemplateRoutes.measurementEntryNew(itemId)) },
-                    onRangeChange = { range -> recordsViewModel.loadMeasurementEntries(itemId, range) },
-                )
-            }
-            composable(
-                route = TemplateRoutes.MEASUREMENT_ENTRY_NEW,
-                arguments = listOf(navArgument(TemplateRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val itemId = entry.arguments?.getLong(TemplateRoutes.RECORD_ITEM_ID) ?: return@composable
-                val item = recordsState.activeItems.firstOrNull { it.id == itemId } ?: return@composable
-                MeasurementEntryScreen(
-                    item = item,
-                    onBack = { navController.popBackStack() },
-                    onSave = { value, onResult ->
-                        recordsViewModel.createEntry(item, value) { entryId, error ->
-                            onResult(error)
-                            if (entryId != null) {
-                                navController.popBackStack()
-                                coroutineScope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Recorded ${displayRecordName(item.name)}.",
-                                        actionLabel = "Undo",
-                                        duration = SnackbarDuration.Short,
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        recordsViewModel.deleteEntry(entryId)
-                                    }
-                                }
-                            }
-                        }
-                    },
-                )
-            }
             }
 
             recordSheetItemId?.let { itemId ->
@@ -602,6 +544,46 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                             } else {
                                                 "Recorded $label."
                                             },
+                                            actionLabel = "Undo",
+                                            duration = SnackbarDuration.Short,
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            recordsViewModel.deleteEntry(entryId)
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+
+            taskSheetId?.let { taskId ->
+                recordsState.findTask(taskId)?.let { task ->
+                    TaskProgressSheet(
+                        task = task,
+                        onDismiss = { taskSheetId = null },
+                        onToggleStep = { step, completed, onResult ->
+                            recordsViewModel.setStepCompleted(step.id, completed, onResult)
+                        },
+                    )
+                }
+            }
+
+            measurementSheetItemId?.let { itemId ->
+                recordsState.activeItems.firstOrNull { it.id == itemId }?.let { item ->
+                    MeasurementPreviewSheet(
+                        item = item,
+                        state = measurementPreviewState.takeIf { it.itemId == itemId }
+                            ?: MeasurementPreviewUiState(itemId = itemId, isLoading = true),
+                        onDismiss = { measurementSheetItemId = null },
+                        onRecord = { value, onResult ->
+                            recordsViewModel.createEntry(item, value) { entryId, error ->
+                                onResult(error)
+                                if (entryId != null) {
+                                    coroutineScope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Recorded ${displayRecordName(item.name)}.",
                                             actionLabel = "Undo",
                                             duration = SnackbarDuration.Short,
                                         )
@@ -714,7 +696,7 @@ private object TemplateRoutes {
     const val OLED_SHIELD = "oled-shield"
 
     fun copyHistoryEdit(historyId: Long) = "global-copy/history/$historyId"
-    const val RECORD_GOALS = "record-goals"
+    const val MANAGE_TASKS = "manage-tasks"
     const val MANAGE_RECORDS = "manage-records"
     const val RECORDS_CONNECTION = "records-connection"
     const val TASK_NEW = "task/new"
@@ -725,16 +707,12 @@ private object TemplateRoutes {
     const val RECORD_ITEM_ACCUMULATE_EDIT = "record-item/accumulate/{$RECORD_ITEM_ID}"
     const val RECORD_ITEM_MEASUREMENT_NEW = "record-item/measurement/new"
     const val RECORD_ITEM_MEASUREMENT_EDIT = "record-item/measurement/{$RECORD_ITEM_ID}"
-    const val MEASUREMENT_DETAIL = "measurement/{$RECORD_ITEM_ID}"
-    const val MEASUREMENT_ENTRY_NEW = "measurement/{$RECORD_ITEM_ID}/entry/new"
 
     fun accumulateItemNew() = RECORD_ITEM_ACCUMULATE_NEW
     fun accumulateItemEdit(itemId: Long) = "record-item/accumulate/$itemId"
     fun measurementItemNew() = RECORD_ITEM_MEASUREMENT_NEW
     fun measurementItemEdit(itemId: Long) = "record-item/measurement/$itemId"
     fun taskDetail(taskId: Long) = "task/$taskId"
-    fun measurementDetail(itemId: Long) = "measurement/$itemId"
-    fun measurementEntryNew(itemId: Long) = "measurement/$itemId/entry/new"
 }
 
 private const val PageTransitionMillis = 220

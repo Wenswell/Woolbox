@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordItemInput, RecordMode, TaskInput } from "./domain.js";
-import { ApiError } from "./domain.js";
+import type { RecordEntryInput, RecordItemInput, RecordMode, TaskCreateInput, TaskTitleInput } from "./domain.js";
+import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
   recordAuditLogs,
@@ -46,6 +46,8 @@ interface ItemAuditSnapshot {
   mode: string;
   valueType: string;
   defaultValue: number | null;
+  minValue: number | null;
+  maxValue: number | null;
   stepValue: number;
   unit: string;
   goalValue: number | null;
@@ -154,8 +156,13 @@ export class RecordsService {
         current.mode !== input.mode
         || current.valueType !== input.valueType
         || current.unit !== input.unit
+        || (current.mode === "MEASUREMENT" && (
+          current.minValue !== input.minValue
+          || current.maxValue !== input.maxValue
+          || current.stepValue !== input.stepValue
+        ))
       )) {
-        throw new ApiError(400, "Mode, type, and unit cannot change after records exist.");
+        throw new ApiError(400, "Recorded item mode, type, unit, and measurement range cannot change.");
       }
 
       const before = itemSnapshot(
@@ -366,7 +373,7 @@ export class RecordsService {
     return step;
   }
 
-  createTask(input: TaskInput) {
+  createTask(input: TaskCreateInput) {
     const id = this.db.transaction((tx) => {
       const now = this.now();
       const task = tx
@@ -374,19 +381,38 @@ export class RecordsService {
         .values({ title: input.title, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoTasks.id })
         .get();
+      const steps = tx.insert(todoSteps)
+        .values(input.steps.map((title) => ({
+          taskId: task.id,
+          title,
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        })))
+        .returning({ id: todoSteps.id, title: todoSteps.title })
+        .all();
       this.writeAudit(tx, {
         action: "TASK_CREATED",
         entityType: "TASK",
         entityId: task.id,
-        after: taskSnapshot({ id: task.id, title: input.title, completedAt: null }),
+        after: { ...taskSnapshot({ id: task.id, title: input.title, completedAt: null }), stepCount: steps.length },
         createdAt: now,
       });
+      for (const step of steps) {
+        this.writeAudit(tx, {
+          action: "STEP_CREATED",
+          entityType: "STEP",
+          entityId: step.id,
+          after: stepSnapshot({ id: step.id, taskId: task.id, title: step.title, completedAt: null }, input.title),
+          createdAt: now,
+        });
+      }
       return task.id;
     });
     return this.getTask(id);
   }
 
-  updateTask(id: number, input: TaskInput) {
+  updateTask(id: number, input: TaskTitleInput) {
     this.db.transaction((tx) => {
       const current = this.requireTask(tx, id);
       const now = this.now();
@@ -400,37 +426,6 @@ export class RecordsService {
         after: taskSnapshot(updated),
         createdAt: now,
       });
-    });
-    return this.getTask(id);
-  }
-
-  setTaskCompleted(id: number, completed: boolean) {
-    this.db.transaction((tx) => {
-      const task = this.requireTask(tx, id);
-      const now = this.now();
-      const steps = tx
-        .select()
-        .from(todoSteps)
-        .where(eq(todoSteps.taskId, id))
-        .orderBy(asc(todoSteps.createdAt), asc(todoSteps.id))
-        .all();
-      for (const step of steps) {
-        if ((step.completedAt !== null) === completed) continue;
-        const updated = { ...step, completedAt: completed ? now : null, updatedAt: now };
-        tx.update(todoSteps)
-          .set({ completedAt: updated.completedAt, updatedAt: now })
-          .where(eq(todoSteps.id, step.id))
-          .run();
-        this.writeAudit(tx, {
-          action: completed ? "STEP_COMPLETED" : "STEP_REOPENED",
-          entityType: "STEP",
-          entityId: step.id,
-          before: stepSnapshot(step, task.title),
-          after: stepSnapshot(updated, task.title),
-          createdAt: now,
-        });
-      }
-      this.setTaskCompletion(tx, task, completed, now);
     });
     return this.getTask(id);
   }
@@ -455,7 +450,7 @@ export class RecordsService {
     });
   }
 
-  createStep(taskId: number, input: TaskInput) {
+  createStep(taskId: number, input: TaskTitleInput) {
     const id = this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
       const now = this.now();
@@ -477,7 +472,7 @@ export class RecordsService {
     return this.getStep(id);
   }
 
-  updateStep(id: number, input: TaskInput) {
+  updateStep(id: number, input: TaskTitleInput) {
     this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
@@ -525,6 +520,12 @@ export class RecordsService {
     return this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
+      const stepCount = tx
+        .select({ value: count() })
+        .from(todoSteps)
+        .where(eq(todoSteps.taskId, task.id))
+        .get()!.value;
+      if (stepCount <= 1) throw new ApiError(400, "Tasks must keep at least one subtask.");
       const now = this.now();
       this.writeAudit(tx, {
         action: "STEP_DELETED",
@@ -535,9 +536,7 @@ export class RecordsService {
       });
       tx.delete(todoSteps).where(eq(todoSteps.id, id)).run();
       const remaining = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
-      if (remaining.length > 0) {
-        this.setTaskCompletion(tx, task, remaining.every((candidate) => candidate.completedAt !== null), now);
-      }
+      this.setTaskCompletion(tx, task, remaining.every((candidate) => candidate.completedAt !== null), now);
       return step;
     });
   }
@@ -601,9 +600,8 @@ export class RecordsService {
 
   private reconcileTaskCompletion(tx: RecordsTransaction, task: TodoTaskRow, now: number) {
     const steps = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
-    if (steps.length > 0) {
-      this.setTaskCompletion(tx, task, steps.every((step) => step.completedAt !== null), now);
-    }
+    if (steps.length === 0) throw new ApiError(500, "Task must have at least one subtask.");
+    this.setTaskCompletion(tx, task, steps.every((step) => step.completedAt !== null), now);
   }
 
   private setTaskCompletion(
@@ -672,6 +670,15 @@ export class RecordsService {
     if (item.mode === "ACCUMULATE" && value <= 0) {
       throw new ApiError(400, "Value must be a positive number.");
     }
+    if (item.mode === "MEASUREMENT") {
+      if (
+        item.minValue === null
+        || item.maxValue === null
+        || !isMeasurementValueOnGrid(value, item.minValue, item.maxValue, item.stepValue)
+      ) {
+        throw new ApiError(400, "Value must be within the configured measurement range and step.");
+      }
+    }
   }
 }
 
@@ -691,7 +698,7 @@ function groupWindows(windows: RecordWindowRow[]) {
 }
 
 function itemSnapshot(
-  item: Pick<RecordItemRow, "id" | "name" | "description" | "mode" | "valueType" | "defaultValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
+  item: Pick<RecordItemRow, "id" | "name" | "description" | "mode" | "valueType" | "defaultValue" | "minValue" | "maxValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
   windows: Array<Pick<RecordWindowRow, "startMinute" | "endMinute">> = [],
 ): ItemAuditSnapshot {
   return {

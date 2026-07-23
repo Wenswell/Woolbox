@@ -77,6 +77,9 @@ internal fun parseOptionalFinite(value: String, label: String): Double? =
         parsed
     }
 
+internal fun parseRequiredFinite(value: String, label: String): Double =
+    parseOptionalFinite(value, label) ?: error("$label is required.")
+
 internal fun parsePositive(value: String, label: String): Double {
     val parsed = value.trim().toDoubleOrNull()
     check(parsed != null && parsed.isFinite() && parsed > 0) { "$label must be a positive number." }

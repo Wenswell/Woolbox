@@ -13,6 +13,7 @@ import {
   parseItemInput,
   parseOptionalId,
   parseOptionalRecordMode,
+  parseTaskCreateInput,
   parseTaskInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
@@ -90,7 +91,7 @@ export function buildApp(options: BuildAppOptions) {
   app.get("/api/tasks", () => ({ tasks: records.listTasks() }));
 
   app.post("/api/tasks", (request, reply) => {
-    const task = records.createTask(parseTaskInput(request.body));
+    const task = records.createTask(parseTaskCreateInput(request.body));
     return reply.status(201).send({ task });
   });
 
@@ -98,13 +99,6 @@ export function buildApp(options: BuildAppOptions) {
     task: records.updateTask(
       parseId((request.params as { id?: unknown }).id, "Task ID"),
       parseTaskInput(request.body),
-    ),
-  }));
-
-  app.put("/api/tasks/:id/completion", (request) => ({
-    task: records.setTaskCompleted(
-      parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseCompleted(request.body),
     ),
   }));
 

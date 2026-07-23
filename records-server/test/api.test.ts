@@ -164,6 +164,8 @@ describe("Records API", () => {
       name: "Temperature",
       mode: "MEASUREMENT",
       defaultValue: null,
+      minValue: 0,
+      maxValue: 10,
       unit: "°C",
       windows: [],
     }));
@@ -211,19 +213,32 @@ describe("Records API", () => {
     expect(await getEntries()).toEqual([]);
   });
 
-  it("allows signed measurement values and rejects incompatible measurement fields", async () => {
+  it("accepts only measurement values on the configured signed range and step", async () => {
     const created = await createItem(itemInput({
       name: "Temperature",
       mode: "MEASUREMENT",
       defaultValue: null,
+      minValue: -10,
+      maxValue: 10,
+      stepValue: 0.5,
       unit: "°C",
       windows: [],
     }));
     expect(created.statusCode).toBe(201);
-    expect(created.json().item).toMatchObject({ mode: "MEASUREMENT", valueType: "NUMBER", goalValue: null, windows: [] });
+    expect(created.json().item).toMatchObject({
+      mode: "MEASUREMENT",
+      valueType: "NUMBER",
+      defaultValue: null,
+      minValue: -10,
+      maxValue: 10,
+      goalValue: null,
+      windows: [],
+    });
 
     expect((await createEntry(entryInput({ itemId: 1, value: 0 }))).statusCode).toBe(201);
     expect((await createEntry(entryInput({ itemId: 1, value: -5.5 }))).statusCode).toBe(201);
+    expect((await createEntry(entryInput({ itemId: 1, value: -5.25 }))).statusCode).toBe(400);
+    expect((await createEntry(entryInput({ itemId: 1, value: 10.5 }))).statusCode).toBe(400);
     expect((await getEntries()).map((entry) => entry.value)).toEqual([-5.5, 0]);
 
     expect((await createItem(itemInput({ name: "Water" }))).statusCode).toBe(201);
@@ -245,21 +260,19 @@ describe("Records API", () => {
     expect(invalid.statusCode).toBe(400);
   });
 
-  it("manages tasks and first-level steps atomically", async () => {
-    const created = await createTask({ title: "  Prepare trip  " });
+  it("creates tasks with subtasks atomically and derives completion from them", async () => {
+    const created = await createTask({ title: "  Prepare trip  ", steps: [" Book train ", "Pack bag"] });
     expect(created.statusCode).toBe(201);
-    expect(created.json().task).toMatchObject({ id: 1, title: "Prepare trip", completedAt: null, steps: [] });
+    expect(created.json().task).toMatchObject({
+      id: 1,
+      title: "Prepare trip",
+      completedAt: null,
+      steps: [
+        { id: 1, title: "Book train", completedAt: null },
+        { id: 2, title: "Pack bag", completedAt: null },
+      ],
+    });
 
-    const directComplete = await setTaskCompleted(1, true);
-    expect(directComplete.statusCode).toBe(200);
-    expect(directComplete.json().task).toMatchObject({ completedAt: 1_700_000_000_000 });
-
-    const firstStep = await createStep(1, { title: "Book train" });
-    expect(firstStep.statusCode).toBe(201);
-    expect(firstStep.json().step).toMatchObject({ id: 1, taskId: 1, title: "Book train", completedAt: null });
-    expect((await getTasks())[0]).toMatchObject({ completedAt: null });
-
-    await createStep(1, { title: "Pack bag" });
     expect((await setStepCompleted(1, true)).statusCode).toBe(200);
     expect((await getTasks())[0]).toMatchObject({ completedAt: null });
 
@@ -274,19 +287,26 @@ describe("Records API", () => {
     });
 
     await setStepCompleted(1, false);
-    const parentComplete = await setTaskCompleted(1, true);
-    expect(parentComplete.json().task.steps).toEqual([
-      expect.objectContaining({ id: 1, completedAt: 1_700_000_000_000 }),
-      expect.objectContaining({ id: 2, completedAt: 1_700_000_000_000 }),
-    ]);
+    expect((await getTasks())[0]).toMatchObject({ completedAt: null });
 
-    await setStepCompleted(1, false);
+    const added = await createStep(1, { title: "Check documents" });
+    expect(added.statusCode).toBe(201);
+    expect((await setStepCompleted(3, true)).statusCode).toBe(200);
     const deleted = await app.inject({ method: "DELETE", url: "/api/steps/1" });
     expect(deleted.statusCode).toBe(200);
     expect((await getTasks())[0]).toMatchObject({
       completedAt: 1_700_000_000_000,
-      steps: [expect.objectContaining({ id: 2, completedAt: 1_700_000_000_000 })],
+      steps: [
+        expect.objectContaining({ id: 2, completedAt: 1_700_000_000_000 }),
+        expect.objectContaining({ id: 3, completedAt: 1_700_000_000_000 }),
+      ],
     });
+
+    const directComplete = await app.inject({ method: "PUT", url: "/api/tasks/1/completion", payload: { completed: true } });
+    expect(directComplete.statusCode).toBe(404);
+
+    expect((await app.inject({ method: "DELETE", url: "/api/steps/2" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: "/api/steps/3" })).statusCode).toBe(400);
 
     const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey" } });
     expect(renamed.statusCode).toBe(200);
@@ -296,8 +316,12 @@ describe("Records API", () => {
   });
 
   it("rejects empty task titles and does not write partial task data", async () => {
-    const task = await createTask({ title: " " });
+    const task = await createTask({ title: " ", steps: ["Prepare"] });
     expect(task.statusCode).toBe(400);
+    const missingSteps = await createTask({ title: "Prepare" });
+    expect(missingSteps.statusCode).toBe(400);
+    const emptyStep = await createTask({ title: "Prepare", steps: [" "] });
+    expect(emptyStep.statusCode).toBe(400);
     expect(await getTasks()).toEqual([]);
 
     const step = await createStep(1, { title: "Missing parent" });
@@ -363,10 +387,6 @@ describe("Records API", () => {
     return app.inject({ method: "POST", url: `/api/tasks/${taskId}/steps`, payload });
   }
 
-  async function setTaskCompleted(taskId: number, completed: boolean) {
-    return app.inject({ method: "PUT", url: `/api/tasks/${taskId}/completion`, payload: { completed } });
-  }
-
   async function setStepCompleted(stepId: number, completed: boolean) {
     return app.inject({ method: "PUT", url: `/api/steps/${stepId}/completion`, payload: { completed } });
   }
@@ -385,6 +405,8 @@ function itemInput(patch: Record<string, unknown> = {}) {
     mode: "ACCUMULATE",
     valueType: "NUMBER",
     defaultValue: 1,
+    minValue: null,
+    maxValue: null,
     stepValue: 1,
     unit: "次",
     goalValue: null,

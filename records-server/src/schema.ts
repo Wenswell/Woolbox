@@ -10,6 +10,8 @@ export const recordItems = sqliteTable(
     mode: text("mode", { enum: ["ACCUMULATE", "MEASUREMENT"] }).notNull().default("ACCUMULATE"),
     valueType: text("value_type", { enum: ["NUMBER", "DURATION"] }).notNull(),
     defaultValue: real("default_value"),
+    minValue: real("min_value"),
+    maxValue: real("max_value"),
     stepValue: real("step_value").notNull(),
     unit: text("unit").notNull(),
     goalValue: real("goal_value"),

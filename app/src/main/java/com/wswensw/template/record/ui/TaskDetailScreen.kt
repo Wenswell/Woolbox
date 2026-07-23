@@ -48,7 +48,6 @@ fun TaskDetailScreen(
     loading: Boolean,
     onBack: () -> Unit,
     onSaveTitle: (String, (String?) -> Unit) -> Unit,
-    onToggleTask: (Boolean) -> Unit,
     onCreateStep: (String, (String?) -> Unit) -> Unit,
     onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
@@ -139,34 +138,16 @@ fun TaskDetailScreen(
                     .fillMaxWidth()
                     .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = task.isCompleted,
-                    onCheckedChange = onToggleTask,
-                )
-                Text("Completed", style = MaterialTheme.typography.bodyLarge)
-            }
         }
 
         TemplateSection(title = "Subtasks") {
-            if (task.steps.isEmpty()) {
-                Text(
-                    text = "No subtasks.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = TemplateStyle.spacing.pageHorizontal, vertical = 8.dp),
-                )
-            }
             task.steps.forEachIndexed { index, step ->
                 TaskStepRow(
                     step = step,
                     onToggle = { completed -> onToggleStep(step, completed) },
                     onEdit = { editingStepId = step.id },
                     onDelete = { deletingStepId = step.id },
+                    canDelete = task.steps.size > 1,
                 )
                 if (index < task.steps.lastIndex) {
                     HorizontalDivider(
@@ -260,6 +241,7 @@ private fun TaskStepRow(
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    canDelete: Boolean,
 ) {
     Row(
         modifier = Modifier
@@ -281,7 +263,7 @@ private fun TaskStepRow(
         IconButton(onClick = onEdit) {
             Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Edit subtask")
         }
-        IconButton(onClick = onDelete) {
+        IconButton(onClick = onDelete, enabled = canDelete) {
             Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Delete subtask")
         }
     }

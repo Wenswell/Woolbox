@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -28,7 +27,6 @@ import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -62,24 +60,22 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val RailCardWidth = 240.dp
-private val RailCardHeight = 140.dp
+private val RailCardHeight = 164.dp
 private val RailCardSpacing = 12.dp
 
 @Composable
 fun RecordsScreen(
     state: RecordsUiState,
-    onGoals: () -> Unit,
-    onManage: () -> Unit,
+    onManageTasks: () -> Unit,
+    onManageRecords: () -> Unit,
     onCreateAccumulate: () -> Unit,
     onCreateMeasurement: () -> Unit,
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
-    onAddMeasurement: (RecordItem) -> Unit,
     onCreateTask: () -> Unit,
     onOpenTask: (TodoTask) -> Unit,
-    onToggleTask: (TodoTask, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var completedTasksExpanded by rememberSaveable { mutableStateOf(false) }
@@ -128,6 +124,14 @@ fun RecordsScreen(
                         title = "Tasks",
                         onAdd = onCreateTask,
                         addContentDescription = "New task",
+                        leadingActions = {
+                            FilledTonalIconButton(onClick = onManageTasks) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_settings_24),
+                                    contentDescription = "Manage tasks",
+                                )
+                            }
+                        },
                     )
                 }
                 if (openTasks.isEmpty()) {
@@ -140,10 +144,9 @@ fun RecordsScreen(
                     }
                 } else {
                     items(openTasks, key = { "open-${it.id}" }) { task ->
-                        TaskChecklistRow(
+                        TaskProgressCard(
                             task = task,
                             onOpen = { onOpenTask(task) },
-                            onToggle = { completed -> onToggleTask(task, completed) },
                         )
                     }
                 }
@@ -157,10 +160,9 @@ fun RecordsScreen(
                     }
                     if (completedTasksExpanded) {
                         items(completedTasks, key = { "done-${it.id}" }) { task ->
-                            TaskChecklistRow(
+                            TaskProgressCard(
                                 task = task,
                                 onOpen = { onOpenTask(task) },
-                                onToggle = { completed -> onToggleTask(task, completed) },
                             )
                         }
                     }
@@ -172,13 +174,7 @@ fun RecordsScreen(
                         onAdd = onCreateAccumulate,
                         addContentDescription = "New accumulate",
                         leadingActions = {
-                            FilledTonalIconButton(onClick = onGoals) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Flag,
-                                    contentDescription = "Goals",
-                                )
-                            }
-                            FilledTonalIconButton(onClick = onManage) {
+                            FilledTonalIconButton(onClick = onManageRecords) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_settings_24),
                                     contentDescription = "Manage records",
@@ -217,6 +213,14 @@ fun RecordsScreen(
                         title = "Measurement",
                         onAdd = onCreateMeasurement,
                         addContentDescription = "New measurement",
+                        leadingActions = {
+                            FilledTonalIconButton(onClick = onManageRecords) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_settings_24),
+                                    contentDescription = "Manage records",
+                                )
+                            }
+                        },
                     )
                 }
                 item {
@@ -236,7 +240,6 @@ fun RecordsScreen(
                                     item = item,
                                     latest = state.latestEntries[item.id],
                                     onOpen = { onOpenMeasurement(item) },
-                                    onAdd = { onAddMeasurement(item) },
                                 )
                             }
                         }
@@ -302,11 +305,12 @@ private fun CompletedTasksHeader(
 }
 
 @Composable
-private fun TaskChecklistRow(
+private fun TaskProgressCard(
     task: TodoTask,
     onOpen: () -> Unit,
-    onToggle: (Boolean) -> Unit,
 ) {
+    val completed = task.completedStepCount
+    val progress = completed.toFloat() / task.steps.size.toFloat()
     Card(
         onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
@@ -323,14 +327,33 @@ private fun TaskChecklistRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .heightIn(min = 76.dp)
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(
-                checked = task.isCompleted,
-                onCheckedChange = { checked -> onToggle(checked) },
-            )
+            Box(
+                modifier = Modifier.size(52.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = if (task.isCompleted) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    strokeWidth = 5.dp,
+                    gapSize = 0.dp,
+                )
+                Text(
+                    text = "$completed",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
@@ -344,24 +367,21 @@ private fun TaskChecklistRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (task.steps.isNotEmpty()) {
-                    val completed = task.completedStepCount
-                    Text(
-                        text = "$completed / ${task.steps.size}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                    LinearProgressIndicator(
-                        progress = { completed.toFloat() / task.steps.size },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp)
-                            .height(3.dp)
-                            .clip(CircleShape),
-                        gapSize = 0.dp,
-                        drawStopIndicator = {},
-                    )
+                Text(
+                    text = "$completed / ${task.steps.size} subtasks",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                if (task.isCompleted) {
+                    task.completedAt?.let { completedAt ->
+                        Text(
+                            text = taskCompletedAtLabel(completedAt),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
             }
         }
@@ -406,38 +426,31 @@ private fun AccumulateRailCard(
         colors = CardDefaults.cardColors(containerColor = container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            DailyGoalMedallion(
+                item = item,
+                progress = progress,
+                reached = goalReached,
+                progressColor = progressColor,
+                size = 88.dp,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (hasGoal) {
-                    DailyGoalMedallion(
-                        item = item,
-                        progress = progress,
-                        reached = goalReached,
-                        progressColor = progressColor,
-                        size = 40.dp,
-                    )
-                } else {
-                    RecordItemInitial(name = item.name, size = 40.dp)
-                }
                 Text(
                     text = displayRecordName(item.name),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
                 )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
                     color = progressColor,
@@ -460,19 +473,14 @@ private fun AccumulateRailCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (period == GoalPeriod.WEEK && !goalReached) {
-                        LinearProgressIndicator(
-                            progress = { progress.coerceIn(0f, 1f) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(CircleShape),
-                            color = progressColor,
-                            trackColor = progressColor.copy(alpha = 0.16f),
-                            gapSize = 0.dp,
-                            drawStopIndicator = {},
-                        )
-                    }
+                } else if (item.description.isNotEmpty()) {
+                    Text(
+                        text = item.description,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 val streakText = streak?.let(::streakLabel)
                 if (streakText != null) {
@@ -505,7 +513,6 @@ private fun MeasurementRailCard(
     item: RecordItem,
     latest: RecordEntry?,
     onOpen: () -> Unit,
-    onAdd: () -> Unit,
 ) {
     val colors = recordItemColors(item.name)
     Card(
@@ -537,15 +544,6 @@ private fun MeasurementRailCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                FilledTonalIconButton(
-                    onClick = onAdd,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = "Add measurement",
-                    )
-                }
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(

@@ -17,6 +17,8 @@ export interface RecordItemInput {
   mode: RecordMode;
   valueType: ValueType;
   defaultValue: number | null;
+  minValue: number | null;
+  maxValue: number | null;
   stepValue: number;
   unit: string;
   goalValue: number | null;
@@ -33,8 +35,12 @@ export interface RecordEntryInput {
   value: number;
 }
 
-export interface TaskInput {
+export interface TaskTitleInput {
   title: string;
+}
+
+export interface TaskCreateInput extends TaskTitleInput {
+  steps: string[];
 }
 
 export class ApiError extends Error {
@@ -54,6 +60,8 @@ export function parseItemInput(value: unknown): RecordItemInput {
   const mode = enumField(input, "mode", RECORD_MODES);
   const valueType = enumField(input, "valueType", VALUE_TYPES);
   const defaultValue = nullableNumberField(input, "defaultValue");
+  const minValue = nullableNumberField(input, "minValue");
+  const maxValue = nullableNumberField(input, "maxValue");
   const stepValue = numberField(input, "stepValue");
   const goalValue = nullableNumberField(input, "goalValue");
   const goalPeriod = nullableEnumField(input, "goalPeriod", GOAL_PERIODS);
@@ -74,8 +82,11 @@ export function parseItemInput(value: unknown): RecordItemInput {
     requirePositive(goalValue, "Goal");
     requireRule(goalValue === null || goalPeriod !== null, "Goal period is required when a goal is set.");
     requireRule(valueType !== "DURATION" || DURATION_UNITS.includes(unit as never), "Duration unit must be 秒, 分, or 小时.");
+    requireRule(minValue === null && maxValue === null, "Accumulate items do not support measurement bounds.");
   } else {
     requireRule(valueType === "NUMBER", "Measurements must use Number.");
+    requireRule(defaultValue === null, "Measurements do not support default values.");
+    requireMeasurementGrid(minValue, maxValue, stepValue);
     requireRule(goalValue === null && goalPeriod === null, "Measurements do not support goals.");
     requireRule(windows.length === 0, "Measurements do not support suggested time windows.");
   }
@@ -86,6 +97,8 @@ export function parseItemInput(value: unknown): RecordItemInput {
     mode,
     valueType,
     defaultValue,
+    minValue,
+    maxValue,
     stepValue,
     unit,
     goalValue,
@@ -109,10 +122,23 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
   return entry;
 }
 
-export function parseTaskInput(value: unknown): TaskInput {
+export function parseTaskInput(value: unknown): TaskTitleInput {
   const title = stringField(objectInput(value), "title").trim();
   requireRule(title.length > 0, "Title is required.");
   return { title };
+}
+
+export function parseTaskCreateInput(value: unknown): TaskCreateInput {
+  const input = objectInput(value);
+  const { title } = parseTaskInput(input);
+  requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
+  const steps = input.steps.map((value) => {
+    requireRule(typeof value === "string", "Subtask titles must be strings.");
+    const step = value.trim();
+    requireRule(step.length > 0, "Subtask titles are required.");
+    return step;
+  });
+  return { title, steps };
 }
 
 export function parseCompleted(value: unknown): boolean {
@@ -211,6 +237,22 @@ function nullableEnumField<T extends string>(input: Record<string, unknown>, fie
 
 function requirePositive(value: number | null, label: string): void {
   if (value !== null) requireRule(value > 0, `${label} must be a positive number.`);
+}
+
+export function isMeasurementValueOnGrid(value: number, minValue: number, maxValue: number, stepValue: number): boolean {
+  if (!Number.isFinite(value) || value < minValue || value > maxValue) return false;
+  const position = (value - minValue) / stepValue;
+  return Math.abs(position - Math.round(position)) <= 1e-9 * Math.max(1, Math.abs(position));
+}
+
+function requireMeasurementGrid(minValue: number | null, maxValue: number | null, stepValue: number): void {
+  requireRule(minValue !== null && maxValue !== null, "Measurement minimum and maximum are required.");
+  requireRule(minValue < maxValue, "Measurement minimum must be less than maximum.");
+  const steps = (maxValue - minValue) / stepValue;
+  requireRule(
+    steps > 0 && Math.abs(steps - Math.round(steps)) <= 1e-9 * Math.max(1, Math.abs(steps)),
+    "Measurement range must divide evenly by step.",
+  );
 }
 
 function isRealDate(value: string): boolean {

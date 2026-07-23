@@ -1,6 +1,7 @@
 package com.wswensw.template.record.model
 
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
@@ -45,6 +46,7 @@ fun RecordItemDraft.validated(): RecordItemDraft {
         RecordMode.ACCUMULATE -> {
             requirePositive(defaultValue, "Default value")
             requirePositive(goalValue, "Goal")
+            requireRecord(minValue == null && maxValue == null, "Accumulate items do not support measurement bounds.")
             requireRecord(
                 goalValue == null || goalPeriod != null,
                 "Goal period is required when a goal is set.",
@@ -56,7 +58,10 @@ fun RecordItemDraft.validated(): RecordItemDraft {
         }
         RecordMode.MEASUREMENT -> {
             requireRecord(valueType == RecordValueType.NUMBER, "Measurements must use Number.")
-            requireFinite(defaultValue, "Default value")
+            requireRecord(defaultValue == null, "Measurements do not support default values.")
+            val measurementMin = minValue ?: throw RecordValidationException("Measurement minimum and maximum are required.")
+            val measurementMax = maxValue ?: throw RecordValidationException("Measurement minimum and maximum are required.")
+            measurementStepCount(measurementMin, measurementMax, stepValue)
             requireRecord(goalValue == null && goalPeriod == null, "Measurements do not support goals.")
             requireRecord(normalizedWindows.isEmpty(), "Measurements do not support suggested time windows.")
         }
@@ -69,6 +74,42 @@ fun RecordItemDraft.validated(): RecordItemDraft {
         goalPeriod = goalPeriod.takeIf { mode == RecordMode.ACCUMULATE && goalValue != null },
         windows = normalizedWindows,
     )
+}
+
+fun measurementStepCount(minValue: Double, maxValue: Double, stepValue: Double): Int {
+    requireRecord(minValue.isFinite() && maxValue.isFinite(), "Measurement bounds must be finite numbers.")
+    requireRecord(minValue < maxValue, "Measurement minimum must be less than maximum.")
+    requirePositive(stepValue, "Step")
+    val span = BigDecimal.valueOf(maxValue).subtract(BigDecimal.valueOf(minValue))
+    val step = BigDecimal.valueOf(stepValue)
+    val (count, remainder) = span.divideAndRemainder(step)
+    requireRecord(remainder.compareTo(BigDecimal.ZERO) == 0, "Measurement range must divide evenly by step.")
+    requireRecord(count > BigDecimal.ZERO && count <= BigDecimal.valueOf(Int.MAX_VALUE.toLong()), "Measurement step count is invalid.")
+    return count.intValueExact()
+}
+
+fun isMeasurementValueOnGrid(value: Double, minValue: Double, maxValue: Double, stepValue: Double): Boolean {
+    if (!value.isFinite() || value < minValue || value > maxValue) return false
+    return runCatching {
+        measurementStepCount(minValue, maxValue, stepValue)
+        BigDecimal.valueOf(value)
+            .subtract(BigDecimal.valueOf(minValue))
+            .divideAndRemainder(BigDecimal.valueOf(stepValue))[1]
+            .compareTo(BigDecimal.ZERO) == 0
+    }.getOrDefault(false)
+}
+
+fun snapMeasurementValue(value: Double, minValue: Double, maxValue: Double, stepValue: Double): Double {
+    val stepCount = measurementStepCount(minValue, maxValue, stepValue)
+    val minimum = BigDecimal.valueOf(minValue)
+    val step = BigDecimal.valueOf(stepValue)
+    val bounded = value.coerceIn(minValue, maxValue)
+    val index = BigDecimal.valueOf(bounded)
+        .subtract(minimum)
+        .divide(step, 0, RoundingMode.HALF_UP)
+        .toInt()
+        .coerceIn(0, stepCount)
+    return minimum.add(step.multiply(BigDecimal.valueOf(index.toLong()))).toDouble()
 }
 
 fun getRecordSuggestions(
@@ -110,15 +151,6 @@ fun stepRecordValue(value: String, step: Double, direction: Int): String {
     val next = (current + stepValue * BigDecimal.valueOf(direction.toLong()))
         .max(stepValue)
     return next.stripTrailingZeros().toPlainString()
-}
-
-fun stepMeasurementValue(value: String, step: Double, direction: Int): String {
-    require(direction == -1 || direction == 1)
-    val stepValue = BigDecimal.valueOf(step)
-    val current = value.trim().toBigDecimalOrNull() ?: BigDecimal.ZERO
-    return (current + stepValue * BigDecimal.valueOf(direction.toLong()))
-        .stripTrailingZeros()
-        .toPlainString()
 }
 
 fun goalValues(
@@ -213,12 +245,6 @@ private fun normalizeMinute(minute: Int): Int = ((minute % (24 * 60)) + 24 * 60)
 private fun requirePositive(value: Double?, label: String) {
     if (value != null) {
         requireRecord(value.isFinite() && value > 0, "$label must be a positive number.")
-    }
-}
-
-private fun requireFinite(value: Double?, label: String) {
-    if (value != null) {
-        requireRecord(value.isFinite(), "$label must be a finite number.")
     }
 }
 

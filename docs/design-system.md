@@ -19,13 +19,14 @@ TemplateTheme
    │     │     ├─ Global Copy entry
    │     │     └─ OLED shield entry
    │     ├─ Records
-   │     │  ├─ Tasks ──> Task detail
-   │     │  └─ Trackers ──> Record / measurement detail
+   │     │  ├─ Tasks ──> Task progress Sheet ──> Manage tasks ──> Edit task
+   │     │  ├─ Accumulate ──> Record Sheet
+   │     │  └─ Measurement ──> Measurement preview Sheet
    │     └─ Setting
    │        ├─ Theme entry
    │        └─ Records connection ──> Credentials form
+   ├─ Manage tasks ──> New / Edit task
    ├─ Manage records ──> New / Edit accumulate | New / Edit measurement
-   ├─ Goals ──> Daily / Weekly goals
    ├─ Global Copy
    │  ├─ primary action
    │  ├─ accessibility state
@@ -109,20 +110,20 @@ Records 根页为单页三分区（同一 `LazyColumn`，`16dp` 块间距），�
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Tasks` | 全宽竖列表；加号进 `New task`；行含复选框、标题；有子事项时显示 `N / M` 与细进度条；已完成折叠。 |
-| `Edit task` | 独立路由表单骨架；顶栏 `Edit task` + 删除/保存 icon；标题、完成、一级子事项与删除。 |
-| `Accumulate` | section 旁 Goals、Manage、新建 icon；横向卡片轨（约 `240×140dp`）显示今日累计/目标/连击；点卡打开快速记录 Sheet。 |
+| `Tasks` | 全宽进度卡；圆环显示 `N / M`，已完成折叠。section 旁 Manage、新建纯 icon；点卡打开子事项进度 Sheet。 |
+| `Manage tasks` / `Edit task` | 管理页展示全部任务；独立编辑路由提供标题、一级子事项和删除，顶栏为删除/保存 icon。 |
+| `Accumulate` | section 旁 Manage、新建 icon；横向卡片轨（约 `240×164dp`）以目标圆环为主视觉，显示今日累计、目标和连击；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；无 mode 切换；Check 保存。 |
-| `Measurement` | section 旁新建 icon；横向卡片轨显示最新值与时间；点卡进详情；卡上加号进 `Add measurement`。 |
-| `New/Edit measurement` | 固定 `MEASUREMENT` 表单；无目标/推荐时段；Check 保存。 |
-| `Measurement detail` | 返回、编辑项、四档范围、原始时间序列图表、只读流水与新增。 |
+| `Measurement` | section 旁 Manage、新建 icon；横向卡片轨显示最新值与时间；点卡打开预览 Sheet。 |
+| `New/Edit measurement` | 固定 `MEASUREMENT` 表单；字段为最小值、最大值、步进、单位和优先级，无默认值、目标/推荐时段；Check 保存。 |
+| Measurement preview Sheet | 标题、最新值、24 小时原始时间序列图表、流水和离散 Slider 录入。 |
 | 累计记录 Sheet | 身份与进度合并为同一标题行；下方仅数值输入与今日流水。 |
 
 未配置凭据、远端失败或对应列表为空时，使用空状态卡与主操作按钮；加载中显示居中进度指示。
 
 `Manage records` 使用标准路由骨架；顶栏分别新建累计与测量；编辑按 `item.mode` 进入对应表单。
 
-`Goals` 空/错误态复用 `RecordsStatusCard`，分区标题与主页一致。
+Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删和删除任务只在 `Edit task`。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
 
 `Records connection` 使用 `TemplateSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
