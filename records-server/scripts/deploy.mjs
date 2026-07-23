@@ -24,8 +24,10 @@ systemctl --user is-active records.service
 /home/ravvss/.local/node/bin/node - <<'NODE'
 const Database = require("better-sqlite3");
 const database = new Database("/srv/records/records.sqlite", { readonly: true });
-const columns = database.prepare("SELECT name FROM pragma_table_info('record_items') WHERE name IN ('min_value', 'max_value') ORDER BY name").all();
-if (columns.length !== 2) throw new Error("Measurement bounds migration is missing.");
+const boundColumns = database.prepare("SELECT name FROM pragma_table_info('record_items') WHERE name IN ('min_value', 'max_value') ORDER BY name").all();
+if (boundColumns.length !== 2) throw new Error("Measurement bounds migration is missing.");
+const positionColumn = database.prepare("SELECT name FROM pragma_table_info('todo_steps') WHERE name = 'position'").get();
+if (!positionColumn) throw new Error("Todo step position migration is missing.");
 console.log("Database schema verified.");
 NODE
 for attempt in {1..20}; do
