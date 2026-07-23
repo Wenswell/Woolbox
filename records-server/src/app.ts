@@ -114,6 +114,14 @@ export function buildApp(options: BuildAppOptions) {
     return reply.status(201).send({ step });
   });
 
+  app.put("/api/tasks/:id/steps/order", (request) => ({
+    task: records.reorderSteps(
+      parseId((request.params as { id?: unknown }).id, "Task ID"),
+      parseIds(request.body),
+    ),
+  }));
+
+
   app.put("/api/steps/:id", (request) => ({
     step: records.updateStep(
       parseId((request.params as { id?: unknown }).id, "Step ID"),

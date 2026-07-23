@@ -192,8 +192,9 @@ private fun ManageRecordCard(
 
 private fun RecordItem.measurementSummary(): String {
     if (mode == RecordMode.MEASUREMENT) {
-        val default = defaultValue?.let(::formatValue) ?: "No default"
-        return "Measurement · default $default $unit · step ${formatValue(stepValue)}"
+        val min = minValue?.let(::formatValue) ?: "--"
+        val max = maxValue?.let(::formatValue) ?: "--"
+        return "$min–$max $unit · step ${formatValue(stepValue)}"
     }
     val type = if (valueType == RecordValueType.NUMBER) "Number" else "Duration"
     val default = defaultValue?.let(::formatValue) ?: "No default"

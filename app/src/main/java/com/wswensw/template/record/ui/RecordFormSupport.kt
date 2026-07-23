@@ -85,3 +85,11 @@ internal fun parsePositive(value: String, label: String): Double {
     check(parsed != null && parsed.isFinite() && parsed > 0) { "$label must be a positive number." }
     return parsed
 }
+
+internal fun <T> List<T>.moveItem(fromIndex: Int, toIndex: Int): List<T> {
+    if (fromIndex == toIndex || fromIndex !in indices || toIndex !in indices) return this
+    val mutable = toMutableList()
+    val item = mutable.removeAt(fromIndex)
+    mutable.add(toIndex, item)
+    return mutable
+}

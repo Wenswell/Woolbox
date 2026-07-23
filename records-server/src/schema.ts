@@ -77,11 +77,15 @@ export const todoSteps = sqliteTable(
       .notNull()
       .references(() => todoTasks.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    position: integer("position").notNull(),
     completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [index("todo_steps_task_created_at_index").on(table.taskId, table.createdAt)],
+  (table) => [
+    index("todo_steps_task_created_at_index").on(table.taskId, table.createdAt),
+    index("todo_steps_task_position_index").on(table.taskId, table.position),
+  ],
 );
 
 export const recordAuditLogs = sqliteTable(

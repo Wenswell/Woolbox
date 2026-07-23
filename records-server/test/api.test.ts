@@ -373,6 +373,44 @@ describe("Records API", () => {
     return response.json().entries;
   }
 
+  it("reorders subtasks and preserves completion state", async () => {
+    const created = await createTask({ title: "Pack", steps: ["A", "B", "C"] });
+    expect(created.statusCode).toBe(201);
+    const task = created.json().task as { id: number; steps: Array<{ id: number; title: string }> };
+    const ids = task.steps.map((step) => step.id);
+    await setStepCompleted(ids[1]!, true);
+
+    const reordered = await app.inject({
+      method: "PUT",
+      url: `/api/tasks/${task.id}/steps/order`,
+      payload: { ids: [ids[2], ids[0], ids[1]] },
+    });
+    expect(reordered.statusCode).toBe(200);
+    const steps = reordered.json().task.steps as Array<{ id: number; title: string; completedAt: number | null }>;
+    expect(steps.map((step) => step.title)).toEqual(["C", "A", "B"]);
+    expect(steps.map((step) => step.id)).toEqual([ids[2], ids[0], ids[1]]);
+    expect(steps[2]?.completedAt).not.toBeNull();
+
+    const listed = await getTasks();
+    const listedTask = listed.find((item) => item.id === task.id) as { steps: Array<{ title: string }> };
+    expect(listedTask.steps.map((step) => step.title)).toEqual(["C", "A", "B"]);
+
+    const incomplete = await app.inject({
+      method: "PUT",
+      url: `/api/tasks/${task.id}/steps/order`,
+      payload: { ids: [ids[0], ids[1]] },
+    });
+    expect(incomplete.statusCode).toBe(400);
+
+    const foreign = await app.inject({
+      method: "PUT",
+      url: `/api/tasks/${task.id}/steps/order`,
+      payload: { ids: [ids[0], ids[1], 999999] },
+    });
+    expect(foreign.statusCode).toBe(400);
+  });
+
+
   async function createTask(payload: Record<string, unknown>) {
     return app.inject({ method: "POST", url: "/api/tasks", payload });
   }

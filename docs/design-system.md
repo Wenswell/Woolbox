@@ -113,9 +113,9 @@ Records 根页：`TemplatePageHeader`（`Records` + 当日英文日期）后接�
 | 区域 | 唯一职责 |
 | --- | --- |
 | `Tasks` | 全宽有色进度卡；标题右侧 `N / M`（accent），标题下 `Next · ...`；已完成折叠。section 旁 Manage 用 `IconButton`、新建用 `FilledTonalIconButton`；点卡打开进度 Sheet。 |
-| `Manage tasks` / `Edit task` | 管理页展示全部任务（同色相进度卡 + chevron）；编辑路由负责标题、子事项和删除。 |
+| `Manage tasks` / `Edit task` | 管理页展示全部任务（同色相进度卡 + chevron）；编辑路由负责标题、子事项增删排序和删除。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
-| `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡 → `Edit measurement`。 |
+| `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
 | `Accumulate` | 横向卡轨 `240×136dp`；`64dp` 目标圆环 + 标题/主值/火苗目标与连击；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；Check 保存。 |
 | `Measurement` | 横向卡轨 `240×136dp`；`40dp` 首字圆 + 标题/主值/时间；点卡打开预览 Sheet。 |
@@ -138,7 +138,7 @@ Records 根页：`TemplatePageHeader`（`Records` + 当日英文日期）后接�
 
 `Manage accumulates` 与 `Manage measurements` 使用相同的标准路由骨架；每页顶栏仅提供本模式新建入口，编辑路由固定为本模式表单。
 
-Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删和删除任务只在 `Edit task`。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
+Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删排序和删除任务只在 `Edit task`。`New task` 同样可调整子事项顺序。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
 
 `Records connection` 使用 `TemplateSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 

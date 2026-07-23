@@ -239,6 +239,13 @@ class RecordsViewModel(
         repository.deleteStep(stepId)
     }
 
+    fun reorderSteps(taskId: Long, stepIds: List<Long>, onResult: (String?) -> Unit) = runTaskAction(
+        onResult = onResult,
+        failureMessage = "Unable to reorder subtasks.",
+    ) {
+        repository.reorderSteps(taskId, stepIds)
+    }
+
     fun loadMeasurementPreview(itemId: Long) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()

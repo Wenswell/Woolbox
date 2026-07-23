@@ -33,6 +33,7 @@ type AuditAction =
   | "TASK_COMPLETED"
   | "TASK_REOPENED"
   | "TASK_DELETED"
+  | "TASK_STEPS_REORDERED"
   | "STEP_CREATED"
   | "STEP_UPDATED"
   | "STEP_COMPLETED"
@@ -73,6 +74,7 @@ interface TaskAuditSnapshot {
   title: string;
   completedAt: number | null;
   stepCount?: number;
+  stepIds?: number[];
 }
 
 interface StepAuditSnapshot {
@@ -382,9 +384,10 @@ export class RecordsService {
         .returning({ id: todoTasks.id })
         .get();
       const steps = tx.insert(todoSteps)
-        .values(input.steps.map((title) => ({
+        .values(input.steps.map((title, position) => ({
           taskId: task.id,
           title,
+          position,
           completedAt: null,
           createdAt: now,
           updatedAt: now,
@@ -454,9 +457,11 @@ export class RecordsService {
     const id = this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
       const now = this.now();
+      const existing = tx.select().from(todoSteps).where(eq(todoSteps.taskId, taskId)).all();
+      const position = existing.reduce((max, step) => Math.max(max, step.position), -1) + 1;
       const step = tx
         .insert(todoSteps)
-        .values({ taskId, title: input.title, completedAt: null, createdAt: now, updatedAt: now })
+        .values({ taskId, title: input.title, position, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoSteps.id })
         .get();
       this.writeAudit(tx, {
@@ -541,6 +546,47 @@ export class RecordsService {
     });
   }
 
+  reorderSteps(taskId: number, stepIds: number[]) {
+    this.db.transaction((tx) => {
+      const task = this.requireTask(tx, taskId);
+      const current = tx
+        .select()
+        .from(todoSteps)
+        .where(eq(todoSteps.taskId, taskId))
+        .orderBy(asc(todoSteps.position), asc(todoSteps.id))
+        .all();
+      if (current.length === 0) throw new ApiError(500, "Task must have at least one subtask.");
+      if (stepIds.length !== current.length) {
+        throw new ApiError(400, "Step order must include every subtask exactly once.");
+      }
+      const currentIds = new Set(current.map((step) => step.id));
+      for (const id of stepIds) {
+        if (!currentIds.has(id)) throw new ApiError(400, "Step does not belong to this task.");
+      }
+      if (new Set(stepIds).size !== stepIds.length) {
+        throw new ApiError(400, "Step order must include every subtask exactly once.");
+      }
+      const now = this.now();
+      const before = current.map((step) => step.id);
+      stepIds.forEach((id, position) => {
+        tx.update(todoSteps)
+          .set({ position, updatedAt: now })
+          .where(eq(todoSteps.id, id))
+          .run();
+      });
+      tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, taskId)).run();
+      this.writeAudit(tx, {
+        action: "TASK_STEPS_REORDERED",
+        entityType: "TASK",
+        entityId: taskId,
+        before: { id: task.id, title: task.title, completedAt: task.completedAt, stepIds: before },
+        after: { id: task.id, title: task.title, completedAt: task.completedAt, stepIds },
+        createdAt: now,
+      });
+    });
+    return this.getTask(taskId);
+  }
+
   listAuditLogs(beforeId?: number) {
     const query = this.db.select().from(recordAuditLogs);
     const rows = (beforeId === undefined ? query : query.where(lt(recordAuditLogs.id, beforeId)))
@@ -575,7 +621,7 @@ export class RecordsService {
       .select()
       .from(todoSteps)
       .where(inArray(todoSteps.taskId, tasks.map((task) => task.id)))
-      .orderBy(asc(todoSteps.taskId), asc(todoSteps.createdAt), asc(todoSteps.id))
+      .orderBy(asc(todoSteps.taskId), asc(todoSteps.position), asc(todoSteps.id))
       .all();
     const stepsByTask = new Map<number, TodoStepRow[]>();
     for (const step of steps) {

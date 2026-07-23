@@ -14,6 +14,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,6 +54,7 @@ fun TaskDetailScreen(
     onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
     onDeleteStep: (TodoStep, (String?) -> Unit) -> Unit,
+    onReorderSteps: (List<Long>, (String?) -> Unit) -> Unit,
     onDeleteTask: ((String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -85,6 +88,18 @@ fun TaskDetailScreen(
     var editingStepId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingStepId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingTask by rememberSaveable { mutableStateOf(false) }
+    var reordering by rememberSaveable { mutableStateOf(false) }
+
+    fun moveStep(fromIndex: Int, toIndex: Int) {
+        if (reordering || toIndex !in task.steps.indices) return
+        val stepIds = task.steps.moveItem(fromIndex, toIndex).map(TodoStep::id)
+        reordering = true
+        errorMessage = null
+        onReorderSteps(stepIds) { error ->
+            reordering = false
+            errorMessage = error
+        }
+    }
 
     fun saveTitle() {
         errorMessage = null
@@ -145,9 +160,13 @@ fun TaskDetailScreen(
                 TaskStepRow(
                     step = step,
                     onToggle = { completed -> onToggleStep(step, completed) },
+                    onMoveUp = { moveStep(index, index - 1) },
+                    onMoveDown = { moveStep(index, index + 1) },
                     onEdit = { editingStepId = step.id },
                     onDelete = { deletingStepId = step.id },
-                    canDelete = task.steps.size > 1,
+                    canMoveUp = !reordering && index > 0,
+                    canMoveDown = !reordering && index < task.steps.lastIndex,
+                    canDelete = !reordering && task.steps.size > 1,
                 )
                 if (index < task.steps.lastIndex) {
                     HorizontalDivider(
@@ -239,8 +258,12 @@ fun TaskDetailScreen(
 private fun TaskStepRow(
     step: TodoStep,
     onToggle: (Boolean) -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     canDelete: Boolean,
 ) {
     Row(
@@ -260,6 +283,12 @@ private fun TaskStepRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+            Icon(imageVector = Icons.Rounded.KeyboardArrowUp, contentDescription = "Move subtask up")
+        }
+        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+            Icon(imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = "Move subtask down")
+        }
         IconButton(onClick = onEdit) {
             Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Edit subtask")
         }

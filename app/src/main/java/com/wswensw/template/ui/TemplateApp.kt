@@ -433,6 +433,9 @@ fun TemplateApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onDeleteStep = { step, onResult ->
                         recordsViewModel.deleteStep(step.id, onResult)
                     },
+                    onReorderSteps = { stepIds, onResult ->
+                        recordsViewModel.reorderSteps(taskId, stepIds, onResult)
+                    },
                     onDeleteTask = { onResult ->
                         recordsViewModel.deleteTask(taskId, onResult)
                     },

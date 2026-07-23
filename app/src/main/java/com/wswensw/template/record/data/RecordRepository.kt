@@ -221,6 +221,15 @@ class RecordRepository(context: Context) {
         Unit
     }
 
+    suspend fun reorderSteps(taskId: Long, stepIds: List<Long>) = withContext(Dispatchers.IO) {
+        request(
+            "PUT",
+            "tasks/$taskId/steps/order",
+            body = JSONObject().put("ids", JSONArray(stepIds)),
+        )
+        Unit
+    }
+
     suspend fun configureCredentials(username: String, password: String) = withContext(Dispatchers.IO) {
         val normalizedUsername = username.trim()
         if (normalizedUsername.isEmpty() || password.isEmpty()) {
