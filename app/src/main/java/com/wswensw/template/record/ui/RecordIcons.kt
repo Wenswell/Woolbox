@@ -78,12 +78,12 @@ internal fun RecordItemInitial(
     Box(
         modifier = modifier
             .size(size)
-            .background(colors.container, CircleShape),
+            .background(colors.accent.copy(alpha = 0.16f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = firstRecordCharacter(name),
-            color = colors.onContainer,
+            color = colors.accent,
             style = if (size > 40.dp) {
                 MaterialTheme.typography.titleLarge
             } else {

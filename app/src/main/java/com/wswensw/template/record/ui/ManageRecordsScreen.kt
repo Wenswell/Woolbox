@@ -85,7 +85,7 @@ fun ManageRecordsScreen(
                     onClick = { onEditItem(item.id) },
                     modifier = Modifier
                         .padding(horizontal = TemplateStyle.spacing.pageHorizontal)
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 8.dp),
                 )
             }
         }
@@ -136,17 +136,20 @@ private fun ManageRecordCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = colors.container),
+        colors = CardDefaults.cardColors(
+            containerColor = colors.container,
+            contentColor = colors.onContainer,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 76.dp)
+                .heightIn(min = 72.dp)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RecordItemInitial(name = item.name, size = 48.dp)
+            RecordItemInitial(name = item.name, size = 40.dp)
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -158,16 +161,17 @@ private fun ManageRecordCard(
                 )
                 Text(
                     text = item.measurementSummary(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.onContainer.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
                 item.goalSummary()?.let { goal ->
                     Text(
                         text = goal,
                         color = colors.accent,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -179,7 +183,7 @@ private fun ManageRecordCard(
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = colors.onContainer.copy(alpha = 0.54f),
                 modifier = Modifier.size(22.dp),
             )
         }

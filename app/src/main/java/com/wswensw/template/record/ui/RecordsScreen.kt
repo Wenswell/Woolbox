@@ -29,8 +29,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,6 +54,7 @@ import com.wswensw.template.record.model.RecordItem
 import com.wswensw.template.record.model.RecordMode
 import com.wswensw.template.record.model.TodoTask
 import com.wswensw.template.record.model.streakLabel
+import com.wswensw.template.ui.TemplatePageHeader
 import com.wswensw.template.ui.TemplateStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -99,7 +100,7 @@ fun RecordsScreen(
             end = TemplateStyle.spacing.pageHorizontal,
             bottom = TemplateStyle.spacing.pageBottom,
         ),
-        verticalArrangement = Arrangement.spacedBy(TemplateStyle.spacing.block),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         when {
             state.isLoading -> item {
@@ -121,12 +122,18 @@ fun RecordsScreen(
             }
             else -> {
                 item {
+                    TemplatePageHeader(
+                        title = "Records",
+                        subtitle = recordsDateLabel(LocalDate.now()),
+                    )
+                }
+                item {
                     RecordsSectionHeader(
                         title = "Tasks",
                         onAdd = onCreateTask,
                         addContentDescription = "New task",
                         leadingActions = {
-                            FilledTonalIconButton(onClick = onManageTasks) {
+                            IconButton(onClick = onManageTasks) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_settings_24),
                                     contentDescription = "Manage tasks",
@@ -169,13 +176,14 @@ fun RecordsScreen(
                     }
                 }
 
+                item { Spacer(Modifier.height(12.dp)) }
                 item {
                     RecordsSectionHeader(
                         title = "Accumulate",
                         onAdd = onCreateAccumulate,
                         addContentDescription = "New accumulate",
                         leadingActions = {
-                            FilledTonalIconButton(onClick = onManageAccumulates) {
+                            IconButton(onClick = onManageAccumulates) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_settings_24),
                                     contentDescription = "Manage accumulates",
@@ -209,13 +217,14 @@ fun RecordsScreen(
                     }
                 }
 
+                item { Spacer(Modifier.height(12.dp)) }
                 item {
                     RecordsSectionHeader(
                         title = "Measurement",
                         onAdd = onCreateMeasurement,
                         addContentDescription = "New measurement",
                         leadingActions = {
-                            FilledTonalIconButton(onClick = onManageMeasurements) {
+                            IconButton(onClick = onManageMeasurements) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_settings_24),
                                     contentDescription = "Manage measurements",
@@ -261,11 +270,12 @@ private fun RecordsSectionHeader(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
@@ -296,7 +306,7 @@ private fun CompletedTasksHeader(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
-        FilledTonalIconButton(onClick = onToggle) {
+        IconButton(onClick = onToggle) {
             Icon(
                 imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                 contentDescription = if (expanded) "Collapse completed tasks" else "Expand completed tasks",
@@ -334,12 +344,12 @@ private fun TaskProgressCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 76.dp)
-                .padding(12.dp),
+                .heightIn(min = 72.dp)
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
@@ -347,16 +357,17 @@ private fun TaskProgressCard(
                     modifier = Modifier.fillMaxSize(),
                     color = colors.accent,
                     trackColor = colors.accent.copy(alpha = 0.18f),
-                    strokeWidth = 5.dp,
+                    strokeWidth = 4.dp,
                     gapSize = 0.dp,
                 )
                 Text(
                     text = "$completed",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
+                    color = colors.accent,
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -366,7 +377,7 @@ private fun TaskProgressCard(
                         text = task.title,
                         color = cardContentColor,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -374,8 +385,8 @@ private fun TaskProgressCard(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "$completed/${task.steps.size}",
-                        color = cardContentColor.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.accent,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
@@ -393,7 +404,7 @@ private fun TaskProgressCard(
                         Text(
                             text = taskCompletedAtLabel(completedAt),
                             color = cardContentColor.copy(alpha = 0.72f),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 2.dp),
                         )
                     }
@@ -452,8 +463,8 @@ private fun AccumulateRailCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DailyGoalMedallion(
@@ -461,11 +472,11 @@ private fun AccumulateRailCard(
                 progress = progress,
                 reached = goalReached,
                 progressColor = progressColor,
-                size = 76.dp,
+                size = 64.dp,
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = displayRecordName(item.name),
@@ -477,7 +488,7 @@ private fun AccumulateRailCard(
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
                     color = progressColor,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -555,21 +566,21 @@ private fun MeasurementRailCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                RecordItemInitial(name = item.name, size = 48.dp)
+                RecordItemInitial(name = item.name, size = 40.dp)
                 Text(
                     text = displayRecordName(item.name),
                     color = colors.onContainer,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
@@ -578,7 +589,7 @@ private fun MeasurementRailCard(
                 Text(
                     text = latest?.let { "${formatValue(it.value)} ${item.unit}" } ?: "--",
                     color = colors.accent,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -614,19 +625,17 @@ internal fun RecordsStatusCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(16.dp),
         ) {
             Text(
                 text = message,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onAction,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 52.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_records_24),

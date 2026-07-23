@@ -1,16 +1,20 @@
 package com.wswensw.template.record.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -77,10 +81,9 @@ fun ManageTasksScreen(
                 TaskManageCard(
                     task = task,
                     onClick = { onEdit(task.id) },
-                    modifier = Modifier.padding(
-                        horizontal = TemplateStyle.spacing.pageHorizontal,
-                        vertical = 4.dp,
-                    ),
+                    modifier = Modifier
+                        .padding(horizontal = TemplateStyle.spacing.pageHorizontal)
+                        .padding(bottom = 8.dp),
                 )
             }
         }
@@ -93,31 +96,77 @@ private fun TaskManageCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val completed = task.completedStepCount
+    val total = task.steps.size
+    val progress = if (total <= 0) 0f else completed.toFloat() / total.toFloat()
+    val colors = recordItemColors(task.title)
+    val contentColor = colors.onContainer.copy(
+        alpha = if (task.isCompleted) 0.72f else 1f,
+    )
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = TemplateStyle.cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(
+            containerColor = if (task.isCompleted) {
+                colors.container.copy(alpha = 0.72f)
+            } else {
+                colors.container
+            },
+            contentColor = contentColor,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 72.dp)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "${task.completedStepCount} / ${task.steps.size} subtasks",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = colors.accent,
+                    trackColor = colors.accent.copy(alpha = 0.18f),
+                    strokeWidth = 3.5.dp,
+                    gapSize = 0.dp,
+                )
+                Text(
+                    text = "$completed",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.accent,
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "$completed / $total subtasks",
+                    color = contentColor.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = contentColor.copy(alpha = 0.54f),
+                modifier = Modifier.size(22.dp),
             )
         }
     }
