@@ -45,7 +45,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 组合待办、记录项、今天流水、最新测量值、目标累计和项目日连击，通过 HTTPS API 读写服务端；连接凭据由 Keystore 加密存储。刷新时拉取待办、活跃/归档项、近 90 天流水和每项最新流水；详情按范围单独拉取测量流水。 |
+| `RecordsViewModel` / `RecordRepository` | 组合待办、活跃记录项、今天流水、最新测量值、目标累计和项目日连击；使用进程级 `OkHttpClient` 通过 HTTPS API 读写服务端，凭据由 Keystore 加密存储。根页用单一 overview 快照原子发布；详情按范围单独拉取测量流水。 |
 
 ## 命令状态机
 
@@ -143,7 +143,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 服务端在事务内校验并写入记录项及完整时间段集合。累计记录使用正数流水、可选目标与推荐时间段；测量记录固定为数字，要求有限的最小值、最大值和正步进，且只接受闭区间内的步进值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型、单位和 Measurement 范围必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。每个成功写操作在同一事务插入一条审计日志；日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。
 
-新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、模式、单位和类型联表展示。Android 刷新时从近 90 天 `ACCUMULATE` 流水派生今天列表、周目标累计和累计记录连击，并用测量项的最新流水显示测量卡片；点卡按需拉取最近 24 小时流水用于预览。删除接口仅供短时撤销和 PC 批量管理使用。
+新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、模式、单位和类型联表展示。`GET /api/overview` 接受近 90 天起止本地日期，一次返回活跃记录项、待办、范围内累计流水和每个活跃 Measurement 的最新流水；最新值在数据库侧批量查询。Android 由 overview 原子生成根页快照、今天列表、周目标累计和累计记录连击；点卡按需拉取最近 24 小时流水用于预览。快照只存在当前进程，ViewModel 合并重叠刷新，写后和恢复前台后台刷新；删除接口仅供短时撤销和 PC 批量管理使用。
 
 待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。迁移会清理旧 Measurement 数据和无子事项待办。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
 

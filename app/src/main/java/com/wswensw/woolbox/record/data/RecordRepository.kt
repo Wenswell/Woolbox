@@ -51,63 +51,55 @@ data class RecordsConnection(
     val username: String,
 )
 
+data class RecordsSnapshot(
+    val activeItems: List<RecordItem>,
+    val entries: List<RecordEntry>,
+    val latestEntries: Map<Long, RecordEntry>,
+    val tasks: List<TodoTask>,
+    val goalValues: Map<Long, Double>,
+    val streaks: Map<Long, ItemStreak>,
+)
+
 class RecordRepository(context: Context) {
     private val credentialStore = BasicAuthStore(context.applicationContext)
-    private val client = OkHttpClient()
-    private val _activeItems = MutableStateFlow<List<RecordItem>>(emptyList())
-    private val _archivedItems = MutableStateFlow<List<RecordItem>>(emptyList())
-    private val _entries = MutableStateFlow<List<RecordEntry>>(emptyList())
-    private val _latestEntries = MutableStateFlow<Map<Long, RecordEntry>>(emptyMap())
-    private val _tasks = MutableStateFlow<List<TodoTask>>(emptyList())
-    private val _goalValues = MutableStateFlow<Map<Long, Double>>(emptyMap())
-    private val _streaks = MutableStateFlow<Map<Long, ItemStreak>>(emptyMap())
+    private val _snapshot = MutableStateFlow<RecordsSnapshot?>(null)
     private val _connection = MutableStateFlow(credentialStore.connection())
 
-    val activeItems: StateFlow<List<RecordItem>> = _activeItems
-    val archivedItems: StateFlow<List<RecordItem>> = _archivedItems
-    val entries: StateFlow<List<RecordEntry>> = _entries
-    val latestEntries: StateFlow<Map<Long, RecordEntry>> = _latestEntries
-    val tasks: StateFlow<List<TodoTask>> = _tasks
-    val goalValues: StateFlow<Map<Long, Double>> = _goalValues
-    val streaks: StateFlow<Map<Long, ItemStreak>> = _streaks
+    val snapshot: StateFlow<RecordsSnapshot?> = _snapshot
     val connection: StateFlow<RecordsConnection> = _connection
 
     suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
-        val active = request("GET", "items", query = mapOf("archived" to "false"))
-        val archived = request("GET", "items", query = mapOf("archived" to "true"))
         val date = LocalDate.parse(localDate)
         val lookbackStart = date.minusDays((STREAK_LOOKBACK_DAYS - 1).toLong()).toString()
-        val range = request(
+        val overview = request(
             "GET",
-            "entries",
+            "overview",
             query = mapOf(
                 "startDate" to lookbackStart,
                 "endDate" to localDate,
-                "mode" to RecordMode.ACCUMULATE.name,
             ),
         )
-        val latest = request("GET", "entries/latest")
-        val tasks = request("GET", "tasks")
-        val activeItems = active.getJSONArray("items").mapObjects(::parseItem)
-        val rangeEntries = range.getJSONArray("entries").mapObjects(::parseEntry)
+        val activeItems = overview.getJSONArray("items").mapObjects(::parseItem)
+        val rangeEntries = overview.getJSONArray("accumulateEntries").mapObjects(::parseEntry)
         val todayEntries = rangeEntries.filter { it.localDate == localDate }
         val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
         val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
         val weekEntries = rangeEntries.filter { it.localDate in weekStart..weekEnd }
-        _activeItems.value = activeItems
-        _archivedItems.value = archived.getJSONArray("items").mapObjects(::parseItem)
-        _entries.value = todayEntries
-        _latestEntries.value = latest.getJSONArray("entries")
+        _snapshot.value = RecordsSnapshot(
+            activeItems = activeItems,
+            entries = todayEntries,
+            latestEntries = overview.getJSONArray("latestMeasurementEntries")
             .mapObjects(::parseEntry)
-            .associateBy(RecordEntry::itemId)
-        _tasks.value = tasks.getJSONArray("tasks").mapObjects(::parseTask)
-        _goalValues.value = goalValues(activeItems, date, todayEntries, weekEntries)
-        _streaks.value = itemStreaks(
-            itemIds = activeItems
-                .filter { it.mode == RecordMode.ACCUMULATE }
-                .map(RecordItem::id),
-            entries = rangeEntries,
-            today = date,
+            .associateBy(RecordEntry::itemId),
+            tasks = overview.getJSONArray("tasks").mapObjects(::parseTask),
+            goalValues = goalValues(activeItems, date, todayEntries, weekEntries),
+            streaks = itemStreaks(
+                itemIds = activeItems
+                    .filter { it.mode == RecordMode.ACCUMULATE }
+                    .map(RecordItem::id),
+                entries = rangeEntries,
+                today = date,
+            ),
         )
     }
 
@@ -280,6 +272,7 @@ class RecordRepository(context: Context) {
         const val BASE_URL = "https://gateway.1662803.xyz/apps/records/"
         private const val BASE_API_URL = "${BASE_URL}api/"
         private val JSON = "application/json".toMediaType()
+        private val client = OkHttpClient()
     }
 }
 

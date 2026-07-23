@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.wswensw.woolbox.record.data.RecordRepository
+import com.wswensw.woolbox.record.data.RecordsSnapshot
 import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
@@ -15,22 +16,17 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-private data class RecordsContent(
-    val activeItems: List<RecordItem>,
-    val archivedItems: List<RecordItem>,
-    val selectedDate: LocalDate,
-    val entries: List<RecordEntry>,
-    val goalValues: Map<Long, Double>,
-)
-
 data class RecordsUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val hasSnapshot: Boolean = false,
     val activeItems: List<RecordItem> = emptyList(),
-    val archivedItems: List<RecordItem> = emptyList(),
     val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
@@ -40,8 +36,7 @@ data class RecordsUiState(
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
-    fun findItem(id: Long): RecordItem? =
-        activeItems.firstOrNull { it.id == id } ?: archivedItems.firstOrNull { it.id == id }
+    fun findItem(id: Long): RecordItem? = activeItems.firstOrNull { it.id == id }
 
     fun findTask(id: Long): TodoTask? = tasks.firstOrNull { it.id == id }
 }
@@ -57,52 +52,29 @@ class RecordsViewModel(
     private val repository: RecordRepository,
 ) : ViewModel() {
     private val selectedDate = MutableStateFlow(LocalDate.now())
-    private val selectedEntries = repository.entries
     private val error = MutableStateFlow<String?>(null)
-    private val isLoading = MutableStateFlow(true)
+    private val isRefreshing = MutableStateFlow(false)
     private val _measurementPreview = MutableStateFlow(MeasurementPreviewUiState())
+    private var refreshInFlight: Deferred<Result<Unit>>? = null
 
     val measurementPreview: StateFlow<MeasurementPreviewUiState> = _measurementPreview
 
-    private val recordsContent = combine(
-        combine(
-            repository.activeItems,
-            repository.archivedItems,
-            selectedDate,
-            selectedEntries,
-            repository.goalValues,
-        ) { activeItems, archivedItems, date, entries, goalValues ->
-            RecordsContent(
-                activeItems = activeItems,
-                archivedItems = archivedItems,
-                selectedDate = date,
-                entries = entries,
-                goalValues = goalValues,
-            )
-        },
-        repository.latestEntries,
-        repository.streaks,
-        repository.tasks,
-    ) { content, latestEntries, streaks, tasks ->
-        RecordsUiState(
-            activeItems = content.activeItems,
-            archivedItems = content.archivedItems,
-            selectedDate = content.selectedDate,
-            entries = content.entries,
-            latestEntries = latestEntries,
-            tasks = tasks,
-            goalValues = content.goalValues,
-            streaks = streaks,
-        )
+    private val recordsContent = combine(repository.snapshot, selectedDate) { snapshot, date ->
+        snapshot?.toUiState(date) ?: RecordsUiState(selectedDate = date)
     }
 
     val uiState: StateFlow<RecordsUiState> = combine(
         recordsContent,
         repository.connection,
         error,
-        isLoading,
-    ) { content, connection, message, loading ->
-        content.copy(isLoading = loading, connection = connection, error = message)
+        isRefreshing,
+    ) { content, connection, message, refreshing ->
+        content.copy(
+            isLoading = !content.hasSnapshot && message == null,
+            isRefreshing = refreshing,
+            connection = connection,
+            error = message,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -110,21 +82,49 @@ class RecordsViewModel(
     )
 
     fun refresh() {
-        viewModelScope.launch {
-            isLoading.value = true
+        startRefresh()
+    }
+
+    private fun startRefresh(): Deferred<Result<Unit>> = synchronized(this) {
+        refreshInFlight?.let { return it }
+        viewModelScope.async {
+            isRefreshing.value = true
             selectedDate.value = LocalDate.now()
             runCatching { repository.refresh(selectedDate.value.toString()) }
                 .onFailure { error.value = it.message ?: "Unable to load records." }
                 .onSuccess { error.value = null }
-            isLoading.value = false
+                .also { isRefreshing.value = false }
+        }.also { refresh ->
+            refreshInFlight = refresh
+            refresh.invokeOnCompletion {
+                synchronized(this) {
+                    if (refreshInFlight === refresh) refreshInFlight = null
+                }
+            }
         }
     }
+
+    private suspend fun refreshOrThrow() {
+        startRefresh().await().getOrThrow()
+    }
+
+    private fun RecordsSnapshot.toUiState(date: LocalDate) =
+        RecordsUiState(
+            hasSnapshot = true,
+            activeItems = activeItems,
+            selectedDate = date,
+            entries = entries,
+            latestEntries = latestEntries,
+            tasks = tasks,
+            goalValues = goalValues,
+            streaks = streaks,
+        )
 
     fun configureCredentials(username: String, password: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             runCatching {
                 repository.configureCredentials(username, password)
-                repository.refresh(selectedDate.value.toString())
+                refreshOrThrow()
             }.fold(
                 onSuccess = {
                     error.value = null
@@ -146,7 +146,7 @@ class RecordsViewModel(
     ) {
         viewModelScope.launch {
             runCatching { repository.saveItem(itemId, draft) }.fold(
-                onSuccess = { refresh(); onResult(null) },
+                onSuccess = { refreshOrThrow(); onResult(null) },
                 onFailure = { error -> onResult(error.message ?: "Unable to save record item.") },
             )
         }
@@ -162,7 +162,7 @@ class RecordsViewModel(
             runCatching {
                 val entryId = repository.createEntry(item, value, occurredAt)
                 selectedDate.value = LocalDate.now()
-                repository.refresh(selectedDate.value.toString())
+                refreshOrThrow()
                 reloadMeasurementPreview(item.id)
                 entryId
             }.fold(
@@ -177,7 +177,7 @@ class RecordsViewModel(
             val itemId = _measurementPreview.value.entries.firstOrNull { it.id == entryId }?.itemId
             runCatching {
                 repository.deleteEntry(entryId)
-                repository.refresh(selectedDate.value.toString())
+                refreshOrThrow()
                 itemId?.let(::reloadMeasurementPreview)
             }
                 .onFailure { error -> onError(error.message ?: "Unable to undo record.") }
@@ -188,7 +188,7 @@ class RecordsViewModel(
         viewModelScope.launch {
             runCatching {
                 val taskId = repository.createTask(title, stepTitles)
-                repository.refresh(selectedDate.value.toString())
+                refreshOrThrow()
                 taskId
             }.fold(
                 onSuccess = { taskId -> onResult(taskId, null) },
@@ -290,7 +290,7 @@ class RecordsViewModel(
         viewModelScope.launch {
             runCatching {
                 action()
-                repository.refresh(selectedDate.value.toString())
+                refreshOrThrow()
             }.fold(
                 onSuccess = {
                     error.value = null
@@ -311,7 +311,6 @@ class RecordsViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
-            applicationContext.deleteDatabase("records.db")
             return RecordsViewModel(RecordRepository(applicationContext)) as T
         }
     }

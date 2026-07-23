@@ -71,6 +71,14 @@ fun ManageRecordsScreen(
                     CircularProgressIndicator()
                 }
             }
+            state.error != null && items.isEmpty() -> item {
+                RecordsStatusCard(
+                    message = state.error,
+                    actionLabel = "Back",
+                    onAction = onBack,
+                    modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal),
+                )
+            }
             items.isEmpty() -> item {
                 RecordsStatusCard(
                     message = copy.emptyMessage,

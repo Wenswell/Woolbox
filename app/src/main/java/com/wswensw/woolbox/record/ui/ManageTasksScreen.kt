@@ -63,7 +63,7 @@ fun ManageTasksScreen(
                     CircularProgressIndicator()
                 }
             }
-            state.error != null -> item {
+            state.error != null && state.tasks.isEmpty() -> item {
                 RecordsStatusCard(
                     message = state.error,
                     actionLabel = "Back",

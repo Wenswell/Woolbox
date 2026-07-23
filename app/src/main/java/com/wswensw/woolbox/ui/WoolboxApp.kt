@@ -153,9 +153,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         BottomNavigationBar(
                             selectedTab = selectedTab,
                             onSelectTab = { tab ->
-                                if (tab == MainTab.RECORDS && selectedTab != MainTab.RECORDS) {
-                                    recordsViewModel.refresh()
-                                }
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
                                     recordSheetItemId = null

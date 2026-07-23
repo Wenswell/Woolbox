@@ -119,7 +119,7 @@ fun RecordsScreen(
                     CircularProgressIndicator()
                 }
             }
-            state.error != null -> item {
+            state.error != null && state.activeItems.isEmpty() -> item {
                 RecordsStatusCard(
                     message = state.error,
                     actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
@@ -127,6 +127,15 @@ fun RecordsScreen(
                 )
             }
             else -> {
+                if (state.error != null) {
+                    item {
+                        RecordsStatusCard(
+                            message = state.error,
+                            actionLabel = "Retry",
+                            onAction = onRetry,
+                        )
+                    }
+                }
                 item {
                     AppPageHeader(
                         title = "Records",
