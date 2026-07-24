@@ -41,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -142,7 +144,8 @@ private fun DrawScope.drawLiquidLayer(
 /**
  * Full-height segmented progress for task cards.
  * One cell per subtask; only completed cells change (pop fill).
- * Empty cells use the idle (progress 0) container color and never recolor with progress.
+ * Gaps are true transparent cuts (nothing drawn) so the card shows through,
+ * not painted divider lines. Empty cells use idle container color only inside tiles.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -152,7 +155,7 @@ internal fun SegmentedProgressFill(
     emptyColor: Color,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
-    gap: Dp = 2.dp,
+    gap: Dp = 3.dp,
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
@@ -171,12 +174,20 @@ internal fun SegmentedProgressFill(
                 },
                 label = "SegmentPop-$index",
             )
+            // Tile only; spacedBy gap stays undrawn → transparent cut.
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .background(emptyColor),
+                    .clip(RoundedCornerShape(4.dp)),
             ) {
+                if (pop < 0.999f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(emptyColor),
+                    )
+                }
                 if (pop > 0.001f) {
                     Box(
                         modifier = Modifier
@@ -209,7 +220,8 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies:
- * one continuous rounded bar, cut into equal segments (not 7 separate pills).
+ * one continuous rounded bar with transparent cuts (BlendMode.Clear),
+ * not painted divider lines and not separate short pills.
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
@@ -220,7 +232,7 @@ internal fun WeeklyGoalProgressBar(
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
     height: Dp = 10.dp,
-    cutWidth: Dp = 1.5.dp,
+    cutWidth: Dp = 2.dp,
 ) {
     require(segments > 0)
     val target = progress.coerceIn(0f, 1f)
@@ -229,36 +241,31 @@ internal fun WeeklyGoalProgressBar(
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
         label = "WeeklyGoalProgressBar",
     )
-    Box(
+    Canvas(
         modifier = modifier
             .width(recentDaysRowWidth())
             .height(height)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(emptyColor),
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .clip(RoundedCornerShape(percent = 50)),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(animated)
-                .background(fillColor),
-        )
-        Row(modifier = Modifier.fillMaxSize()) {
-            repeat(segments) { index ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                ) {
-                    if (index < segments - 1) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .width(cutWidth)
-                                .fillMaxHeight()
-                                .background(emptyColor),
-                        )
-                    }
-                }
+        drawRect(color = emptyColor)
+        val fillW = size.width * animated
+        if (fillW > 0f) {
+            drawRect(
+                color = fillColor,
+                size = Size(fillW, size.height),
+            )
+        }
+        if (segments > 1) {
+            val cut = cutWidth.toPx()
+            val step = size.width / segments
+            for (index in 1 until segments) {
+                drawRect(
+                    color = Color.Black,
+                    topLeft = Offset(step * index - cut / 2f, 0f),
+                    size = Size(cut, size.height),
+                    blendMode = BlendMode.Clear,
+                )
             }
         }
     }
