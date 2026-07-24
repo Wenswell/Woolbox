@@ -22,7 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -32,7 +32,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,10 +61,7 @@ import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.streakLabel
-import com.wswensw.woolbox.ui.AppPageHeader
 import com.wswensw.woolbox.ui.AppStyle
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val GridCardHeight = 120.dp
@@ -78,13 +74,10 @@ fun RecordsScreen(
     onManageTasks: () -> Unit,
     onManageAccumulates: () -> Unit,
     onManageMeasurements: () -> Unit,
-    onCreateAccumulate: () -> Unit,
-    onCreateMeasurement: () -> Unit,
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
-    onCreateTask: () -> Unit,
     onOpenTask: (TodoTask) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -142,12 +135,6 @@ fun RecordsScreen(
                         )
                     }
                 }
-                item {
-                    AppPageHeader(
-                        title = "Records",
-                        subtitle = recordsDateLabel(LocalDate.now()),
-                    )
-                }
                 val dayOverview = recordsDayOverview(
                     tasks = state.tasks,
                     items = state.activeItems,
@@ -162,24 +149,16 @@ fun RecordsScreen(
                 item {
                     RecordsSectionHeader(
                         title = "Tasks",
-                        onAdd = onCreateTask,
-                        addContentDescription = "New task",
-                        leadingActions = {
-                            IconButton(onClick = onManageTasks) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_settings_24),
-                                    contentDescription = "Manage tasks",
-                                )
-                            }
-                        },
+                        manageContentDescription = "Manage tasks",
+                        onManage = onManageTasks,
                     )
                 }
                 if (openTasks.isEmpty()) {
                     item {
                         RecordsStatusCard(
                             message = "No open tasks.",
-                            actionLabel = "Create task",
-                            onAction = onCreateTask,
+                            actionLabel = "Manage tasks",
+                            onAction = onManageTasks,
                         )
                     }
                 } else {
@@ -247,28 +226,20 @@ fun RecordsScreen(
                     }
                 }
 
-                item { Spacer(Modifier.height(12.dp)) }
+                item { Spacer(Modifier.height(8.dp)) }
                 item {
                     RecordsSectionHeader(
                         title = "Accumulate",
-                        onAdd = onCreateAccumulate,
-                        addContentDescription = "New accumulate",
-                        leadingActions = {
-                            IconButton(onClick = onManageAccumulates) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_settings_24),
-                                    contentDescription = "Manage accumulates",
-                                )
-                            }
-                        },
+                        manageContentDescription = "Manage accumulates",
+                        onManage = onManageAccumulates,
                     )
                 }
                 if (accumulateItems.isEmpty()) {
                     item {
                         RecordsStatusCard(
                             message = "No accumulate items yet.",
-                            actionLabel = "Create accumulate",
-                            onAction = onCreateAccumulate,
+                            actionLabel = "Manage accumulates",
+                            onAction = onManageAccumulates,
                         )
                     }
                 } else {
@@ -292,28 +263,20 @@ fun RecordsScreen(
                     }
                 }
 
-                item { Spacer(Modifier.height(12.dp)) }
+                item { Spacer(Modifier.height(8.dp)) }
                 item {
                     RecordsSectionHeader(
                         title = "Measurement",
-                        onAdd = onCreateMeasurement,
-                        addContentDescription = "New measurement",
-                        leadingActions = {
-                            IconButton(onClick = onManageMeasurements) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_settings_24),
-                                    contentDescription = "Manage measurements",
-                                )
-                            }
-                        },
+                        manageContentDescription = "Manage measurements",
+                        onManage = onManageMeasurements,
                     )
                 }
                 if (measurementItems.isEmpty()) {
                     item {
                         RecordsStatusCard(
                             message = "No measurement items yet.",
-                            actionLabel = "Create measurement",
-                            onAction = onCreateMeasurement,
+                            actionLabel = "Manage measurements",
+                            onAction = onManageMeasurements,
                         )
                     }
                 } else {
@@ -342,27 +305,30 @@ fun RecordsScreen(
 @Composable
 private fun RecordsSectionHeader(
     title: String,
-    onAdd: () -> Unit,
-    addContentDescription: String,
-    leadingActions: @Composable (() -> Unit)? = null,
+    manageContentDescription: String,
+    onManage: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = title,
             color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
-        leadingActions?.invoke()
-        FilledTonalIconButton(onClick = onAdd) {
+        IconButton(
+            onClick = onManage,
+            modifier = Modifier.size(36.dp),
+        ) {
             Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = addContentDescription,
+                painter = painterResource(R.drawable.ic_settings_24),
+                contentDescription = manageContentDescription,
+                modifier = Modifier.size(18.dp),
             )
         }
     }
@@ -612,8 +578,8 @@ private fun AccumulateRailCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DailyGoalMedallion(
@@ -621,7 +587,7 @@ private fun AccumulateRailCard(
                 progress = progress,
                 reached = goalReached,
                 progressColor = progressColor,
-                size = 52.dp,
+                size = 48.dp,
                 colors = colors,
             )
             Column(
@@ -630,45 +596,48 @@ private fun AccumulateRailCard(
             ) {
                 Text(
                     text = displayRecordName(item.name),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor.copy(alpha = 0.62f),
+                    style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "${formatValue(todayValue)} ${item.unit}",
                     color = progressColor,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (!hasGoal && item.description.isNotEmpty()) {
-                    Text(
-                        text = item.description,
-                        color = contentColor.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                val streakText = streak?.let(::streakLabel)
-                val summaryText = buildString {
-                    if (hasGoal) {
+                if (hasGoal) {
+                    val goalText = buildString {
                         append(formatValue(checkNotNull(target)))
                         if (item.unit.isNotBlank()) {
-                            append(" ")
+                            append(' ')
                             append(item.unit)
                         }
                     }
-                    if (hasGoal && streakText != null) {
-                        append(" · ")
-                    }
-                    if (streakText != null) {
-                        append(streakText)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Flag,
+                            contentDescription = null,
+                            tint = progressColor,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = goalText,
+                            color = progressColor,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
-                if (summaryText.isNotEmpty()) {
+                streak?.let(::streakLabel)?.let { streakText ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -680,7 +649,7 @@ private fun AccumulateRailCard(
                             modifier = Modifier.size(14.dp),
                         )
                         Text(
-                            text = summaryText,
+                            text = streakText,
                             color = progressColor,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
@@ -930,6 +899,3 @@ internal fun goalItems(items: List<RecordItem>, period: GoalPeriod? = null): Lis
 
 internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =
     entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) -> itemEntries.sumOf(RecordEntry::value) }
-
-internal fun recordsDateLabel(date: LocalDate): String =
-    date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH))

@@ -8,7 +8,6 @@ import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
-import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -191,11 +190,6 @@ class RecordsScreenTest {
             null,
             nextTaskStepTitle(task.copy(steps = task.steps.map { it.copy(completedAt = 1) })),
         )
-    }
-
-    @Test
-    fun recordsDateLabelIsStableEnglishText() {
-        assertEquals("Wednesday, July 22", recordsDateLabel(LocalDate.of(2026, 7, 22)))
     }
 
 

@@ -88,7 +88,7 @@ private enum class MainTab(
     val iconRes: Int,
 ) {
     RECORDS(R.string.tab_records, R.drawable.ic_records_24),
-    TOOLS(R.string.tab_tools, R.drawable.ic_home_24),
+    TOOLS(R.string.tab_tools, R.drawable.ic_tools_24),
     SETTING(R.string.tab_setting, R.drawable.ic_settings_24),
 }
 
@@ -200,14 +200,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     measurementSheetItemId = null
                                     navController.navigate(AppRoutes.MANAGE_MEASUREMENTS)
                                 },
-                                onCreateAccumulate = {
-                                    recordSheetItemId = null
-                                    navController.navigate(AppRoutes.RECORD_ITEM_ACCUMULATE_NEW)
-                                },
-                                onCreateMeasurement = {
-                                    recordSheetItemId = null
-                                    navController.navigate(AppRoutes.RECORD_ITEM_MEASUREMENT_NEW)
-                                },
                                 onConfigureConnection = {
                                     navController.navigate(AppRoutes.RECORDS_CONNECTION)
                                 },
@@ -216,9 +208,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
-                                },
-                                onCreateTask = {
-                                    navController.navigate(AppRoutes.TASK_NEW)
                                 },
                                 onOpenTask = { task ->
                                     taskSheetId = task.id

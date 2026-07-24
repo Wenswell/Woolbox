@@ -105,12 +105,12 @@ Tile 用于不离开目标应用的快速启动。点击后系统面板收起，
 ### 用户流程
 
 1. 首次使用在 Setting 的 `Records connection` 配置 Basic Auth 用户名和密码；凭据使用 Android Keystore 加密保存。
-2. 启动默认停在 `Records` 底栏；根列表顺序为 **Tasks → Accumulate → Measurement**（无 Tasks/Trackers 页签）。
-   - 标题下在有任务或有目标累计时显示只读总览：`Tasks` 完成比、`Goals` 达标比、活跃 `Streaks` 个数。
+2. 启动默认停在 `Records` 底栏；根列表顺序为 **Tasks → Accumulate → Measurement**（无页头大标题、无 Tasks/Trackers 页签）。
+   - 有任务或有目标累计时显示紧凑只读总览：`Tasks` 完成比、`Goals` 达标比、活跃 `Streaks` 个数。
    - 卡片颜色按进度变化：进行中 primary 逐步加深，完成用固定绿色（与接近完成区分），不按名称随机、不用粉色系。
-3. **Tasks**：按 `Today` / `Later` 分组；Today 默认展开，Later 默认折叠；每组最多显示 Setting 中的预览条数（默认 5），超出进 Manage。卡为紧凑进度行。已完成仍折叠。顶部纯图标分别进入 `Manage tasks` 和 `New task`；点卡打开子事项进度 Sheet，只能勾选子事项。完成子事项有轻触觉；父项刚全部完成时有强触觉与 `{title} done` Snackbar。低频标题、子事项增删排序和删除操作在 `New task` / `Edit task` 完成；子事项顺序由列表位置决定，可用上下箭头调整。
-4. **Accumulate**：section 旁为 Manage 与加号；内容为 2 列 grid 卡。点卡打开快速记录 Sheet；加号进入 `New accumulate`；Manage 进入只列出累计项的 `Manage accumulates`，卡片只进入 `Edit accumulate`。
-5. **Measurement**：section 旁为 Manage 与加号；2 列 grid 显示最新值与时间。点卡打开 24 小时预览 Sheet，显示原始图表、流水和滑块录入；加号进入 `New measurement`；Manage 进入只列出测量项的 `Manage measurements`，卡片只进入 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
+3. **Tasks**：按 `Today` / `Later` 分组；Today 默认展开，Later 默认折叠；每组最多显示 Setting 中的预览条数（默认 5），超出进 Manage。区标题旁仅 Manage 入口，不提供根页新建。卡为紧凑进度行。已完成仍折叠。点卡打开子事项进度 Sheet，只能勾选子事项。完成子事项有轻触觉；父项刚全部完成时有强触觉与 `{title} done` Snackbar。新建与编辑（标题、子事项增删排序、删除）在 `Manage tasks` → `New task` / `Edit task` 完成；子事项顺序由列表位置决定，可用上下箭头调整。
+4. **Accumulate**：区标题旁仅 Manage；2 列 grid 卡。名称弱化，主值突出；目标用旗帜图标单独一行，连击火苗与天数另起一行。点卡打开快速记录 Sheet；新建在 `Manage accumulates` 顶栏加号 → `New accumulate`，色卡进 `Edit accumulate`。
+5. **Measurement**：区标题旁仅 Manage；2 列 grid 显示最新值与时间。点卡打开 24 小时预览 Sheet；新建在 `Manage measurements` 顶栏加号 → `New measurement`，色卡进 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
 6. 累计确认写入时提交当前设备时刻，成功关闭 Sheet 并短时 `Undo`；刚达标时附加 `Goal reached` 文案与强触觉；失败保持 Sheet 并显示错误。
 7. 新建/编辑均为独立全屏路由，顶栏 New/Edit + 纯 icon 保存；累计与测量表单分离，无 mode 切换。
 8. PC 管理页的 `Entries` 仅用于筛选和批量删除流水；`Record items` 可配置记录模式；`Logs` 显示每次成功写操作的对象、动作、时间和变更内容。
