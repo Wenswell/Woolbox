@@ -221,7 +221,7 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies.
- * Height matches non-today pie (12dp). Outer A=4dp, fill B=2dp, gap 1.5dp.
+ * Height matches non-today pie (12dp). Outer A=6dp, fill B=1dp, gap 2dp.
  * Seven independent stroked tiles with transparent gaps.
  */
 @Composable
@@ -232,9 +232,9 @@ internal fun WeeklyGoalProgressBar(
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
     height: Dp = 12.dp,
-    gap: Dp = 1.5.dp,
-    trackRadius: Dp = 4.dp,
-    fillRadius: Dp = 2.dp,
+    gap: Dp = 2.dp,
+    trackRadius: Dp = 6.dp,
+    fillRadius: Dp = 1.dp,
 ) {
     require(segments > 0)
     val target = progress.coerceIn(0f, 1f)
