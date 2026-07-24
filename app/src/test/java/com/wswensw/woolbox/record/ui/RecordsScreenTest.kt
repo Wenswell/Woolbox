@@ -1,7 +1,6 @@
 package com.wswensw.woolbox.record.ui
 
 import com.wswensw.woolbox.record.model.GoalPeriod
-import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
@@ -273,14 +272,13 @@ class RecordsScreenTest {
             tasks = emptyList(),
             items = emptyList(),
             goalValues = emptyMap(),
-            streaks = emptyMap(),
         )
         assertEquals(false, overview.isVisible)
         assertEquals("", overview.label)
     }
 
     @Test
-    fun recordsDayOverviewSummarizesTasksGoalsAndStreaks() {
+    fun recordsDayOverviewSummarizesTasksAndGoals() {
         val tasks = listOf(
             todoTask(id = 1, completedSteps = 2, totalSteps = 2),
             todoTask(id = 2, completedSteps = 0, totalSteps = 1),
@@ -296,19 +294,13 @@ class RecordsScreenTest {
             tasks = tasks,
             items = items,
             goalValues = mapOf(10L to 8.0, 11L to 1.0),
-            streaks = mapOf(
-                10L to ItemStreak(current = 3, best = 5),
-                11L to ItemStreak(current = 0, best = 2),
-                12L to ItemStreak(current = 4, best = 4),
-            ),
         )
         assertEquals(true, overview.isVisible)
         assertEquals(1, overview.taskDone)
         assertEquals(2, overview.taskTotal)
         assertEquals(1, overview.goalDone)
         assertEquals(2, overview.goalTotal)
-        assertEquals(2, overview.activeStreaks)
-        assertEquals("Tasks 1/2 · Goals 1/2 · Streaks 2", overview.label)
+        assertEquals("Tasks 1/2 · Goals 1/2", overview.label)
     }
 
     @Test
@@ -330,12 +322,11 @@ class RecordsScreenTest {
     }
 
     @Test
-    fun streakQuantityProgressUsesTiers() {
-        assertEquals(0f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 0), 0f)
-        assertEquals(1f / 6f, streakQuantityProgress(todayValue = 1.0, streakCurrent = 0), 0f)
-        assertEquals(1f / 3f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 2), 0f)
-        assertEquals(2f / 3f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 5), 0f)
-        assertEquals(1f, streakQuantityProgress(todayValue = 0.0, streakCurrent = 7), 0f)
+    fun recentActivityProgressUsesActiveDayRatio() {
+        assertEquals(0f, recentActivityProgress(listOf(false, false, false, false, false, false, false)), 0f)
+        assertEquals(1f / 7f, recentActivityProgress(listOf(false, false, false, false, false, false, true)), 0f)
+        assertEquals(3f / 7f, recentActivityProgress(listOf(true, false, true, false, false, false, true)), 0f)
+        assertEquals(1f, recentActivityProgress(listOf(true, true, true, true, true, true, true)), 0f)
     }
 
     @Test

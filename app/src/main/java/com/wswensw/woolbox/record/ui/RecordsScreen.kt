@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
@@ -53,14 +52,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.GoalPeriod
-import com.wswensw.woolbox.record.model.ItemStreak
+import com.wswensw.woolbox.record.model.emptyRecentDays
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
-import com.wswensw.woolbox.record.model.streakLabel
 import com.wswensw.woolbox.ui.AppStyle
 import java.util.Locale
 
@@ -139,7 +137,6 @@ fun RecordsScreen(
                     tasks = state.tasks,
                     items = state.activeItems,
                     goalValues = state.goalValues,
-                    streaks = state.streaks,
                 )
                 if (dayOverview.isVisible) {
                     item {
@@ -253,7 +250,7 @@ fun RecordsScreen(
                                     item = item,
                                     todayValue = todayValues[item.id] ?: 0.0,
                                     goalCumulative = state.goalValues[item.id],
-                                    streak = state.streaks[item.id],
+                                    recentDays = state.recentDays[item.id],
                                     onClick = { onRecordItem(item) },
                                     modifier = Modifier.weight(1f),
                                 )
@@ -533,7 +530,7 @@ private fun AccumulateRailCard(
     item: RecordItem,
     todayValue: Double,
     goalCumulative: Double?,
-    streak: ItemStreak?,
+    recentDays: List<Boolean>?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -541,11 +538,11 @@ private fun AccumulateRailCard(
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0.0 && period != null
     val cumulative = goalCumulative ?: todayValue
+    val resolvedRecentDays = recentDays ?: emptyRecentDays()
     val colorProgress = accumulateColorProgress(
         item = item,
         cumulative = cumulative,
-        todayValue = todayValue,
-        streak = streak,
+        recentDays = resolvedRecentDays,
     )
     val fillProgress = if (hasGoal) {
         goalProgressFraction(cumulative, checkNotNull(target))
@@ -638,27 +635,10 @@ private fun AccumulateRailCard(
                         )
                     }
                 }
-                streak?.let(::streakLabel)?.let { streakText ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.LocalFireDepartment,
-                            contentDescription = null,
-                            tint = progressColor,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Text(
-                            text = streakText,
-                            color = progressColor,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
+                RecentDayPies(
+                    recentDays = resolvedRecentDays,
+                    accent = progressColor,
+                )
             }
         }
     }
@@ -812,7 +792,6 @@ internal data class RecordsDayOverview(
     val taskTotal: Int,
     val goalDone: Int,
     val goalTotal: Int,
-    val activeStreaks: Int,
 ) {
     val isVisible: Boolean
         get() = taskTotal > 0 || goalTotal > 0
@@ -821,7 +800,6 @@ internal data class RecordsDayOverview(
         get() = buildList {
             if (taskTotal > 0) add("Tasks $taskDone/$taskTotal")
             if (goalTotal > 0) add("Goals $goalDone/$goalTotal")
-            if (activeStreaks > 0) add("Streaks $activeStreaks")
         }.joinToString(" · ")
 }
 
@@ -829,19 +807,14 @@ internal fun recordsDayOverview(
     tasks: List<TodoTask>,
     items: List<RecordItem>,
     goalValues: Map<Long, Double>,
-    streaks: Map<Long, ItemStreak>,
 ): RecordsDayOverview {
     val goals = goalItems(items)
     val goalCompletion = focusGoalCompletion(goals, goalValues)
-    val activeStreaks = items.count { item ->
-        item.mode == RecordMode.ACCUMULATE && (streaks[item.id]?.current ?: 0) > 0
-    }
     return RecordsDayOverview(
         taskDone = tasks.count(TodoTask::isCompleted),
         taskTotal = tasks.size,
         goalDone = goalCompletion.done,
         goalTotal = goalCompletion.total,
-        activeStreaks = activeStreaks,
     )
 }
 

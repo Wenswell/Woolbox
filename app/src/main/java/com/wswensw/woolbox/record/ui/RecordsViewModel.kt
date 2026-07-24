@@ -8,7 +8,6 @@ import com.wswensw.woolbox.record.data.RecordRepository
 import com.wswensw.woolbox.record.data.RecordsUiPreferences
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.data.RecordsSnapshot
-import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
@@ -35,7 +34,7 @@ data class RecordsUiState(
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val tasks: List<TodoTask> = emptyList(),
     val goalValues: Map<Long, Double> = emptyMap(),
-    val streaks: Map<Long, ItemStreak> = emptyMap(),
+    val recentDays: Map<Long, List<Boolean>> = emptyMap(),
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
@@ -127,7 +126,7 @@ class RecordsViewModel(
             latestEntries = latestEntries,
             tasks = tasks,
             goalValues = goalValues,
-            streaks = streaks,
+            recentDays = recentDays,
         )
 
     fun configureCredentials(username: String, password: String, onResult: (String?) -> Unit) {

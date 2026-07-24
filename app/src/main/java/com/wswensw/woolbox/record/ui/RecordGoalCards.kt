@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordItem
+import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -132,6 +133,54 @@ private fun DrawScope.drawLiquidLayer(
     path.lineTo(width, height)
     path.close()
     drawPath(path = path, color = color)
+}
+
+
+@Composable
+internal fun RecentDayPies(
+    recentDays: List<Boolean>,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 12.dp,
+    gap: Dp = 3.dp,
+) {
+    require(recentDays.size == RECENT_ACTIVE_DAYS)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        recentDays.forEachIndexed { index, active ->
+            val isToday = index == recentDays.lastIndex
+            Canvas(modifier = Modifier.size(size)) {
+                val stroke = 1.4.dp.toPx()
+                val diameter = size.toPx()
+                val inset = stroke / 2f
+                val arcSize = Size(diameter - stroke, diameter - stroke)
+                val topLeft = Offset(inset, inset)
+                val track = accent.copy(alpha = if (isToday) 0.28f else 0.16f)
+                drawArc(
+                    color = track,
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+                if (active) {
+                    drawArc(
+                        color = accent,
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = true,
+                        topLeft = topLeft,
+                        size = arcSize,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

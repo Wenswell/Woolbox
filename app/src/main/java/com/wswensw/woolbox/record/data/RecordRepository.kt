@@ -16,10 +16,9 @@ import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.parseTaskHorizon
-import com.wswensw.woolbox.record.model.ItemStreak
-import com.wswensw.woolbox.record.model.STREAK_LOOKBACK_DAYS
+import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
 import com.wswensw.woolbox.record.model.goalValues
-import com.wswensw.woolbox.record.model.itemStreaks
+import com.wswensw.woolbox.record.model.itemRecentActiveDays
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.record.model.validated
@@ -59,7 +58,7 @@ data class RecordsSnapshot(
     val latestEntries: Map<Long, RecordEntry>,
     val tasks: List<TodoTask>,
     val goalValues: Map<Long, Double>,
-    val streaks: Map<Long, ItemStreak>,
+    val recentDays: Map<Long, List<Boolean>>,
 )
 
 class RecordRepository(context: Context) {
@@ -72,7 +71,7 @@ class RecordRepository(context: Context) {
 
     suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
         val date = LocalDate.parse(localDate)
-        val lookbackStart = date.minusDays((STREAK_LOOKBACK_DAYS - 1).toLong()).toString()
+        val lookbackStart = date.minusDays((RECENT_ACTIVE_DAYS - 1).toLong()).toString()
         val overview = request(
             "GET",
             "overview",
@@ -95,7 +94,7 @@ class RecordRepository(context: Context) {
             .associateBy(RecordEntry::itemId),
             tasks = overview.getJSONArray("tasks").mapObjects(::parseTask),
             goalValues = goalValues(activeItems, date, todayEntries, weekEntries),
-            streaks = itemStreaks(
+            recentDays = itemRecentActiveDays(
                 itemIds = activeItems
                     .filter { it.mode == RecordMode.ACCUMULATE }
                     .map(RecordItem::id),
