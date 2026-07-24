@@ -18,8 +18,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -106,13 +104,7 @@ private fun TaskManageCard(
 ) {
     val completed = task.completedStepCount
     val total = task.steps.size
-    val progress = if (total <= 0) 0f else completed.toFloat() / total.toFloat()
     val reduceMotion = prefersReducedMotionManage()
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "ManageTaskProgress",
-    )
     val targetColors = recordProgressColors(
         progress = taskColorProgress(task),
         completed = task.isCompleted,
@@ -144,8 +136,9 @@ private fun TaskManageCard(
                 .fillMaxWidth()
                 .heightIn(min = 72.dp),
         ) {
-            HorizontalProgressFill(
-                progress = animatedProgress,
+            SegmentedProgressFill(
+                completed = completed,
+                total = total,
                 fillColor = accent,
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),

@@ -10,11 +10,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -53,7 +54,6 @@ import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
 import kotlin.math.PI
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -138,91 +138,71 @@ private fun DrawScope.drawLiquidLayer(
 }
 
 /**
- * Left-to-right progress wash for horizontal task cards.
- * Soft leading edge; optional sheen when motion is enabled and progress is partial.
+ * Full-height segmented progress for task cards.
+ * One cell per subtask; completed cells pop in, next cell soft-pulses while partial.
  */
 @Composable
-internal fun HorizontalProgressFill(
-    progress: Float,
+internal fun SegmentedProgressFill(
+    completed: Int,
+    total: Int,
     fillColor: Color,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
+    gap: Dp = 2.dp,
 ) {
-    val target = progress.coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = target,
-        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "HorizontalProgressFillLevel",
-    )
-    val transition = rememberInfiniteTransition(label = "HorizontalProgressSheen")
-    val sheenPhase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
+    val safeTotal = total.coerceAtLeast(0)
+    val safeCompleted = completed.coerceIn(0, safeTotal)
+    val allDone = safeTotal > 0 && safeCompleted >= safeTotal
+    val fillAlpha = if (allDone) 0.34f else 0.28f
+    val trackAlpha = 0.10f
+    val transition = rememberInfiniteTransition(label = "SegmentedProgressPulse")
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.10f,
+        targetValue = 0.20f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
+            animation = tween(durationMillis = 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "HorizontalProgressSheenPhase",
+        label = "SegmentedProgressPulseAlpha",
     )
-    val sheenActive = !reduceMotion && target > 0.001f && target < 0.999f
-    Canvas(modifier = modifier.fillMaxSize()) {
-        if (animatedProgress <= 0.001f) return@Canvas
-        val width = this.size.width
-        val height = this.size.height
-        if (width <= 0f || height <= 0f) return@Canvas
-        val fillWidth = width * animatedProgress
-        val complete = animatedProgress >= 0.999f
-        val frontAlpha = if (complete) 0.34f else 0.26f
-        val backAlpha = if (complete) 0.18f else 0.14f
-        val edge = if (complete) 0f else min(20.dp.toPx(), fillWidth * 0.35f)
+    val pulse = if (!reduceMotion && safeCompleted < safeTotal) pulseAlpha else trackAlpha
 
-        // Soft depth layer slightly trailing the front edge.
-        val backWidth = (fillWidth - edge * 0.35f).coerceAtLeast(0f)
-        if (backWidth > 0f) {
-            drawRect(
-                color = fillColor.copy(alpha = backAlpha),
-                size = Size(backWidth, height),
+    Row(
+        modifier = modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+    ) {
+        repeat(safeTotal) { index ->
+            val filled = index < safeCompleted
+            val isNext = index == safeCompleted && !allDone
+            val pop by animateFloatAsState(
+                targetValue = if (filled) 1f else 0f,
+                animationSpec = if (reduceMotion) {
+                    tween(0)
+                } else {
+                    spring(dampingRatio = 0.72f, stiffness = 420f)
+                },
+                label = "SegmentPop-$index",
             )
-        }
-
-        val solidWidth = (fillWidth - edge).coerceAtLeast(0f)
-        if (solidWidth > 0f) {
-            drawRect(
-                color = fillColor.copy(alpha = frontAlpha),
-                size = Size(solidWidth, height),
-            )
-        }
-        if (edge > 0f) {
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        fillColor.copy(alpha = frontAlpha),
-                        fillColor.copy(alpha = 0f),
-                    ),
-                    startX = solidWidth,
-                    endX = fillWidth,
-                ),
-                topLeft = Offset(solidWidth, 0f),
-                size = Size(edge, height),
-            )
-        }
-
-        if (sheenActive && fillWidth > 8.dp.toPx()) {
-            val band = min(36.dp.toPx(), fillWidth * 0.45f)
-            val travel = fillWidth + band
-            val x = -band + travel * sheenPhase
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.White.copy(alpha = 0.10f),
-                        Color.Transparent,
-                    ),
-                    startX = x,
-                    endX = x + band,
-                ),
-                size = Size(fillWidth, height),
-            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(fillColor.copy(alpha = if (isNext) pulse else trackAlpha)),
+            ) {
+                if (pop > 0.001f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val s = 0.86f + 0.14f * pop
+                                scaleX = s
+                                scaleY = s
+                                alpha = pop
+                            }
+                            .background(fillColor.copy(alpha = fillAlpha)),
+                    )
+                }
+            }
         }
     }
 }

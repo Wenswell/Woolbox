@@ -2,8 +2,6 @@ package com.wswensw.woolbox.record.ui
 
 import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -405,17 +403,8 @@ private fun TaskProgressCard(
     onOpen: () -> Unit,
 ) {
     val completed = task.completedStepCount
-    val progress = if (task.steps.isEmpty()) {
-        0f
-    } else {
-        completed.toFloat() / task.steps.size.toFloat()
-    }
+    val total = task.steps.size
     val reduceMotion = prefersReducedMotion()
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "TaskProgress",
-    )
     val nextStepTitle = nextTaskStepTitle(task)
     val targetColors = recordProgressColors(
         progress = taskColorProgress(task),
@@ -449,8 +438,9 @@ private fun TaskProgressCard(
                 .fillMaxWidth()
                 .heightIn(min = 56.dp),
         ) {
-            HorizontalProgressFill(
-                progress = animatedProgress,
+            SegmentedProgressFill(
+                completed = completed,
+                total = total,
                 fillColor = accent,
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),
@@ -486,7 +476,7 @@ private fun TaskProgressCard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "$completed/${task.steps.size}",
+                        text = "$completed/$total",
                         color = accent,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
