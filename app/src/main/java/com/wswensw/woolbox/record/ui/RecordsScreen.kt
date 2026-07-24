@@ -444,47 +444,37 @@ private fun TaskProgressCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .heightIn(min = 56.dp),
         ) {
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center,
+            HorizontalProgressFill(
+                progress = animatedProgress,
+                fillColor = accent,
+                reduceMotion = reduceMotion,
+                modifier = Modifier.matchParentSize(),
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                CircularProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.fillMaxSize(),
-                    color = accent,
-                    trackColor = accent.copy(alpha = 0.18f),
-                    strokeWidth = 4.dp,
-                    gapSize = 0.dp,
-                )
-                if (task.isCompleted) {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(22.dp),
-                    )
-                } else {
-                    Text(
-                        text = "$completed",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = accent,
-                    )
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    if (task.isCompleted) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(18.dp),
+                        )
+                    }
                     Text(
                         text = task.title,
                         color = cardContentColor,
@@ -509,7 +499,6 @@ private fun TaskProgressCard(
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
                     )
                 } else if (task.isCompleted) {
                     task.completedAt?.let { completedAt ->
@@ -517,7 +506,6 @@ private fun TaskProgressCard(
                             text = taskCompletedAtLabel(completedAt),
                             color = cardContentColor.copy(alpha = 0.72f),
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 2.dp),
                         )
                     }
                 }

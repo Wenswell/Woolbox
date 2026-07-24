@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -52,6 +53,7 @@ import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
 import kotlin.math.PI
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -133,6 +135,96 @@ private fun DrawScope.drawLiquidLayer(
     path.lineTo(width, height)
     path.close()
     drawPath(path = path, color = color)
+}
+
+/**
+ * Left-to-right progress wash for horizontal task cards.
+ * Soft leading edge; optional sheen when motion is enabled and progress is partial.
+ */
+@Composable
+internal fun HorizontalProgressFill(
+    progress: Float,
+    fillColor: Color,
+    modifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
+) {
+    val target = progress.coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "HorizontalProgressFillLevel",
+    )
+    val transition = rememberInfiniteTransition(label = "HorizontalProgressSheen")
+    val sheenPhase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "HorizontalProgressSheenPhase",
+    )
+    val sheenActive = !reduceMotion && target > 0.001f && target < 0.999f
+    Canvas(modifier = modifier.fillMaxSize()) {
+        if (animatedProgress <= 0.001f) return@Canvas
+        val width = this.size.width
+        val height = this.size.height
+        if (width <= 0f || height <= 0f) return@Canvas
+        val fillWidth = width * animatedProgress
+        val complete = animatedProgress >= 0.999f
+        val frontAlpha = if (complete) 0.34f else 0.26f
+        val backAlpha = if (complete) 0.18f else 0.14f
+        val edge = if (complete) 0f else min(20.dp.toPx(), fillWidth * 0.35f)
+
+        // Soft depth layer slightly trailing the front edge.
+        val backWidth = (fillWidth - edge * 0.35f).coerceAtLeast(0f)
+        if (backWidth > 0f) {
+            drawRect(
+                color = fillColor.copy(alpha = backAlpha),
+                size = Size(backWidth, height),
+            )
+        }
+
+        val solidWidth = (fillWidth - edge).coerceAtLeast(0f)
+        if (solidWidth > 0f) {
+            drawRect(
+                color = fillColor.copy(alpha = frontAlpha),
+                size = Size(solidWidth, height),
+            )
+        }
+        if (edge > 0f) {
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        fillColor.copy(alpha = frontAlpha),
+                        fillColor.copy(alpha = 0f),
+                    ),
+                    startX = solidWidth,
+                    endX = fillWidth,
+                ),
+                topLeft = Offset(solidWidth, 0f),
+                size = Size(edge, height),
+            )
+        }
+
+        if (sheenActive && fillWidth > 8.dp.toPx()) {
+            val band = min(36.dp.toPx(), fillWidth * 0.45f)
+            val travel = fillWidth + band
+            val x = -band + travel * sheenPhase
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.10f),
+                        Color.Transparent,
+                    ),
+                    startX = x,
+                    endX = x + band,
+                ),
+                size = Size(fillWidth, height),
+            )
+        }
+    }
 }
 
 
