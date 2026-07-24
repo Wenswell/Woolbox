@@ -107,6 +107,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
+    val rootTaskPreviewLimit by recordsViewModel.rootTaskPreviewLimit.collectAsStateWithLifecycle()
     val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.RECORDS) }
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
@@ -186,6 +187,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
 
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
+                                rootTaskPreviewLimit = rootTaskPreviewLimit,
                                 onManageTasks = {
                                     taskSheetId = null
                                     navController.navigate(AppRoutes.MANAGE_TASKS)
@@ -233,6 +235,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onOpenRecordsConnection = {
                                     navController.navigate(AppRoutes.RECORDS_CONNECTION)
                                 },
+                                rootTaskPreviewLimit = rootTaskPreviewLimit,
+                                onRootTaskPreviewLimitChange = recordsViewModel::setRootTaskPreviewLimit,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -398,8 +402,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             composable(AppRoutes.TASK_NEW) {
                 TaskCreateScreen(
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, stepTitles, onResult ->
-                        recordsViewModel.createTask(title, stepTitles) { taskId, error ->
+                    onCreate = { title, stepTitles, horizon, onResult ->
+                        recordsViewModel.createTask(title, stepTitles, horizon) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -415,8 +419,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     task = recordsState.findTask(taskId),
                     loading = recordsState.isLoading,
                     onBack = { navController.popBackStack() },
-                    onSaveTitle = { title, onResult ->
-                        recordsViewModel.updateTask(taskId, title, onResult)
+                    onSave = { title, horizon, onResult ->
+                        recordsViewModel.updateTask(taskId, title, horizon, onResult)
                     },
                     onCreateStep = { title, onResult ->
                         recordsViewModel.createStep(taskId, title, onResult)

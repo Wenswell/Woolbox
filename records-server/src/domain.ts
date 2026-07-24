@@ -1,11 +1,13 @@
 export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "WEEK"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
+export const TASK_HORIZONS = ["TODAY", "LATER"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
+export type TaskHorizon = (typeof TASK_HORIZONS)[number];
 
 export interface RecordWindowInput {
   startMinute: number;
@@ -39,7 +41,11 @@ export interface TaskTitleInput {
   title: string;
 }
 
-export interface TaskCreateInput extends TaskTitleInput {
+export interface TaskWriteInput extends TaskTitleInput {
+  horizon: TaskHorizon;
+}
+
+export interface TaskCreateInput extends TaskWriteInput {
   steps: string[];
 }
 
@@ -122,15 +128,26 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
   return entry;
 }
 
+export function parseTaskHorizon(value: unknown): TaskHorizon {
+  requireRule(typeof value === "string" && TASK_HORIZONS.includes(value as TaskHorizon), "Horizon is invalid.");
+  return value as TaskHorizon;
+}
+
 export function parseTaskInput(value: unknown): TaskTitleInput {
   const title = stringField(objectInput(value), "title").trim();
   requireRule(title.length > 0, "Title is required.");
   return { title };
 }
 
-export function parseTaskCreateInput(value: unknown): TaskCreateInput {
+export function parseTaskWriteInput(value: unknown): TaskWriteInput {
   const input = objectInput(value);
   const { title } = parseTaskInput(input);
+  return { title, horizon: parseTaskHorizon(input.horizon) };
+}
+
+export function parseTaskCreateInput(value: unknown): TaskCreateInput {
+  const input = objectInput(value);
+  const { title, horizon } = parseTaskWriteInput(input);
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
   const steps = input.steps.map((value) => {
     requireRule(typeof value === "string", "Subtask titles must be strings.");
@@ -138,7 +155,7 @@ export function parseTaskCreateInput(value: unknown): TaskCreateInput {
     requireRule(step.length > 0, "Subtask titles are required.");
     return step;
   });
-  return { title, steps };
+  return { title, horizon, steps };
 }
 
 export function parseCompleted(value: unknown): boolean {

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
@@ -34,10 +36,12 @@ import com.wswensw.woolbox.ui.AppStyle
 @Composable
 fun TaskCreateScreen(
     onBack: () -> Unit,
-    onCreate: (title: String, stepTitles: List<String>, onResult: (String?) -> Unit) -> Unit,
+    onCreate: (title: String, stepTitles: List<String>, horizon: TaskHorizon, onResult: (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
+    var horizonName by rememberSaveable { mutableStateOf(TaskHorizon.TODAY.name) }
+    val horizon = TaskHorizon.valueOf(horizonName)
     var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
@@ -55,7 +59,7 @@ fun TaskCreateScreen(
             return
         }
         saving = true
-        onCreate(normalizedTitle, normalizedSteps) { error ->
+        onCreate(normalizedTitle, normalizedSteps, horizon) { error ->
             saving = false
             errorMessage = error
         }
@@ -93,6 +97,21 @@ fun TaskCreateScreen(
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TaskHorizon.entries.forEach { option ->
+                    FilterChip(
+                        selected = horizon == option,
+                        onClick = { horizonName = option.name },
+                        enabled = !saving,
+                        label = { Text(option.label) },
+                    )
+                }
+            }
         }
         AppSection(title = "Subtasks") {
             stepTitles.forEachIndexed { index, stepTitle ->

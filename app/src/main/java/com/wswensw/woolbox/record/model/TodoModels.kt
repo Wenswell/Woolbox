@@ -1,8 +1,21 @@
 package com.wswensw.woolbox.record.model
 
+enum class TaskHorizon {
+    TODAY,
+    LATER,
+    ;
+
+    val label: String
+        get() = when (this) {
+            TODAY -> "Today"
+            LATER -> "Later"
+        }
+}
+
 data class TodoTask(
     val id: Long,
     val title: String,
+    val horizon: TaskHorizon,
     val completedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
@@ -32,3 +45,8 @@ fun validatedTaskTitle(value: String): String {
     if (title.isEmpty()) throw RecordValidationException("Title is required.")
     return title
 }
+
+fun parseTaskHorizon(value: String): TaskHorizon =
+    runCatching { TaskHorizon.valueOf(value) }.getOrElse {
+        throw RecordValidationException("Horizon is invalid.")
+    }

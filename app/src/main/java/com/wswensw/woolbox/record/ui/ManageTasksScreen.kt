@@ -164,7 +164,7 @@ private fun TaskManageCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "$completed / $total subtasks",
+                    text = "${task.horizon.label} · $completed / $total subtasks",
                     color = contentColor.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,

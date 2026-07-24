@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.validatedTaskTitle
@@ -49,7 +51,7 @@ fun TaskDetailScreen(
     task: TodoTask?,
     loading: Boolean,
     onBack: () -> Unit,
-    onSaveTitle: (String, (String?) -> Unit) -> Unit,
+    onSave: (String, TaskHorizon, (String?) -> Unit) -> Unit,
     onCreateStep: (String, (String?) -> Unit) -> Unit,
     onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
@@ -81,6 +83,8 @@ fun TaskDetailScreen(
     }
 
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
+    var horizonName by rememberSaveable(task.id) { mutableStateOf(task.horizon.name) }
+    val horizon = TaskHorizon.valueOf(horizonName)
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var savingTitle by rememberSaveable { mutableStateOf(false) }
@@ -101,22 +105,22 @@ fun TaskDetailScreen(
         }
     }
 
-    fun saveTitle() {
+    fun saveTask() {
         errorMessage = null
         val normalizedTitle = runCatching { validatedTaskTitle(title) }.getOrElse { error ->
             titleError = error.message
             errorMessage = "Check the highlighted field."
             return
         }
-        if (normalizedTitle == task.title) return
+        if (normalizedTitle == task.title && horizon == task.horizon) return
         savingTitle = true
-        onSaveTitle(normalizedTitle) { error ->
+        onSave(normalizedTitle, horizon) { error ->
             savingTitle = false
             errorMessage = error
         }
     }
 
-    val titleDirty = title.trim() != task.title
+    val titleDirty = title.trim() != task.title || horizon != task.horizon
     AppRouteScaffold(
         title = "Edit task",
         onBack = onBack,
@@ -127,7 +131,7 @@ fun TaskDetailScreen(
             }
             Spacer(Modifier.width(4.dp))
             FilledTonalIconButton(
-                onClick = ::saveTitle,
+                onClick = ::saveTask,
                 enabled = !savingTitle && titleDirty && title.isNotBlank(),
             ) {
                 Icon(
@@ -153,6 +157,21 @@ fun TaskDetailScreen(
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TaskHorizon.entries.forEach { option ->
+                    FilterChip(
+                        selected = horizon == option,
+                        onClick = { horizonName = option.name },
+                        enabled = !savingTitle,
+                        label = { Text(option.label) },
+                    )
+                }
+            }
         }
 
         AppSection(title = "Subtasks") {

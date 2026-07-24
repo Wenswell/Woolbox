@@ -62,11 +62,15 @@ export const todoTasks = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     title: text("title").notNull(),
+    horizon: text("horizon").notNull().default("TODAY"),
     completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [index("todo_tasks_created_at_index").on(table.createdAt)],
+  (table) => [
+    index("todo_tasks_created_at_index").on(table.createdAt),
+    index("todo_tasks_horizon_index").on(table.horizon),
+  ],
 );
 
 export const todoSteps = sqliteTable(

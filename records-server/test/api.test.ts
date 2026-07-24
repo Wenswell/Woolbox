@@ -289,7 +289,7 @@ describe("Records API", () => {
         { id: 2, name: "Temperature", archived: false },
         { id: 1, name: "Water", archived: false },
       ],
-      tasks: [{ id: 1, title: "Pack", steps: [{ title: "Bag" }] }],
+      tasks: [{ id: 1, title: "Pack", horizon: "TODAY", steps: [{ title: "Bag" }] }],
       accumulateEntries: [{ itemId: 1, value: 2, itemMode: "ACCUMULATE" }],
       latestMeasurementEntries: [{ itemId: 2, value: 4, itemMode: "MEASUREMENT" }],
     });
@@ -302,6 +302,7 @@ describe("Records API", () => {
     expect(created.json().task).toMatchObject({
       id: 1,
       title: "Prepare trip",
+      horizon: "TODAY",
       completedAt: null,
       steps: [
         { id: 1, title: "Book train", completedAt: null },
@@ -344,9 +345,10 @@ describe("Records API", () => {
     expect((await app.inject({ method: "DELETE", url: "/api/steps/2" })).statusCode).toBe(200);
     expect((await app.inject({ method: "DELETE", url: "/api/steps/3" })).statusCode).toBe(400);
 
-    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey" } });
+    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey", horizon: "LATER" } });
     expect(renamed.statusCode).toBe(200);
     expect(renamed.json().task.title).toBe("Prepare journey");
+    expect(renamed.json().task.horizon).toBe("LATER");
     expect((await getAuditLogs()).map((log) => log.action)).toContain("TASK_COMPLETED");
     expect((await getAuditLogs()).map((log) => log.action)).toContain("STEP_REOPENED");
   });
@@ -448,7 +450,11 @@ describe("Records API", () => {
 
 
   async function createTask(payload: Record<string, unknown>) {
-    return app.inject({ method: "POST", url: "/api/tasks", payload });
+    return app.inject({
+      method: "POST",
+      url: "/api/tasks",
+      payload: { horizon: "TODAY", ...payload },
+    });
   }
 
   async function getTasks(): Promise<Array<Record<string, unknown>>> {

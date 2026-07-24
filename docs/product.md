@@ -12,7 +12,7 @@ Woolbox 是 Android 12 及以上的工具应用。当前提供两项跨应用无
 
 Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。
 
-当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、提醒、期限、重复任务、标签、协作、多级子事项或可配置图表；PC 管理页只管理记录项、流水和审计日志，不提供待办管理。
+当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、提醒、日历 due、重复任务、标签、协作、多级子事项或可配置图表；PC 管理页只管理记录项、流水和审计日志，不提供待办管理。
 
 ## 入口语义
 
@@ -108,16 +108,16 @@ Tile 用于不离开目标应用的快速启动。点击后系统面板收起，
 2. 启动默认停在 `Records` 底栏；根列表顺序为 **Tasks → Accumulate → Measurement**（无 Tasks/Trackers 页签）。
    - 标题下在有任务或有目标累计时显示只读总览：`Tasks` 完成比、`Goals` 达标比、活跃 `Streaks` 个数。
    - 卡片颜色按进度变化：进行中 primary 逐步加深，完成用固定绿色（与接近完成区分），不按名称随机、不用粉色系。
-3. **Tasks**：全宽进度卡；未完成按创建顺序，已完成收在折叠区并按完成时间倒序。顶部纯图标分别进入 `Manage tasks` 和 `New task`；点卡打开子事项进度 Sheet，只能勾选子事项。完成子事项有轻触觉；父项刚全部完成时有强触觉与 `{title} done` Snackbar。低频标题、子事项增删排序和删除操作在 `New task` / `Edit task` 完成；子事项顺序由列表位置决定，可用上下箭头调整。
-4. **Accumulate**：section 旁为 Manage 与加号（纯 icon）；内容为横向目标圆环卡片轨。点卡打开快速记录 Sheet；加号进入 `New accumulate`；Manage 进入只列出累计项的 `Manage accumulates`，卡片只进入 `Edit accumulate`。
-5. **Measurement**：section 旁为 Manage 与加号；横向卡片显示最新值与时间。点卡打开 24 小时预览 Sheet，显示原始图表、流水和滑块录入；加号进入 `New measurement`；Manage 进入只列出测量项的 `Manage measurements`，卡片只进入 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
+3. **Tasks**：按 `Today` / `Later` 分组；Today 默认展开，Later 默认折叠；每组最多显示 Setting 中的预览条数（默认 5），超出进 Manage。卡为紧凑进度行。已完成仍折叠。顶部纯图标分别进入 `Manage tasks` 和 `New task`；点卡打开子事项进度 Sheet，只能勾选子事项。完成子事项有轻触觉；父项刚全部完成时有强触觉与 `{title} done` Snackbar。低频标题、子事项增删排序和删除操作在 `New task` / `Edit task` 完成；子事项顺序由列表位置决定，可用上下箭头调整。
+4. **Accumulate**：section 旁为 Manage 与加号；内容为 2 列 grid 卡。点卡打开快速记录 Sheet；加号进入 `New accumulate`；Manage 进入只列出累计项的 `Manage accumulates`，卡片只进入 `Edit accumulate`。
+5. **Measurement**：section 旁为 Manage 与加号；2 列 grid 显示最新值与时间。点卡打开 24 小时预览 Sheet，显示原始图表、流水和滑块录入；加号进入 `New measurement`；Manage 进入只列出测量项的 `Manage measurements`，卡片只进入 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
 6. 累计确认写入时提交当前设备时刻，成功关闭 Sheet 并短时 `Undo`；刚达标时附加 `Goal reached` 文案与强触觉；失败保持 Sheet 并显示错误。
 7. 新建/编辑均为独立全屏路由，顶栏 New/Edit + 纯 icon 保存；累计与测量表单分离，无 mode 切换。
 8. PC 管理页的 `Entries` 仅用于筛选和批量删除流水；`Record items` 可配置记录模式；`Logs` 显示每次成功写操作的对象、动作、时间和变更内容。
 
 ### 待办规则
 
-- 待办与子事项只有标题和完成状态。标题保存前去除首尾空白且不能为空；每个待办必须有至少一个一级子事项。
+- 待办有标题、完成状态和 horizon（`TODAY` / `LATER`）；子事项只有标题和完成状态。标题保存前去除首尾空白且不能为空；每个待办必须有至少一个一级子事项。
 - 新建待办会在同一事务创建标题和全部子事项。父项完成状态只由子事项派生，根页和进度 Sheet 不提供父项完成开关。
 - 全部子事项完成时父项完成；重开任一子事项或向已完成父项新增子事项时父项重开。编辑页不能删除最后一个子事项。
 - 删除待办会级联删除其子事项。第一版不提供拖动排序、多级嵌套、期限、提醒、重复、优先级、项目、标签、附件或协作。

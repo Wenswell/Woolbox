@@ -13,7 +13,9 @@ import com.wswensw.woolbox.record.model.RecordValidationException
 import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TodoStep
+import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.parseTaskHorizon
 import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.model.STREAK_LOOKBACK_DAYS
 import com.wswensw.woolbox.record.model.goalValues
@@ -158,7 +160,7 @@ class RecordRepository(context: Context) {
         Unit
     }
 
-    suspend fun createTask(title: String, stepTitles: List<String>): Long = withContext(Dispatchers.IO) {
+    suspend fun createTask(title: String, stepTitles: List<String>, horizon: TaskHorizon): Long = withContext(Dispatchers.IO) {
         val normalizedSteps = stepTitles.map(::validatedTaskTitle)
         if (normalizedSteps.isEmpty()) {
             throw RecordValidationException("At least one subtask is required.")
@@ -168,15 +170,18 @@ class RecordRepository(context: Context) {
             "tasks",
             body = JSONObject()
                 .put("title", validatedTaskTitle(title))
+                .put("horizon", horizon.name)
                 .put("steps", JSONArray(normalizedSteps)),
         ).getJSONObject("task").getLong("id")
     }
 
-    suspend fun updateTask(taskId: Long, title: String) = withContext(Dispatchers.IO) {
+    suspend fun updateTask(taskId: Long, title: String, horizon: TaskHorizon) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "tasks/$taskId",
-            body = JSONObject().put("title", validatedTaskTitle(title)),
+            body = JSONObject()
+                .put("title", validatedTaskTitle(title))
+                .put("horizon", horizon.name),
         )
         Unit
     }
@@ -330,6 +335,7 @@ private fun parseEntry(value: JSONObject) = RecordEntry(
 private fun parseTask(value: JSONObject) = TodoTask(
     id = value.getLong("id"),
     title = value.getString("title"),
+    horizon = parseTaskHorizon(value.getString("horizon")),
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),

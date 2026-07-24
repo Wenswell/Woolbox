@@ -12,7 +12,8 @@ class TodoModelsTest {
         val task = TodoTask(
             id = 1,
             title = "Prepare trip",
-            completedAt = null,
+            horizon = com.wswensw.woolbox.record.model.TaskHorizon.TODAY,
+        completedAt = null,
             createdAt = 0,
             updatedAt = 0,
             steps = listOf(

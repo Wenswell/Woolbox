@@ -11,6 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.wswensw.woolbox.BuildConfig
+import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 
 @Composable
 fun SettingScreen(
@@ -18,9 +19,12 @@ fun SettingScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     recordsConnection: String,
     onOpenRecordsConnection: () -> Unit,
+    rootTaskPreviewLimit: RootTaskPreviewLimit,
+    onRootTaskPreviewLimitChange: (RootTaskPreviewLimit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+    var showPreviewLimitDialog by rememberSaveable { mutableStateOf(false) }
     var showVersionDialog by rememberSaveable { mutableStateOf(false) }
 
     AppPage(
@@ -49,6 +53,14 @@ fun SettingScreen(
                 navigate = true,
                 onClick = onOpenRecordsConnection,
             )
+            AppListItem(
+                title = "Root task preview",
+                subtitle = rootTaskPreviewLimit.label,
+                leadingContent = {
+                    AppListLeadingIcon(imageVector = Icons.Outlined.Info)
+                },
+                onClick = { showPreviewLimitDialog = true },
+            )
         }
 
         AppSection(title = "About") {
@@ -71,6 +83,17 @@ fun SettingScreen(
             label = { it.label },
             onSelected = onThemeModeChange,
             onDismiss = { showThemeDialog = false },
+        )
+    }
+
+    if (showPreviewLimitDialog) {
+        AppSingleChoiceDialog(
+            title = "Root task preview",
+            options = RootTaskPreviewLimit.entries,
+            selected = rootTaskPreviewLimit,
+            label = { it.label },
+            onSelected = onRootTaskPreviewLimitChange,
+            onDismiss = { showPreviewLimitDialog = false },
         )
     }
 

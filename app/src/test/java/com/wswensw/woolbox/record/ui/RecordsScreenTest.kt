@@ -175,7 +175,8 @@ class RecordsScreenTest {
         val task = TodoTask(
             id = 1,
             title = "Plan",
-            completedAt = null,
+            horizon = com.wswensw.woolbox.record.model.TaskHorizon.TODAY,
+        completedAt = null,
             createdAt = 0,
             updatedAt = 0,
             steps = listOf(
@@ -375,6 +376,7 @@ private fun todoTask(id: Long, completedSteps: Int, totalSteps: Int): TodoTask {
     return TodoTask(
         id = id,
         title = "Task $id",
+        horizon = com.wswensw.woolbox.record.model.TaskHorizon.TODAY,
         completedAt = if (completedSteps >= totalSteps && totalSteps > 0) 1L else null,
         createdAt = 1L,
         updatedAt = 1L,

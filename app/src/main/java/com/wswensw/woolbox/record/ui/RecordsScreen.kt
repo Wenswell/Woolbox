@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +59,8 @@ import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
+import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
+import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.streakLabel
 import com.wswensw.woolbox.ui.AppPageHeader
@@ -66,13 +69,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val RailCardWidth = 240.dp
-private val RailCardHeight = 136.dp
-private val RailCardSpacing = 12.dp
+private val GridCardHeight = 120.dp
+private val GridCardSpacing = 8.dp
 
 @Composable
 fun RecordsScreen(
     state: RecordsUiState,
+    rootTaskPreviewLimit: RootTaskPreviewLimit,
     onManageTasks: () -> Unit,
     onManageAccumulates: () -> Unit,
     onManageMeasurements: () -> Unit,
@@ -87,7 +90,11 @@ fun RecordsScreen(
     modifier: Modifier = Modifier,
 ) {
     var completedTasksExpanded by rememberSaveable { mutableStateOf(false) }
+    var laterTasksExpanded by rememberSaveable { mutableStateOf(false) }
     val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
+    val todayTasks = openTasks.filter { it.horizon == TaskHorizon.TODAY }
+    val laterTasks = openTasks.filter { it.horizon == TaskHorizon.LATER }
+    val previewLimit = rootTaskPreviewLimit.count
     val completedTasks = state.tasks
         .filter(TodoTask::isCompleted)
         .sortedByDescending(TodoTask::completedAt)
@@ -177,11 +184,50 @@ fun RecordsScreen(
                         )
                     }
                 } else {
-                    items(openTasks, key = { "open-${it.id}" }) { task ->
-                        TaskProgressCard(
-                            task = task,
-                            onOpen = { onOpenTask(task) },
-                        )
+                    item { TaskHorizonHeader(title = "Today", count = todayTasks.size) }
+                    if (todayTasks.isEmpty()) {
+                        item {
+                            Text(
+                                text = "No today tasks.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    } else {
+                        val visibleToday = previewLimit?.let { todayTasks.take(it) } ?: todayTasks
+                        items(visibleToday, key = { "today-${it.id}" }) { task ->
+                            TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
+                        }
+                        if (previewLimit != null && todayTasks.size > previewLimit) {
+                            item {
+                                TextButton(onClick = onManageTasks) {
+                                    Text("+${todayTasks.size - previewLimit} more in Manage")
+                                }
+                            }
+                        }
+                    }
+                    if (laterTasks.isNotEmpty()) {
+                        item {
+                            TaskHorizonHeader(
+                                title = "Later",
+                                count = laterTasks.size,
+                                expanded = laterTasksExpanded,
+                                onToggle = { laterTasksExpanded = !laterTasksExpanded },
+                            )
+                        }
+                        if (laterTasksExpanded) {
+                            val visibleLater = previewLimit?.let { laterTasks.take(it) } ?: laterTasks
+                            items(visibleLater, key = { "later-${it.id}" }) { task ->
+                                TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
+                            }
+                            if (previewLimit != null && laterTasks.size > previewLimit) {
+                                item {
+                                    TextButton(onClick = onManageTasks) {
+                                        Text("+${laterTasks.size - previewLimit} more in Manage")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 if (completedTasks.isNotEmpty()) {
@@ -218,27 +264,31 @@ fun RecordsScreen(
                         },
                     )
                 }
-                item {
-                    if (accumulateItems.isEmpty()) {
+                if (accumulateItems.isEmpty()) {
+                    item {
                         RecordsStatusCard(
                             message = "No accumulate items yet.",
                             actionLabel = "Create accumulate",
                             onAction = onCreateAccumulate,
                         )
-                    } else {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(RailCardSpacing),
-                            contentPadding = PaddingValues(horizontal = 0.dp),
-                        ) {
-                            items(accumulateItems, key = RecordItem::id) { item ->
+                    }
+                } else {
+                    items(
+                        accumulateItems.chunked(2),
+                        key = { row -> "acc-" + row.joinToString("-") { it.id.toString() } },
+                    ) { row ->
+                        RecordGridRow {
+                            row.forEach { item ->
                                 AccumulateRailCard(
                                     item = item,
                                     todayValue = todayValues[item.id] ?: 0.0,
                                     goalCumulative = state.goalValues[item.id],
                                     streak = state.streaks[item.id],
                                     onClick = { onRecordItem(item) },
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
+                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -259,25 +309,29 @@ fun RecordsScreen(
                         },
                     )
                 }
-                item {
-                    if (measurementItems.isEmpty()) {
+                if (measurementItems.isEmpty()) {
+                    item {
                         RecordsStatusCard(
                             message = "No measurement items yet.",
                             actionLabel = "Create measurement",
                             onAction = onCreateMeasurement,
                         )
-                    } else {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(RailCardSpacing),
-                            contentPadding = PaddingValues(horizontal = 0.dp),
-                        ) {
-                            items(measurementItems, key = RecordItem::id) { item ->
+                    }
+                } else {
+                    items(
+                        measurementItems.chunked(2),
+                        key = { row -> "mes-" + row.joinToString("-") { it.id.toString() } },
+                    ) { row ->
+                        RecordGridRow {
+                            row.forEach { item ->
                                 MeasurementRailCard(
                                     item = item,
                                     latest = state.latestEntries[item.id],
                                     onOpen = { onOpenMeasurement(item) },
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
+                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -341,6 +395,47 @@ private fun CompletedTasksHeader(
     }
 }
 
+
+@Composable
+private fun TaskHorizonHeader(
+    title: String,
+    count: Int,
+    expanded: Boolean? = null,
+    onToggle: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$title ($count)",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        if (expanded != null && onToggle != null) {
+            IconButton(onClick = onToggle) {
+                Icon(
+                    imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = if (expanded) "Collapse $title" else "Expand $title",
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecordGridRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(GridCardSpacing),
+        content = content,
+    )
+}
+
 @Composable
 private fun TaskProgressCard(
     task: TodoTask,
@@ -389,12 +484,12 @@ private fun TaskProgressCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .padding(16.dp),
+                .heightIn(min = 56.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
@@ -475,6 +570,7 @@ private fun AccumulateRailCard(
     goalCumulative: Double?,
     streak: ItemStreak?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val target = item.goalValue
     val period = item.goalPeriod
@@ -506,9 +602,7 @@ private fun AccumulateRailCard(
 
     Card(
         onClick = onClick,
-        modifier = Modifier
-            .width(RailCardWidth)
-            .height(RailCardHeight),
+        modifier = modifier.height(GridCardHeight),
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
             containerColor = container,
@@ -519,8 +613,8 @@ private fun AccumulateRailCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DailyGoalMedallion(
@@ -528,7 +622,7 @@ private fun AccumulateRailCard(
                 progress = progress,
                 reached = goalReached,
                 progressColor = progressColor,
-                size = 64.dp,
+                size = 52.dp,
                 colors = colors,
             )
             Column(
@@ -606,6 +700,7 @@ private fun MeasurementRailCard(
     item: RecordItem,
     latest: RecordEntry?,
     onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val targetColors = recordProgressColors(
         progress = measurementColorProgress(item.minValue, item.maxValue, latest?.value),
@@ -625,9 +720,7 @@ private fun MeasurementRailCard(
     val colors = targetColors.copy(accent = accent, container = container, onContainer = onContainer)
     Card(
         onClick = onOpen,
-        modifier = Modifier
-            .width(RailCardWidth)
-            .height(RailCardHeight),
+        modifier = modifier.height(GridCardHeight),
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
             containerColor = container,
@@ -638,15 +731,15 @@ private fun MeasurementRailCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                RecordItemInitial(name = item.name, size = 40.dp, colors = colors)
+                RecordItemInitial(name = item.name, size = 36.dp, colors = colors)
                 Text(
                     text = displayRecordName(item.name),
                     color = colors.onContainer,

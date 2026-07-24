@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordItemInput, RecordMode, TaskCreateInput, TaskTitleInput } from "./domain.js";
+import type { RecordEntryInput, RecordItemInput, RecordMode, TaskCreateInput, TaskTitleInput, TaskWriteInput } from "./domain.js";
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
@@ -72,6 +72,7 @@ interface EntryAuditSnapshot {
 interface TaskAuditSnapshot {
   id: number;
   title: string;
+  horizon: string;
   completedAt: number | null;
   stepCount?: number;
   stepIds?: number[];
@@ -405,7 +406,7 @@ export class RecordsService {
       const now = this.now();
       const task = tx
         .insert(todoTasks)
-        .values({ title: input.title, completedAt: null, createdAt: now, updatedAt: now })
+        .values({ title: input.title, horizon: input.horizon, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoTasks.id })
         .get();
       const steps = tx.insert(todoSteps)
@@ -423,7 +424,7 @@ export class RecordsService {
         action: "TASK_CREATED",
         entityType: "TASK",
         entityId: task.id,
-        after: { ...taskSnapshot({ id: task.id, title: input.title, completedAt: null }), stepCount: steps.length },
+        after: { ...taskSnapshot({ id: task.id, title: input.title, horizon: input.horizon, completedAt: null }), stepCount: steps.length },
         createdAt: now,
       });
       for (const step of steps) {
@@ -440,12 +441,12 @@ export class RecordsService {
     return this.getTask(id);
   }
 
-  updateTask(id: number, input: TaskTitleInput) {
+  updateTask(id: number, input: TaskWriteInput) {
     this.db.transaction((tx) => {
       const current = this.requireTask(tx, id);
       const now = this.now();
-      const updated = { ...current, title: input.title, updatedAt: now };
-      tx.update(todoTasks).set({ title: input.title, updatedAt: now }).where(eq(todoTasks.id, id)).run();
+      const updated = { ...current, title: input.title, horizon: input.horizon, updatedAt: now };
+      tx.update(todoTasks).set({ title: input.title, horizon: input.horizon, updatedAt: now }).where(eq(todoTasks.id, id)).run();
       this.writeAudit(tx, {
         action: "TASK_UPDATED",
         entityType: "TASK",
@@ -790,12 +791,11 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
   };
 }
 
-function taskSnapshot(
-  task: Pick<TodoTaskRow, "id" | "title" | "completedAt">,
-): TaskAuditSnapshot {
+function taskSnapshot(task: { id: number; title: string; horizon: string; completedAt: number | null }) {
   return {
     id: task.id,
     title: task.title,
+    horizon: task.horizon,
     completedAt: task.completedAt,
   };
 }

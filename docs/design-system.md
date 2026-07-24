@@ -112,13 +112,13 @@ Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Tasks` | 全宽有色进度卡；标题右侧 `N / M`（accent），标题下 `Next · ...`；已完成折叠。section 旁 Manage 用 `IconButton`、新建用 `FilledTonalIconButton`；点卡打开进度 Sheet。 |
+| `Tasks` | `Today`/`Later` 分组；紧凑进度卡；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
 | `Manage tasks` / `Edit task` | 管理页展示全部任务（同色相进度卡 + chevron）；编辑路由负责标题、子事项增删排序和删除。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
-| `Accumulate` | 横向卡轨 `240×136dp`；`64dp` 目标圆环 + 标题/主值/火苗目标与连击；点卡打开快速记录 Sheet。 |
+| `Accumulate` | 2 列 grid，卡高约 `120dp`；目标环 + 主值/连击；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；Check 保存。 |
-| `Measurement` | 横向卡轨 `240×136dp`；`40dp` 首字圆 + 标题/主值/时间；点卡打开预览 Sheet。 |
+| `Measurement` | 2 列 grid，卡高约 `120dp`；首字圆 + 主值/时间；点卡打开预览 Sheet。 |
 | `New/Edit measurement` | 固定 `MEASUREMENT` 表单；Check 保存。 |
 | Measurement preview Sheet | 标题、最新值、24 小时图、流水和离散 Slider。 |
 | 累计记录 Sheet | 身份与进度同一标题行；下方数值输入与今日流水。 |
@@ -128,7 +128,7 @@ Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分
 ### Records 视觉规则
 
 - 字阶：section `titleSmall` primary；卡标题 `titleMedium` SemiBold；主值 `titleLarge` SemiBold + accent；次文案 `bodySmall`/`labelMedium` 且 `onContainer` 0.72。
-- 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（container 洗色约 6%→46%）；`LATE` 仍为 primary 深色，**`DONE` 固定成功绿**（与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用今日记录 + 连击档；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
+- 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（浅色 wash 约 7%→46%，深色 10%→36%，文案用 `onSurface`）；`LATE` 仍为 primary；**`DONE` 固定成功绿**（深/浅分套，与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用今日记录 + 连击档；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 动作：新建 / 顶栏加号为 tonal；Manage 与完成折叠为普通 `IconButton`。
 - Accumulate 圆环表达进度；主值只显示当前累计；目标用火苗 + 目标值，不重复百分比或 `current / target`。

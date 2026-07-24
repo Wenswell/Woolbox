@@ -24,7 +24,6 @@ import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.pow
 
-/** Discrete progress stages used for Records card color. */
 internal enum class ProgressColorStage {
     IDLE,
     EARLY,
@@ -42,11 +41,9 @@ internal data class RecordItemColors(
 )
 
 /**
- * Progress colors: single primary ramp while in progress, fixed green when done.
- * Never uses secondary/tertiary (often pink/rose under dynamic color).
- *
- * - IDLE → LATE: gray → primary deepens (container wash strengthens with progress)
- * - DONE: success green, hue-distinct from LATE so "almost" ≠ "done"
+ * In-progress: primary wash on surface container (readable in light/dark).
+ * Done: fixed success green with theme-specific contrast.
+ * Never uses secondary/tertiary for progress.
  */
 @Composable
 internal fun recordProgressColors(
@@ -58,34 +55,29 @@ internal fun recordProgressColors(
     val unit = colorProgressUnit(progress = progress, completed = completed)
     val dark = scheme.background.luminance() < 0.5f
     val primary = scheme.primary
-    val surface = scheme.surface
+    val base = if (dark) scheme.surfaceContainerHigh else scheme.surface
     val idleAccent = scheme.onSurfaceVariant
 
     if (stage == ProgressColorStage.DONE) {
         return recordsDoneColors(dark = dark)
     }
 
-    // Continuous primary strength 0..1 for incomplete work only.
     val ramp = unit.pow(0.9f)
-    // Accent: stay readable; move clearly from muted → full primary by LATE.
     val accent = when (stage) {
         ProgressColorStage.IDLE -> idleAccent
-        else -> lerp(idleAccent, primary, 0.40f + 0.60f * ramp)
+        else -> lerp(idleAccent, primary, if (dark) 0.55f + 0.45f * ramp else 0.40f + 0.60f * ramp)
     }
-    // Container wash: wide steps so deepening is obvious.
     val wash = when (stage) {
-        ProgressColorStage.IDLE -> 0.06f
-        ProgressColorStage.EARLY -> 0.12f + 0.08f * stageLocalUnit(unit, 0f, 1f / 3f)
-        ProgressColorStage.MID -> 0.24f + 0.08f * stageLocalUnit(unit, 1f / 3f, 2f / 3f)
-        ProgressColorStage.LATE -> 0.36f + 0.10f * stageLocalUnit(unit, 2f / 3f, 1f)
+        ProgressColorStage.IDLE -> if (dark) 0.10f else 0.07f
+        ProgressColorStage.EARLY -> (if (dark) 0.14f else 0.12f) + 0.06f * stageLocalUnit(unit, 0f, 1f / 3f)
+        ProgressColorStage.MID -> (if (dark) 0.20f else 0.22f) + 0.06f * stageLocalUnit(unit, 1f / 3f, 2f / 3f)
+        ProgressColorStage.LATE -> (if (dark) 0.28f else 0.34f) + 0.08f * stageLocalUnit(unit, 2f / 3f, 1f)
         ProgressColorStage.DONE -> 0f
     }
-    val container = lerp(surface, primary, wash.coerceIn(0.06f, 0.48f))
-    val onContainer = if (container.luminance() > 0.5f) {
-        scheme.onSurface
-    } else {
-        scheme.surface
-    }
+    val maxWash = if (dark) 0.36f else 0.46f
+    val container = lerp(base, primary, wash.coerceIn(0.07f, maxWash))
+    // Always use onSurface for in-progress card text — primary-tinted dark cards stay readable.
+    val onContainer = scheme.onSurface
 
     return RecordItemColors(
         accent = accent,
@@ -95,13 +87,12 @@ internal fun recordProgressColors(
     )
 }
 
-/** Fixed success green — independent of dynamic secondary/tertiary. */
 internal fun recordsDoneColors(dark: Boolean): RecordItemColors {
     return if (dark) {
         RecordItemColors(
-            accent = Color(0xFF5EDF96),
-            container = Color(0xFF143526),
-            onContainer = Color(0xFFD4F5E2),
+            accent = Color(0xFF7DDEA4),
+            container = Color(0xFF1A3326),
+            onContainer = Color(0xFFE3F7EB),
             stage = ProgressColorStage.DONE,
         )
     } else {
@@ -114,7 +105,6 @@ internal fun recordsDoneColors(dark: Boolean): RecordItemColors {
     }
 }
 
-/** 0..1 progress inside [start, end). */
 internal fun stageLocalUnit(unit: Float, start: Float, end: Float): Float {
     if (end <= start) return 0f
     return ((unit - start) / (end - start)).coerceIn(0f, 1f)
@@ -131,7 +121,6 @@ internal fun progressColorStage(
     return ProgressColorStage.LATE
 }
 
-/** Maps progress into 0f..1f for continuous blending (incomplete path only uses this). */
 internal fun colorProgressUnit(
     progress: Float,
     completed: Boolean = false,
@@ -146,9 +135,6 @@ internal fun taskColorProgress(task: TodoTask): Float {
     return task.completedStepCount.toFloat() / task.steps.size.toFloat()
 }
 
-/**
- * Goal items use cumulative/target. Items without a goal use today's activity and streak length.
- */
 internal fun accumulateColorProgress(
     item: RecordItem,
     cumulative: Double,
@@ -163,9 +149,6 @@ internal fun accumulateColorProgress(
     return streakQuantityProgress(todayValue = todayValue, streakCurrent = streak?.current ?: 0)
 }
 
-/**
- * Measurement uses latest value within [min, max]. Missing range falls back to idle/early.
- */
 internal fun measurementColorProgress(
     minValue: Double?,
     maxValue: Double?,

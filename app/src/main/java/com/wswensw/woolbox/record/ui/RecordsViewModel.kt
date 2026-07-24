@@ -5,12 +5,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.wswensw.woolbox.record.data.RecordRepository
+import com.wswensw.woolbox.record.data.RecordsUiPreferences
+import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.data.RecordsSnapshot
 import com.wswensw.woolbox.record.model.ItemStreak
 import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
+import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +53,14 @@ data class MeasurementPreviewUiState(
 
 class RecordsViewModel(
     private val repository: RecordRepository,
+    private val uiPreferences: RecordsUiPreferences,
 ) : ViewModel() {
+    val rootTaskPreviewLimit = uiPreferences.rootTaskPreviewLimit
+
+    fun setRootTaskPreviewLimit(limit: RootTaskPreviewLimit) {
+        uiPreferences.setRootTaskPreviewLimit(limit)
+    }
+
     private val selectedDate = MutableStateFlow(LocalDate.now())
     private val error = MutableStateFlow<String?>(null)
     private val isRefreshing = MutableStateFlow(false)
@@ -184,10 +194,10 @@ class RecordsViewModel(
         }
     }
 
-    fun createTask(title: String, stepTitles: List<String>, onResult: (taskId: Long?, error: String?) -> Unit) {
+    fun createTask(title: String, stepTitles: List<String>, horizon: TaskHorizon, onResult: (taskId: Long?, error: String?) -> Unit) {
         viewModelScope.launch {
             runCatching {
-                val taskId = repository.createTask(title, stepTitles)
+                val taskId = repository.createTask(title, stepTitles, horizon)
                 refreshOrThrow()
                 taskId
             }.fold(
@@ -197,11 +207,11 @@ class RecordsViewModel(
         }
     }
 
-    fun updateTask(taskId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+    fun updateTask(taskId: Long, title: String, horizon: TaskHorizon, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessage = "Unable to update task.",
     ) {
-        repository.updateTask(taskId, title)
+        repository.updateTask(taskId, title, horizon)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
@@ -311,7 +321,10 @@ class RecordsViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
-            return RecordsViewModel(RecordRepository(applicationContext)) as T
+            return RecordsViewModel(
+                repository = RecordRepository(applicationContext),
+                uiPreferences = RecordsUiPreferences(applicationContext),
+            ) as T
         }
     }
 }

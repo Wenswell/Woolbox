@@ -15,6 +15,7 @@ import {
   parseOptionalRecordMode,
   parseTaskCreateInput,
   parseTaskInput,
+  parseTaskWriteInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
 
@@ -106,7 +107,7 @@ export function buildApp(options: BuildAppOptions) {
   app.put("/api/tasks/:id", (request) => ({
     task: records.updateTask(
       parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseTaskInput(request.body),
+      parseTaskWriteInput(request.body),
     ),
   }));
 

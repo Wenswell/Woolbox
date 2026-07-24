@@ -57,6 +57,13 @@
       "when": 1784860000000,
       "tag": "0007_todo_step_position",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784860000001,
+      "tag": "0008_todo_task_horizon",
+      "breakpoints": true
     }
   ]
 }
