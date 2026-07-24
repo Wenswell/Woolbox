@@ -108,7 +108,7 @@ Tile 用于不离开目标应用的快速启动。点击后系统面板收起，
 2. 启动默认停在 `Records` 底栏；根列表顺序为 **Tasks → Accumulate → Measurement**（无页头大标题、无 Tasks/Trackers 页签）。
    - 有任务或有目标累计时显示紧凑只读总览：`Tasks` 完成比、`Goals` 达标比。
    - 卡片颜色按进度变化：进行中 primary 逐步加深，完成用固定绿色（与接近完成区分），不按名称随机、不用粉色系。
-3. **Tasks**：按 `Today` / `Later` 分组；Today 默认展开，Later 默认折叠；每组最多显示 Setting 中的预览条数（默认 5），超出进 Manage。区标题旁仅 Manage 入口，不提供根页新建。卡为全宽分段竖条进度（一格一子事项；完成格弹出，未完成格为进度 0 卡底色，格间透明）。已完成仍折叠。点卡打开子事项进度 Sheet，只能勾选子事项。完成子事项有轻触觉；父项刚全部完成时有强触觉与 `{title} done` Snackbar。新建与编辑（标题、子事项增删排序、删除）在 `Manage tasks` → `New task` / `Edit task` 完成；子事项顺序由列表位置决定，可用上下箭头调整。
+3. **Tasks**：按 `Today` / `Later` 分组；Today 默认展开，Later 默认折叠；每组最多显示 Setting 中的预览条数（默认 5），超出进 Manage。区标题旁仅 Manage 入口，不提供根页新建。卡为全宽分段竖条进度（一格一子事项；仅完成格弹出填充，未完成与格间透明露卡面）。已完成仍折叠。点卡打开子事项进度 Sheet，只能勾选子事项。完成子事项有轻触觉；父项刚全部完成时有强触觉与 `{title} done` Snackbar。新建与编辑（标题、子事项增删排序、删除）在 `Manage tasks` → `New task` / `Edit task` 完成；子事项顺序由列表位置决定，可用上下箭头调整。
 4. **Accumulate**：区标题旁仅 Manage；2 列 grid 卡。整卡背景自下而上液面表示进度（波纹动画；系统减动画时静止）。名称弱化，主值突出；日目标：旗帜 + 近 7 日达标饼；周目标：日历图标与 `· week` + 与 7 饼同宽、高同非今日饼的 7 段独立描边进度条（两端 6dp / 切口与填充 1.5dp / 缝 2dp）。色与液面同规则，满额完成绿。点卡打开快速记录 Sheet；新建在 `Manage accumulates` 顶栏加号 → `New accumulate`，色卡进 `Edit accumulate`。
 5. **Measurement**：区标题旁仅 Manage；2 列 grid 显示最新值与时间。点卡打开 24 小时预览 Sheet；新建在 `Manage measurements` 顶栏加号 → `New measurement`，色卡进 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
 6. 累计确认写入时提交当前设备时刻，成功关闭 Sheet 并短时 `Undo`；刚达标时附加 `Goal reached` 文案与强触觉；失败保持 Sheet 并显示错误。
