@@ -249,9 +249,11 @@ internal fun WeeklyGoalProgressBar(
         val inset = stroke / 2f
         val innerW = size.width - stroke
         val innerH = size.height - stroke
-        // Match task segment tiles (4.dp), not a full pill.
-        val radius = 4.dp.toPx().coerceAtMost(innerH / 2f)
-        val corner = CornerRadius(radius, radius)
+        // Outer track more rounded; progress fill flatter/smaller radius.
+        val trackRadius = innerH / 2f
+        val fillRadius = 4.dp.toPx().coerceAtMost(trackRadius)
+        val trackCorner = CornerRadius(trackRadius, trackRadius)
+        val fillCorner = CornerRadius(fillRadius, fillRadius)
 
         // Progress fill + pie-like stroke, then transparent cuts through both.
         val fillW = innerW * animated
@@ -260,14 +262,14 @@ internal fun WeeklyGoalProgressBar(
                 color = fillColor,
                 topLeft = Offset(inset, inset),
                 size = Size(fillW.coerceAtMost(innerW), innerH),
-                cornerRadius = corner,
+                cornerRadius = fillCorner,
             )
         }
         drawRoundRect(
             color = borderColor,
             topLeft = Offset(inset, inset),
             size = Size(innerW, innerH),
-            cornerRadius = corner,
+            cornerRadius = trackCorner,
             style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
         if (segments > 1) {
