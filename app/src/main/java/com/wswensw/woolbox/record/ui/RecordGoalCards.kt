@@ -140,7 +140,8 @@ private fun DrawScope.drawLiquidLayer(
 internal fun RecentDayPies(
     progresses: List<Float>,
     modifier: Modifier = Modifier,
-    size: Dp = 12.dp,
+    daySize: Dp = 12.dp,
+    todaySize: Dp = 15.dp,
     gap: Dp = 3.dp,
 ) {
     require(progresses.size == RECENT_ACTIVE_DAYS)
@@ -156,11 +157,11 @@ internal fun RecentDayPies(
                 completed = progress >= 1f,
             ).accent
             val isToday = index == progresses.lastIndex
-            Canvas(modifier = Modifier.size(size)) {
-                val stroke = 1.4.dp.toPx()
-                val diameter = size.toPx()
+            val diameter = if (isToday) todaySize else daySize
+            Canvas(modifier = Modifier.size(diameter)) {
+                val stroke = (if (isToday) 1.6.dp else 1.4.dp).toPx()
                 val inset = stroke / 2f
-                val arcSize = Size(diameter - stroke, diameter - stroke)
+                val arcSize = Size(this.size.width - stroke, this.size.height - stroke)
                 val topLeft = Offset(inset, inset)
                 val track = fill.copy(alpha = if (isToday) 0.28f else 0.16f)
                 drawArc(
