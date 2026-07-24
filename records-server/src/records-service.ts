@@ -605,8 +605,8 @@ export class RecordsService {
         action: "TASK_STEPS_REORDERED",
         entityType: "TASK",
         entityId: taskId,
-        before: { id: task.id, title: task.title, completedAt: task.completedAt, stepIds: before },
-        after: { id: task.id, title: task.title, completedAt: task.completedAt, stepIds },
+        before: { id: task.id, title: task.title, horizon: task.horizon, completedAt: task.completedAt, stepIds: before },
+        after: { id: task.id, title: task.title, horizon: task.horizon, completedAt: task.completedAt, stepIds },
         createdAt: now,
       });
     });

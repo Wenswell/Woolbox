@@ -28,6 +28,8 @@ const boundColumns = database.prepare("SELECT name FROM pragma_table_info('recor
 if (boundColumns.length !== 2) throw new Error("Measurement bounds migration is missing.");
 const positionColumn = database.prepare("SELECT name FROM pragma_table_info('todo_steps') WHERE name = 'position'").get();
 if (!positionColumn) throw new Error("Todo step position migration is missing.");
+const horizonColumn = database.prepare("SELECT name FROM pragma_table_info('todo_tasks') WHERE name = 'horizon'").get();
+if (!horizonColumn) throw new Error("Todo task horizon migration is missing.");
 console.log("Database schema verified.");
 NODE
 for attempt in {1..20}; do
