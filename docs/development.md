@@ -157,7 +157,6 @@ adb exec-out uiautomator dump /dev/tty
 | Global Copy 没有会话 | 节点是否有效，或 `copy_history.db` 写入是否失败。 | 空快照直接结束；非空快照保存成功后才显示会话。 |
 | OLED 参数未恢复 | `profiles` 是否包含包名，profile 六个字段是否完整。 | 应用 profile 不存在时读取当前默认值。 |
 | 打开 Woolbox 后覆盖层关闭 | 本应用是否成为活动或焦点 `TYPE_APPLICATION` 窗口。 | 这是产品关闭规则；仅覆盖层事件不能触发关闭。 |
-| Records 返回 `iconKey is invalid` | 运行中的服务端是否仍为删除固定图标前的版本。 | 部署当前 `records-server` 并执行 `0003_drop_record_item_icons.sql`；客户端不恢复旧字段。 |
 
 ## 参考旧应用
 

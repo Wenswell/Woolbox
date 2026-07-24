@@ -137,7 +137,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值或 Measurement 最小值/最大值、步进、单位、目标、优先级、归档状态和时间戳。 |
 | `record_windows` | 保存记录项推荐区间的起止分钟；`itemId` 建索引并随父项级联删除。 |
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
-| `todo_tasks（含 horizon）` | 保存待办标题、完成时间、创建/更新时间；按创建时间索引。 |
+| `todo_tasks` | 保存待办标题、horizon（`TODAY`/`LATER`）、完成时间、创建/更新时间；按创建时间与 horizon 索引。 |
 | `todo_steps` | 保存待办的一级子事项、列表位置 `position`、完成时间、创建/更新时间；`taskId` 外键级联删除；列表按 `(taskId, position)` 排序，另保留 `(taskId, createdAt)` 索引。 |
 | `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TASK`、`STEP` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表，删除业务数据后审计历史仍保留。 |
 
@@ -145,7 +145,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、模式、单位和类型联表展示。`GET /api/overview` 接受近 90 天起止本地日期，一次返回活跃记录项、待办、范围内累计流水和每个活跃 Measurement 的最新流水；最新值在数据库侧批量查询。Android 由 overview 原子生成根页快照、今天列表、周目标累计和累计记录连击；点卡按需拉取最近 24 小时流水用于预览。快照只存在当前进程，ViewModel 合并重叠刷新，写后和恢复前台后台刷新；删除接口仅供短时撤销和 PC 批量管理使用。
 
-待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。迁移会清理旧 Measurement 数据和无子事项待办。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
+待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
 
 ## OLED 配置
 

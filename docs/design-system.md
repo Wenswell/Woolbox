@@ -113,7 +113,7 @@ Records 根页：`AppPageHeader`（`Records` + 当日英文日期）后接三分
 | 区域 | 唯一职责 |
 | --- | --- |
 | `Tasks` | `Today`/`Later` 分组；紧凑进度卡；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
-| `Manage tasks` / `Edit task` | 管理页展示全部任务（同色相进度卡 + chevron）；编辑路由负责标题、子事项增删排序和删除。 |
+| `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron）；编辑路由负责标题、子事项增删排序和删除。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
 | `Accumulate` | 2 列 grid，卡高约 `120dp`；目标环 + 主值/连击；点卡打开快速记录 Sheet。 |
