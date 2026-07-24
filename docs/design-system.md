@@ -116,7 +116,7 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 | `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron）；顶栏加号新建；编辑路由负责标题、子事项增删排序和删除。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
-| `Accumulate` | 2 列 grid，卡高约 `120dp`；整卡自下而上液面进度（双层正弦波，可减动画）；弱化名称 + 主值；日目标：旗帜 + 近 7 日达标饼；周目标：日历图标 + `· week` 文案 + 与 7 饼同宽的 7 段独立描边进度（A=6dp / B=1dp，高 12dp、缝 2dp，满额完成绿）；点卡打开快速记录 Sheet。 |
+| `Accumulate` | 2 列 grid，卡高约 `120dp`；整卡自下而上液面进度（双层正弦波，可减动画）；弱化名称 + 主值；日目标：旗帜 + 近 7 日达标饼；周目标：日历图标 + `· week` 文案 + 与 7 饼同宽的 7 段独立描边进度（两端 A=6dp、切口/填充 B=1dp，高 12dp、缝 2dp，满额完成绿）；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；Check 保存。 |
 | `Measurement` | 2 列 grid，卡高约 `120dp`；首字圆 + 主值/时间；点卡打开预览 Sheet。 |
 | `New/Edit measurement` | 固定 `MEASUREMENT` 表单；Check 保存。 |

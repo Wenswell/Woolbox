@@ -221,7 +221,7 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies.
- * Height matches non-today pie (12dp). Outer A=6dp, fill B=1dp, gap 2dp.
+ * Height matches non-today pie (12dp). Bar ends A=6dp; cut sides and fill B=1dp; gap 2dp.
  * Seven independent stroked tiles with transparent gaps.
  */
 @Composable
@@ -245,7 +245,6 @@ internal fun WeeklyGoalProgressBar(
     )
     val borderColor = fillColor.copy(alpha = 0.16f)
     val units = animated * segments
-    val trackShape = RoundedCornerShape(trackRadius)
     val fillShape = RoundedCornerShape(fillRadius)
     Row(
         modifier = modifier
@@ -256,6 +255,15 @@ internal fun WeeklyGoalProgressBar(
     ) {
         repeat(segments) { index ->
             val segFill = (units - index).coerceIn(0f, 1f)
+            // Outer ends keep trackRadius; cut sides use fillRadius (1dp).
+            val start = if (index == 0) trackRadius else fillRadius
+            val end = if (index == segments - 1) trackRadius else fillRadius
+            val trackShape = RoundedCornerShape(
+                topStart = start,
+                topEnd = end,
+                bottomEnd = end,
+                bottomStart = start,
+            )
             Box(
                 modifier = Modifier
                     .weight(1f)
