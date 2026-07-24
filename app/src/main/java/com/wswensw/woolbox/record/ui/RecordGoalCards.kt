@@ -249,7 +249,8 @@ internal fun WeeklyGoalProgressBar(
         val inset = stroke / 2f
         val innerW = size.width - stroke
         val innerH = size.height - stroke
-        val radius = innerH / 2f
+        // Match task segment tiles (4.dp), not a full pill.
+        val radius = 4.dp.toPx().coerceAtMost(innerH / 2f)
         val corner = CornerRadius(radius, radius)
 
         // Progress fill + pie-like stroke, then transparent cuts through both.
