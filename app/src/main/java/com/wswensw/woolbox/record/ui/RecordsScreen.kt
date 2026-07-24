@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -442,7 +443,7 @@ private fun TaskProgressCard(
                 completed = completed,
                 total = total,
                 fillColor = accent.copy(alpha = 0.32f),
-                emptyColor = onContainer.copy(alpha = 0.08f),
+                emptyColor = recordProgressColors(progress = 0f).container,
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),
             )
@@ -588,11 +589,15 @@ private fun AccumulateRailCard(
                 )
                 Spacer(Modifier.weight(1f))
                 if (hasGoal) {
+                    val isWeekGoal = period == GoalPeriod.WEEK
                     val goalText = buildString {
                         append(formatValue(checkNotNull(target)))
                         if (item.unit.isNotBlank()) {
                             append(' ')
                             append(item.unit)
+                        }
+                        if (isWeekGoal) {
+                            append(" · week")
                         }
                     }
                     Row(
@@ -600,8 +605,12 @@ private fun AccumulateRailCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.Flag,
-                            contentDescription = null,
+                            imageVector = if (isWeekGoal) {
+                                Icons.Outlined.DateRange
+                            } else {
+                                Icons.Outlined.Flag
+                            },
+                            contentDescription = if (isWeekGoal) "Weekly goal" else "Daily goal",
                             tint = progressColor,
                             modifier = Modifier.size(14.dp),
                         )
@@ -616,13 +625,26 @@ private fun AccumulateRailCard(
                     }
                 }
                 if (hasGoal) {
-                    RecentDayPies(
-                        progresses = recentDayPieProgress(
-                            dayValues = resolvedDayValues,
-                            goalValue = target,
-                            goalPeriod = period,
-                        ),
-                    )
+                    if (period == GoalPeriod.WEEK) {
+                        WeeklyGoalProgressBar(
+                            progress = fillProgress,
+                            fillColor = if (goalReached) {
+                                progressColor
+                            } else {
+                                progressColor.copy(alpha = 0.85f)
+                            },
+                            emptyColor = recordProgressColors(progress = 0f).container,
+                            reduceMotion = reduceMotion,
+                        )
+                    } else {
+                        RecentDayPies(
+                            progresses = recentDayPieProgress(
+                                dayValues = resolvedDayValues,
+                                goalValue = target,
+                                goalPeriod = period,
+                            ),
+                        )
+                    }
                 }
             }
         }

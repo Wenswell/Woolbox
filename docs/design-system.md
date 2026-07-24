@@ -112,11 +112,11 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Tasks` | `Today`/`Later` 分组；全宽卡，整卡按子事项分段竖条（完成格弹出填充；未完成格固定中性底）；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
+| `Tasks` | `Today`/`Later` 分组；全宽卡，整卡按子事项分段竖条（完成格弹出填充；未完成格用进度 0 / IDLE 卡底色）；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
 | `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron）；顶栏加号新建；编辑路由负责标题、子事项增删排序和删除。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
-| `Accumulate` | 2 列 grid，卡高约 `120dp`；整卡自下而上液面进度（双层正弦波，可减动画）；弱化名称 + 主值；目标行旗帜、近 7 日达标饼状图（扇区=当日进度；满额完成绿）；点卡打开快速记录 Sheet。 |
+| `Accumulate` | 2 列 grid，卡高约 `120dp`；整卡自下而上液面进度（双层正弦波，可减动画）；弱化名称 + 主值；日目标：旗帜 + 近 7 日达标饼；周目标：日历图标 + `· week` 文案 + 底部 7 格长圆条（本周累计映射到 7 格，满额完成绿）；点卡打开快速记录 Sheet。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；Check 保存。 |
 | `Measurement` | 2 列 grid，卡高约 `120dp`；首字圆 + 主值/时间；点卡打开预览 Sheet。 |
 | `New/Edit measurement` | 固定 `MEASUREMENT` 表单；Check 保存。 |
@@ -131,8 +131,8 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 - 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（浅色 wash 约 7%→46%，深色 10%→36%，文案用 `onSurface`）；`LATE` 仍为 primary；**`DONE` 固定成功绿**（深/浅分套，与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用近 7 日有值天数比；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 动作：根页仅 Manage（小 `IconButton`）；新建只在 Manage 顶栏 tonal 加号。完成折叠为普通 `IconButton`。
-- Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日参照，日目标用 goal、周目标用 goal/7；色与卡背景同档：未满 primary 加深，满额完成绿；无记录仅描边；今日 15dp、其余 12dp，今日描边略强）；不重复百分比或 `current / target`。系统关闭动画时液面静止、高度仍可短动画到位。
-- Tasks 分段竖条表达子事项完成比；完成格用进度 accent 填充并 spring 弹出，未完成格固定中性底（不随进度变色、无脉冲）；全完成时完成格与卡色为完成绿。系统关闭动画时弹出瞬时到位。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
+- Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有周目标时底部为 7 格长圆条（本周累计连续映射到 7 格），目标行用日历图标与 `· week` 区分；空格底同 IDLE 卡色；不重复百分比或 `current / target`。系统关闭动画时液面静止、高度仍可短动画到位。
+- Tasks 分段竖条表达子事项完成比；完成格用进度 accent 填充并 spring 弹出；未完成格固定为 `recordProgressColors(0)` 卡底（与 Accumulate 空进度同色，不随当前进度变）；全完成时完成格与卡色为完成绿。系统关闭动画时弹出瞬时到位。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
 - 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。
 - Measurement 与 Accumulate 共用标题/主值字阶，避免横轨内字号分叉。
 

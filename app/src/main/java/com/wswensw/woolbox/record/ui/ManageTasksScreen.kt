@@ -140,7 +140,7 @@ private fun TaskManageCard(
                 completed = completed,
                 total = total,
                 fillColor = accent.copy(alpha = 0.32f),
-                emptyColor = contentColor.copy(alpha = 0.08f),
+                emptyColor = recordProgressColors(progress = 0f).container,
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),
             )

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Icon
@@ -41,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -140,7 +142,7 @@ private fun DrawScope.drawLiquidLayer(
 /**
  * Full-height segmented progress for task cards.
  * One cell per subtask; only completed cells change (pop fill).
- * Empty cells stay a fixed neutral track and never pulse or recolor.
+ * Empty cells use the idle (progress 0) container color and never recolor with progress.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -193,6 +195,57 @@ internal fun SegmentedProgressFill(
     }
 }
 
+
+/**
+ * Weekly goal track: one long bar split into 7 equal rounded cells.
+ * Continuous week progress maps left→right across cells; full = done green.
+ */
+@Composable
+internal fun WeeklyGoalProgressBar(
+    progress: Float,
+    fillColor: Color,
+    emptyColor: Color,
+    modifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
+    segments: Int = RECENT_ACTIVE_DAYS,
+    height: Dp = 8.dp,
+    gap: Dp = 2.dp,
+) {
+    require(segments > 0)
+    val target = progress.coerceIn(0f, 1f)
+    val animated by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "WeeklyGoalProgressBar",
+    )
+    val units = animated * segments
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+    ) {
+        repeat(segments) { index ->
+            val segmentFill = (units - index).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(emptyColor),
+            ) {
+                if (segmentFill > 0.001f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(segmentFill)
+                            .background(fillColor),
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun RecentDayPies(
