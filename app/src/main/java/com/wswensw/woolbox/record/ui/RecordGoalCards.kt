@@ -218,8 +218,9 @@ internal fun recentDaysRowWidth(
 }
 
 /**
- * Weekly goal track in the same footprint as the 7-day pies:
- * pie-like stroke border, transparent body, continuous fill, transparent segment cuts.
+ * Weekly goal track in the same footprint as the 7-day pies.
+ * Outer stroke uses a larger radius; progress fill and segment cuts use a
+ * smaller/flatter radius. Gaps between segments stay transparent.
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
@@ -242,29 +243,40 @@ internal fun WeeklyGoalProgressBar(
     Canvas(
         modifier = modifier
             .width(recentDaysRowWidth())
-            .height(height)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+            .height(height),
     ) {
         val stroke = 1.4.dp.toPx()
         val inset = stroke / 2f
         val innerW = size.width - stroke
         val innerH = size.height - stroke
-        // Outer track more rounded; progress fill flatter/smaller radius.
         val trackRadius = innerH / 2f
-        val fillRadius = 4.dp.toPx().coerceAtMost(trackRadius)
+        val segmentRadius = 4.dp.toPx().coerceAtMost(trackRadius * 0.55f)
         val trackCorner = CornerRadius(trackRadius, trackRadius)
-        val fillCorner = CornerRadius(fillRadius, fillRadius)
+        val segmentCorner = CornerRadius(segmentRadius, segmentRadius)
+        val gap = cutWidth.toPx()
+        val totalGap = gap * (segments - 1).coerceAtLeast(0)
+        val segW = if (segments > 0) (innerW - totalGap) / segments else innerW
+        val units = animated * segments
 
-        // Progress fill + pie-like stroke, then transparent cuts through both.
-        val fillW = innerW * animated
-        if (fillW > 0.001f) {
-            drawRoundRect(
-                color = fillColor,
-                topLeft = Offset(inset, inset),
-                size = Size(fillW.coerceAtMost(innerW), innerH),
-                cornerRadius = fillCorner,
-            )
+        // Segment fills with smaller radius; undrawn gaps = transparent cuts.
+        var x = inset
+        for (index in 0 until segments) {
+            val segFill = (units - index).coerceIn(0f, 1f)
+            if (segFill > 0.001f) {
+                val w = (segW * segFill).coerceAtLeast(0f)
+                if (w > 0.001f) {
+                    drawRoundRect(
+                        color = fillColor,
+                        topLeft = Offset(x, inset),
+                        size = Size(w.coerceAtMost(segW), innerH),
+                        cornerRadius = segmentCorner,
+                    )
+                }
+            }
+            x += segW + gap
         }
+
+        // Outer frame keeps the larger overall radius.
         drawRoundRect(
             color = borderColor,
             topLeft = Offset(inset, inset),
@@ -272,18 +284,6 @@ internal fun WeeklyGoalProgressBar(
             cornerRadius = trackCorner,
             style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
-        if (segments > 1) {
-            val cut = cutWidth.toPx()
-            val step = size.width / segments
-            for (index in 1 until segments) {
-                drawRect(
-                    color = Color.Black,
-                    topLeft = Offset(step * index - cut / 2f, 0f),
-                    size = Size(cut, size.height),
-                    blendMode = BlendMode.Clear,
-                )
-            }
-        }
     }
 }
 
