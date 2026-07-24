@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -219,8 +220,8 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies.
- * Outer stroke uses a larger radius; progress fill and segment cuts use a
- * smaller/flatter radius. Gaps between segments stay transparent.
+ * Tasks-like radii: outer segment frame A=8dp, progress fill B=4dp.
+ * Seven independent stroked tiles with transparent gaps (no continuous pill border).
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
@@ -229,8 +230,10 @@ internal fun WeeklyGoalProgressBar(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
-    height: Dp = 12.dp,
-    cutWidth: Dp = 2.dp,
+    height: Dp = 18.dp,
+    gap: Dp = 3.dp,
+    trackRadius: Dp = 8.dp,
+    fillRadius: Dp = 4.dp,
 ) {
     require(segments > 0)
     val target = progress.coerceIn(0f, 1f)
@@ -240,50 +243,36 @@ internal fun WeeklyGoalProgressBar(
         label = "WeeklyGoalProgressBar",
     )
     val borderColor = fillColor.copy(alpha = 0.16f)
-    Canvas(
+    val units = animated * segments
+    val trackShape = RoundedCornerShape(trackRadius)
+    val fillShape = RoundedCornerShape(fillRadius)
+    Row(
         modifier = modifier
             .width(recentDaysRowWidth())
             .height(height),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        val stroke = 1.4.dp.toPx()
-        val inset = stroke / 2f
-        val innerW = size.width - stroke
-        val innerH = size.height - stroke
-        val trackRadius = innerH / 2f
-        val segmentRadius = 4.dp.toPx().coerceAtMost(trackRadius * 0.55f)
-        val trackCorner = CornerRadius(trackRadius, trackRadius)
-        val segmentCorner = CornerRadius(segmentRadius, segmentRadius)
-        val gap = cutWidth.toPx()
-        val totalGap = gap * (segments - 1).coerceAtLeast(0)
-        val segW = if (segments > 0) (innerW - totalGap) / segments else innerW
-        val units = animated * segments
-
-        // Segment fills with smaller radius; undrawn gaps = transparent cuts.
-        var x = inset
-        for (index in 0 until segments) {
+        repeat(segments) { index ->
             val segFill = (units - index).coerceIn(0f, 1f)
-            if (segFill > 0.001f) {
-                val w = (segW * segFill).coerceAtLeast(0f)
-                if (w > 0.001f) {
-                    drawRoundRect(
-                        color = fillColor,
-                        topLeft = Offset(x, inset),
-                        size = Size(w.coerceAtMost(segW), innerH),
-                        cornerRadius = segmentCorner,
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .border(width = 1.4.dp, color = borderColor, shape = trackShape)
+                    .clip(trackShape),
+            ) {
+                if (segFill > 0.001f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(segFill)
+                            .clip(fillShape)
+                            .background(fillColor),
                     )
                 }
             }
-            x += segW + gap
         }
-
-        // Outer frame keeps the larger overall radius.
-        drawRoundRect(
-            color = borderColor,
-            topLeft = Offset(inset, inset),
-            size = Size(innerW, innerH),
-            cornerRadius = trackCorner,
-            style = Stroke(width = stroke, cap = StrokeCap.Round),
-        )
     }
 }
 
