@@ -628,12 +628,7 @@ private fun AccumulateRailCard(
                     if (period == GoalPeriod.WEEK) {
                         WeeklyGoalProgressBar(
                             progress = fillProgress,
-                            fillColor = if (goalReached) {
-                                progressColor
-                            } else {
-                                progressColor.copy(alpha = 0.85f)
-                            },
-                            emptyColor = recordProgressColors(progress = 0f).container,
+                            fillColor = progressColor,
                             reduceMotion = reduceMotion,
                         )
                     } else {

@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -220,18 +221,16 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies:
- * one continuous rounded bar with transparent cuts (BlendMode.Clear),
- * not painted divider lines and not separate short pills.
+ * pie-like stroke border, transparent body, continuous fill, transparent segment cuts.
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
     progress: Float,
     fillColor: Color,
-    emptyColor: Color,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
-    height: Dp = 10.dp,
+    height: Dp = 12.dp,
     cutWidth: Dp = 2.dp,
 ) {
     require(segments > 0)
@@ -241,21 +240,37 @@ internal fun WeeklyGoalProgressBar(
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
         label = "WeeklyGoalProgressBar",
     )
+    val borderColor = fillColor.copy(alpha = 0.16f)
     Canvas(
         modifier = modifier
             .width(recentDaysRowWidth())
             .height(height)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .clip(RoundedCornerShape(percent = 50)),
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
     ) {
-        drawRect(color = emptyColor)
-        val fillW = size.width * animated
-        if (fillW > 0f) {
-            drawRect(
+        val stroke = 1.4.dp.toPx()
+        val inset = stroke / 2f
+        val innerW = size.width - stroke
+        val innerH = size.height - stroke
+        val radius = innerH / 2f
+        val corner = CornerRadius(radius, radius)
+
+        // Progress fill + pie-like stroke, then transparent cuts through both.
+        val fillW = innerW * animated
+        if (fillW > 0.001f) {
+            drawRoundRect(
                 color = fillColor,
-                size = Size(fillW, size.height),
+                topLeft = Offset(inset, inset),
+                size = Size(fillW.coerceAtMost(innerW), innerH),
+                cornerRadius = corner,
             )
         }
+        drawRoundRect(
+            color = borderColor,
+            topLeft = Offset(inset, inset),
+            size = Size(innerW, innerH),
+            cornerRadius = corner,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
         if (segments > 1) {
             val cut = cutWidth.toPx()
             val step = size.width / segments
