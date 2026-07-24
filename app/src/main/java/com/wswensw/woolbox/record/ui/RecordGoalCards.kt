@@ -144,9 +144,8 @@ private fun DrawScope.drawLiquidLayer(
 
 /**
  * Full-height segmented progress for task cards.
- * One cell per subtask; only completed cells change (pop fill).
- * Gaps are true transparent cuts (nothing drawn) so the card shows through,
- * not painted divider lines. Empty cells use idle container color only inside tiles.
+ * Idle [emptyColor] is one continuous base; only completed tiles paint [fillColor].
+ * Gaps draw nothing, so cuts are the same idle base (not the card's progress wash).
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -160,47 +159,46 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    Row(
-        modifier = modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(gap),
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(emptyColor),
     ) {
-        repeat(safeTotal) { index ->
-            val filled = index < safeCompleted
-            val pop by animateFloatAsState(
-                targetValue = if (filled) 1f else 0f,
-                animationSpec = if (reduceMotion) {
-                    tween(0)
-                } else {
-                    spring(dampingRatio = 0.72f, stiffness = 420f)
-                },
-                label = "SegmentPop-$index",
-            )
-            // Tile only; spacedBy gap stays undrawn → transparent cut.
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp)),
-            ) {
-                if (pop < 0.999f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(emptyColor),
-                    )
-                }
-                if (pop > 0.001f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                val s = 0.86f + 0.14f * pop
-                                scaleX = s
-                                scaleY = s
-                                alpha = pop
-                            }
-                            .background(fillColor),
-                    )
+        if (safeTotal == 0) return@Box
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+        ) {
+            repeat(safeTotal) { index ->
+                val filled = index < safeCompleted
+                val pop by animateFloatAsState(
+                    targetValue = if (filled) 1f else 0f,
+                    animationSpec = if (reduceMotion) {
+                        tween(0)
+                    } else {
+                        spring(dampingRatio = 0.72f, stiffness = 420f)
+                    },
+                    label = "SegmentPop-$index",
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(4.dp)),
+                ) {
+                    if (pop > 0.001f) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    val s = 0.86f + 0.14f * pop
+                                    scaleX = s
+                                    scaleY = s
+                                    alpha = pop
+                                }
+                                .background(fillColor),
+                        )
+                    }
                 }
             }
         }

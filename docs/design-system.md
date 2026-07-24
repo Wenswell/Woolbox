@@ -132,7 +132,7 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 动作：根页仅 Manage（小 `IconButton`）；新建只在 Manage 顶栏 tonal 加号。完成折叠为普通 `IconButton`。
 - Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有周目标时底部为与近 7 日饼行同宽的一体长圆条：描边同圆饼 track（accent 16%）、体内透明、进度实心填充、段间透明镂空切缝；目标行用日历图标与 `· week` 区分；不重复百分比或 `current / target`。系统关闭动画时液面静止、高度仍可短动画到位。
-- Tasks 分段竖条表达子事项完成比；格间为透明切开（不画固定色分割线，露出下层卡面）；完成格 spring 弹出填充，未完成格为 `recordProgressColors(0)` 卡底；全完成时完成格与卡色为完成绿。系统关闭动画时弹出瞬时到位。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
+- Tasks 分段竖条表达子事项完成比；底层整面为 `recordProgressColors(0)` IDLE 底，仅完成格绘制填充；格间不绘制，切开处仍是 IDLE 底（不露出进度洗卡色当分割线）；完成格 spring 弹出；全完成时完成格与强调色为完成绿。系统关闭动画时弹出瞬时到位。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
 - 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。
 - Measurement 与 Accumulate 共用标题/主值字阶，避免横轨内字号分叉。
 
