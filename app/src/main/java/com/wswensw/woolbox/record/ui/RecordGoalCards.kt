@@ -221,7 +221,7 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies.
- * Height matches today pie (15dp). Outer A=4dp, progress fill B=2dp.
+ * Height matches non-today pie (12dp). Outer A=4dp, fill B=2dp, gap 1.5dp.
  * Seven independent stroked tiles with transparent gaps.
  */
 @Composable
@@ -231,8 +231,8 @@ internal fun WeeklyGoalProgressBar(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
-    height: Dp = 15.dp,
-    gap: Dp = 3.dp,
+    height: Dp = 12.dp,
+    gap: Dp = 1.5.dp,
     trackRadius: Dp = 4.dp,
     fillRadius: Dp = 2.dp,
 ) {
