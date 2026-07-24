@@ -18,7 +18,7 @@ import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.parseTaskHorizon
 import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
 import com.wswensw.woolbox.record.model.goalValues
-import com.wswensw.woolbox.record.model.itemRecentActiveDays
+import com.wswensw.woolbox.record.model.itemRecentDayValues
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.record.model.validated
@@ -58,7 +58,7 @@ data class RecordsSnapshot(
     val latestEntries: Map<Long, RecordEntry>,
     val tasks: List<TodoTask>,
     val goalValues: Map<Long, Double>,
-    val recentDays: Map<Long, List<Boolean>>,
+    val recentDayValues: Map<Long, List<Double>>,
 )
 
 class RecordRepository(context: Context) {
@@ -94,7 +94,7 @@ class RecordRepository(context: Context) {
             .associateBy(RecordEntry::itemId),
             tasks = overview.getJSONArray("tasks").mapObjects(::parseTask),
             goalValues = goalValues(activeItems, date, todayEntries, weekEntries),
-            recentDays = itemRecentActiveDays(
+            recentDayValues = itemRecentDayValues(
                 itemIds = activeItems
                     .filter { it.mode == RecordMode.ACCUMULATE }
                     .map(RecordItem::id),

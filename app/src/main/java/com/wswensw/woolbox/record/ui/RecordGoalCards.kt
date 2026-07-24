@@ -138,27 +138,31 @@ private fun DrawScope.drawLiquidLayer(
 
 @Composable
 internal fun RecentDayPies(
-    recentDays: List<Boolean>,
-    accent: Color,
+    progresses: List<Float>,
     modifier: Modifier = Modifier,
     size: Dp = 12.dp,
     gap: Dp = 3.dp,
 ) {
-    require(recentDays.size == RECENT_ACTIVE_DAYS)
+    require(progresses.size == RECENT_ACTIVE_DAYS)
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        recentDays.forEachIndexed { index, active ->
-            val isToday = index == recentDays.lastIndex
+        progresses.forEachIndexed { index, raw ->
+            val progress = raw.coerceIn(0f, 1f)
+            val fill = recordProgressColors(
+                progress = progress,
+                completed = progress >= 1f,
+            ).accent
+            val isToday = index == progresses.lastIndex
             Canvas(modifier = Modifier.size(size)) {
                 val stroke = 1.4.dp.toPx()
                 val diameter = size.toPx()
                 val inset = stroke / 2f
                 val arcSize = Size(diameter - stroke, diameter - stroke)
                 val topLeft = Offset(inset, inset)
-                val track = accent.copy(alpha = if (isToday) 0.28f else 0.16f)
+                val track = fill.copy(alpha = if (isToday) 0.28f else 0.16f)
                 drawArc(
                     color = track,
                     startAngle = -90f,
@@ -168,11 +172,11 @@ internal fun RecentDayPies(
                     size = arcSize,
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
-                if (active) {
+                if (progress > 0f) {
                     drawArc(
-                        color = accent,
+                        color = fill,
                         startAngle = -90f,
-                        sweepAngle = 360f,
+                        sweepAngle = 360f * progress,
                         useCenter = true,
                         topLeft = topLeft,
                         size = arcSize,

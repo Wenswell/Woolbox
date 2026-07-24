@@ -34,7 +34,7 @@ data class RecordsUiState(
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val tasks: List<TodoTask> = emptyList(),
     val goalValues: Map<Long, Double> = emptyMap(),
-    val recentDays: Map<Long, List<Boolean>> = emptyMap(),
+    val recentDayValues: Map<Long, List<Double>> = emptyMap(),
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
@@ -126,7 +126,7 @@ class RecordsViewModel(
             latestEntries = latestEntries,
             tasks = tasks,
             goalValues = goalValues,
-            recentDays = recentDays,
+            recentDayValues = recentDayValues,
         )
 
     fun configureCredentials(username: String, password: String, onResult: (String?) -> Unit) {

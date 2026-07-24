@@ -322,11 +322,11 @@ class RecordsScreenTest {
     }
 
     @Test
-    fun recentActivityProgressUsesActiveDayRatio() {
-        assertEquals(0f, recentActivityProgress(listOf(false, false, false, false, false, false, false)), 0f)
-        assertEquals(1f / 7f, recentActivityProgress(listOf(false, false, false, false, false, false, true)), 0f)
-        assertEquals(3f / 7f, recentActivityProgress(listOf(true, false, true, false, false, false, true)), 0f)
-        assertEquals(1f, recentActivityProgress(listOf(true, true, true, true, true, true, true)), 0f)
+    fun recentActivityProgressUsesDaysWithValue() {
+        assertEquals(0f, recentActivityProgress(listOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), 0f)
+        assertEquals(1f / 7f, recentActivityProgress(listOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0)), 0f)
+        assertEquals(3f / 7f, recentActivityProgress(listOf(1.0, 0.0, 2.0, 0.0, 0.0, 0.0, 4.0)), 0f)
+        assertEquals(1f, recentActivityProgress(listOf(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)), 0f)
     }
 
     @Test

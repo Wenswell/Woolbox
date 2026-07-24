@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.wswensw.woolbox.record.model.emptyRecentDays
+import com.wswensw.woolbox.record.model.emptyRecentDayValues
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.TodoTask
 import java.text.BreakIterator
@@ -138,14 +138,14 @@ internal fun taskColorProgress(task: TodoTask): Float {
 internal fun accumulateColorProgress(
     item: RecordItem,
     cumulative: Double,
-    recentDays: List<Boolean>?,
+    recentDayValues: List<Double>?,
 ): Float {
     val target = item.goalValue
     val period = item.goalPeriod
     if (target != null && target > 0.0 && period != null) {
         return goalProgressRatio(cumulative, target).toFloat()
     }
-    return recentActivityProgress(recentDays ?: emptyRecentDays())
+    return recentActivityProgress(recentDayValues ?: emptyRecentDayValues())
 }
 
 internal fun measurementColorProgress(
@@ -158,9 +158,10 @@ internal fun measurementColorProgress(
     return ((latestValue - minValue) / (maxValue - minValue)).toFloat().coerceIn(0f, 1f)
 }
 
-internal fun recentActivityProgress(recentDays: List<Boolean>): Float {
-    if (recentDays.isEmpty()) return 0f
-    return recentDays.count { it }.toFloat() / recentDays.size.toFloat()
+/** No-goal liquid fill: share of recent days with any value. */
+internal fun recentActivityProgress(recentDayValues: List<Double>): Float {
+    if (recentDayValues.isEmpty()) return 0f
+    return recentDayValues.count { it > 0.0 }.toFloat() / recentDayValues.size.toFloat()
 }
 
 @Composable

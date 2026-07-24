@@ -52,7 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.GoalPeriod
-import com.wswensw.woolbox.record.model.emptyRecentDays
+import com.wswensw.woolbox.record.model.emptyRecentDayValues
+import com.wswensw.woolbox.record.model.recentDayPieProgress
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
@@ -250,7 +251,7 @@ fun RecordsScreen(
                                     item = item,
                                     todayValue = todayValues[item.id] ?: 0.0,
                                     goalCumulative = state.goalValues[item.id],
-                                    recentDays = state.recentDays[item.id],
+                                    recentDayValues = state.recentDayValues[item.id],
                                     onClick = { onRecordItem(item) },
                                     modifier = Modifier.weight(1f),
                                 )
@@ -530,7 +531,7 @@ private fun AccumulateRailCard(
     item: RecordItem,
     todayValue: Double,
     goalCumulative: Double?,
-    recentDays: List<Boolean>?,
+    recentDayValues: List<Double>?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -538,11 +539,11 @@ private fun AccumulateRailCard(
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0.0 && period != null
     val cumulative = goalCumulative ?: todayValue
-    val resolvedRecentDays = recentDays ?: emptyRecentDays()
+    val resolvedDayValues = recentDayValues ?: emptyRecentDayValues()
     val colorProgress = accumulateColorProgress(
         item = item,
         cumulative = cumulative,
-        recentDays = resolvedRecentDays,
+        recentDayValues = resolvedDayValues,
     )
     val fillProgress = if (hasGoal) {
         goalProgressFraction(cumulative, checkNotNull(target))
@@ -635,10 +636,15 @@ private fun AccumulateRailCard(
                         )
                     }
                 }
-                RecentDayPies(
-                    recentDays = resolvedRecentDays,
-                    accent = progressColor,
-                )
+                if (hasGoal) {
+                    RecentDayPies(
+                        progresses = recentDayPieProgress(
+                            dayValues = resolvedDayValues,
+                            goalValue = target,
+                            goalPeriod = period,
+                        ),
+                    )
+                }
             }
         }
     }
