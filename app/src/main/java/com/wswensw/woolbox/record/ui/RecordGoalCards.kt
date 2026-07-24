@@ -145,8 +145,8 @@ private fun DrawScope.drawLiquidLayer(
 
 /**
  * Full-height segmented progress for task cards.
- * Idle [emptyColor] is one continuous base; only completed tiles paint [fillColor].
- * Gaps draw nothing, so cuts are the same idle base (not the card's progress wash).
+ * Completed tiles paint [fillColor]; incomplete tiles paint [emptyColor].
+ * Gaps draw nothing (true transparent cuts to the card beneath), never a shared empty wash.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -160,46 +160,47 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(emptyColor),
+    Row(
+        modifier = modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
-        if (safeTotal == 0) return@Box
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(gap),
-        ) {
-            repeat(safeTotal) { index ->
-                val filled = index < safeCompleted
-                val pop by animateFloatAsState(
-                    targetValue = if (filled) 1f else 0f,
-                    animationSpec = if (reduceMotion) {
-                        tween(0)
-                    } else {
-                        spring(dampingRatio = 0.72f, stiffness = 420f)
-                    },
-                    label = "SegmentPop-$index",
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(4.dp)),
-                ) {
-                    if (pop > 0.001f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    val s = 0.86f + 0.14f * pop
-                                    scaleX = s
-                                    scaleY = s
-                                    alpha = pop
-                                }
-                                .background(fillColor),
-                        )
-                    }
+        repeat(safeTotal) { index ->
+            val filled = index < safeCompleted
+            val pop by animateFloatAsState(
+                targetValue = if (filled) 1f else 0f,
+                animationSpec = if (reduceMotion) {
+                    tween(0)
+                } else {
+                    spring(dampingRatio = 0.72f, stiffness = 420f)
+                },
+                label = "SegmentPop-$index",
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(4.dp)),
+            ) {
+                // Incomplete tile only — does not extend into the gap.
+                if (pop < 0.999f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(emptyColor),
+                    )
+                }
+                if (pop > 0.001f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val s = 0.86f + 0.14f * pop
+                                scaleX = s
+                                scaleY = s
+                                alpha = pop
+                            }
+                            .background(fillColor),
+                    )
                 }
             }
         }
@@ -220,8 +221,8 @@ internal fun recentDaysRowWidth(
 
 /**
  * Weekly goal track in the same footprint as the 7-day pies.
- * Tasks-like radii: outer segment frame A=8dp, progress fill B=4dp.
- * Seven independent stroked tiles with transparent gaps (no continuous pill border).
+ * Height matches today pie (15dp). Outer A=4dp, progress fill B=2dp.
+ * Seven independent stroked tiles with transparent gaps.
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
@@ -230,10 +231,10 @@ internal fun WeeklyGoalProgressBar(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
-    height: Dp = 18.dp,
+    height: Dp = 15.dp,
     gap: Dp = 3.dp,
-    trackRadius: Dp = 8.dp,
-    fillRadius: Dp = 4.dp,
+    trackRadius: Dp = 4.dp,
+    fillRadius: Dp = 2.dp,
 ) {
     require(segments > 0)
     val target = progress.coerceIn(0f, 1f)
