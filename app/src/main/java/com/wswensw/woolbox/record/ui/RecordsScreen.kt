@@ -541,15 +541,20 @@ private fun AccumulateRailCard(
     val period = item.goalPeriod
     val hasGoal = target != null && target > 0.0 && period != null
     val cumulative = goalCumulative ?: todayValue
-    val progress = if (hasGoal) goalProgressRatio(cumulative, checkNotNull(target)).toFloat() else 0f
+    val colorProgress = accumulateColorProgress(
+        item = item,
+        cumulative = cumulative,
+        todayValue = todayValue,
+        streak = streak,
+    )
+    val fillProgress = if (hasGoal) {
+        goalProgressFraction(cumulative, checkNotNull(target))
+    } else {
+        colorProgress.coerceIn(0f, 1f)
+    }
     val goalReached = hasGoal && cumulative >= checkNotNull(target)
     val colors = recordProgressColors(
-        progress = accumulateColorProgress(
-            item = item,
-            cumulative = cumulative,
-            todayValue = todayValue,
-            streak = streak,
-        ),
+        progress = colorProgress,
         completed = goalReached,
     )
     val progressColor by animateColorAsState(
@@ -564,6 +569,7 @@ private fun AccumulateRailCard(
         targetValue = colors.onContainer,
         label = "AccumulateRailOnContainer",
     )
+    val reduceMotion = prefersReducedMotion()
 
     Card(
         onClick = onClick,
@@ -575,23 +581,17 @@ private fun AccumulateRailCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DailyGoalMedallion(
-                item = item,
-                progress = progress,
-                reached = goalReached,
-                progressColor = progressColor,
-                size = 48.dp,
-                colors = colors,
+        Box(modifier = Modifier.fillMaxSize()) {
+            LiquidProgressFill(
+                progress = fillProgress,
+                fillColor = progressColor,
+                reduceMotion = reduceMotion,
+                modifier = Modifier.fillMaxSize(),
             )
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
@@ -609,6 +609,7 @@ private fun AccumulateRailCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.weight(1f))
                 if (hasGoal) {
                     val goalText = buildString {
                         append(formatValue(checkNotNull(target)))

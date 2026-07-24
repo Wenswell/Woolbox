@@ -1,7 +1,12 @@
 package com.wswensw.woolbox.record.ui
 
 import android.provider.Settings
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -34,7 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +50,89 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordItem
+import kotlin.math.PI
 import kotlin.math.roundToInt
+import kotlin.math.sin
+
+
+/**
+ * Bottom-up liquid progress fill for accumulate cards.
+ * Dual sine waves animate only when motion is enabled and progress is partial.
+ */
+@Composable
+internal fun LiquidProgressFill(
+    progress: Float,
+    fillColor: Color,
+    modifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
+) {
+    val target = progress.coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "LiquidProgressFillLevel",
+    )
+    val transition = rememberInfiniteTransition(label = "LiquidProgressWave")
+    val animatedPhase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "LiquidProgressPhase",
+    )
+    val waveActive = !reduceMotion && target > 0.001f && target < 0.999f
+    val phase = if (waveActive) animatedPhase else 0f
+    val densityAmp = 3.dp
+    val densityAmpBack = 2.dp
+    Canvas(modifier = modifier.fillMaxSize()) {
+        if (animatedProgress <= 0.001f) return@Canvas
+        val frontAlpha = if (animatedProgress >= 0.999f) 0.34f else 0.26f
+        val backAlpha = if (animatedProgress >= 0.999f) 0.18f else 0.14f
+        val amp = if (!waveActive) 0f else densityAmp.toPx()
+        val ampBack = if (!waveActive) 0f else densityAmpBack.toPx()
+        drawLiquidLayer(
+            progress = animatedProgress,
+            phase = phase + 1.1f,
+            amplitude = ampBack,
+            waves = 1.15f,
+            color = fillColor.copy(alpha = backAlpha),
+        )
+        drawLiquidLayer(
+            progress = animatedProgress,
+            phase = phase,
+            amplitude = amp,
+            waves = 1.0f,
+            color = fillColor.copy(alpha = frontAlpha),
+        )
+    }
+}
+
+private fun DrawScope.drawLiquidLayer(
+    progress: Float,
+    phase: Float,
+    amplitude: Float,
+    waves: Float,
+    color: Color,
+) {
+    val width = size.width
+    val height = size.height
+    if (width <= 0f || height <= 0f) return
+    val level = height * (1f - progress.coerceIn(0f, 1f))
+    val path = Path()
+    path.moveTo(0f, height)
+    path.lineTo(0f, level)
+    val steps = (width / 3f).toInt().coerceIn(24, 96)
+    for (i in 0..steps) {
+        val x = width * i / steps
+        val y = level + amplitude * sin((2.0 * PI * waves * (x / width) + phase)).toFloat()
+        path.lineTo(x, y)
+    }
+    path.lineTo(width, height)
+    path.close()
+    drawPath(path = path, color = color)
+}
 
 @Composable
 internal fun DailyGoalMedallion(
