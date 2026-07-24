@@ -196,9 +196,20 @@ internal fun SegmentedProgressFill(
 }
 
 
+/** Width of the recent-day pie row: 6×day + today + 6×gap. */
+internal fun recentDaysRowWidth(
+    daySize: Dp = 12.dp,
+    todaySize: Dp = 15.dp,
+    gap: Dp = 3.dp,
+    days: Int = RECENT_ACTIVE_DAYS,
+): Dp {
+    require(days > 0)
+    return daySize * (days - 1) + todaySize + gap * (days - 1)
+}
+
 /**
- * Weekly goal track: one long bar split into 7 equal rounded cells.
- * Continuous week progress maps left→right across cells; full = done green.
+ * Weekly goal track in the same footprint as the 7-day pies:
+ * one continuous rounded bar, cut into equal segments (not 7 separate pills).
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
@@ -208,8 +219,8 @@ internal fun WeeklyGoalProgressBar(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
-    height: Dp = 8.dp,
-    gap: Dp = 2.dp,
+    height: Dp = 10.dp,
+    cutWidth: Dp = 1.5.dp,
 ) {
     require(segments > 0)
     val target = progress.coerceIn(0f, 1f)
@@ -218,29 +229,35 @@ internal fun WeeklyGoalProgressBar(
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
         label = "WeeklyGoalProgressBar",
     )
-    val units = animated * segments
-    Row(
+    Box(
         modifier = modifier
-            .fillMaxWidth()
-            .height(height),
-        horizontalArrangement = Arrangement.spacedBy(gap),
+            .width(recentDaysRowWidth())
+            .height(height)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(emptyColor),
     ) {
-        repeat(segments) { index ->
-            val segmentFill = (units - index).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(emptyColor),
-            ) {
-                if (segmentFill > 0.001f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(segmentFill)
-                            .background(fillColor),
-                    )
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(animated)
+                .background(fillColor),
+        )
+        Row(modifier = Modifier.fillMaxSize()) {
+            repeat(segments) { index ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    if (index < segments - 1) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .width(cutWidth)
+                                .fillMaxHeight()
+                                .background(emptyColor),
+                        )
+                    }
                 }
             }
         }
