@@ -441,7 +441,8 @@ private fun TaskProgressCard(
             SegmentedProgressFill(
                 completed = completed,
                 total = total,
-                fillColor = accent,
+                fillColor = accent.copy(alpha = 0.32f),
+                emptyColor = onContainer.copy(alpha = 0.08f),
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),
             )

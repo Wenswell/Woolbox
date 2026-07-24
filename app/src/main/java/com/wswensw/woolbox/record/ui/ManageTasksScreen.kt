@@ -139,7 +139,8 @@ private fun TaskManageCard(
             SegmentedProgressFill(
                 completed = completed,
                 total = total,
-                fillColor = accent,
+                fillColor = accent.copy(alpha = 0.32f),
+                emptyColor = contentColor.copy(alpha = 0.08f),
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),
             )

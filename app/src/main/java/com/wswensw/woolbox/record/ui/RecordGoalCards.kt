@@ -139,41 +139,27 @@ private fun DrawScope.drawLiquidLayer(
 
 /**
  * Full-height segmented progress for task cards.
- * One cell per subtask; completed cells pop in, next cell soft-pulses while partial.
+ * One cell per subtask; only completed cells change (pop fill).
+ * Empty cells stay a fixed neutral track and never pulse or recolor.
  */
 @Composable
 internal fun SegmentedProgressFill(
     completed: Int,
     total: Int,
     fillColor: Color,
+    emptyColor: Color,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     gap: Dp = 2.dp,
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    val allDone = safeTotal > 0 && safeCompleted >= safeTotal
-    val fillAlpha = if (allDone) 0.34f else 0.28f
-    val trackAlpha = 0.10f
-    val transition = rememberInfiniteTransition(label = "SegmentedProgressPulse")
-    val pulseAlpha by transition.animateFloat(
-        initialValue = 0.10f,
-        targetValue = 0.20f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "SegmentedProgressPulseAlpha",
-    )
-    val pulse = if (!reduceMotion && safeCompleted < safeTotal) pulseAlpha else trackAlpha
-
     Row(
         modifier = modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
         repeat(safeTotal) { index ->
             val filled = index < safeCompleted
-            val isNext = index == safeCompleted && !allDone
             val pop by animateFloatAsState(
                 targetValue = if (filled) 1f else 0f,
                 animationSpec = if (reduceMotion) {
@@ -187,7 +173,7 @@ internal fun SegmentedProgressFill(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .background(fillColor.copy(alpha = if (isNext) pulse else trackAlpha)),
+                    .background(emptyColor),
             ) {
                 if (pop > 0.001f) {
                     Box(
@@ -199,7 +185,7 @@ internal fun SegmentedProgressFill(
                                 scaleY = s
                                 alpha = pop
                             }
-                            .background(fillColor.copy(alpha = fillAlpha)),
+                            .background(fillColor),
                     )
                 }
             }
