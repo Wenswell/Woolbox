@@ -10,12 +10,14 @@ import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
 import com.wswensw.woolbox.tool.service.ToolServiceController
 import com.wswensw.woolbox.ui.WoolboxApp
+import com.wswensw.woolbox.update.AppUpdateManager
 
 class MainActivity : ComponentActivity() {
     private var pendingToolCommand: ExternalToolCommand? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppUpdateManager.initialize(applicationContext)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 lightScrim = android.graphics.Color.TRANSPARENT,

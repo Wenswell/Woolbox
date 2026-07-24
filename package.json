@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.11.0",
+  "scripts": {
+    "publish:update": "node tools/publish-update.mjs"
+  }
+}

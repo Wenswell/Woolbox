@@ -4,6 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.wswensw.woolbox.BuildConfig
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
+import com.wswensw.woolbox.update.AppUpdatePhase
+import com.wswensw.woolbox.update.AppUpdateUiState
 
 @Composable
 fun SettingScreen(
@@ -21,11 +26,16 @@ fun SettingScreen(
     onOpenRecordsConnection: () -> Unit,
     rootTaskPreviewLimit: RootTaskPreviewLimit,
     onRootTaskPreviewLimitChange: (RootTaskPreviewLimit) -> Unit,
+    updateState: AppUpdateUiState,
+    onCheckForUpdate: () -> Unit,
+    onDownloadAndInstall: () -> Unit,
+    onOpenInstallSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     var showPreviewLimitDialog by rememberSaveable { mutableStateOf(false) }
     var showVersionDialog by rememberSaveable { mutableStateOf(false) }
+    var showDownloadConfirmation by rememberSaveable { mutableStateOf(false) }
 
     AppPage(
         title = "Setting",
@@ -73,6 +83,51 @@ fun SettingScreen(
                 onClick = { showVersionDialog = true },
             )
         }
+
+        AppSection(title = "Updates") {
+            AppListItem(
+                title = "Current version",
+                subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                leadingContent = {
+                    AppListLeadingIcon(imageVector = Icons.Outlined.Info)
+                },
+                enabled = !updateState.isBusy,
+                onClick = onCheckForUpdate,
+            )
+            if (updateState.hasUpdate) {
+                val title = when (updateState.phase) {
+                    AppUpdatePhase.DOWNLOADED -> "Install ${updateState.availableVersionName}"
+                    AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION -> "Allow installs"
+                    AppUpdatePhase.INSTALLING -> "Installing ${updateState.availableVersionName}"
+                    else -> "Update ${updateState.availableVersionName}"
+                }
+                val onClick = when (updateState.phase) {
+                    AppUpdatePhase.AVAILABLE,
+                    AppUpdatePhase.DOWNLOADED,
+                    -> { { showDownloadConfirmation = true } }
+
+                    AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION -> onOpenInstallSettings
+                    else -> null
+                }
+                AppListItem(
+                    title = title,
+                    subtitle = updateState.status,
+                    leadingContent = {
+                        AppListLeadingIcon(imageVector = Icons.Outlined.Info)
+                    },
+                    enabled = !updateState.isBusy,
+                    onClick = onClick,
+                )
+            } else if (updateState.status != "Check for updates.") {
+                AppListItem(
+                    title = "Update status",
+                    subtitle = updateState.status,
+                    leadingContent = {
+                        AppListLeadingIcon(imageVector = Icons.Outlined.Info)
+                    },
+                )
+            }
+        }
     }
 
     if (showThemeDialog) {
@@ -104,4 +159,42 @@ fun SettingScreen(
             onDismiss = { showVersionDialog = false },
         )
     }
+
+    if (showDownloadConfirmation) {
+        val isDownloaded = updateState.phase == AppUpdatePhase.DOWNLOADED
+        AlertDialog(
+            onDismissRequest = { showDownloadConfirmation = false },
+            title = { Text(if (isDownloaded) "Install update" else "Download update") },
+            text = {
+                Text(
+                    if (isDownloaded) {
+                        "Open Android installer for ${updateState.availableVersionName}?"
+                    } else {
+                        "Download ${updateState.availableVersionName} (${updateState.availableSizeBytes.formatUpdateBytes()}) and open Android installer?"
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDownloadConfirmation = false
+                        onDownloadAndInstall()
+                    },
+                ) {
+                    Text(if (isDownloaded) "Install" else "Download")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDownloadConfirmation = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+}
+
+private fun Long.formatUpdateBytes(): String = when {
+    this < 1024L -> "$this B"
+    this < 1024L * 1024L -> "%.1f KiB".format(java.util.Locale.US, this / 1024.0)
+    else -> "%.2f MiB".format(java.util.Locale.US, this / (1024.0 * 1024.0))
 }

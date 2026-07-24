@@ -28,6 +28,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、任务/测量预览 Sheet、管理页、记录 Sheet 和记录项表单。 |
+| `update/` | `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
 | `records-server/web/`、`deploy/` | PC 管理页、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
@@ -90,10 +91,39 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `TodoModelsTest` | 待办标题与完成进度派生。 |
 | `RecordsScreenTest` | Records 首字符与标题裁剪、待办排序、管理列表模式隔离、目标周期分组、进度边界、今日累计和下一个子事项。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
+| `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
 | `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办事务、审计快照、根页 overview、模式筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志、记录项模式和归档/恢复。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
+
+## 版本与发布
+
+任何 APK 内容或默认行为变更都必须递增 `app/build.gradle.kts` 的 `versionCode` 和 `versionName`，并同步 README。debug 和 release 使用独立更新通道：
+
+```text
+https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json
+https://dl.1662803.xyz/d/woolbox/releases/release/latest.json
+```
+
+`latest.json` 与版本化 APK 由发布工具生成。发布 debug：
+
+```bash
+pnpm run publish:update -- --build-type debug
+```
+
+发布工具会运行 debug 测试、lint 和构建，验证 APK 签名，从 `output-metadata.json` 生成 manifest，上传目录，并校验远端 manifest 与 APK `content-length`。release 命令会执行 `assembleRelease`，且只接受已签名 APK；未配置 release 签名时必须失败，不能上传 unsigned APK。
+
+```bash
+pnpm run publish:update -- --build-type release
+```
+
+修改发布脚本后执行：
+
+```bash
+node --check tools/create-update-manifest.mjs
+node --check tools/publish-update.mjs
+```
 
 ## 真机验收
 
@@ -118,6 +148,7 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 17. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 19. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
+20. 发布 debug 通道后，在低版本 debug APK 打开 Setting；确认自动检查显示远端版本。确认下载 Dialog 的版本和大小；下载完成后断网重试安装仍复用并校验缓存。首次安装打开“安装未知应用”授权，返回后再次选择安装，确认 Android 安装器要求用户确认；篡改缓存 APK 后确认安装前会重新下载，非同包名、非同 build type 或非 `dl.1662803.xyz` manifest 均被拒绝。
 
 ## 设备诊断
 

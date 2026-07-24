@@ -32,6 +32,13 @@
 - 卡片只用于单个内容块或设置分组；页面 section 保持全宽布局。
 - 不增加兼容层、备用路径或静默降级；平台边界不明确时先在真机验证。
 
+## 版本与发布
+
+- 任何会改变 APK 内容、默认行为、资源、依赖、Manifest、BuildConfig 或构建结果的修改，都必须在同一提交前递增 `app/build.gradle.kts` 的 `versionCode` 和 `versionName`。
+- 纯文档或不进入 APK 的本地辅助文件可保持版本不变。升版本时同步 README 当前版本，并重新构建对应 APK 核对 `output-metadata.json`。
+- 更新通道按 `debug` 和 `release` 隔离。每个通道发布版本化 APK 和固定 `latest.json`；发布成功必须校验远端 manifest、APK `200` 和 `content-length`。release 只允许发布已签名 APK。
+- 功能版本升级的完成条件包括对应通道的远端发布与校验；提交信息或 README 必须记录本轮 manifest URL、版本和 APK 大小校验结果。
+
 ## 文档同步
 
 - 按 `docs/documentation.md` 的信息归属更新唯一事实来源。
@@ -52,6 +59,8 @@ git diff --check
 ```
 
 涉及无障碍窗口、页面退后台、Tile 或覆盖层时，还需按 `docs/development.md` 完成真机验收。JVM 测试不能替代系统窗口验收。
+
+涉及 App 更新、发布脚本或 release 构建时，还需执行 `:app:assembleRelease` 和 `pnpm run publish:update -- --build-type <debug|release>` 对应的验证步骤。
 
 ## 提交
 

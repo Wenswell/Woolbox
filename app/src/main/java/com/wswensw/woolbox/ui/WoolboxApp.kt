@@ -81,6 +81,7 @@ import com.wswensw.woolbox.tool.ui.CopyHistoryEditorScreen
 import com.wswensw.woolbox.tool.ui.CopyHistoryScreen
 import com.wswensw.woolbox.tool.ui.CopyHistoryViewModel
 import com.wswensw.woolbox.tool.ui.ToolViewModel
+import com.wswensw.woolbox.update.AppUpdateManager
 import kotlinx.coroutines.launch
 
 private enum class MainTab(
@@ -109,6 +110,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
     val rootTaskPreviewLimit by recordsViewModel.rootTaskPreviewLimit.collectAsStateWithLifecycle()
     val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
+    val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.RECORDS) }
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -121,10 +123,15 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == MainTab.SETTING) AppUpdateManager.checkForUpdate()
+    }
+
     DisposableEffect(lifecycleOwner, toolViewModel, recordsViewModel, selectedTab) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 toolViewModel.refreshAccessibilityState()
+                AppUpdateManager.syncInstallPermission()
                 if (selectedTab == MainTab.RECORDS) recordsViewModel.refresh()
             }
         }
@@ -226,6 +233,10 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 },
                                 rootTaskPreviewLimit = rootTaskPreviewLimit,
                                 onRootTaskPreviewLimitChange = recordsViewModel::setRootTaskPreviewLimit,
+                                updateState = updateState,
+                                onCheckForUpdate = AppUpdateManager::checkForUpdate,
+                                onDownloadAndInstall = AppUpdateManager::downloadAndInstall,
+                                onOpenInstallSettings = AppUpdateManager::openInstallSettings,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

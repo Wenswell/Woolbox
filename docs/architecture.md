@@ -147,6 +147,12 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
 
+## App 更新
+
+`AppUpdateManager` 在 `MainActivity.onCreate` 初始化，设置页进入时读取 `BuildConfig.UPDATE_MANIFEST_URL`。debug 与 release 的 URL 固定为 `https://dl.1662803.xyz/d/woolbox/releases/{buildType}/latest.json`；manifest 必须匹配 `BuildConfig.APPLICATION_ID`、`BuildConfig.BUILD_TYPE`、正版本号、版本化 APK 路径、SHA-256 和 `1..500MiB` 的大小。HTTP 不跟随重定向，APK 仅接受同 host、无 query/fragment 的预期路径。
+
+下载写入 `files/updates/` 的临时文件，大小与 SHA-256 全部通过后才改名为缓存 APK；缓存复用前重新校验。`AppUpdateInstaller` 使用 `MODE_FULL_INSTALL`、目标包名和 `USER_ACTION_REQUIRED` 创建 `PackageInstaller` session；`AppUpdateInstallReceiver` 只处理本应用显式广播并启动系统确认 Intent。安装来源授权由 `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 打开，App 不使用 FileProvider、静默安装或跨 build type 的 APK。
+
 ## OLED 配置
 
 配置保存在 `oled_shield_config` SharedPreferences 中。默认键前缀为 `default`；应用包名集合键为 `profiles`，应用键前缀为 `profile.<packageName>`，字段为 `opacity`、`width`、`height`、`panel_x`、`panel_y`、`recorded_at`。

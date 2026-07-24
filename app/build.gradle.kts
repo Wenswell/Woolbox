@@ -21,8 +21,8 @@ android {
         targetSdk {
             version = release(36)
         }
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
     }
 
     buildFeatures {
@@ -31,7 +31,19 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            buildConfigField(
+                "String",
+                "UPDATE_MANIFEST_URL",
+                "\"https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json\"",
+            )
+        }
         release {
+            buildConfigField(
+                "String",
+                "UPDATE_MANIFEST_URL",
+                "\"https://dl.1662803.xyz/d/woolbox/releases/release/latest.json\"",
+            )
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
