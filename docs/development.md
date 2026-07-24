@@ -88,7 +88,8 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化、累计/测量值规则、推荐排序、跨午夜时间段和十进制步进。 |
 | `TodoModelsTest` | 待办标题与完成进度派生。 |
-| `RecordsScreenTest` | Records 首字符与标题裁剪、待办排序、管理列表模式隔离、目标周期分组、进度边界、今日累计、下一个子事项和日期文案。 |
+| `RecordsScreenTest` | Records 首字符与标题裁剪、待办排序、管理列表模式隔离、目标周期分组、进度边界、今日累计和下一个子事项。 |
+| `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办事务、审计快照、根页 overview、模式筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志、记录项模式和归档/恢复。 |
 
@@ -113,7 +114,7 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 13. 工具活动时切换应用、重新打开 Woolbox、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
 15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Records 根页 Tasks，创建标题和至少两个子事项并用箭头调整顺序；依次在进度 Sheet 勾选、重开子事项，确认完成时间、父项状态和已完成折叠区正确。进入 Manage tasks / Edit task，确认标题编辑、子事项增删排序和最后一项不能删除；刷新后服务端顺序一致。
-16. 在同一 Records 根页创建累计记录后确认目标圆环、快速记录、`Undo` 与断网错误行为；创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`。点卡确认预览 Sheet 显示 24 小时原始点位和流水，Slider 只能选择配置步进，录入后值和当前设备时间更新，短时 `Undo` 可删除该条流水；检查浅色与深色的可读性。
+16. 在同一 Records 根页创建累计记录后确认液面、日目标饼或周目标分段条、快速记录、`Undo` 与断网错误行为；断网前启动刷新并立即记录一次，确认服务端写入成功不会被报告为写入失败，恢复网络后可刷新到新快照。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`。快速切换两个 Measurement，确认预览不被前一个请求覆盖；点卡确认预览 Sheet 显示 24 小时原始点位和流水，Slider 只能选择配置步进，录入后值和当前设备时间更新，短时 `Undo` 可删除该条流水；检查浅色与深色的可读性。
 17. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 19. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。

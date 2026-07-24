@@ -1,6 +1,5 @@
 package com.wswensw.woolbox.record.ui
 
-import android.provider.Settings
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -35,9 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -338,14 +335,7 @@ internal fun DailyGoalMedallion(
     colors: RecordItemColors? = null,
 ) {
     val resolvedColors = colors ?: recordProgressColors(progress = progress, completed = reached)
-    val context = LocalContext.current
-    val reduceMotion = remember(context) {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) == 0f
-    }
+    val reduceMotion = prefersReducedMotion()
     val scale by animateFloatAsState(
         targetValue = if (reached && !reduceMotion) 1.06f else 1f,
         animationSpec = if (reduceMotion) tween(0) else spring(),

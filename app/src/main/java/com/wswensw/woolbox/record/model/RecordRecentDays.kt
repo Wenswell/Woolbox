@@ -33,27 +33,17 @@ fun itemRecentDayValues(
     return totals.mapValues { (_, values) -> values.toList() }
 }
 
-/**
- * Pie fill 0..1 for each recent day.
- * Day goal uses goal value; week goal uses goal/7 pace; no goal uses window max day.
- */
+/** Pie fill 0..1 for each recent day against a daily goal. */
 fun recentDayPieProgress(
     dayValues: List<Double>,
-    goalValue: Double?,
-    goalPeriod: GoalPeriod?,
+    goalValue: Double,
     days: Int = RECENT_ACTIVE_DAYS,
 ): List<Float> {
     require(dayValues.size == days) { "dayValues must contain $days values." }
-    val target = when {
-        goalValue != null && goalValue > 0.0 && goalPeriod == GoalPeriod.DAY -> goalValue
-        goalValue != null && goalValue > 0.0 && goalPeriod == GoalPeriod.WEEK -> goalValue / days.toDouble()
-        else -> dayValues.maxOrNull()?.takeIf { it > 0.0 }
-    } ?: return List(days) { 0f }
+    require(goalValue > 0.0) { "goalValue must be positive." }
     return dayValues.map { value ->
-        (value / target).toFloat().coerceIn(0f, 1f)
+        (value / goalValue).toFloat().coerceIn(0f, 1f)
     }
 }
 
 fun emptyRecentDayValues(days: Int = RECENT_ACTIVE_DAYS): List<Double> = List(days) { 0.0 }
-
-fun emptyRecentDayPies(days: Int = RECENT_ACTIVE_DAYS): List<Float> = List(days) { 0f }

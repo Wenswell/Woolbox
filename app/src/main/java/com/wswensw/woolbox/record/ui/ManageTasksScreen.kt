@@ -1,6 +1,5 @@
 package com.wswensw.woolbox.record.ui
 
-import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,9 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,7 +101,7 @@ private fun TaskManageCard(
 ) {
     val completed = task.completedStepCount
     val total = task.steps.size
-    val reduceMotion = prefersReducedMotionManage()
+    val reduceMotion = prefersReducedMotion()
     val targetColors = recordProgressColors(
         progress = taskColorProgress(task),
         completed = task.isCompleted,
@@ -195,17 +192,5 @@ private fun TaskManageCard(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun prefersReducedMotionManage(): Boolean {
-    val context = LocalContext.current
-    return remember(context) {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) == 0f
     }
 }

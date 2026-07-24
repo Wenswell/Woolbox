@@ -15,21 +15,17 @@ import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class RecordsUiState(
     val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
     val hasSnapshot: Boolean = false,
     val activeItems: List<RecordItem> = emptyList(),
-    val selectedDate: LocalDate = LocalDate.now(),
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val tasks: List<TodoTask> = emptyList(),
@@ -60,27 +56,20 @@ class RecordsViewModel(
         uiPreferences.setRootTaskPreviewLimit(limit)
     }
 
-    private val selectedDate = MutableStateFlow(LocalDate.now())
     private val error = MutableStateFlow<String?>(null)
-    private val isRefreshing = MutableStateFlow(false)
     private val _measurementPreview = MutableStateFlow(MeasurementPreviewUiState())
-    private var refreshInFlight: Deferred<Result<Unit>>? = null
+    private val recordsOperations = RecordsOperationCoordinator()
+    private var measurementPreviewRequestId = 0L
 
     val measurementPreview: StateFlow<MeasurementPreviewUiState> = _measurementPreview
 
-    private val recordsContent = combine(repository.snapshot, selectedDate) { snapshot, date ->
-        snapshot?.toUiState(date) ?: RecordsUiState(selectedDate = date)
-    }
-
     val uiState: StateFlow<RecordsUiState> = combine(
-        recordsContent,
+        repository.snapshot,
         repository.connection,
         error,
-        isRefreshing,
-    ) { content, connection, message, refreshing ->
-        content.copy(
-            isLoading = !content.hasSnapshot && message == null,
-            isRefreshing = refreshing,
+    ) { snapshot, connection, message ->
+        (snapshot?.toUiState() ?: RecordsUiState()).copy(
+            isLoading = snapshot == null && message == null,
             connection = connection,
             error = message,
         )
@@ -91,37 +80,18 @@ class RecordsViewModel(
     )
 
     fun refresh() {
-        startRefresh()
+        recordsOperations.refresh(viewModelScope) { refreshSnapshot() }
     }
 
-    private fun startRefresh(): Deferred<Result<Unit>> = synchronized(this) {
-        refreshInFlight?.let { return it }
-        viewModelScope.async {
-            isRefreshing.value = true
-            selectedDate.value = LocalDate.now()
-            runCatching { repository.refresh(selectedDate.value.toString()) }
-                .onFailure { error.value = it.message ?: "Unable to load records." }
-                .onSuccess { error.value = null }
-                .also { isRefreshing.value = false }
-        }.also { refresh ->
-            refreshInFlight = refresh
-            refresh.invokeOnCompletion {
-                synchronized(this) {
-                    if (refreshInFlight === refresh) refreshInFlight = null
-                }
-            }
-        }
-    }
+    private suspend fun refreshSnapshot(): Result<Unit> =
+        runCatching { repository.refresh(LocalDate.now().toString()) }
+            .onFailure { error.value = it.message ?: "Unable to load records." }
+            .onSuccess { error.value = null }
 
-    private suspend fun refreshOrThrow() {
-        startRefresh().await().getOrThrow()
-    }
-
-    private fun RecordsSnapshot.toUiState(date: LocalDate) =
+    private fun RecordsSnapshot.toUiState() =
         RecordsUiState(
             hasSnapshot = true,
             activeItems = activeItems,
-            selectedDate = date,
             entries = entries,
             latestEntries = latestEntries,
             tasks = tasks,
@@ -132,13 +102,12 @@ class RecordsViewModel(
     fun configureCredentials(username: String, password: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             runCatching {
-                repository.configureCredentials(username, password)
-                refreshOrThrow()
+                recordsOperations.writeAndRefresh(
+                    write = { repository.configureCredentials(username, password) },
+                    refresh = { refreshSnapshot().getOrThrow() },
+                )
             }.fold(
-                onSuccess = {
-                    error.value = null
-                    onResult(null)
-                },
+                onSuccess = { onResult(null) },
                 onFailure = { failure ->
                     val message = failure.message ?: "Unable to connect to Records."
                     error.value = message
@@ -148,16 +117,30 @@ class RecordsViewModel(
         }
     }
 
+    private suspend fun <T> writeAndRefresh(
+        action: suspend () -> T,
+        onWritten: (T) -> Unit,
+    ): Result<T> =
+        runCatching {
+            recordsOperations.writeAndRefresh(
+                write = action,
+                onWritten = onWritten,
+                refresh = { refreshSnapshot() },
+            )
+        }
+
     fun saveItem(
         itemId: Long?,
         draft: RecordItemDraft,
         onResult: (String?) -> Unit,
     ) {
         viewModelScope.launch {
-            runCatching { repository.saveItem(itemId, draft) }.fold(
-                onSuccess = { refreshOrThrow(); onResult(null) },
-                onFailure = { error -> onResult(error.message ?: "Unable to save record item.") },
-            )
+            writeAndRefresh(
+                action = { repository.saveItem(itemId, draft) },
+                onWritten = { onResult(null) },
+            ).onFailure { failure ->
+                onResult(failure.message ?: "Unable to save record item.")
+            }
         }
     }
 
@@ -168,41 +151,38 @@ class RecordsViewModel(
         onResult: (entryId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
-            runCatching {
-                val entryId = repository.createEntry(item, value, occurredAt)
-                selectedDate.value = LocalDate.now()
-                refreshOrThrow()
-                reloadMeasurementPreview(item.id)
-                entryId
-            }.fold(
-                onSuccess = { entryId -> onResult(entryId, null) },
-                onFailure = { error -> onResult(null, error.message ?: "Unable to save record.") },
-            )
+            writeAndRefresh(
+                action = { repository.createEntry(item, value, occurredAt) },
+                onWritten = { entryId ->
+                    reloadMeasurementPreview(item.id)
+                    onResult(entryId, null)
+                },
+            ).onFailure { failure ->
+                onResult(null, failure.message ?: "Unable to save record.")
+            }
         }
     }
 
     fun deleteEntry(entryId: Long, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             val itemId = _measurementPreview.value.entries.firstOrNull { it.id == entryId }?.itemId
-            runCatching {
-                repository.deleteEntry(entryId)
-                refreshOrThrow()
-                itemId?.let(::reloadMeasurementPreview)
+            writeAndRefresh(
+                action = { repository.deleteEntry(entryId) },
+                onWritten = { itemId?.let(::reloadMeasurementPreview) },
+            ).onFailure { failure ->
+                onError(failure.message ?: "Unable to undo record.")
             }
-                .onFailure { error -> onError(error.message ?: "Unable to undo record.") }
         }
     }
 
     fun createTask(title: String, stepTitles: List<String>, horizon: TaskHorizon, onResult: (taskId: Long?, error: String?) -> Unit) {
         viewModelScope.launch {
-            runCatching {
-                val taskId = repository.createTask(title, stepTitles, horizon)
-                refreshOrThrow()
-                taskId
-            }.fold(
-                onSuccess = { taskId -> onResult(taskId, null) },
-                onFailure = { error -> onResult(null, error.message ?: "Unable to create task.") },
-            )
+            writeAndRefresh(
+                action = { repository.createTask(title, stepTitles, horizon) },
+                onWritten = { taskId -> onResult(taskId, null) },
+            ).onFailure { failure ->
+                onResult(null, failure.message ?: "Unable to create task.")
+            }
         }
     }
 
@@ -256,12 +236,13 @@ class RecordsViewModel(
     }
 
     fun loadMeasurementPreview(itemId: Long) {
+        val requestId = ++measurementPreviewRequestId
+        _measurementPreview.value = MeasurementPreviewUiState(
+            itemId = itemId,
+            isLoading = true,
+        )
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            _measurementPreview.value = MeasurementPreviewUiState(
-                itemId = itemId,
-                isLoading = true,
-            )
             runCatching {
                 repository.entriesForItem(
                     itemId = itemId,
@@ -270,16 +251,20 @@ class RecordsViewModel(
                 ).filter { entry -> entry.occurredAt in (now - 24 * 60 * 60 * 1_000)..now }
             }.fold(
                 onSuccess = { entries ->
-                    _measurementPreview.value = MeasurementPreviewUiState(
-                        itemId = itemId,
-                        entries = entries,
-                    )
+                    if (requestId == measurementPreviewRequestId) {
+                        _measurementPreview.value = MeasurementPreviewUiState(
+                            itemId = itemId,
+                            entries = entries,
+                        )
+                    }
                 },
                 onFailure = { failure ->
-                    _measurementPreview.value = MeasurementPreviewUiState(
-                        itemId = itemId,
-                        error = failure.message ?: "Unable to load measurements.",
-                    )
+                    if (requestId == measurementPreviewRequestId) {
+                        _measurementPreview.value = MeasurementPreviewUiState(
+                            itemId = itemId,
+                            error = failure.message ?: "Unable to load measurements.",
+                        )
+                    }
                 },
             )
         }
@@ -297,20 +282,14 @@ class RecordsViewModel(
         action: suspend () -> Unit,
     ) {
         viewModelScope.launch {
-            runCatching {
-                action()
-                refreshOrThrow()
-            }.fold(
-                onSuccess = {
-                    error.value = null
-                    onResult(null)
-                },
-                onFailure = { failure ->
-                    val message = failure.message ?: failureMessage
-                    error.value = message
-                    onResult(message)
-                },
-            )
+            writeAndRefresh(
+                action = action,
+                onWritten = { onResult(null) },
+            ).onFailure { failure ->
+                val message = failure.message ?: failureMessage
+                error.value = message
+                onResult(message)
+            }
         }
     }
 

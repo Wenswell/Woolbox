@@ -50,6 +50,14 @@ describe("Records API", () => {
       before: { name: "Water", windows: [{ startMinute: 480, endMinute: 540 }] },
       after: { name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] },
     });
+
+    const unchanged = await app.inject({
+      method: "PUT",
+      url: "/api/items/1",
+      payload: itemInput({ name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] }),
+    });
+    expect(unchanged.statusCode).toBe(200);
+    expect((await getAuditLogs()).map((log) => log.action)).toEqual(["ITEM_UPDATED", "ITEM_CREATED"]);
   });
 
   it.each([

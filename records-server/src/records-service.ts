@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
 import type { RecordEntryInput, RecordItemInput, RecordMode, TaskCreateInput, TaskTitleInput, TaskWriteInput } from "./domain.js";
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
@@ -163,6 +164,13 @@ export class RecordsService {
       const current = tx.select().from(recordItems).where(eq(recordItems.id, id)).get();
       if (!current) throw new ApiError(404, "Record item not found.");
       this.requireUniqueName(input.name, id);
+      const before = itemSnapshot(
+        current,
+        tx.select().from(recordWindows).where(eq(recordWindows.itemId, id)).all(),
+      );
+      const after = itemSnapshot({ ...current, ...withoutWindows(input) }, input.windows);
+      if (isDeepStrictEqual(before, after)) return;
+
       const entryTotal = tx
         .select({ value: count() })
         .from(recordEntries)
@@ -181,10 +189,6 @@ export class RecordsService {
         throw new ApiError(400, "Recorded item mode, type, unit, and measurement range cannot change.");
       }
 
-      const before = itemSnapshot(
-        current,
-        tx.select().from(recordWindows).where(eq(recordWindows.itemId, id)).all(),
-      );
       const now = this.now();
       tx.update(recordItems)
         .set({ ...withoutWindows(input), updatedAt: now })
@@ -201,7 +205,7 @@ export class RecordsService {
         entityType: "ITEM",
         entityId: id,
         before,
-        after: itemSnapshot({ ...current, ...withoutWindows(input) }, input.windows),
+        after,
         createdAt: now,
       });
     });
@@ -775,7 +779,9 @@ function itemSnapshot(
 ): ItemAuditSnapshot {
   return {
     ...item,
-    windows: windows.map(({ startMinute, endMinute }) => ({ startMinute, endMinute })),
+    windows: windows
+      .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }))
+      .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute),
   };
 }
 

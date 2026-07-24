@@ -34,25 +34,7 @@ class RecordRecentDaysTest {
         val values = listOf(0.0, 2.0, 4.0, 8.0, 10.0, 0.0, 4.0)
         assertEquals(
             listOf(0f, 0.25f, 0.5f, 1f, 1f, 0f, 0.5f),
-            recentDayPieProgress(values, goalValue = 8.0, goalPeriod = GoalPeriod.DAY),
-        )
-    }
-
-    @Test
-    fun recentDayPieProgressUsesWeeklyPace() {
-        val values = listOf(0.0, 1.0, 2.0, 0.0, 0.0, 0.0, 3.0)
-        assertEquals(
-            listOf(0f, 1f / 3f, 2f / 3f, 0f, 0f, 0f, 1f),
-            recentDayPieProgress(values, goalValue = 21.0, goalPeriod = GoalPeriod.WEEK),
-        )
-    }
-
-    @Test
-    fun recentDayPieProgressUsesWindowMaxWithoutGoal() {
-        val values = listOf(0.0, 1.0, 2.0, 0.0, 4.0, 0.0, 2.0)
-        assertEquals(
-            listOf(0f, 0.25f, 0.5f, 0f, 1f, 0f, 0.5f),
-            recentDayPieProgress(values, goalValue = null, goalPeriod = null),
+            recentDayPieProgress(values, goalValue = 8.0),
         )
     }
 

@@ -108,7 +108,7 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **Tasks → Accumulate → Measurement**。区标题为紧凑 `labelLarge` + Manage 图标，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。可出现只读总览行（`Tasks a/b · Goals c/d`）；无任务且无目标时隐藏。任务环与累计环进度变化使用短动画；系统关闭动画时瞬时到位。
+Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **Tasks → Accumulate → Measurement**。区标题为紧凑 `labelLarge` + Manage 图标，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。可出现只读总览行（`Tasks a/b · Goals c/d`）；无任务且无目标时隐藏。分段进度、液面和卡色变化使用短动画；系统关闭动画时瞬时到位。
 
 | 区域 | 唯一职责 |
 | --- | --- |
@@ -134,9 +134,9 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 - Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有周目标时底部为与近 7 日饼行同宽同高的 7 段独立描边块（Tasks 同理念：段外框 A=6dp、进度填充 B=1.5dp、高 12dp 同非今日饼、段间 2dp 透明；描边同圆饼 track 16%）；目标行用日历图标与 `· week` 区分；不重复百分比或 `current / target`。系统关闭动画时液面静止、高度仍可短动画到位。
 - Tasks 分段竖条表达子事项完成比；仅完成格绘制填充并 spring 弹出，未完成格与格间均透明（直接露出卡面，不铺未完成色）。全完成时完成格与强调色为完成绿。系统关闭动画时弹出瞬时到位。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
 - 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。
-- Measurement 与 Accumulate 共用标题/主值字阶，避免横轨内字号分叉。
+- Measurement 与 Accumulate 共用标题/主值字阶，避免网格卡字号分叉。
 
-验收：浅/深色 Tasks 与 Manage tasks 均非灰底；横轨高 `136dp`；字阶与色规则一致；点击与数据路径不变。
+验收：浅/深色 Tasks 与 Manage tasks 均非灰底；Accumulate 与 Measurement 两列卡高 `120dp`；字阶与色规则一致；点击与数据路径不变。
 
 `Manage accumulates` 与 `Manage measurements` 使用相同的标准路由骨架；每页顶栏仅提供本模式新建入口，编辑路由固定为本模式表单。
 

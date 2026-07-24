@@ -1,6 +1,5 @@
 package com.wswensw.woolbox.record.ui
 
-import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -37,12 +36,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
@@ -116,7 +113,7 @@ fun RecordsScreen(
                     CircularProgressIndicator()
                 }
             }
-            state.error != null && state.activeItems.isEmpty() -> item {
+            state.error != null && !state.hasSnapshot -> item {
                 RecordsStatusCard(
                     message = state.error,
                     actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
@@ -634,8 +631,7 @@ private fun AccumulateRailCard(
                         RecentDayPies(
                             progresses = recentDayPieProgress(
                                 dayValues = resolvedDayValues,
-                                goalValue = target,
-                                goalPeriod = period,
+                                goalValue = requireNotNull(target),
                             ),
                         )
                     }
@@ -776,18 +772,6 @@ private fun RecordsDayOverviewRow(overview: RecordsDayOverview) {
     )
 }
 
-@Composable
-private fun prefersReducedMotion(): Boolean {
-    val context = LocalContext.current
-    return remember(context) {
-        Settings.Global.getFloat(
-            context.contentResolver,
-            Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        ) == 0f
-    }
-}
-
 internal data class RecordsDayOverview(
     val taskDone: Int,
     val taskTotal: Int,
@@ -822,10 +806,7 @@ internal fun recordsDayOverview(
 internal data class FocusGoalCompletion(
     val done: Int,
     val total: Int,
-) {
-    val fraction: Float
-        get() = if (total <= 0) 0f else done.toFloat() / total.toFloat()
-}
+)
 
 internal fun focusGoalCompletion(
     goals: List<RecordItem>,
@@ -836,13 +817,6 @@ internal fun focusGoalCompletion(
         (values[item.id] ?: 0.0) >= target
     }
     return FocusGoalCompletion(done = done, total = goals.size)
-}
-
-internal fun dayStatusLabel(completion: FocusGoalCompletion): String = when {
-    completion.total <= 0 -> ""
-    completion.done <= 0 -> "0 of ${completion.total} goals done"
-    completion.done >= completion.total -> "All goals done"
-    else -> "${completion.done} of ${completion.total} goals done"
 }
 
 internal fun crossedGoalThreshold(

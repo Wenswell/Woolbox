@@ -205,15 +205,6 @@ class RecordsScreenTest {
         )
         assertEquals(2, completion.done)
         assertEquals(3, completion.total)
-        assertEquals(2f / 3f, completion.fraction, 0.0001f)
-    }
-
-    @Test
-    fun dayStatusLabelCoversEmptyPartialAndComplete() {
-        assertEquals("", dayStatusLabel(FocusGoalCompletion(0, 0)))
-        assertEquals("0 of 2 goals done", dayStatusLabel(FocusGoalCompletion(0, 2)))
-        assertEquals("1 of 2 goals done", dayStatusLabel(FocusGoalCompletion(1, 2)))
-        assertEquals("All goals done", dayStatusLabel(FocusGoalCompletion(2, 2)))
     }
 
     @Test
@@ -302,14 +293,6 @@ class RecordsScreenTest {
         assertEquals(2, overview.goalTotal)
         assertEquals("Tasks 1/2 · Goals 1/2", overview.label)
     }
-
-    @Test
-    fun crossedGoalThresholdOnlyOnRisingEdge() {
-        assertEquals(true, crossedGoalThreshold(previous = 7.0, current = 8.0, target = 8.0))
-        assertEquals(false, crossedGoalThreshold(previous = 8.0, current = 9.0, target = 8.0))
-        assertEquals(false, crossedGoalThreshold(previous = 1.0, current = 2.0, target = null))
-    }
-
 
     @Test
     fun progressColorStageMapsThresholds() {
