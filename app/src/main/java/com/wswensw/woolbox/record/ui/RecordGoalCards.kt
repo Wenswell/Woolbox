@@ -142,13 +142,16 @@ private fun DrawScope.drawLiquidLayer(
 
 /**
  * Full-height segmented progress for task cards.
- * Only completed tiles paint [fillColor]. Incomplete tiles and gaps stay
- * fully transparent so the card surface shows through the cuts.
+ * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
+ * transparent and expose the page surface. Completed tiles use
+ * [completedBackgroundColor] with [fillColor] above it.
  */
 @Composable
 internal fun SegmentedProgressFill(
     completed: Int,
     total: Int,
+    unfinishedBackgroundColor: Color,
+    completedBackgroundColor: Color,
     fillColor: Color,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
@@ -175,7 +178,10 @@ internal fun SegmentedProgressFill(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp)),
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        if (filled) completedBackgroundColor else unfinishedBackgroundColor,
+                    ),
             ) {
                 if (pop > 0.001f) {
                     Box(

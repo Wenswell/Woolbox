@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -408,6 +409,7 @@ private fun TaskProgressCard(
         progress = taskColorProgress(task),
         completed = task.isCompleted,
     )
+    val unfinishedContainer = recordProgressColors(progress = 0f).container
     val container by animateColorAsState(
         targetValue = targetColors.container,
         label = "TaskCardContainer",
@@ -426,7 +428,7 @@ private fun TaskProgressCard(
         modifier = Modifier.fillMaxWidth(),
         shape = AppStyle.cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = container,
+            containerColor = Color.Transparent,
             contentColor = cardContentColor,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -439,6 +441,8 @@ private fun TaskProgressCard(
             SegmentedProgressFill(
                 completed = completed,
                 total = total,
+                unfinishedBackgroundColor = unfinishedContainer,
+                completedBackgroundColor = container,
                 fillColor = accent.copy(alpha = 0.32f),
                 reduceMotion = reduceMotion,
                 modifier = Modifier.matchParentSize(),
