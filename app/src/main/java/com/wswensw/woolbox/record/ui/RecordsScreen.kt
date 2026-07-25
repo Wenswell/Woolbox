@@ -596,7 +596,7 @@ private fun AccumulateRailCard(
                             append(item.unit)
                         }
                         if (isWeekGoal) {
-                            append(" · week")
+                            append(" · 7 days")
                         }
                     }
                     Row(

@@ -410,7 +410,7 @@ fun AccumulateItemFormScreen(
                             onClick = { goalPeriodName = period.name },
                             enabled = !saving,
                             shape = SegmentedButtonDefaults.itemShape(index, GoalPeriod.entries.size),
-                            label = { Text(if (period == GoalPeriod.DAY) "Day" else "Week") },
+                            label = { Text(if (period == GoalPeriod.DAY) "Day" else "7 days") },
                         )
                     }
                 }

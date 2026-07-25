@@ -210,7 +210,7 @@ private fun RecordItem.measurementSummary(): String {
 }
 
 internal fun RecordItem.goalSummary(): String? = goalValue?.let { target ->
-    "Target ${formatValue(target)} $unit / ${if (goalPeriod == GoalPeriod.DAY) "day" else "week"}"
+    "Target ${formatValue(target)} $unit / ${if (goalPeriod == GoalPeriod.DAY) "day" else "7 days"}"
 }
 
 internal fun formatValue(value: Double): String =

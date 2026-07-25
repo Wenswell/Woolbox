@@ -563,7 +563,7 @@ internal fun GoalProgressPanel(
     val progressColor = colors.accent
     val periodLabel = when (checkNotNull(item.goalPeriod)) {
         GoalPeriod.DAY -> "today"
-        GoalPeriod.WEEK -> "this week"
+        GoalPeriod.WEEK -> "last 7 days"
     }
 
     Column(modifier = modifier.fillMaxWidth()) {

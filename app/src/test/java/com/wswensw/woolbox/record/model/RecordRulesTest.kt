@@ -104,22 +104,25 @@ class RecordRulesTest {
     }
 
     @Test
-    fun calculatesDailyAndWeeklyGoalValues() {
+    fun calculatesDailyAndRollingSevenDayGoalValues() {
         val daily = item(1, "Water", "", 0, 1).copy(goalValue = 8.0, goalPeriod = GoalPeriod.DAY)
         val weekly = item(2, "Read", "", 0, 1).copy(goalValue = 10.0, goalPeriod = GoalPeriod.WEEK)
+        // 2026-07-21 rolling window: 2026-07-15 .. 2026-07-21
         val values = goalValues(
             items = listOf(daily, weekly),
             date = LocalDate.parse("2026-07-21"),
             dayEntries = listOf(entry(1, "2026-07-21", 2.0), entry(2, "2026-07-21", 3.0)),
-            weekEntries = listOf(
+            recentEntries = listOf(
+                entry(2, "2026-07-14", 9.0), // outside rolling window
+                entry(2, "2026-07-15", 1.0),
                 entry(2, "2026-07-20", 4.0),
                 entry(2, "2026-07-21", 3.0),
-                entry(2, "2026-07-26", 5.0),
+                entry(2, "2026-07-26", 5.0), // outside rolling window
             ),
         )
 
         assertEquals(2.0, values[1])
-        assertEquals(12.0, values[2])
+        assertEquals(8.0, values[2])
     }
 
     private fun draft(

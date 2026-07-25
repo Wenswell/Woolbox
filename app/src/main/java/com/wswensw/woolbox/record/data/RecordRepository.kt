@@ -26,10 +26,8 @@ import com.wswensw.woolbox.record.model.validatedTaskTitle
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.time.Instant
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -83,9 +81,6 @@ class RecordRepository(context: Context) {
         val activeItems = overview.getJSONArray("items").mapObjects(::parseItem)
         val rangeEntries = overview.getJSONArray("accumulateEntries").mapObjects(::parseEntry)
         val todayEntries = rangeEntries.filter { it.localDate == localDate }
-        val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
-        val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
-        val weekEntries = rangeEntries.filter { it.localDate in weekStart..weekEnd }
         _snapshot.value = RecordsSnapshot(
             activeItems = activeItems,
             entries = todayEntries,
@@ -93,7 +88,7 @@ class RecordRepository(context: Context) {
             .mapObjects(::parseEntry)
             .associateBy(RecordEntry::itemId),
             tasks = overview.getJSONArray("tasks").mapObjects(::parseTask),
-            goalValues = goalValues(activeItems, date, todayEntries, weekEntries),
+            goalValues = goalValues(activeItems, date, todayEntries, rangeEntries),
             recentDayValues = itemRecentDayValues(
                 itemIds = activeItems
                     .filter { it.mode == RecordMode.ACCUMULATE }

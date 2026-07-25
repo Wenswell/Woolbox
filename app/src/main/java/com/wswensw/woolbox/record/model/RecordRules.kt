@@ -2,9 +2,7 @@ package com.wswensw.woolbox.record.model
 
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 const val DEFAULT_NUMBER_UNIT = "次"
@@ -157,16 +155,19 @@ fun goalValues(
     items: List<RecordItem>,
     date: LocalDate,
     dayEntries: List<RecordEntry>,
-    weekEntries: List<RecordEntry>,
+    recentEntries: List<RecordEntry>,
 ): Map<Long, Double> {
-    val weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
-    val weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).toString()
+    // WEEK goals use a rolling last-N-days window so totals move forward every day.
+    val rollingStart = date.minusDays((RECENT_ACTIVE_DAYS - 1).toLong()).toString()
+    val today = date.toString()
     return items.mapNotNull { item ->
         if (item.mode != RecordMode.ACCUMULATE) return@mapNotNull null
         val period = item.goalPeriod ?: return@mapNotNull null
         item.goalValue ?: return@mapNotNull null
-        val entries = if (period == GoalPeriod.DAY) dayEntries else weekEntries.filter {
-            it.localDate in weekStart..weekEnd
+        val entries = if (period == GoalPeriod.DAY) {
+            dayEntries
+        } else {
+            recentEntries.filter { it.localDate in rollingStart..today }
         }
         item.id to entries.filter { it.itemId == item.id }.sumOf(RecordEntry::value)
     }.toMap()
