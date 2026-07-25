@@ -179,7 +179,7 @@ internal fun SegmentedProgressFill(
         while (true) {
             stripePhase.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 1_400, easing = LinearEasing),
+                animationSpec = tween(durationMillis = 2_700, easing = LinearEasing),
             )
             stripePhase.snapTo(0f)
         }
@@ -219,7 +219,7 @@ internal fun SegmentedProgressFill(
                                 alpha = pop
                             }
                             .drawWithCache {
-                                val stripeWidth = 10.dp.toPx()
+                                val stripeWidth = 89.dp.toPx()
                                 val period = stripeWidth * 2f
                                 val gapPx = gap.toPx()
                                 val localLeft = index * (size.width + gapPx)
@@ -227,7 +227,8 @@ internal fun SegmentedProgressFill(
                                 val localShift = ((globalShift - localLeft) % period + period) % period
                                 val baseColor = fillColor
                                 val stripeColor = fillColor.copy(
-                                    alpha = (fillColor.alpha * 1.55f).coerceIn(0.2f, 0.58f),
+                                    // Barely-there lift over the base wash.
+                                    alpha = (fillColor.alpha * 1.12f).coerceIn(0.18f, 0.42f),
                                 )
                                 onDrawBehind {
                                     drawRect(baseColor)

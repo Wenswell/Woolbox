@@ -44,7 +44,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.12` (`versionCode 13`) |
+| 版本 | `0.1.13` (`versionCode 14`) |
 
 ## 目录
 
@@ -87,7 +87,7 @@ pnpm run publish:debug
 
 | 构建类型 | 当前发布版本 |
 | --- | --- |
-| debug | `0.1.12` (`versionCode 13`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.12-debug.apk`，远端 `content-length` `66,432,191`，SHA-256 `470013989e0c037ba19f050e1c0eb9b457f958a84954a2896f356ddb3bd81546`。 |
+| debug | `0.1.13` (`versionCode 14`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.13-debug.apk`，远端 `content-length` `66,432,187`，SHA-256 `1c493e928ff7dd97f3a02dcb0a3cd1aab980924f42a6d58cb17c565877bfa772`。 |
 | release | 尚未发布。 |
 
 安装到已连接设备：
