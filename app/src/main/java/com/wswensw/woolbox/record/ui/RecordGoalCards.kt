@@ -149,7 +149,8 @@ private fun DrawScope.drawLiquidLayer(
  * Full-height segmented progress for task cards.
  * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
  * transparent and expose the page surface. Completed tiles use
- * [completedBackgroundColor] with a soft left-to-right sheen over [fillColor].
+ * [completedBackgroundColor] with [fillColor] and one shared left-to-right
+ * sheen sampled across the whole bar.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -171,8 +172,8 @@ internal fun SegmentedProgressFill(
             sheenPhase.snapTo(0.5f)
             return@LaunchedEffect
         }
-        // Soft horizontal light band loops left → right only.
-        // Band starts fully off-screen left and ends fully off-screen right,
+        // One soft band loops left → right across the full segmented bar.
+        // Travel starts fully off-screen left and ends fully off-screen right,
         // so the snap-back is invisible.
         sheenPhase.snapTo(0f)
         while (true) {
@@ -219,9 +220,19 @@ internal fun SegmentedProgressFill(
                             }
                             .drawWithCache {
                                 val phase = sheenPhase.value
-                                val band = size.width * 0.9f
-                                val travel = size.width + band
-                                val startX = -band + travel * phase
+                                val gapPx = gap.toPx()
+                                val segmentWidth = size.width
+                                val fullWidth = if (safeTotal <= 1) {
+                                    segmentWidth
+                                } else {
+                                    segmentWidth * safeTotal + gapPx * (safeTotal - 1)
+                                }
+                                // One band sized to the whole bar, not each tile.
+                                val band = fullWidth * 0.32f
+                                val travel = fullWidth + band
+                                val globalStartX = -band + travel * phase
+                                val localLeft = index * (segmentWidth + gapPx)
+                                val localStartX = globalStartX - localLeft
                                 val sheen = Color.White.copy(alpha = 0.18f)
                                 val brush = Brush.horizontalGradient(
                                     colorStops = arrayOf(
@@ -229,8 +240,8 @@ internal fun SegmentedProgressFill(
                                         0.5f to sheen,
                                         1f to Color.Transparent,
                                     ),
-                                    startX = startX,
-                                    endX = startX + band,
+                                    startX = localStartX,
+                                    endX = localStartX + band,
                                 )
                                 onDrawBehind {
                                     drawRect(fillColor)

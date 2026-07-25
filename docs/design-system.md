@@ -134,7 +134,7 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 动作：根页仅 Manage（小 `IconButton`）；新建只在 Manage 顶栏 tonal 加号。完成折叠为普通 `IconButton`。
 - Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有周目标时底部为与近 7 日饼行同宽同高的 7 段独立描边块（Tasks 同理念：段外框 A=6dp、进度填充 B=1.5dp、高 12dp 同非今日饼、段间 2dp 透明；描边同圆饼 track 16%）；目标行用日历图标与 `· week` 区分；不重复百分比或 `current / target`。系统关闭动画时液面静止、高度仍可短动画到位。
-- Tasks 分段竖条表达子事项完成比；未完成格固定使用 `recordProgressColors(progress = 0f).container`，与 Accumulate 0% 卡底色一致；完成格使用任务进度底色，并在其上铺 `fillColor` 与白色横向柔光带（spring 弹出）。柔光只在部分完成且 Motion 已启用时从左到右匀速循环，每圈 `1.8s`（`Linear`）；光带从格外左侧进入、右侧完全离开后再重置，循环无可见跳变；全完成或 Motion 关闭时柔光固定在中部。格间透明，直接露出页面底色。全完成时完成格与强调色为完成绿。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
+- Tasks 分段竖条表达子事项完成比；未完成格固定使用 `recordProgressColors(progress = 0f).container`，与 Accumulate 0% 卡底色一致；完成格使用任务进度底色，并在其上铺 `fillColor` 与一条共享的白色横向柔光带（spring 弹出）。柔光按整条分段条的坐标系从左到右匀速循环，每圈 `1.8s`（`Linear`），完成格只裁切同一条光带的局部；光带从条外左侧进入、右侧完全离开后再重置，循环无可见跳变；全完成或 Motion 关闭时柔光固定在中部。格间透明，直接露出页面底色。全完成时完成格与强调色为完成绿。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
 - 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。
 - Measurement 与 Accumulate 共用标题/主值字阶，避免网格卡字号分叉。
 
