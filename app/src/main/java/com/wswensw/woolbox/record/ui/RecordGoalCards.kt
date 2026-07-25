@@ -147,16 +147,15 @@ private fun DrawScope.drawLiquidLayer(
 
 /**
  * Full-height segmented progress for task cards.
- * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
- * transparent and expose the page surface. Completed tiles use
- * [completedBackgroundColor] under a [fillColor] wash. While a task is
- * only partly done, completed tiles share one diagonal stripe field that
- * scrolls left to right across the whole bar.
+ * Each entry in [stepFilled] maps to one fixed-order subtask tile. Unfinished
+ * tiles paint [unfinishedBackgroundColor]; gaps stay transparent and expose
+ * the page surface. Completed tiles use [completedBackgroundColor] under a
+ * [fillColor] wash. While a task is only partly done, completed tiles share
+ * one diagonal stripe field that scrolls left to right across the whole bar.
  */
 @Composable
 internal fun SegmentedProgressFill(
-    completed: Int,
-    total: Int,
+    stepFilled: List<Boolean>,
     unfinishedBackgroundColor: Color,
     completedBackgroundColor: Color,
     fillColor: Color,
@@ -164,8 +163,8 @@ internal fun SegmentedProgressFill(
     reduceMotion: Boolean = false,
     gap: Dp = 3.dp,
 ) {
-    val safeTotal = total.coerceAtLeast(0)
-    val safeCompleted = completed.coerceIn(0, safeTotal)
+    val safeTotal = stepFilled.size.coerceAtLeast(0)
+    val safeCompleted = stepFilled.count { it }
     val stripePhase = remember { Animatable(0f) }
     val animateStripes = safeCompleted in 1 until safeTotal && !reduceMotion
     LaunchedEffect(animateStripes) {
@@ -189,7 +188,7 @@ internal fun SegmentedProgressFill(
         horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
         repeat(safeTotal) { index ->
-            val filled = index < safeCompleted
+            val filled = stepFilled.getOrElse(index) { false }
             val pop by animateFloatAsState(
                 targetValue = if (filled) 1f else 0f,
                 animationSpec = if (reduceMotion) {

@@ -439,8 +439,7 @@ private fun TaskProgressCard(
                 .heightIn(min = 56.dp),
         ) {
             SegmentedProgressFill(
-                completed = completed,
-                total = total,
+                stepFilled = task.steps.map { it.isCompleted },
                 unfinishedBackgroundColor = unfinishedContainer,
                 completedBackgroundColor = container,
                 fillColor = accent.copy(alpha = 0.32f),
