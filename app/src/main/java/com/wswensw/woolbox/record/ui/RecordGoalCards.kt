@@ -179,7 +179,7 @@ internal fun SegmentedProgressFill(
         while (true) {
             stripePhase.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 2_700, easing = LinearEasing),
+                animationSpec = tween(durationMillis = 5_600, easing = LinearEasing),
             )
             stripePhase.snapTo(0f)
         }
@@ -226,15 +226,15 @@ internal fun SegmentedProgressFill(
                                 val globalShift = stripePhase.value * period
                                 val localShift = ((globalShift - localLeft) % period + period) % period
                                 val baseColor = fillColor
-                                val stripeColor = fillColor.copy(
-                                    // Barely-there lift over the base wash.
-                                    alpha = (fillColor.alpha * 1.12f).coerceIn(0.18f, 0.42f),
-                                )
+                                // Stripe is an incremental wash only. Drawing another full
+                                // translucent fillColor on top would SrcOver-stack and nearly
+                                // double perceived opacity (e.g. 0.32 under 0.36 ≈ 0.56).
+                                val stripeLift = fillColor.copy(alpha = 0.1f)
                                 onDrawBehind {
                                     drawRect(baseColor)
                                     if (animateStripes) {
                                         drawDiagonalStripes(
-                                            stripeColor = stripeColor,
+                                            stripeColor = stripeLift,
                                             stripeWidthPx = stripeWidth,
                                             periodPx = period,
                                             shiftPx = localShift,
@@ -284,9 +284,9 @@ internal fun recentDaysRowWidth(
 }
 
 /**
- * Weekly goal track in the same footprint as the 7-day pies.
- * Height matches non-today pie (12dp). Bar ends A=6dp; cut sides and fill B=1.5dp; gap 2dp.
- * Seven independent stroked tiles with transparent gaps.
+ * Weekly goal track in the same width footprint as the 7-day pies.
+ * Height is 8dp (thinner than the non-today pie). Bar ends A=6dp; cut sides
+ * and fill B=1.5dp; gap 2dp. Seven independent stroked tiles with transparent gaps.
  */
 @Composable
 internal fun WeeklyGoalProgressBar(
@@ -295,7 +295,7 @@ internal fun WeeklyGoalProgressBar(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     segments: Int = RECENT_ACTIVE_DAYS,
-    height: Dp = 12.dp,
+    height: Dp = 8.dp,
     gap: Dp = 2.dp,
     trackRadius: Dp = 6.dp,
     fillRadius: Dp = 1.5.dp,
