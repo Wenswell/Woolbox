@@ -60,7 +60,7 @@ git diff --check
 
 涉及无障碍窗口、页面退后台、Tile 或覆盖层时，还需按 `docs/development.md` 完成真机验收。JVM 测试不能替代系统窗口验收。
 
-涉及 App 更新、发布脚本或 release 构建时，还需执行 `:app:assembleRelease` 和 `pnpm run publish:update -- --build-type <debug|release>` 对应的验证步骤。
+涉及 App 更新、发布脚本或 release 构建时，还需执行 `:app:assembleRelease` 和 `pnpm run publish:<debug|release>` 对应的验证步骤。
 
 ## 提交
 

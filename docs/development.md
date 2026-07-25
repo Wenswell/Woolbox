@@ -109,13 +109,13 @@ https://dl.1662803.xyz/d/woolbox/releases/release/latest.json
 `latest.json` 与版本化 APK 由发布工具生成。发布 debug：
 
 ```bash
-pnpm run publish:update -- --build-type debug
+pnpm run publish:debug
 ```
 
-发布工具会运行 debug 测试、lint 和构建，验证 APK 签名，从 `output-metadata.json` 生成 manifest，上传目录，并校验远端 manifest 与 APK `content-length`。release 命令会执行 `assembleRelease`，且只接受已签名 APK；未配置 release 签名时必须失败，不能上传 unsigned APK。
+`pnpm run publish:debug` 一次运行 debug 测试、lint 和构建，验证 APK 签名，从 `output-metadata.json` 生成 `latest.json`，上传版本化 APK 与 manifest，并校验远端 manifest 和 APK `content-length`。`pnpm run publish:release` 会执行 `assembleRelease`，且只接受已签名 APK；未配置 release 签名时必须失败，不能上传 unsigned APK。
 
 ```bash
-pnpm run publish:update -- --build-type release
+pnpm run publish:release
 ```
 
 修改发布脚本后执行：

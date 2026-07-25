@@ -78,10 +78,10 @@ git diff --check
 发布 debug 更新通道：
 
 ```bash
-pnpm run publish:update -- --build-type debug
+pnpm run publish:debug
 ```
 
-发布时指定构建类型；debug 只发布 debug，release 只发布 release。远端校验要求见 [开发指南](docs/development.md)。
+`pnpm run publish:debug` 一次完成 debug APK 构建、`latest.json` 生成、版本化 APK 上传和远端校验。release 使用 `pnpm run publish:release`，只处理 release 包。远端校验要求见 [开发指南](docs/development.md)。
 
 ## 更新版本
 

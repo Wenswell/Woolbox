@@ -3,6 +3,7 @@
   "type": "module",
   "packageManager": "pnpm@11.11.0",
   "scripts": {
-    "publish:update": "node tools/publish-update.mjs"
+    "publish:debug": "node tools/publish-update.mjs --build-type debug",
+    "publish:release": "node tools/publish-update.mjs --build-type release"
   }
 }
