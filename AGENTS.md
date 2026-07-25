@@ -36,8 +36,8 @@
 
 - 任何会改变 APK 内容、默认行为、资源、依赖、Manifest、BuildConfig 或构建结果的修改，都必须在同一提交前递增 `app/build.gradle.kts` 的 `versionCode` 和 `versionName`。
 - 纯文档或不进入 APK 的本地辅助文件可保持版本不变。升版本时同步 README 当前版本，并重新构建对应 APK 核对 `output-metadata.json`。
-- 更新通道按 `debug` 和 `release` 隔离。每个通道发布版本化 APK 和固定 `latest.json`；发布成功必须校验远端 manifest、APK `200` 和 `content-length`。release 只允许发布已签名 APK。
-- 功能版本升级的完成条件包括对应通道的远端发布与校验；提交信息或 README 必须记录本轮 manifest URL、版本和 APK 大小校验结果。
+- 更新通道按 `debug` 和 `release` 隔离：debug 只检查、下载、安装、生成和发布 debug APK；release 只处理 release APK。每个通道发布版本化 APK 和固定 `latest.json`；发布成功必须校验远端 manifest、APK `200` 和 `content-length`。release 只允许发布已签名 APK。
+- 功能版本升级的完成条件包括对应构建类型的远端发布与校验；提交信息或 README 必须记录构建类型、版本、manifest URL 和 APK 大小校验结果。
 
 ## 文档同步
 

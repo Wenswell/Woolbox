@@ -87,7 +87,7 @@ fun SettingScreen(
         AppSection(title = "Updates") {
             AppListItem(
                 title = "Current version",
-                subtitle = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                subtitle = "${BuildConfig.BUILD_TYPE} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Info)
                 },
@@ -95,11 +95,12 @@ fun SettingScreen(
                 onClick = onCheckForUpdate,
             )
             if (updateState.hasUpdate) {
+                val updateVersion = "${BuildConfig.BUILD_TYPE} ${updateState.availableVersionName}"
                 val title = when (updateState.phase) {
-                    AppUpdatePhase.DOWNLOADED -> "Install ${updateState.availableVersionName}"
+                    AppUpdatePhase.DOWNLOADED -> "Install $updateVersion"
                     AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION -> "Allow installs"
-                    AppUpdatePhase.INSTALLING -> "Installing ${updateState.availableVersionName}"
-                    else -> "Update ${updateState.availableVersionName}"
+                    AppUpdatePhase.INSTALLING -> "Installing $updateVersion"
+                    else -> "Update $updateVersion"
                 }
                 val onClick = when (updateState.phase) {
                     AppUpdatePhase.AVAILABLE,
@@ -168,9 +169,10 @@ fun SettingScreen(
             text = {
                 Text(
                     if (isDownloaded) {
-                        "Open Android installer for ${updateState.availableVersionName}?"
+                        "Open Android installer for ${BuildConfig.BUILD_TYPE} ${updateState.availableVersionName}?"
                     } else {
-                        "Download ${updateState.availableVersionName} (${updateState.availableSizeBytes.formatUpdateBytes()}) and open Android installer?"
+                        "Download ${BuildConfig.BUILD_TYPE} ${updateState.availableVersionName} " +
+                            "(${updateState.availableSizeBytes.formatUpdateBytes()}) and open Android installer?"
                     },
                 )
             },

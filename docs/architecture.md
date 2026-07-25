@@ -149,7 +149,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 ## App 更新
 
-`AppUpdateManager` 在 `MainActivity.onCreate` 初始化，设置页进入时读取 `BuildConfig.UPDATE_MANIFEST_URL`。debug 与 release 的 URL 固定为 `https://dl.1662803.xyz/d/woolbox/releases/{buildType}/latest.json`；manifest 必须匹配 `BuildConfig.APPLICATION_ID`、`BuildConfig.BUILD_TYPE`、正版本号、版本化 APK 路径、SHA-256 和 `1..500MiB` 的大小。HTTP 不跟随重定向，APK 仅接受同 host、无 query/fragment 的预期路径。
+`AppUpdateManager` 在 `MainActivity.onCreate` 初始化，设置页进入时读取 `BuildConfig.UPDATE_MANIFEST_URL`。debug 与 release 的 URL 固定为 `https://dl.1662803.xyz/d/woolbox/releases/{buildType}/latest.json`；manifest 必须匹配 `BuildConfig.APPLICATION_ID`、`BuildConfig.BUILD_TYPE`、正版本号、对应构建类型的版本化 APK 路径、SHA-256 和 `1..500MiB` 的大小。HTTP 不跟随重定向，APK 仅接受同 host、无 query/fragment 的预期路径。
 
 下载写入 `files/updates/` 的临时文件，大小与 SHA-256 全部通过后才改名为缓存 APK；缓存复用前重新校验。`AppUpdateInstaller` 使用 `MODE_FULL_INSTALL`、目标包名和 `USER_ACTION_REQUIRED` 创建 `PackageInstaller` session；`AppUpdateInstallReceiver` 只处理本应用显式广播并启动系统确认 Intent。安装来源授权由 `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 打开，App 不使用 FileProvider、静默安装或跨 build type 的 APK。
 

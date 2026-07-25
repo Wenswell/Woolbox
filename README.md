@@ -10,7 +10,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Woolbox，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
 | `Records` | 单人在线待办（含一级子事项）和量化记录；记录项可累计或按任意时间录入测量值。 | `Records` 底栏；分区与独立路由。 |
 
-`Global Copy` 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。OLED 没有服务时可在 Woolbox 内直接使用；服务连接后，页面入口会先把 Woolbox 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。Setting 会从 `dl.1662803.xyz` 检查同构建类型的版本化 APK，并经系统确认安装更新。
+`Global Copy` 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。OLED 没有服务时可在 Woolbox 内直接使用；服务连接后，页面入口会先把 Woolbox 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。Setting 仅检查当前构建类型的版本化 APK：debug 只更新 debug，release 只更新 release，并经系统确认安装。
 
 ## 使用前提
 
@@ -44,7 +44,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.1` (`versionCode 2`) |
+| 版本 | `0.1.2` (`versionCode 3`) |
 
 ## 目录
 
@@ -81,14 +81,14 @@ git diff --check
 pnpm run publish:update -- --build-type debug
 ```
 
-版本、签名 release 发布与远端校验要求见 [开发指南](docs/development.md)。
+发布时指定构建类型；debug 只发布 debug，release 只发布 release。远端校验要求见 [开发指南](docs/development.md)。
 
-## 更新通道
+## 更新版本
 
-| 通道 | 当前发布 |
+| 构建类型 | 当前发布版本 |
 | --- | --- |
-| debug | `0.1.1` (`versionCode 2`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.1-debug.apk`，远端 `content-length` `66,841,401`，SHA-256 `70de0a6a71b214b9c2d4a72357ea7103ea4e2f7986b2bf9178d5d751957b66a6`。 |
-| release | 仅发布使用正式证书签名的 APK；当前未发布。 |
+| debug | `0.1.2` (`versionCode 3`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.2-debug.apk`，远端 `content-length` `66,415,799`，SHA-256 `2a1f1df1e58115b8e4cd8401afa592cccfad892be6c39bc5951e2ff9459f9884`。 |
+| release | 尚未发布。 |
 
 安装到已连接设备：
 
