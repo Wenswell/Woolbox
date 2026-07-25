@@ -7,8 +7,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.wswensw.woolbox.record.ui.LocalMotionMode
+import com.wswensw.woolbox.record.ui.MotionMode
 
 enum class ThemeMode(
     val label: String,
@@ -72,6 +75,7 @@ private val DarkColors = darkColorScheme(
 fun AppTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     darkTheme: Boolean = themeMode.resolvedDarkTheme(isSystemInDarkTheme()),
+    motionMode: MotionMode = MotionMode.SYSTEM,
     useDynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -83,9 +87,11 @@ fun AppTheme(
         else -> LightColors
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = MaterialTheme.typography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalMotionMode provides motionMode) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = MaterialTheme.typography,
+            content = content,
+        )
+    }
 }

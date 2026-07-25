@@ -2,6 +2,7 @@ package com.wswensw.woolbox.record.ui
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -33,14 +34,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.luminance
@@ -159,6 +164,24 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
+    val gradientPhase = remember { Animatable(1f) }
+    val animateGradient = safeCompleted in 1 until safeTotal && !reduceMotion
+    LaunchedEffect(animateGradient) {
+        if (!animateGradient) {
+            gradientPhase.snapTo(0.5f)
+        } else {
+            while (true) {
+                gradientPhase.animateTo(
+                    targetValue = 0.85f,
+                    animationSpec = tween(durationMillis = 1_500, easing = LinearEasing),
+                )
+                gradientPhase.animateTo(
+                    targetValue = 0.15f,
+                    animationSpec = tween(durationMillis = 1_500, easing = LinearEasing),
+                )
+            }
+        }
+    }
     Row(
         modifier = modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(gap),
@@ -193,7 +216,19 @@ internal fun SegmentedProgressFill(
                                 scaleY = s
                                 alpha = pop
                             }
-                            .background(fillColor),
+                            .drawWithCache {
+                                val offset = size.width * (gradientPhase.value * 2f - 1f)
+                                val gradient = Brush.linearGradient(
+                                    colors = listOf(
+                                        fillColor,
+                                        fillColor.copy(alpha = fillColor.alpha * 1.05f),
+                                        fillColor,
+                                    ),
+                                    start = Offset(offset - size.width, size.height),
+                                    end = Offset(offset + size.width, 0f),
+                                )
+                                onDrawBehind { drawRect(gradient) }
+                            },
                     )
                 }
             }

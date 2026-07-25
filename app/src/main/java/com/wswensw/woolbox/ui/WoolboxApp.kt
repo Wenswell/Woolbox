@@ -62,6 +62,7 @@ import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
+import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.record.ui.RecordSheet
 import com.wswensw.woolbox.record.ui.crossedGoalThreshold
 import com.wswensw.woolbox.record.ui.displayRecordName
@@ -113,6 +114,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.RECORDS) }
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
+    var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var taskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -144,6 +146,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     AppTheme(
         themeMode = themeMode,
         darkTheme = darkTheme,
+        motionMode = motionMode,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
@@ -225,6 +228,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             MainTab.SETTING -> SettingScreen(
                                 themeMode = themeMode,
                                 onThemeModeChange = { themeMode = it },
+                                motionMode = motionMode,
+                                onMotionModeChange = { motionMode = it },
                                 recordsConnection = recordsState.connection.username
                                     .takeIf { recordsState.connection.isConfigured }
                                     ?: "Not configured",

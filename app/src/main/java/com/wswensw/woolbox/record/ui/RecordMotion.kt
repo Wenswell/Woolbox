@@ -3,16 +3,32 @@ package com.wswensw.woolbox.record.ui
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+
+enum class MotionMode(
+    val label: String,
+) {
+    SYSTEM("Follow system"),
+    ON("On"),
+    OFF("Off"),
+}
+
+internal val LocalMotionMode = staticCompositionLocalOf { MotionMode.SYSTEM }
 
 @Composable
 internal fun prefersReducedMotion(): Boolean {
     val context = LocalContext.current
-    return remember(context) {
+    val systemPrefersReducedMotion = remember(context) {
         Settings.Global.getFloat(
             context.contentResolver,
             Settings.Global.ANIMATOR_DURATION_SCALE,
             1f,
         ) == 0f
+    }
+    return when (LocalMotionMode.current) {
+        MotionMode.SYSTEM -> systemPrefersReducedMotion
+        MotionMode.ON -> false
+        MotionMode.OFF -> true
     }
 }

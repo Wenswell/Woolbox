@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.wswensw.woolbox.BuildConfig
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
+import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.update.AppUpdatePhase
 import com.wswensw.woolbox.update.AppUpdateUiState
 
@@ -22,6 +23,8 @@ import com.wswensw.woolbox.update.AppUpdateUiState
 fun SettingScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    motionMode: MotionMode,
+    onMotionModeChange: (MotionMode) -> Unit,
     recordsConnection: String,
     onOpenRecordsConnection: () -> Unit,
     rootTaskPreviewLimit: RootTaskPreviewLimit,
@@ -33,6 +36,7 @@ fun SettingScreen(
     modifier: Modifier = Modifier,
 ) {
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+    var showMotionDialog by rememberSaveable { mutableStateOf(false) }
     var showPreviewLimitDialog by rememberSaveable { mutableStateOf(false) }
     var showVersionDialog by rememberSaveable { mutableStateOf(false) }
     var showDownloadConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -50,6 +54,14 @@ fun SettingScreen(
                     AppListLeadingIcon(imageVector = Icons.Outlined.Palette)
                 },
                 onClick = { showThemeDialog = true },
+            )
+            AppListItem(
+                title = "Motion",
+                subtitle = motionMode.label,
+                leadingContent = {
+                    AppListLeadingIcon(imageVector = Icons.Outlined.Info)
+                },
+                onClick = { showMotionDialog = true },
             )
         }
 
@@ -139,6 +151,17 @@ fun SettingScreen(
             label = { it.label },
             onSelected = onThemeModeChange,
             onDismiss = { showThemeDialog = false },
+        )
+    }
+
+    if (showMotionDialog) {
+        AppSingleChoiceDialog(
+            title = "Motion",
+            options = MotionMode.entries,
+            selected = motionMode,
+            label = { it.label },
+            onSelected = onMotionModeChange,
+            onDismiss = { showMotionDialog = false },
         )
     }
 
