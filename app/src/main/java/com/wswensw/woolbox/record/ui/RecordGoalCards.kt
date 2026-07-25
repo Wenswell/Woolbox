@@ -149,8 +149,8 @@ private fun DrawScope.drawLiquidLayer(
  * Full-height segmented progress for task cards.
  * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
  * transparent and expose the page surface. Completed tiles use
- * [completedBackgroundColor] with [fillColor] and one shared left-to-right
- * sheen sampled across the whole bar.
+ * [completedBackgroundColor] under a shared A→B→A→B color gradient that
+ * scrolls left to right across the whole bar.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -165,23 +165,21 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    val sheenPhase = remember { Animatable(0.5f) }
-    val animateSheen = safeCompleted in 1 until safeTotal && !reduceMotion
-    LaunchedEffect(animateSheen) {
-        if (!animateSheen) {
-            sheenPhase.snapTo(0.5f)
+    val gradientPhase = remember { Animatable(0.5f) }
+    val animateGradient = safeCompleted in 1 until safeTotal && !reduceMotion
+    LaunchedEffect(animateGradient) {
+        if (!animateGradient) {
+            gradientPhase.snapTo(0.5f)
             return@LaunchedEffect
         }
-        // One soft band loops left → right across the full segmented bar.
-        // Travel starts fully off-screen left and ends fully off-screen right,
-        // so the snap-back is invisible.
-        sheenPhase.snapTo(0f)
+        // Scroll one A→B cycle per loop so the pattern continues without a jump.
+        gradientPhase.snapTo(0f)
         while (true) {
-            sheenPhase.animateTo(
+            gradientPhase.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 1_800, easing = LinearEasing),
             )
-            sheenPhase.snapTo(0f)
+            gradientPhase.snapTo(0f)
         }
     }
     Row(
@@ -219,7 +217,7 @@ internal fun SegmentedProgressFill(
                                 alpha = pop
                             }
                             .drawWithCache {
-                                val phase = sheenPhase.value
+                                val phase = gradientPhase.value
                                 val gapPx = gap.toPx()
                                 val segmentWidth = size.width
                                 val fullWidth = if (safeTotal <= 1) {
@@ -227,26 +225,29 @@ internal fun SegmentedProgressFill(
                                 } else {
                                     segmentWidth * safeTotal + gapPx * (safeTotal - 1)
                                 }
-                                // One band sized to the whole bar, not each tile.
-                                val band = fullWidth * 0.32f
-                                val travel = fullWidth + band
-                                val globalStartX = -band + travel * phase
+                                val colorA = fillColor
+                                val colorB = fillColor.copy(
+                                    alpha = (fillColor.alpha * 2f).coerceIn(0.18f, 0.64f),
+                                )
+                                // One A→B→A cycle width; 3 cycles cover the bar while scrolling.
+                                val cycle = (fullWidth * 0.5f).coerceAtLeast(1f)
+                                val shift = phase * cycle
                                 val localLeft = index * (segmentWidth + gapPx)
-                                val localStartX = globalStartX - localLeft
-                                val sheen = Color.White.copy(alpha = 0.18f)
+                                val localStartX = shift - cycle - localLeft
                                 val brush = Brush.horizontalGradient(
-                                    colorStops = arrayOf(
-                                        0f to Color.Transparent,
-                                        0.5f to sheen,
-                                        1f to Color.Transparent,
+                                    colors = listOf(
+                                        colorA,
+                                        colorB,
+                                        colorA,
+                                        colorB,
+                                        colorA,
+                                        colorB,
+                                        colorA,
                                     ),
                                     startX = localStartX,
-                                    endX = localStartX + band,
+                                    endX = localStartX + cycle * 3f,
                                 )
-                                onDrawBehind {
-                                    drawRect(fillColor)
-                                    drawRect(brush)
-                                }
+                                onDrawBehind { drawRect(brush) }
                             },
                     )
                 }
