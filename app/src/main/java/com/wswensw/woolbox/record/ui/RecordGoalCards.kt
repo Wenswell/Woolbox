@@ -149,7 +149,7 @@ private fun DrawScope.drawLiquidLayer(
  * Full-height segmented progress for task cards.
  * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
  * transparent and expose the page surface. Completed tiles use
- * [completedBackgroundColor] with [fillColor] above it.
+ * [completedBackgroundColor] with a soft left-to-right sheen over [fillColor].
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -164,22 +164,23 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    val gradientPhase = remember { Animatable(1f) }
-    val animateGradient = safeCompleted in 1 until safeTotal && !reduceMotion
-    LaunchedEffect(animateGradient) {
-        if (!animateGradient) {
-            gradientPhase.snapTo(0.5f)
-        } else {
-            while (true) {
-                gradientPhase.animateTo(
-                    targetValue = 0.85f,
-                    animationSpec = tween(durationMillis = 1_500, easing = LinearEasing),
-                )
-                gradientPhase.animateTo(
-                    targetValue = 0.15f,
-                    animationSpec = tween(durationMillis = 1_500, easing = LinearEasing),
-                )
-            }
+    val sheenPhase = remember { Animatable(0.5f) }
+    val animateSheen = safeCompleted in 1 until safeTotal && !reduceMotion
+    LaunchedEffect(animateSheen) {
+        if (!animateSheen) {
+            sheenPhase.snapTo(0.5f)
+            return@LaunchedEffect
+        }
+        // Soft horizontal light band loops left → right only.
+        // Band starts fully off-screen left and ends fully off-screen right,
+        // so the snap-back is invisible.
+        sheenPhase.snapTo(0f)
+        while (true) {
+            sheenPhase.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 1_800, easing = LinearEasing),
+            )
+            sheenPhase.snapTo(0f)
         }
     }
     Row(
@@ -217,17 +218,24 @@ internal fun SegmentedProgressFill(
                                 alpha = pop
                             }
                             .drawWithCache {
-                                val offset = size.width * (gradientPhase.value * 2f - 1f)
-                                val gradient = Brush.linearGradient(
-                                    colors = listOf(
-                                        fillColor,
-                                        fillColor.copy(alpha = fillColor.alpha * 1.05f),
-                                        fillColor,
+                                val phase = sheenPhase.value
+                                val band = size.width * 0.9f
+                                val travel = size.width + band
+                                val startX = -band + travel * phase
+                                val sheen = Color.White.copy(alpha = 0.18f)
+                                val brush = Brush.horizontalGradient(
+                                    colorStops = arrayOf(
+                                        0f to Color.Transparent,
+                                        0.5f to sheen,
+                                        1f to Color.Transparent,
                                     ),
-                                    start = Offset(offset - size.width, size.height),
-                                    end = Offset(offset + size.width, 0f),
+                                    startX = startX,
+                                    endX = startX + band,
                                 )
-                                onDrawBehind { drawRect(gradient) }
+                                onDrawBehind {
+                                    drawRect(fillColor)
+                                    drawRect(brush)
+                                }
                             },
                     )
                 }
