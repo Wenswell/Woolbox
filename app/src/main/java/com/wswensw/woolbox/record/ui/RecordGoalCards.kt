@@ -1,5 +1,6 @@
 package com.wswensw.woolbox.record.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Animatable
@@ -149,8 +150,8 @@ private fun DrawScope.drawLiquidLayer(
  * Full-height segmented progress for task cards.
  * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
  * transparent and expose the page surface. Completed tiles use
- * [completedBackgroundColor] under a shared A→B→A→B color gradient that
- * scrolls left to right across the whole bar.
+ * [completedBackgroundColor] under a solid [fillColor] wash. While a task
+ * is only partly done, that wash shares one slow alpha breath.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -165,23 +166,30 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    val gradientPhase = remember { Animatable(0.5f) }
-    val animateGradient = safeCompleted in 1 until safeTotal && !reduceMotion
-    LaunchedEffect(animateGradient) {
-        if (!animateGradient) {
-            gradientPhase.snapTo(0.5f)
+    val breathPhase = remember { Animatable(0.5f) }
+    val animateBreath = safeCompleted in 1 until safeTotal && !reduceMotion
+    LaunchedEffect(animateBreath) {
+        if (!animateBreath) {
+            breathPhase.snapTo(0.5f)
             return@LaunchedEffect
         }
-        // Scroll one A→B cycle per loop so the pattern continues without a jump.
-        gradientPhase.snapTo(0f)
         while (true) {
-            gradientPhase.animateTo(
+            breathPhase.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 1_800, easing = LinearEasing),
+                animationSpec = tween(durationMillis = 2_200, easing = FastOutSlowInEasing),
             )
-            gradientPhase.snapTo(0f)
+            breathPhase.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 2_200, easing = FastOutSlowInEasing),
+            )
         }
     }
+    val fillAlpha = if (animateBreath) {
+        0.28f + (0.40f - 0.28f) * breathPhase.value
+    } else {
+        fillColor.alpha
+    }
+    val breathFill = fillColor.copy(alpha = fillAlpha)
     Row(
         modifier = modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(gap),
@@ -216,39 +224,7 @@ internal fun SegmentedProgressFill(
                                 scaleY = s
                                 alpha = pop
                             }
-                            .drawWithCache {
-                                val phase = gradientPhase.value
-                                val gapPx = gap.toPx()
-                                val segmentWidth = size.width
-                                val fullWidth = if (safeTotal <= 1) {
-                                    segmentWidth
-                                } else {
-                                    segmentWidth * safeTotal + gapPx * (safeTotal - 1)
-                                }
-                                val colorA = fillColor
-                                val colorB = fillColor.copy(
-                                    alpha = (fillColor.alpha * 2f).coerceIn(0.18f, 0.64f),
-                                )
-                                // One A→B→A cycle width; 3 cycles cover the bar while scrolling.
-                                val cycle = (fullWidth * 0.5f).coerceAtLeast(1f)
-                                val shift = phase * cycle
-                                val localLeft = index * (segmentWidth + gapPx)
-                                val localStartX = shift - cycle - localLeft
-                                val brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        colorA,
-                                        colorB,
-                                        colorA,
-                                        colorB,
-                                        colorA,
-                                        colorB,
-                                        colorA,
-                                    ),
-                                    startX = localStartX,
-                                    endX = localStartX + cycle * 3f,
-                                )
-                                onDrawBehind { drawRect(brush) }
-                            },
+                            .background(breathFill),
                     )
                 }
             }
