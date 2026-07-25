@@ -58,7 +58,7 @@ class RecordRulesTest {
 
     @Test
     fun clearsPeriodWhenGoalIsAbsent() {
-        val result = draft(goalValue = null, goalPeriod = GoalPeriod.WEEK).validated()
+        val result = draft(goalValue = null, goalPeriod = GoalPeriod.DAYS_7).validated()
 
         assertNull(result.goalPeriod)
     }
@@ -104,12 +104,12 @@ class RecordRulesTest {
     }
 
     @Test
-    fun calculatesDailyAndRollingSevenDayGoalValues() {
+    fun calculatesDailyAndDays7GoalValues() {
         val daily = item(1, "Water", "", 0, 1).copy(goalValue = 8.0, goalPeriod = GoalPeriod.DAY)
-        val weekly = item(2, "Read", "", 0, 1).copy(goalValue = 10.0, goalPeriod = GoalPeriod.WEEK)
+        val days7 = item(2, "Read", "", 0, 1).copy(goalValue = 10.0, goalPeriod = GoalPeriod.DAYS_7)
         // 2026-07-21 rolling window: 2026-07-15 .. 2026-07-21
         val values = goalValues(
-            items = listOf(daily, weekly),
+            items = listOf(daily, days7),
             date = LocalDate.parse("2026-07-21"),
             dayEntries = listOf(entry(1, "2026-07-21", 2.0), entry(2, "2026-07-21", 3.0)),
             recentEntries = listOf(

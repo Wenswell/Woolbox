@@ -157,17 +157,16 @@ fun goalValues(
     dayEntries: List<RecordEntry>,
     recentEntries: List<RecordEntry>,
 ): Map<Long, Double> {
-    // WEEK goals use a rolling last-N-days window so totals move forward every day.
+    // DAYS_7 goals sum a rolling last-N-days window that advances every day.
     val rollingStart = date.minusDays((RECENT_ACTIVE_DAYS - 1).toLong()).toString()
     val today = date.toString()
     return items.mapNotNull { item ->
         if (item.mode != RecordMode.ACCUMULATE) return@mapNotNull null
         val period = item.goalPeriod ?: return@mapNotNull null
         item.goalValue ?: return@mapNotNull null
-        val entries = if (period == GoalPeriod.DAY) {
-            dayEntries
-        } else {
-            recentEntries.filter { it.localDate in rollingStart..today }
+        val entries = when (period) {
+            GoalPeriod.DAY -> dayEntries
+            GoalPeriod.DAYS_7 -> recentEntries.filter { it.localDate in rollingStart..today }
         }
         item.id to entries.filter { it.itemId == item.id }.sumOf(RecordEntry::value)
     }.toMap()

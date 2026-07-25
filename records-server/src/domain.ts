@@ -1,5 +1,5 @@
 export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
-export const GOAL_PERIODS = ["DAY", "WEEK"] as const;
+export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const TASK_HORIZONS = ["TODAY", "LATER"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;

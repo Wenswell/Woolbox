@@ -283,12 +283,12 @@ internal fun recentDaysRowWidth(
 }
 
 /**
- * Weekly goal track in the same width footprint as the 7-day pies.
+ * 7-day goal track in the same width footprint as the 7-day pies.
  * Height is 8dp (thinner than the non-today pie). Bar ends A=6dp; cut sides
  * and fill B=1.5dp; gap 2dp. Seven independent stroked tiles with transparent gaps.
  */
 @Composable
-internal fun WeeklyGoalProgressBar(
+internal fun Days7GoalProgressBar(
     progress: Float,
     fillColor: Color,
     modifier: Modifier = Modifier,
@@ -304,7 +304,7 @@ internal fun WeeklyGoalProgressBar(
     val animated by animateFloatAsState(
         targetValue = target,
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "WeeklyGoalProgressBar",
+        label = "Days7GoalProgressBar",
     )
     val borderColor = fillColor.copy(alpha = 0.16f)
     val units = animated * segments
@@ -563,7 +563,7 @@ internal fun GoalProgressPanel(
     val progressColor = colors.accent
     val periodLabel = when (checkNotNull(item.goalPeriod)) {
         GoalPeriod.DAY -> "today"
-        GoalPeriod.WEEK -> "last 7 days"
+        GoalPeriod.DAYS_7 -> "last 7 days"
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -573,7 +573,7 @@ internal fun GoalProgressPanel(
             fontWeight = FontWeight.SemiBold,
             color = progressColor,
         )
-        if (item.goalPeriod == GoalPeriod.WEEK) {
+        if (item.goalPeriod == GoalPeriod.DAYS_7) {
             Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },

@@ -15,7 +15,7 @@ export const recordItems = sqliteTable(
     stepValue: real("step_value").notNull(),
     unit: text("unit").notNull(),
     goalValue: real("goal_value"),
-    goalPeriod: text("goal_period", { enum: ["DAY", "WEEK"] }),
+    goalPeriod: text("goal_period", { enum: ["DAY", "DAYS_7"] }),
     priority: integer("priority").notNull(),
     archived: integer("archived", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),

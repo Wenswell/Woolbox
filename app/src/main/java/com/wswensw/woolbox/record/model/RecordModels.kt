@@ -12,7 +12,7 @@ enum class RecordMode {
 
 enum class GoalPeriod {
     DAY,
-    WEEK,
+    DAYS_7,
 }
 
 data class RecordWindow(

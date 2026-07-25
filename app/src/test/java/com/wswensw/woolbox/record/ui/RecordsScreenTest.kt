@@ -63,7 +63,7 @@ class RecordsScreenTest {
         val ordered = orderedRecordItems(
             listOf(
                 recordItem(id = 1, name = "A", priority = 100, period = null),
-                recordItem(id = 2, name = "B", priority = 20, period = GoalPeriod.WEEK),
+                recordItem(id = 2, name = "B", priority = 20, period = GoalPeriod.DAYS_7),
                 recordItem(id = 3, name = "C", priority = 50, period = GoalPeriod.DAY),
                 recordItem(id = 4, name = "D", priority = 90, period = null),
             ),
@@ -77,7 +77,7 @@ class RecordsScreenTest {
             recordItem(id = 1, name = "Water", priority = 1, period = GoalPeriod.DAY),
             recordItem(id = 2, name = "Temperature", priority = 2, period = null)
                 .copy(mode = RecordMode.MEASUREMENT),
-            recordItem(id = 3, name = "Reading", priority = 3, period = GoalPeriod.WEEK),
+            recordItem(id = 3, name = "Reading", priority = 3, period = GoalPeriod.DAYS_7),
         )
 
         assertEquals(
@@ -95,10 +95,10 @@ class RecordsScreenTest {
         val focus = goalItems(
             listOf(
                 recordItem(id = 1, name = "A", priority = 100, period = null),
-                recordItem(id = 2, name = "B", priority = 20, period = GoalPeriod.WEEK),
+                recordItem(id = 2, name = "B", priority = 20, period = GoalPeriod.DAYS_7),
                 recordItem(id = 3, name = "C", priority = 50, period = GoalPeriod.DAY),
                 recordItem(id = 4, name = "D", priority = 40, period = GoalPeriod.DAY),
-                recordItem(id = 5, name = "E", priority = 10, period = GoalPeriod.WEEK),
+                recordItem(id = 5, name = "E", priority = 10, period = GoalPeriod.DAYS_7),
             ),
         )
 
@@ -109,12 +109,12 @@ class RecordsScreenTest {
     fun goalItemsSeparatePeriodsAndKeepPriorityOrder() {
         val items = listOf(
             recordItem(id = 1, name = "A", priority = 10, period = GoalPeriod.DAY),
-            recordItem(id = 2, name = "B", priority = 30, period = GoalPeriod.WEEK),
+            recordItem(id = 2, name = "B", priority = 30, period = GoalPeriod.DAYS_7),
             recordItem(id = 3, name = "C", priority = 20, period = GoalPeriod.DAY),
         )
 
         assertEquals(listOf(3L, 1L), goalItems(items, GoalPeriod.DAY).map(RecordItem::id))
-        assertEquals(listOf(2L), goalItems(items, GoalPeriod.WEEK).map(RecordItem::id))
+        assertEquals(listOf(2L), goalItems(items, GoalPeriod.DAYS_7).map(RecordItem::id))
     }
 
     @Test
@@ -196,7 +196,7 @@ class RecordsScreenTest {
     fun focusGoalCompletionCountsReachedGoals() {
         val goals = listOf(
             recordItem(id = 1, name = "A", priority = 10, period = GoalPeriod.DAY, goalValue = 10.0),
-            recordItem(id = 2, name = "B", priority = 9, period = GoalPeriod.WEEK, goalValue = 20.0),
+            recordItem(id = 2, name = "B", priority = 9, period = GoalPeriod.DAYS_7, goalValue = 20.0),
             recordItem(id = 3, name = "C", priority = 8, period = GoalPeriod.DAY, goalValue = 5.0),
         )
         val completion = focusGoalCompletion(

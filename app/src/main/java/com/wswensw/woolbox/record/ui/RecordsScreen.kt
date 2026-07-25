@@ -588,14 +588,14 @@ private fun AccumulateRailCard(
                 )
                 Spacer(Modifier.weight(1f))
                 if (hasGoal) {
-                    val isWeekGoal = period == GoalPeriod.WEEK
+                    val isDays7Goal = period == GoalPeriod.DAYS_7
                     val goalText = buildString {
                         append(formatValue(checkNotNull(target)))
                         if (item.unit.isNotBlank()) {
                             append(' ')
                             append(item.unit)
                         }
-                        if (isWeekGoal) {
+                        if (isDays7Goal) {
                             append(" · 7 days")
                         }
                     }
@@ -604,12 +604,12 @@ private fun AccumulateRailCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
-                            imageVector = if (isWeekGoal) {
+                            imageVector = if (isDays7Goal) {
                                 Icons.Outlined.DateRange
                             } else {
                                 Icons.Outlined.Flag
                             },
-                            contentDescription = if (isWeekGoal) "Weekly goal" else "Daily goal",
+                            contentDescription = if (isDays7Goal) "7-day goal" else "Daily goal",
                             tint = progressColor,
                             modifier = Modifier.size(14.dp),
                         )
@@ -624,8 +624,8 @@ private fun AccumulateRailCard(
                     }
                 }
                 if (hasGoal) {
-                    if (period == GoalPeriod.WEEK) {
-                        WeeklyGoalProgressBar(
+                    if (period == GoalPeriod.DAYS_7) {
+                        Days7GoalProgressBar(
                             progress = fillProgress,
                             fillColor = progressColor,
                             reduceMotion = reduceMotion,
