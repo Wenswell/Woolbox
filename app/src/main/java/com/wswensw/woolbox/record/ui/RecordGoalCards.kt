@@ -1,6 +1,5 @@
 package com.wswensw.woolbox.record.ui
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Animatable
@@ -150,8 +149,9 @@ private fun DrawScope.drawLiquidLayer(
  * Full-height segmented progress for task cards.
  * Unfinished tiles paint [unfinishedBackgroundColor], while gaps stay
  * transparent and expose the page surface. Completed tiles use
- * [completedBackgroundColor] under a solid [fillColor] wash. While a task
- * is only partly done, that wash shares one slow alpha breath.
+ * [completedBackgroundColor] under a [fillColor] wash. While a task is
+ * only partly done, completed tiles share one diagonal stripe field that
+ * scrolls left to right across the whole bar.
  */
 @Composable
 internal fun SegmentedProgressFill(
@@ -166,30 +166,24 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = total.coerceAtLeast(0)
     val safeCompleted = completed.coerceIn(0, safeTotal)
-    val breathPhase = remember { Animatable(0.5f) }
-    val animateBreath = safeCompleted in 1 until safeTotal && !reduceMotion
-    LaunchedEffect(animateBreath) {
-        if (!animateBreath) {
-            breathPhase.snapTo(0.5f)
+    val stripePhase = remember { Animatable(0f) }
+    val animateStripes = safeCompleted in 1 until safeTotal && !reduceMotion
+    LaunchedEffect(animateStripes) {
+        if (!animateStripes) {
+            stripePhase.snapTo(0f)
             return@LaunchedEffect
         }
+        // One stripe period per loop; snap-back is invisible because the
+        // pattern repeats every period.
+        stripePhase.snapTo(0f)
         while (true) {
-            breathPhase.animateTo(
+            stripePhase.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 2_200, easing = FastOutSlowInEasing),
+                animationSpec = tween(durationMillis = 1_400, easing = LinearEasing),
             )
-            breathPhase.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 2_200, easing = FastOutSlowInEasing),
-            )
+            stripePhase.snapTo(0f)
         }
     }
-    val fillAlpha = if (animateBreath) {
-        0.28f + (0.40f - 0.28f) * breathPhase.value
-    } else {
-        fillColor.alpha
-    }
-    val breathFill = fillColor.copy(alpha = fillAlpha)
     Row(
         modifier = modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(gap),
@@ -224,11 +218,55 @@ internal fun SegmentedProgressFill(
                                 scaleY = s
                                 alpha = pop
                             }
-                            .background(breathFill),
+                            .drawWithCache {
+                                val stripeWidth = 10.dp.toPx()
+                                val period = stripeWidth * 2f
+                                val gapPx = gap.toPx()
+                                val localLeft = index * (size.width + gapPx)
+                                val globalShift = stripePhase.value * period
+                                val localShift = ((globalShift - localLeft) % period + period) % period
+                                val baseColor = fillColor
+                                val stripeColor = fillColor.copy(
+                                    alpha = (fillColor.alpha * 1.55f).coerceIn(0.2f, 0.58f),
+                                )
+                                onDrawBehind {
+                                    drawRect(baseColor)
+                                    if (animateStripes) {
+                                        drawDiagonalStripes(
+                                            stripeColor = stripeColor,
+                                            stripeWidthPx = stripeWidth,
+                                            periodPx = period,
+                                            shiftPx = localShift,
+                                        )
+                                    }
+                                }
+                            },
                     )
                 }
             }
         }
+    }
+}
+
+/** 45° candy stripes. [shiftPx] is already reduced into one [periodPx]. */
+private fun DrawScope.drawDiagonalStripes(
+    stripeColor: Color,
+    stripeWidthPx: Float,
+    periodPx: Float,
+    shiftPx: Float,
+) {
+    val extent = size.width + size.height + periodPx
+    var x = -size.height - periodPx + shiftPx
+    while (x < extent) {
+        val path = Path().apply {
+            moveTo(x, size.height)
+            lineTo(x + stripeWidthPx, size.height)
+            lineTo(x + stripeWidthPx + size.height, 0f)
+            lineTo(x + size.height, 0f)
+            close()
+        }
+        drawPath(path = path, color = stripeColor)
+        x += periodPx
     }
 }
 
