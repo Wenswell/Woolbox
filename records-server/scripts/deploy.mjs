@@ -28,7 +28,9 @@ if (!response?.ok) process.exit(1);
 const overview = await response.json();
 if (!Array.isArray(overview.items) || !Array.isArray(overview.tasks)) process.exit(1);
 if (!overview.items.every((item) => Array.isArray(item.windows))) process.exit(1);
-if (!overview.tasks.every((task) => Array.isArray(task.windows))) process.exit(1);
+if (!overview.tasks.every(
+  (task) => Array.isArray(task.steps) && task.steps.every((step) => Array.isArray(step.windows)),
+)) process.exit(1);
 NODE
   then
     break

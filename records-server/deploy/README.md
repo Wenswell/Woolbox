@@ -42,7 +42,7 @@ pnpm deploy
 
 `pnpm deploy` runs type checking, API and Web tests, production build, release synchronization, production dependency installation, service restart, migration-schema verification, and a local API health check that waits up to 20 seconds. It targets the `cloud` SSH host and `/home/ravvss/records` release path.
 
-Deploy a server contract change before distributing an Android APK that depends on it. The deployment check validates required schema objects and the current `/api/overview` response contract, including `windows` arrays for every record item and task.
+Deploy a server contract change before distributing an Android APK that depends on it. The deployment check validates required schema objects and the current `/api/overview` response contract, including `windows` arrays for every record item and task step.
 
 ## Verify
 
