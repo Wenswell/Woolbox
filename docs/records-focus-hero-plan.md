@@ -44,33 +44,47 @@ that model is sound and tested; only its presentation and its write path change.
    the data behind it — only the drawing goes.
 
 2. **Accumulate hero.** Full-width card reusing `LiquidProgressFill` and
-   `recordProgressColors`: name, `cumulative / goal unit`, reason, then a row of
-   `[−] amount unit [+]` and a submit control. Amount seeds from `defaultValue`
-   and steps by `stepValue` through `stepRecordValue`. Only submit writes.
+   `recordProgressColors`: name, value, reason, then a row of `[−] amount unit
+   [+]` and a submit control. The value is today's total for a daily goal or no
+   goal, and the rolling 7-day total for a 7-day goal; show `/ goal` only when a
+   goal exists. Amount seeds from `defaultValue` and steps by `stepValue` through
+   `stepRecordValue`. Only a valid, idle submit writes. Disable all hero writes
+   while its request is in flight; on failure keep the draft amount and show the
+   server error, and on success reset it to the default.
 
 3. **Subtask hero.** Same footprint using `SegmentedProgressFill` for the parent
    task's progress: subtask title, task title, reason, and a checkbox as the
-   commit target. No stepper — a subtask is boolean.
+   commit target. The checkbox is disabled while completion is in flight. No
+   stepper — a subtask is boolean.
 
 4. **Queue rows.** Rows navigate: accumulate opens the record Sheet, subtask
    opens the task progress Sheet. Subtask rows carry a leading checkbox as an
    independent target. Deferral moves to the hero's overflow, keeping one primary
-   and one secondary action per surface.
+   and one secondary action per surface. Show `Not now` only for a non-deferred
+   hero; it keeps the existing same-day tail ordering and automatically expires
+   on the next local date.
 
 5. **Reason labels.** Drop `FocusReason.Queued`'s label; render nothing when a
    candidate has no informative reason. Keep the reason in the model, since it
    still drives ordering.
 
-6. **Tests.** Amount stepping and submission are pure functions where possible;
-   cover seed value, stepping bounds and that a mis-stepped amount never becomes
-   an entry. Ranking tests stay as they are.
+6. **Tests.** Keep amount stepping and submit eligibility pure where possible;
+   cover default seeding, the positive step floor, invalid input, and that an
+   amount change never writes. Cover an in-flight submit being accepted once,
+   preserving its value on failure, and a successful submit resetting it to the
+   default. Ranking tests stay as they are.
 
 7. **Docs and version.** Rewrite the `Focus` rows in `docs/product.md` and
    `docs/design-system.md`, update `README.md`, bump `versionCode`/`versionName`
    and sync the README version row in the same commit.
 
-8. **Verify.** `./gradlew :app:testDebugUnitTest :app:assembleDebug` and
-   `git diff --check`. The server is untouched.
+8. **Verify and publish.** Run `:app:testDebugUnitTest`, `:app:assembleDebug`,
+   `git diff --check`, and inspect the debug `output-metadata.json` for the
+   bumped version. Install the debug APK on the connected device and complete the
+   device acceptance below. Commit the finished change, then run
+   `pnpm run publish:debug`; verify the remote debug `latest.json`, versioned APK
+   `200`, and `content-length`. Record the manifest URL and size result in the
+   README release row or commit message. The server is untouched.
 
 ## Acceptance
 
@@ -78,14 +92,23 @@ that model is sound and tested; only its presentation and its write path change.
   without writing anything.
 - Exactly one control per hero writes to the server; stepping and scrolling never
   produce an entry.
+- A submit remains single-shot until its server request completes; a failed
+  request keeps its selected amount, while a successful one resets to the default.
+- A no-goal accumulate hero shows today's total without a missing goal value; a
+  daily and a 7-day goal use their respective accumulation periods.
 - No queue row writes on a body tap; subtask checkboxes are the only in-row
   commit target.
+- `Not now` appears only for a non-deferred hero and still expires at the next
+  local date.
 - The focus surface introduces no shape that the sections do not already use.
 - Day state occupies one line and one rule.
 - Android unit tests and `assembleDebug` pass; the working tree is clean.
 
 ## Device acceptance
 
-Mis-tap resistance, the hero's weight against the sections, and whether the
-stepper is comfortable one-handed cannot be judged by JVM tests. All three need
-the connected device before publishing.
+On the connected debug build, adjust an accumulate value without submitting,
+then submit it once and confirm the exact value appears in today's entries. Also
+check a fast repeated tap during submission, a failed request, subtask checkbox
+vs row-body navigation, deferral expiry after a date change, and one-handed
+stepper reach. Confirm the hero remains visually subordinate to the three
+sections. These checks are required before publishing.
