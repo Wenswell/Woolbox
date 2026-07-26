@@ -110,10 +110,11 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **Tasks → Accumulate → Measurement**。区标题为紧凑 `labelLarge` + Manage 图标，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。可出现只读总览行（`Tasks a/b · Goals c/d`）；无任务且无目标时隐藏。分段进度、液面和卡色变化使用短动画；系统关闭动画时瞬时到位。根列表滑动期间冻结液面波与任务条纹等装饰性循环动画，避免与滚动抢帧；停滑后再延迟 `300ms` 恢复。
+Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **Tasks → Accumulate → Measurement**。区标题为紧凑 `labelLarge` + Manage 图标，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。列表首行可出现只读 `Now` 时间条；无任务、无目标且无推荐时段时隐藏。分段进度、液面和卡色变化使用短动画；系统关闭动画时瞬时到位。根列表滑动期间冻结液面波与任务条纹等装饰性循环动画，避免与滚动抢帧；停滑后再延迟 `300ms` 恢复。
 
 | 区域 | 唯一职责 |
 | --- | --- |
+| `Now` | 列表首行时间条：左 `EEE d MMM · HH:mm`、右 `Tasks a/b · Goals c/d`（均 `labelLarge` `onSurfaceVariant`），下方 `3dp` 当日已过进度线；再下方为推荐时段 chip 行或 `Next · HH:mm 名称 · in 1h 20m` 单行提示。 |
 | `Tasks` | `Today`/`Later` 分组；全宽卡按子事项分段竖条，未完成格固定使用 Accumulate 0% 的卡底色，完成格使用任务进度底色并弹出填充，格间透明露出页面底色；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
 | `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron）；顶栏加号新建；编辑路由负责标题、子事项增删排序和删除。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
@@ -132,6 +133,7 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 - 字阶：section `labelLarge` primary；Accumulate 名称 `labelMedium` 弱化（约 0.62 alpha）；主值 `titleMedium` SemiBold + accent；次文案 `labelMedium`/`bodySmall`。
 - 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（浅色 wash 约 7%→46%，深色 10%→36%，文案用 `onSurface`）；`LATE` 仍为 primary；**`DONE` 固定成功绿**（深/浅分套，与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用近 7 日有值天数比；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
+- 时间：`Now` 时间条的当日进度线不表达用户成绩，固定用 `onSurfaceVariant`（轨 16%、已过 45%），不占用 primary 与完成绿；推荐 chip 用记录项自身进度色（`accent` 14% 底 + `accent` 字，`CircleShape`，等宽 `weight(1f)`，最小高 `44dp`），文案为 `名称 +默认值`。Accumulate 卡名称行右端显示当日最后一次记录时刻（`HH:mm`，与名称同为 `labelMedium` 0.62 alpha），无今日流水时不显示。时间条只在自身作用域读取时钟，分钟跳动不触发整页重组。
 - 动作：根页仅 Manage（小 `IconButton`）；新建只在 Manage 顶栏 tonal 加号。完成折叠为普通 `IconButton`。
 - Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有7 日目标时底部为与近 7 日饼行同宽、高 8dp 的 7 段独立描边块（按滚动近 7 日累计/目标比例填充；段外框 A=6dp、进度填充 B=1.5dp、段间 2dp 透明；描边同圆饼 track 16%）；目标行用日历图标与 `· 7 days` 区分；不重复百分比或 `current / target`。系统关闭动画或 Records 根列表正在滑动时液面波静止（高度仍保留；停滑并延迟 `300ms` 后恢复）；高度变化仍可短动画到位。
 - Tasks 分段竖条与子事项**固定位序**一一对应（完成第 1、3 项则只填第 1、3 格，不把完成项挤到左侧）；顺序只在 `Edit task` / `New task` 手动调整。未完成格固定使用 `recordProgressColors(progress = 0f).container`，与 Accumulate 0% 卡底色一致；完成格使用任务进度底色，并在其上铺同色 `fillColor` 洗色（spring 弹出）。仅在部分完成且 Motion 已启用时，全部完成格共享一组 45° 斜向条纹（条宽 `89dp`，条纹仅为底色上的增量洗色 `alpha 0.1`（避免半透明叠加以免对比翻倍），低对比若有若无），按整条分段条坐标系从左到右匀速滚动，每圈 `5.6s`（`Linear`，滚动一个条纹周期，无可见跳变）；Records 根列表滑动时冻结当前相位，停滑并再延迟 `300ms` 后按剩余相位续播。全完成、Motion 关闭时为静态实心洗色。格间透明，直接露出页面底色。全完成时完成格与强调色为完成绿。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。

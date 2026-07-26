@@ -12,11 +12,15 @@ import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
+import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -60,8 +64,29 @@ class RecordsViewModel(
     private val _measurementPreview = MutableStateFlow(MeasurementPreviewUiState())
     private val recordsOperations = RecordsOperationCoordinator()
     private var measurementPreviewRequestId = 0L
+    private var loadedDate: LocalDate? = null
 
     val measurementPreview: StateFlow<MeasurementPreviewUiState> = _measurementPreview
+
+    /**
+     * Minute-aligned local clock. Only runs while a screen collects it, and
+     * reloads the snapshot when the local date moves past the loaded day.
+     */
+    val clock: StateFlow<RecordsClock> = flow {
+        while (true) {
+            emit(RecordsClock.now())
+            delay(MILLIS_PER_MINUTE - System.currentTimeMillis() % MILLIS_PER_MINUTE)
+        }
+    }
+        .onEach { tick ->
+            val loaded = loadedDate
+            if (loaded != null && tick.date != loaded) refresh()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = RecordsClock.now(),
+        )
 
     val uiState: StateFlow<RecordsUiState> = combine(
         repository.snapshot,
@@ -83,10 +108,15 @@ class RecordsViewModel(
         recordsOperations.refresh(viewModelScope) { refreshSnapshot() }
     }
 
-    private suspend fun refreshSnapshot(): Result<Unit> =
-        runCatching { repository.refresh(LocalDate.now().toString()) }
+    private suspend fun refreshSnapshot(): Result<Unit> {
+        // Claim the requested day before the request so a failed midnight
+        // rollover does not retry on every clock tick.
+        val date = LocalDate.now()
+        loadedDate = date
+        return runCatching { repository.refresh(date.toString()) }
             .onFailure { error.value = it.message ?: "Unable to load records." }
             .onSuccess { error.value = null }
+    }
 
     private fun RecordsSnapshot.toUiState() =
         RecordsUiState(
@@ -291,6 +321,10 @@ class RecordsViewModel(
                 onResult(message)
             }
         }
+    }
+
+    private companion object {
+        const val MILLIS_PER_MINUTE = 60_000L
     }
 
     class Factory(context: Context) : ViewModelProvider.Factory {

@@ -45,7 +45,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 组合待办、活跃记录项、今天流水、最新测量值、目标累计和近 7 日每日累计值；使用进程级 `OkHttpClient` 通过 HTTPS API 读写服务端，凭据由 Keystore 加密存储。根页用单一 overview 快照原子发布；详情按范围单独拉取测量流水。 |
+| `RecordsViewModel` / `RecordRepository` | 组合待办、活跃记录项、今天流水、最新测量值、目标累计和近 7 日每日累计值；使用进程级 `OkHttpClient` 通过 HTTPS API 读写服务端，凭据由 Keystore 加密存储。根页用单一 overview 快照原子发布；详情按范围单独拉取测量流水。另发布与快照分离的分钟对齐时钟 `StateFlow`：只在页面订阅时运行，本地日期变化时按新日期重新拉取快照，请求前先记账目标日期以避免失败后每分钟重试。 |
 
 ## 命令状态机
 

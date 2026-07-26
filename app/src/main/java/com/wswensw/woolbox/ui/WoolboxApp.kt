@@ -58,6 +58,7 @@ import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.ui.ManageTasksScreen
 import com.wswensw.woolbox.record.ui.ManageRecordsScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
+import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
@@ -124,6 +125,47 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val hapticFeedback = LocalHapticFeedback.current
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
+    val recordsClock = recordsViewModel.clock.collectAsStateWithLifecycle()
+
+    // Shared by the record Sheet and the root page quick-record chips so both
+    // produce the same haptics, goal detection and undo.
+    val recordValue: (RecordItem, Double, (String?) -> Unit) -> Unit = { item, value, onResult ->
+        val previous = recordsState.goalValues[item.id]
+            ?: recordsState.entries.filter { it.itemId == item.id }.sumOf { it.value }
+        recordsViewModel.createEntry(item, value) { entryId, error ->
+            onResult(error)
+            if (entryId != null) {
+                val goalJustReached = crossedGoalThreshold(
+                    previous = previous,
+                    current = previous + value,
+                    target = item.goalValue,
+                )
+                hapticFeedback.performHapticFeedback(
+                    if (goalJustReached) {
+                        HapticFeedbackType.LongPress
+                    } else {
+                        HapticFeedbackType.ContextClick
+                    },
+                )
+                recordSheetItemId = null
+                coroutineScope.launch {
+                    val label = displayRecordName(item.name)
+                    val result = snackbarHostState.showSnackbar(
+                        message = if (goalJustReached) {
+                            "Goal reached · $label"
+                        } else {
+                            "Recorded $label."
+                        },
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        recordsViewModel.deleteEntry(entryId)
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(selectedTab) {
         if (selectedTab == MainTab.SETTING) AppUpdateManager.checkForUpdate()
@@ -197,6 +239,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
 
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
+                                clock = recordsClock,
                                 rootTaskPreviewLimit = rootTaskPreviewLimit,
                                 onManageTasks = {
                                     taskSheetId = null
@@ -215,6 +258,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 },
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
+                                onQuickRecord = { item, value -> recordValue(item, value) {} },
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
@@ -534,45 +578,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                         cumulative = recordsState.goalValues[itemId]
                             ?: recordsState.entries.filter { it.itemId == itemId }.sumOf { it.value },
                         onDismiss = { recordSheetItemId = null },
-                        onRecord = { recordedItem, value, onResult ->
-                            val previous = recordsState.goalValues[recordedItem.id]
-                                ?: recordsState.entries
-                                    .filter { it.itemId == recordedItem.id }
-                                    .sumOf { it.value }
-                            recordsViewModel.createEntry(recordedItem, value) { entryId, error ->
-                                onResult(error)
-                                if (entryId != null) {
-                                    val goalJustReached = crossedGoalThreshold(
-                                        previous = previous,
-                                        current = previous + value,
-                                        target = recordedItem.goalValue,
-                                    )
-                                    hapticFeedback.performHapticFeedback(
-                                        if (goalJustReached) {
-                                            HapticFeedbackType.LongPress
-                                        } else {
-                                            HapticFeedbackType.ContextClick
-                                        },
-                                    )
-                                    recordSheetItemId = null
-                                    coroutineScope.launch {
-                                        val label = displayRecordName(recordedItem.name)
-                                        val result = snackbarHostState.showSnackbar(
-                                            message = if (goalJustReached) {
-                                                "Goal reached · $label"
-                                            } else {
-                                                "Recorded $label."
-                                            },
-                                            actionLabel = "Undo",
-                                            duration = SnackbarDuration.Short,
-                                        )
-                                        if (result == SnackbarResult.ActionPerformed) {
-                                            recordsViewModel.deleteEntry(entryId)
-                                        }
-                                    }
-                                }
-                            }
-                        },
+                        onRecord = recordValue,
                     )
                 }
             }
