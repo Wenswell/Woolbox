@@ -73,18 +73,6 @@ class RecordRulesTest {
     }
 
     @Test
-    fun suggestionsPreferTextThenCurrentWindow() {
-        val current = item(1, "Read", "books", 21 * 60, 22 * 60)
-        val later = item(2, "Reading notes", "write", 8 * 60, 9 * 60)
-
-        val textResults = getRecordSuggestions(listOf(later, current), "read", 21 * 60)
-        val timeResults = getRecordSuggestions(listOf(later, current), "", 21 * 60)
-
-        assertEquals(listOf("Read", "Reading notes"), textResults.map { it.item.name })
-        assertEquals("Read", timeResults.first().item.name)
-    }
-
-    @Test
     fun matchesSuggestedWindowAcrossMidnight() {
         assertTrue(isMinuteInWindow(30, 23 * 60, 2 * 60))
     }

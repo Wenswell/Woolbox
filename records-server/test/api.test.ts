@@ -318,6 +318,33 @@ describe("Records API", () => {
     expect(response.json().items).not.toContainEqual(expect.objectContaining({ name: "Archived" }));
   });
 
+  it("returns every accumulate entry inside a month-long overview range", async () => {
+    // The root page learns habit times and streaks from this range, so the
+    // window is the caller's to choose and nothing inside it may be dropped.
+    await createItem(itemInput({ name: "Water" }));
+    for (const day of ["2026-06-21", "2026-07-05", "2026-07-20"]) {
+      await createEntry(entryInput({ itemId: 1, localDate: day, localMinute: 540, value: 2 }));
+    }
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/overview?startDate=2026-06-21&endDate=2026-07-20",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().accumulateEntries).toMatchObject([
+      { localDate: "2026-07-20", localMinute: 540 },
+      { localDate: "2026-07-05", localMinute: 540 },
+      { localDate: "2026-06-21", localMinute: 540 },
+    ]);
+
+    const narrower = await app.inject({
+      method: "GET",
+      url: "/api/overview?startDate=2026-07-01&endDate=2026-07-20",
+    });
+    expect(narrower.json().accumulateEntries).toHaveLength(2);
+  });
+
   it("creates tasks with subtasks atomically and derives completion from them", async () => {
     const created = await createTask({ title: "  Prepare trip  ", steps: [" Book train ", "Pack bag"] });
     expect(created.statusCode).toBe(201);

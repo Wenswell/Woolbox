@@ -16,8 +16,12 @@ import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.parseTaskHorizon
-import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
+import com.wswensw.woolbox.record.model.FOCUS_HISTORY_DAYS
+import com.wswensw.woolbox.record.model.StreakDays
+import com.wswensw.woolbox.record.model.dailyGoalStreak
 import com.wswensw.woolbox.record.model.goalValues
+import com.wswensw.woolbox.record.model.habitMinutes
+import com.wswensw.woolbox.record.model.itemStreaks
 import com.wswensw.woolbox.record.model.itemRecentDayValues
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
@@ -64,6 +68,12 @@ data class RecordsSnapshot(
     val tasks: List<TodoTask>,
     val goalValues: Map<Long, Double>,
     val recentDayValues: Map<Long, List<Double>>,
+    /** Time of day each item is normally recorded at, learned from history. */
+    val habitMinutes: Map<Long, Int>,
+    /** Consecutive days each item was done, counting back from today. */
+    val itemStreaks: Map<Long, Int>,
+    /** Consecutive days every daily goal was met. */
+    val goalStreak: StreakDays,
 )
 
 class RecordRepository(context: Context) {
@@ -76,7 +86,9 @@ class RecordRepository(context: Context) {
 
     suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
         val date = LocalDate.parse(localDate)
-        val lookbackStart = date.minusDays((RECENT_ACTIVE_DAYS - 1).toLong()).toString()
+        // Habits and streaks need more than the card window, so one range
+        // covers both: the cards read the last 7 days out of the same entries.
+        val lookbackStart = date.minusDays((FOCUS_HISTORY_DAYS - 1).toLong()).toString()
         val overview = request(
             "GET",
             "overview",
@@ -103,6 +115,9 @@ class RecordRepository(context: Context) {
                 entries = rangeEntries,
                 today = date,
             ),
+            habitMinutes = habitMinutes(rangeEntries, date),
+            itemStreaks = itemStreaks(activeItems, rangeEntries, date),
+            goalStreak = dailyGoalStreak(activeItems, rangeEntries, date),
         )
     }
 

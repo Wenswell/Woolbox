@@ -2,7 +2,6 @@ package com.wswensw.woolbox.record.model
 
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,108 +24,18 @@ class RecordNowTest {
     }
 
     @Test
-    fun activeSuggestionsOnlyIncludeOpenWindows() {
-        val morning = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
-        val evening = accumulate(id = 2, name = "Reading", windows = listOf(20 * 60 to 22 * 60))
-
-        val active = activeNowSuggestions(listOf(morning, evening), minuteOfDay = 9 * 60)
-
-        assertEquals(listOf(1L), active.map { it.item?.id })
-        assertEquals(60, active.single().endsInMinutes)
-        assertEquals(0, active.single().startsInMinutes)
+    fun circularDistanceTakesTheShorterDirection() {
+        assertEquals(0, circularMinuteDistance(600, 600))
+        assertEquals(30, circularMinuteDistance(600, 630))
+        assertEquals(30, circularMinuteDistance(630, 600))
+        // Across midnight the short way is 20 minutes, not 1420.
+        assertEquals(20, circularMinuteDistance(23 * 60 + 50, 10))
     }
 
     @Test
-    fun activeSuggestionsPutTheSoonestClosingWindowFirst() {
-        val closingSoon = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
-        val closingLater = accumulate(id = 2, name = "Walk", windows = listOf(8 * 60 to 12 * 60))
-
-        val active = activeNowSuggestions(listOf(closingLater, closingSoon), minuteOfDay = 9 * 60)
-
-        assertEquals(listOf(1L, 2L), active.map { it.item?.id })
-    }
-
-    @Test
-    fun activeSuggestionsSpanMidnightAndRespectTheLimit() {
-        val overnight = accumulate(id = 1, name = "Sleep", windows = listOf(23 * 60 to 2 * 60))
-        val other = accumulate(id = 2, name = "Water", windows = listOf(0 to 6 * 60))
-
-        assertEquals(
-            listOf(1L, 2L),
-            activeNowSuggestions(listOf(overnight, other), minuteOfDay = 30).map { it.item?.id },
-        )
-        assertEquals(
-            1,
-            activeNowSuggestions(listOf(overnight, other), minuteOfDay = 30, limit = 1).size,
-        )
-    }
-
-    @Test
-    fun activeSuggestionsSkipSatisfiedAndMeasurementItems() {
-        val reached = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
-        val measurement = accumulate(id = 2, name = "Weight", windows = emptyList())
-            .copy(mode = RecordMode.MEASUREMENT, windows = listOf(RecordWindow(startMinute = 8 * 60, endMinute = 10 * 60)))
-
-        val active = activeNowSuggestions(
-            items = listOf(reached, measurement),
-            minuteOfDay = 9 * 60,
-            isSatisfied = { it.id == 1L },
-        )
-
-        assertTrue(active.isEmpty())
-    }
-
-    @Test
-    fun activeSuggestionsDropWindowsThatAlreadyGotAnEntryToday() {
-        val item = accumulate(
-            id = 1,
-            name = "Water",
-            windows = listOf(8 * 60 to 10 * 60, 12 * 60 to 14 * 60),
-        )
-        val recorded = mapOf(1L to listOf(9 * 60 + 5))
-
-        assertTrue(
-            activeNowSuggestions(listOf(item), minuteOfDay = 9 * 60 + 30, recordedMinutes = recorded)
-                .isEmpty(),
-        )
-        // A different window of the same item still stands on its own.
-        assertEquals(
-            listOf(1L),
-            activeNowSuggestions(listOf(item), minuteOfDay = 13 * 60, recordedMinutes = recorded)
-                .map { it.item?.id },
-        )
-    }
-
-    @Test
-    fun nextSuggestionSkipsWindowsThatAlreadyGotAnEntryToday() {
-        val item = accumulate(id = 1, name = "Water", windows = listOf(10 * 60 to 11 * 60))
-
-        assertNull(
-            nextNowSuggestion(
-                items = listOf(item),
-                minuteOfDay = 9 * 60,
-                recordedMinutes = mapOf(1L to listOf(10 * 60 + 30)),
-            ),
-        )
-    }
-
-    @Test
-    fun nextSuggestionUsesTheNearestUpcomingWindowWithinLookahead() {
-        val soon = accumulate(id = 1, name = "Water", windows = listOf(10 * 60 to 11 * 60))
-        val later = accumulate(id = 2, name = "Reading", windows = listOf(20 * 60 to 22 * 60))
-
-        val next = nextNowSuggestion(listOf(later, soon), minuteOfDay = 9 * 60)
-
-        assertEquals(1L, next?.item?.id)
-        assertEquals(60, next?.startsInMinutes)
-        assertNull(nextNowSuggestion(listOf(later), minuteOfDay = 9 * 60))
-    }
-
-    @Test
-    fun nextSuggestionIgnoresWindowsThatAreAlreadyOpen() {
-        val open = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
-
-        assertNull(nextNowSuggestion(listOf(open), minuteOfDay = 9 * 60))
+    fun windowLengthMeasuresTheOpenSpan() {
+        assertEquals(120, windowLengthMinutes(window(8 * 60, 10 * 60)))
+        assertEquals(360, windowLengthMinutes(window(23 * 60, 5 * 60)))
     }
 
     @Test
@@ -139,104 +48,13 @@ class RecordNowTest {
     }
 
     @Test
-    fun hasSuggestedWindowsCountsAccumulateItemsAndSubtasks() {
-        val withWindow = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
-        val withoutWindow = accumulate(id = 2, name = "Walk", windows = emptyList())
-
-        assertTrue(hasSuggestedWindows(listOf(withoutWindow, withWindow)))
-        assertEquals(false, hasSuggestedWindows(listOf(withoutWindow)))
-        assertTrue(
-            hasSuggestedWindows(
-                items = listOf(withoutWindow),
-                tasks = listOf(task(id = 1, stepWindows = listOf(listOf(8 * 60 to 9 * 60)))),
-            ),
-        )
-    }
-
-    @Test
-    fun activeSuggestionsUseTheScheduledSubtaskNotTheFirstOne() {
-        // Only the second subtask is scheduled, so it is the one suggested even
-        // though the first is still unfinished.
-        val scheduled = task(
-            id = 5,
-            title = "Morning routine",
-            stepTitles = listOf("Stretch", "Shower"),
-            stepWindows = listOf(emptyList(), listOf(8 * 60 to 9 * 60)),
-        )
-
-        val active = activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(scheduled))
-
-        val target = active.single().target as NowTarget.Task
-        assertEquals(5L, target.task.id)
-        assertEquals("Shower", target.step.title)
-        assertEquals(30, active.single().endsInMinutes)
-    }
-
-    @Test
-    fun eachScheduledSubtaskIsItsOwnSuggestion() {
-        val scheduled = task(
-            id = 5,
-            stepTitles = listOf("Morning pill", "Evening pill"),
-            stepWindows = listOf(listOf(8 * 60 to 9 * 60), listOf(20 * 60 to 21 * 60)),
-        )
-
-        assertEquals(
-            listOf("Morning pill"),
-            activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(scheduled))
-                .map { (it.target as NowTarget.Task).step.title },
-        )
-        assertEquals(
-            listOf("Evening pill"),
-            activeNowSuggestions(emptyList(), minuteOfDay = 20 * 60 + 30, tasks = listOf(scheduled))
-                .map { (it.target as NowTarget.Task).step.title },
-        )
-    }
-
-    @Test
-    fun activeSuggestionsSkipCompletedAndUnscheduledSubtasks() {
-        val done = task(
-            id = 5,
-            stepTitles = listOf("Stretch"),
-            stepWindows = listOf(listOf(8 * 60 to 9 * 60)),
-            completedStepCount = 1,
-        )
-        val unscheduled = task(id = 6, stepTitles = listOf("Later"), stepWindows = listOf(emptyList()))
-
-        assertTrue(
-            activeNowSuggestions(
-                items = emptyList(),
-                minuteOfDay = 8 * 60 + 30,
-                tasks = listOf(done, unscheduled),
-            ).isEmpty(),
-        )
-    }
-
-    @Test
-    fun subtaskSuggestionsRankAboveAccumulatesClosingAtTheSameTime() {
-        val item = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
-        val scheduled = task(id = 5, stepWindows = listOf(listOf(8 * 60 to 9 * 60)))
-
-        val active = activeNowSuggestions(
-            items = listOf(item),
-            minuteOfDay = 8 * 60 + 30,
-            tasks = listOf(scheduled),
-        )
-
-        assertTrue(active.first().target is NowTarget.Task)
-    }
-
-    @Test
-    fun nextSuggestionCoversUpcomingSubtaskWindows() {
-        val scheduled = task(
-            id = 5,
-            stepTitles = listOf("Take meds"),
-            stepWindows = listOf(listOf(10 * 60 to 11 * 60)),
-        )
-
-        val next = nextNowSuggestion(emptyList(), minuteOfDay = 9 * 60, tasks = listOf(scheduled))
-
-        assertEquals(60, next?.startsInMinutes)
-        assertEquals("Take meds", (next?.target as NowTarget.Task).step.title)
+    fun windowRecordedMatchesEntriesInsideTheWindowOnly() {
+        val window = window(8 * 60, 10 * 60)
+        assertTrue(isWindowRecorded(window, listOf(9 * 60)))
+        assertEquals(false, isWindowRecorded(window, listOf(10 * 60)))
+        assertEquals(false, isWindowRecorded(window, null))
+        // Overnight windows only see minutes on today's local date.
+        assertTrue(isWindowRecorded(window(23 * 60, 2 * 60), listOf(30)))
     }
 
     @Test
@@ -275,41 +93,6 @@ class RecordNowTest {
 
     private fun window(startMinute: Int, endMinute: Int) =
         RecordWindow(startMinute = startMinute, endMinute = endMinute)
-
-    private fun task(
-        id: Long,
-        title: String = "Task $id",
-        stepTitles: List<String> = listOf("Step"),
-        stepWindows: List<List<Pair<Int, Int>>> = emptyList(),
-        completedStepCount: Int = 0,
-    ) = TodoTask(
-        id = id,
-        title = title,
-        horizon = TaskHorizon.TODAY,
-        completedAt = if (completedStepCount >= stepTitles.size) 1L else null,
-        createdAt = 0,
-        updatedAt = 0,
-        steps = stepTitles.mapIndexed { index, stepTitle ->
-            TodoStep(
-                id = id * 100 + index,
-                taskId = id,
-                title = stepTitle,
-                completedAt = if (index < completedStepCount) 1L else null,
-                createdAt = 0,
-                updatedAt = 0,
-                windows = stepWindows.getOrElse(index) { emptyList() }
-                    .map { (start, end) -> RecordWindow(startMinute = start, endMinute = end) },
-            )
-        },
-    )
-
-    @Test
-    fun minuteSpansAreCompact() {
-        assertEquals("0m", com.wswensw.woolbox.record.ui.formatMinuteSpan(0))
-        assertEquals("45m", com.wswensw.woolbox.record.ui.formatMinuteSpan(45))
-        assertEquals("1h 00m", com.wswensw.woolbox.record.ui.formatMinuteSpan(60))
-        assertEquals("2h 05m", com.wswensw.woolbox.record.ui.formatMinuteSpan(125))
-    }
 
     private fun accumulate(
         id: Long,

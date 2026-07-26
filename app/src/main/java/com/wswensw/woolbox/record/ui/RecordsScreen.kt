@@ -59,17 +59,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.GoalPeriod
-import com.wswensw.woolbox.record.model.activeNowSuggestions
+import com.wswensw.woolbox.record.model.dayRing
 import com.wswensw.woolbox.record.model.emptyRecentDayValues
-import com.wswensw.woolbox.record.model.hasSuggestedWindows
+import com.wswensw.woolbox.record.model.focusQueue
 import com.wswensw.woolbox.record.model.isGoalSatisfied
-import com.wswensw.woolbox.record.model.nextNowSuggestion
 import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.recentDayPieProgress
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
-import com.wswensw.woolbox.record.model.RecordNowSuggestion
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.model.TaskHorizon
@@ -117,6 +115,19 @@ fun RecordsScreen(
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
     val recordMinutes = todayRecordMinutes(state.entries)
+    // The queue tracks the clock; everything else here is snapshot derived.
+    val focusQueue = focusQueue(
+        items = accumulateItems,
+        tasks = openTasks,
+        clock = clock.value,
+        goalValues = state.goalValues,
+        todayValues = todayValues,
+        todayMinutes = recordMinutes,
+        habitMinutes = state.habitMinutes,
+        itemStreaks = state.itemStreaks,
+    )
+    val ring = dayRing(items = accumulateItems, tasks = openTasks, goalValues = state.goalValues)
+    val windowStarts = focusWindowStarts(items = accumulateItems, tasks = openTasks)
     val listState = rememberLazyListState()
     var pauseDecorativeMotion by remember { mutableStateOf(false) }
     LaunchedEffect(listState) {
@@ -171,29 +182,35 @@ fun RecordsScreen(
                         )
                     }
                 }
-                val dayOverview = recordsDayOverview(
-                    tasks = state.tasks,
-                    items = state.activeItems,
-                    goalValues = state.goalValues,
-                )
-                // Visibility stays time independent so the band never appears or
-                // disappears mid-minute; only its contents follow the clock.
-                if (dayOverview.isVisible || hasSuggestedWindows(accumulateItems, openTasks)) {
+                if (ring.isVisible || focusQueue.isNotEmpty()) {
                     item {
-                        RecordsNowBand(
+                        RecordsFocusCard(
                             clock = clock,
-                            overview = dayOverview,
-                            accumulateItems = accumulateItems,
-                            tasks = openTasks,
-                            todayValues = todayValues,
-                            recordMinutes = recordMinutes,
-                            goalValues = state.goalValues,
-                            recentDayValues = state.recentDayValues,
+                            queue = focusQueue,
+                            ring = ring,
+                            streak = state.goalStreak,
+                            windowStarts = windowStarts,
+                            colorProgressOf = { target ->
+                                when (target) {
+                                    is NowTarget.Accumulate -> accumulateColorProgress(
+                                        item = target.item,
+                                        cumulative = state.goalValues[target.item.id]
+                                            ?: todayValues[target.item.id]
+                                            ?: 0.0,
+                                        recentDayValues = state.recentDayValues[target.item.id],
+                                    )
+                                    is NowTarget.Task -> taskColorProgress(target.task)
+                                }
+                            },
+                            quickValueOf = { item ->
+                                item.defaultValue?.takeIf { it.isFinite() && it > 0.0 }
+                            },
                             onQuickRecord = onQuickRecord,
                             onOpenItem = onRecordItem,
                             onCompleteStep = onCompleteStep,
                         )
                     }
+                    item { Spacer(Modifier.height(4.dp)) }
                 }
                 item {
                     RecordsSectionHeader(
@@ -832,270 +849,6 @@ internal fun RecordsStatusCard(
             }
         }
     }
-}
-
-/**
- * Read-only day band above the sections: local date and time, day progress,
- * and the accumulate items whose suggested window is open right now.
- * The clock is read here only, so a minute tick recomposes this band alone.
- */
-@Composable
-private fun RecordsNowBand(
-    clock: State<RecordsClock>,
-    overview: RecordsDayOverview,
-    accumulateItems: List<RecordItem>,
-    tasks: List<TodoTask>,
-    todayValues: Map<Long, Double>,
-    recordMinutes: Map<Long, List<Int>>,
-    goalValues: Map<Long, Double>,
-    recentDayValues: Map<Long, List<Double>>,
-    onQuickRecord: (RecordItem, Double) -> Unit,
-    onOpenItem: (RecordItem) -> Unit,
-    onCompleteStep: (TodoTask, TodoStep) -> Unit,
-) {
-    val now = clock.value
-    val satisfied: (RecordItem) -> Boolean = { item ->
-        isGoalSatisfied(item, goalValues[item.id] ?: todayValues[item.id] ?: 0.0)
-    }
-    val active = activeNowSuggestions(
-        items = accumulateItems,
-        minuteOfDay = now.minuteOfDay,
-        tasks = tasks,
-        recordedMinutes = recordMinutes,
-        isSatisfied = satisfied,
-    )
-    val next = if (active.isEmpty()) {
-        nextNowSuggestion(
-            items = accumulateItems,
-            minuteOfDay = now.minuteOfDay,
-            tasks = tasks,
-            recordedMinutes = recordMinutes,
-            isSatisfied = satisfied,
-        )
-    } else {
-        null
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = recordsDayLabel(now),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            if (overview.label.isNotEmpty()) {
-                Text(
-                    text = overview.label,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                )
-            }
-        }
-        DayElapsedTrack(fraction = now.dayFraction)
-        if (active.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                active.forEach { suggestion ->
-                    NowSuggestionChip(
-                        suggestion = suggestion,
-                        colorProgress = when (val target = suggestion.target) {
-                            is NowTarget.Accumulate -> accumulateColorProgress(
-                                item = target.item,
-                                cumulative = goalValues[target.item.id]
-                                    ?: todayValues[target.item.id]
-                                    ?: 0.0,
-                                recentDayValues = recentDayValues[target.item.id],
-                            )
-                            is NowTarget.Task -> taskColorProgress(target.task)
-                        },
-                        onQuickRecord = onQuickRecord,
-                        onOpenItem = onOpenItem,
-                        onCompleteStep = onCompleteStep,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        } else if (next != null) {
-            Text(
-                text = "Next · ${formatMinute(next.window.startMinute)} " +
-                    "${nowTargetLabel(next.target)} · in ${formatMinuteSpan(next.startsInMinutes)}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/** Quiet 3dp track for the elapsed share of the local day. */
-@Composable
-private fun DayElapsedTrack(fraction: Float) {
-    val reduceMotion = prefersReducedMotion()
-    val animated by animateFloatAsState(
-        targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "DayElapsedTrack",
-    )
-    val color = MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(3.dp)
-            .clip(CircleShape)
-            .background(color.copy(alpha = 0.16f)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(animated)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.45f)),
-        )
-    }
-}
-
-/**
- * One-tap record for an item inside its suggested window. Items without a
- * default value open the record Sheet instead of writing a guessed amount.
- */
-@Composable
-private fun NowSuggestionChip(
-    suggestion: RecordNowSuggestion,
-    colorProgress: Float,
-    onQuickRecord: (RecordItem, Double) -> Unit,
-    onOpenItem: (RecordItem) -> Unit,
-    onCompleteStep: (TodoTask, TodoStep) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = recordProgressColors(progress = colorProgress)
-    val target = suggestion.target
-    val quickValue = (target as? NowTarget.Accumulate)
-        ?.item
-        ?.defaultValue
-        ?.takeIf { it.isFinite() && it > 0.0 }
-    val label = when (target) {
-        is NowTarget.Accumulate -> if (quickValue != null) {
-            "${displayRecordName(target.item.name)} +${formatValue(quickValue)}"
-        } else {
-            displayRecordName(target.item.name)
-        }
-        is NowTarget.Task -> "${target.step.title} · ${target.task.title}"
-    }
-    Surface(
-        onClick = {
-            when (target) {
-                is NowTarget.Accumulate -> if (quickValue != null) {
-                    onQuickRecord(target.item, quickValue)
-                } else {
-                    onOpenItem(target.item)
-                }
-                is NowTarget.Task -> onCompleteStep(target.task, target.step)
-            }
-        },
-        modifier = modifier.heightIn(min = 44.dp),
-        shape = CircleShape,
-        color = colors.accent.copy(alpha = 0.14f),
-        contentColor = colors.accent,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-internal fun nowTargetLabel(target: NowTarget): String = when (target) {
-    is NowTarget.Accumulate -> displayRecordName(target.item.name)
-    is NowTarget.Task -> "${target.step.title} · ${target.task.title}"
-}
-
-internal fun recordsDayLabel(clock: RecordsClock): String =
-    "${DayLabelFormatter.format(clock.date)} · ${formatMinute(clock.minuteOfDay)}"
-
-/** Compact span for suggested windows, e.g. `45m` or `2h 05m`. */
-internal fun formatMinuteSpan(minutes: Int): String {
-    val safe = minutes.coerceAtLeast(0)
-    val hours = safe / 60
-    val rest = safe % 60
-    return if (hours == 0) {
-        "${rest}m"
-    } else {
-        String.format(Locale.ROOT, "%dh %02dm", hours, rest)
-    }
-}
-
-private val DayLabelFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
-
-internal data class RecordsDayOverview(
-    val taskDone: Int,
-    val taskTotal: Int,
-    val goalDone: Int,
-    val goalTotal: Int,
-) {
-    val isVisible: Boolean
-        get() = taskTotal > 0 || goalTotal > 0
-
-    val label: String
-        get() = buildList {
-            if (taskTotal > 0) add("Tasks $taskDone/$taskTotal")
-            if (goalTotal > 0) add("Goals $goalDone/$goalTotal")
-        }.joinToString(" · ")
-}
-
-internal fun recordsDayOverview(
-    tasks: List<TodoTask>,
-    items: List<RecordItem>,
-    goalValues: Map<Long, Double>,
-): RecordsDayOverview {
-    val goals = goalItems(items)
-    val goalCompletion = focusGoalCompletion(goals, goalValues)
-    return RecordsDayOverview(
-        taskDone = tasks.count(TodoTask::isCompleted),
-        taskTotal = tasks.size,
-        goalDone = goalCompletion.done,
-        goalTotal = goalCompletion.total,
-    )
-}
-
-internal data class FocusGoalCompletion(
-    val done: Int,
-    val total: Int,
-)
-
-internal fun focusGoalCompletion(
-    goals: List<RecordItem>,
-    values: Map<Long, Double>,
-): FocusGoalCompletion {
-    val done = goals.count { item ->
-        val target = item.goalValue ?: return@count false
-        (values[item.id] ?: 0.0) >= target
-    }
-    return FocusGoalCompletion(done = done, total = goals.size)
 }
 
 internal fun crossedGoalThreshold(

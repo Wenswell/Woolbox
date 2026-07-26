@@ -193,21 +193,6 @@ class RecordsScreenTest {
 
 
     @Test
-    fun focusGoalCompletionCountsReachedGoals() {
-        val goals = listOf(
-            recordItem(id = 1, name = "A", priority = 10, period = GoalPeriod.DAY, goalValue = 10.0),
-            recordItem(id = 2, name = "B", priority = 9, period = GoalPeriod.DAYS_7, goalValue = 20.0),
-            recordItem(id = 3, name = "C", priority = 8, period = GoalPeriod.DAY, goalValue = 5.0),
-        )
-        val completion = focusGoalCompletion(
-            goals = goals,
-            values = mapOf(1L to 10.0, 2L to 5.0, 3L to 8.0),
-        )
-        assertEquals(2, completion.done)
-        assertEquals(3, completion.total)
-    }
-
-    @Test
     fun crossedGoalThresholdOnlyOnFirstCrossing() {
         assertEquals(true, crossedGoalThreshold(9.0, 10.0, 10.0))
         assertEquals(false, crossedGoalThreshold(10.0, 12.0, 10.0))
@@ -256,43 +241,6 @@ class RecordsScreenTest {
         itemUnit = "count",
         itemValueType = RecordValueType.NUMBER,
     )
-
-    @Test
-    fun recordsDayOverviewHidesWhenEmpty() {
-        val overview = recordsDayOverview(
-            tasks = emptyList(),
-            items = emptyList(),
-            goalValues = emptyMap(),
-        )
-        assertEquals(false, overview.isVisible)
-        assertEquals("", overview.label)
-    }
-
-    @Test
-    fun recordsDayOverviewSummarizesTasksAndGoals() {
-        val tasks = listOf(
-            todoTask(id = 1, completedSteps = 2, totalSteps = 2),
-            todoTask(id = 2, completedSteps = 0, totalSteps = 1),
-        )
-        val items = listOf(
-            recordItem(id = 10, name = "Water", priority = 1, period = GoalPeriod.DAY)
-                .copy(goalValue = 8.0),
-            recordItem(id = 11, name = "Run", priority = 2, period = GoalPeriod.DAY)
-                .copy(goalValue = 5.0),
-            recordItem(id = 12, name = "Note", priority = 3, period = null),
-        )
-        val overview = recordsDayOverview(
-            tasks = tasks,
-            items = items,
-            goalValues = mapOf(10L to 8.0, 11L to 1.0),
-        )
-        assertEquals(true, overview.isVisible)
-        assertEquals(1, overview.taskDone)
-        assertEquals(2, overview.taskTotal)
-        assertEquals(1, overview.goalDone)
-        assertEquals(2, overview.goalTotal)
-        assertEquals("Tasks 1/2 · Goals 1/2", overview.label)
-    }
 
     @Test
     fun progressColorStageMapsThresholds() {

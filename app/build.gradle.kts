@@ -21,8 +21,8 @@ android {
         targetSdk {
             version = release(36)
         }
-        versionCode = 23
-        versionName = "0.1.22"
+        versionCode = 24
+        versionName = "0.1.23"
     }
 
     buildFeatures {

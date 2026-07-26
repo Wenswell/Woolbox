@@ -67,6 +67,7 @@ import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
 import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.record.ui.RecordSheet
+import com.wswensw.woolbox.record.model.dayRing
 import com.wswensw.woolbox.record.ui.crossedGoalThreshold
 import com.wswensw.woolbox.record.ui.displayRecordName
 import com.wswensw.woolbox.record.ui.RecordsConnectionScreen
@@ -129,7 +130,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val recordsClock = recordsViewModel.clock.collectAsStateWithLifecycle()
 
-    // Shared by the task progress Sheet and the Now band chips so completing a
+    // Shared by the task progress Sheet and the focus card so completing a
     // subtask gives the same haptics and parent-done Snackbar either way.
     val completeStep: (TodoTask, TodoStep) -> Unit = { task, step ->
         val parentCompleting = task.steps.all { it.id == step.id || it.isCompleted }
@@ -154,8 +155,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         }
     }
 
-    // Shared by the record Sheet and the root page quick-record chips so both
-    // produce the same haptics, goal detection and undo.
+    // Shared by the record Sheet and the focus card so both produce the same
+    // haptics, goal detection and undo.
     val recordValue: (RecordItem, Double, (String?) -> Unit) -> Unit = { item, value, onResult ->
         val previous = recordsState.goalValues[item.id]
             ?: recordsState.entries.filter { it.itemId == item.id }.sumOf { it.value }
@@ -192,6 +193,27 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 }
             }
         }
+    }
+
+    // The moment today's last commitment closes, announced once. Closing the
+    // ring is the day's own result, so it does not wait for a screen to notice.
+    val dayRing = dayRing(
+        items = recordsState.activeItems,
+        tasks = recordsState.tasks.filterNot(TodoTask::isCompleted),
+        goalValues = recordsState.goalValues,
+    )
+    // Starts from whatever is already true, so opening the app on an
+    // already-closed day says nothing; only the crossing is worth announcing.
+    var ringWasComplete by remember { mutableStateOf(dayRing.isComplete) }
+    LaunchedEffect(dayRing.isComplete) {
+        val justClosed = dayRing.isComplete && !ringWasComplete
+        ringWasComplete = dayRing.isComplete
+        if (!justClosed) return@LaunchedEffect
+        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+        snackbarHostState.showSnackbar(
+            message = "Day closed · ${dayRing.total} done",
+            duration = SnackbarDuration.Short,
+        )
     }
 
     LaunchedEffect(selectedTab) {
