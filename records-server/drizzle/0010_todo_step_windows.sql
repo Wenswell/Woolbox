@@ -6,4 +6,5 @@ CREATE TABLE `todo_step_windows` (
 	FOREIGN KEY (`step_id`) REFERENCES `todo_steps`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `todo_step_windows_step_id_index` ON `todo_step_windows` (`step_id`);
+CREATE INDEX `todo_step_windows_step_id_index` ON `todo_step_windows` (`step_id`);--> statement-breakpoint
+DROP TABLE `todo_task_windows`;
