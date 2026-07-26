@@ -21,6 +21,24 @@ PATH="$HOME/.local/node/bin:$HOME/.local/share/pnpm:$PATH" pnpm install --prod -
 systemctl --user daemon-reload
 systemctl --user restart records.service
 systemctl --user is-active records.service
+for attempt in {1..20}; do
+  if /home/ravvss/.local/node/bin/node - <<'NODE'
+const response = await fetch("http://127.0.0.1:4320/api/overview?startDate=2000-01-01&endDate=2000-01-01").catch(() => null);
+if (!response?.ok) process.exit(1);
+const overview = await response.json();
+if (!Array.isArray(overview.items) || !Array.isArray(overview.tasks)) process.exit(1);
+if (!overview.items.every((item) => Array.isArray(item.windows))) process.exit(1);
+if (!overview.tasks.every((task) => Array.isArray(task.windows))) process.exit(1);
+NODE
+  then
+    break
+  fi
+  if [[ $attempt -eq 20 ]]; then
+    echo "Records API did not become ready within 20 seconds." >&2
+    exit 1
+  fi
+  sleep 1
+done
 /home/ravvss/.local/node/bin/node - <<'NODE'
 const Database = require("better-sqlite3");
 const database = new Database("/srv/records/records.sqlite", { readonly: true });
@@ -30,17 +48,11 @@ const positionColumn = database.prepare("SELECT name FROM pragma_table_info('tod
 if (!positionColumn) throw new Error("Todo step position migration is missing.");
 const horizonColumn = database.prepare("SELECT name FROM pragma_table_info('todo_tasks') WHERE name = 'horizon'").get();
 if (!horizonColumn) throw new Error("Todo task horizon migration is missing.");
+const taskWindowsTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'todo_task_windows'").get();
+if (!taskWindowsTable) throw new Error("Todo task windows migration is missing.");
 console.log("Database schema verified.");
 NODE
-for attempt in {1..20}; do
-  if curl -fsS http://127.0.0.1:4320/api/items > /dev/null; then
-    echo "Records deployment verified."
-    exit 0
-  fi
-  sleep 1
-done
-echo "Records API did not become ready within 20 seconds." >&2
-exit 1
+echo "Records deployment verified."
 `;
 
 run("pnpm", ["typecheck"]);
