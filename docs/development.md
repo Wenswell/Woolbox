@@ -30,7 +30,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、任务/测量预览 Sheet、管理页、记录 Sheet 和记录项表单。 |
 | `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
-| `records-server/web/`、`deploy/` | PC 管理页、systemd、备份及恢复验证。 |
+| `records-server/web/`、`deploy/` | PC 管理页（`App` shell、`views/`、`components/`、`lib/`）、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
 | `tool/service/WindowSnapshotBuilder.kt` | Global Copy 节点遍历和文本快照。 |
@@ -93,7 +93,7 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
 | `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办事务、审计快照、含多个 Measurement 最新值的根页 overview、模式筛选和批量 API。 |
-| `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志、记录项模式和归档/恢复。 |
+| `records-server/web/src/App.test.tsx` | 管理页即时筛选、删除确认、审计日志、记录项归档/恢复。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 

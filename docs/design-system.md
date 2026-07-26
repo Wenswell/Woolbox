@@ -146,7 +146,7 @@ Task progress Sheet 只显示子事项复选框和完成时间；标题、子事
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
-PC 管理页使用 Entries/Record items/Logs 三个页签。Entries 使用日期范围和记录项筛选、可选择表格与批量删除，不提供编辑入口；Record items 使用可选择表格、新建/编辑 Dialog 和批量归档/恢复；Logs 使用只读表格显示操作时间、对象、动作和变更摘要，并可加载更早日志。操作成功后刷新当前数据，失败时在当前页面或 Dialog 显示错误。
+PC 管理页使用 App shell：粘性顶栏、分段页签（Entries / Record items / Logs）和主内容区。Entries 提供 Today/7 days/30 days 预设、起止日期与记录项即时筛选、结果计数、行选择与危险确认后的批量删除，不提供编辑入口。Record items 提供 All/Active/Archived 状态分段、模式/状态徽章、新建与编辑 Dialog（按 Mode 分区字段）、选择后的归档/恢复确认。Logs 以只读表格显示时间、对象、动作徽章和变更摘要，并可加载更早日志。成功操作显示 toast；失败在页面错误条或 Dialog 内显示并可重试。
 
 
 ## 状态呈现
