@@ -27,7 +27,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
-从 `Records` 进入后，同一页按 Tasks、Accumulate、Measurement 分区展示：待办竖列表，累计与测量为两列卡片网格。列表首行是 `Focus` 卡：当日环、时间轴与连续天数，加上一条按信号强弱排出的行动队列——处于推荐时段、接近习惯时刻、连续天数将断、落后于当日进度，逐条给出理由，点一下即完成并由下一条补位；此刻做不了的可压到当天队尾。推荐时段可选，不配也有队列。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
+从 `Records` 进入后，同一页按 Tasks、Accumulate、Measurement 分区展示：待办竖列表，累计与测量为两列卡片网格。列表首行的 `Focus` 用日期、当日进度和已过时间规则定位当前时刻，再以液面或分段进度卡呈现队首。累计项先用步进器调整数量、再单独提交；子事项用复选框完成。后续队列行只打开对应 Sheet，子事项另有独立复选框。推荐时段可选，不配也有队列；此刻做不了的项可从队首菜单延后至当天队尾。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 
@@ -44,7 +44,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.24` (`versionCode 25`) |
+| 版本 | `0.1.25` (`versionCode 26`) |
 
 ## 目录
 

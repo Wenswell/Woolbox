@@ -93,8 +93,8 @@ fun RecordsScreen(
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
-    onQuickRecord: (RecordItem, Double) -> Unit,
-    onCompleteStep: (TodoTask, TodoStep) -> Unit,
+    onQuickRecord: (RecordItem, Double, (String?) -> Unit) -> Unit,
+    onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
     onDeferTarget: (NowTarget) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
     onOpenTask: (TodoTask) -> Unit,
@@ -206,11 +206,12 @@ fun RecordsScreen(
                                     is NowTarget.Task -> taskColorProgress(target.task)
                                 }
                             },
-                            quickValueOf = { item ->
-                                item.defaultValue?.takeIf { it.isFinite() && it > 0.0 }
+                            cumulativeOf = { item ->
+                                state.goalValues[item.id] ?: todayValues[item.id] ?: 0.0
                             },
-                            onQuickRecord = onQuickRecord,
+                            onRecord = onQuickRecord,
                             onOpenItem = onRecordItem,
+                            onOpenTask = onOpenTask,
                             onCompleteStep = onCompleteStep,
                             onDefer = onDeferTarget,
                         )

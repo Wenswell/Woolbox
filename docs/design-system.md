@@ -110,11 +110,11 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **Tasks → Accumulate → Measurement**。区标题为紧凑 `labelLarge` + Manage 图标，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。列表首行可出现 `Focus` 卡；今日无承诺且队列为空时隐藏。分段进度、液面和卡色变化使用短动画；系统关闭动画时瞬时到位。根列表滑动期间冻结液面波与任务条纹等装饰性循环动画，避免与滚动抢帧；停滑后再延迟 `300ms` 恢复。
+Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **Tasks → Accumulate → Measurement**。区标题为紧凑 `labelLarge` + Manage 图标，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。列表首行可出现无外框的 `Focus` 区域；今日无承诺且队列为空时隐藏。分段进度、液面和卡色变化使用短动画；系统关闭动画时瞬时到位。根列表滑动期间冻结液面波与任务条纹等装饰性循环动画，避免与滚动抢帧；停滑后再延迟 `300ms` 恢复。
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Focus` | 列表首行卡（`surfaceContainerLow`，圆角 `20dp`）：顶行左 `44dp` 当日环（`closed/total`，满环换对勾并放大 `1.06`）、中 `EEE d MMM · HH:mm` + 剩余件数、右连续天数徽标（无连续时不显示）；下方 `6dp` 当日时间轴（已过填充 + 各推荐时段起点刻度 + primary 当前位置）；再下方为主行动块与队列行。主行动块为整行 `titleMedium` 名称 + `labelMedium` 理由 + `40dp` 下压箭头（`onContainer` 55%，仅未压项显示）+ `48dp` 圆形动作按钮（累计用加号，子事项用对勾），队列行为 `bodyMedium` 名称 + 右侧理由。队列为空时改为 `Day closed` / `Nothing due right now` 完成绿块。 |
+| `Focus` | 列表首行无外框区域：`labelLarge` 单行显示 `EEE d MMM · HH:mm · closed/total today`，连续天数直接追加；下方为 `2dp` 已过时间规则。队首使用 `16dp` 圆角的全宽 Hero：累计复用液面填充，显示名称、有效理由、累计值、`−` / `+` 步进与独立确认图标；子事项复用父待办的分段进度，显示子事项、待办、有效理由和独立复选框。更多菜单只在未延后队首提供 `Not now`。后续行为透明导航行：累计行打开记录 Sheet，子事项行打开进度 Sheet，并在前置复选框完成。`queued` 不显示理由。队列为空时使用 `Day closed` / `Nothing due right now` 完成卡。 |
 | `Tasks` | `Today`/`Later` 分组；全宽卡按子事项分段竖条，未完成格固定使用 Accumulate 0% 的卡底色，完成格使用任务进度底色并弹出填充，格间透明露出页面底色；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
 | `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron）；顶栏加号新建；编辑路由负责标题、子事项增删排序和删除；子事项的推荐时段在其编辑 Dialog 内配置。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
@@ -134,8 +134,8 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 - 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（浅色 wash 约 7%→46%，深色 10%→36%，文案用 `onSurface`）；`LATE` 仍为 primary；**`DONE` 固定成功绿**（深/浅分套，与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用近 7 日有值天数比；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
 - 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
 - 运动：`Focus` 队首用 `AnimatedContent` 表达补位——离场向上 `180ms`，入场自下 `220ms`，`SizeTransform` 不裁剪。这是卡内唯一承重运动，减动画或根列表滑动时退化为瞬时替换（与液面波、任务条纹同一 `LocalPauseDecorativeMotion` 契约）。
-- 时间：`Focus` 时间轴不表达用户成绩，已过部分固定用 `onSurfaceVariant`（轨 14%、已过 34%），不占用完成绿；当前位置与未过的时段刻度用 primary，已过刻度退回 `onSurfaceVariant` 50%。当日环与主行动块用目标自身进度色（累计用累计/目标，子事项用所属待办的子事项比）；主行动块用 `container` 底 + `onContainer` 字，动作按钮为 `accent` 18% 圆底 + `accent` 图标。连续天数徽标用完成绿 16% 底。Accumulate 卡名称行右端显示当日最后一次记录时刻（`HH:mm`，与名称同为 `labelMedium` 0.62 alpha），无今日流水时不显示。`Focus` 卡只在自身作用域读取时钟，分钟跳动不触发整页重组。
-- 动作：根页仅 Manage（小 `IconButton`）；新建只在 Manage 顶栏 tonal 加号。完成折叠为普通 `IconButton`。
+- 时间：`Focus` 的 `2dp` 时间规则仅表达当日已过比例，轨道为 `onSurfaceVariant` 14%，已过部分为同色 42%，不使用完成绿、当前点或推荐时段刻度。当日闭环和连续天数均为日信息单行文本。Hero 使用目标自身进度色（累计用累计/目标或近 7 日活跃度，子事项用所属待办的子事项比），并只在自身作用域读取时钟，分钟跳动不触发整页重组。
+- 动作：根页仅 Manage（小 `IconButton`）；新建只在 Manage 顶栏 tonal 加号。Focus 累计 Hero 的步进控件只改本地数量，确认图标是唯一写入目标，提交中禁用全部写入控件；子事项 Hero 和队列行只有复选框写入，行体一律导航。完成折叠为普通 `IconButton`。
 - Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有7 日目标时底部为与近 7 日饼行同宽、高 8dp 的 7 段独立描边块（按滚动近 7 日累计/目标比例填充；段外框 A=6dp、进度填充 B=1.5dp、段间 2dp 透明；描边同圆饼 track 16%）；目标行用日历图标与 `· 7 days` 区分；不重复百分比或 `current / target`。系统关闭动画或 Records 根列表正在滑动时液面波静止（高度仍保留；停滑并延迟 `300ms` 后恢复）；高度变化仍可短动画到位。
 - Tasks 分段竖条与子事项**固定位序**一一对应（完成第 1、3 项则只填第 1、3 格，不把完成项挤到左侧）；顺序只在 `Edit task` / `New task` 手动调整。未完成格固定使用 `recordProgressColors(progress = 0f).container`，与 Accumulate 0% 卡底色一致；完成格使用任务进度底色，并在其上铺同色 `fillColor` 洗色（spring 弹出）。仅在部分完成且 Motion 已启用时，全部完成格共享一组 45° 斜向条纹（条宽 `89dp`，条纹仅为底色上的增量洗色 `alpha 0.1`（避免半透明叠加以免对比翻倍），低对比若有若无），按整条分段条坐标系从左到右匀速滚动，每圈 `5.6s`（`Linear`，滚动一个条纹周期，无可见跳变）；Records 根列表滑动时冻结当前相位，停滑并再延迟 `300ms` 后按剩余相位续播。全完成、Motion 关闭时为静态实心洗色。格间透明，直接露出页面底色。全完成时完成格与强调色为完成绿。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
 - 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。当日环刚满时强触觉 + Snackbar `Day closed · {total} done`；只在跨越那一刻触发，打开已闭环的一天不提示。

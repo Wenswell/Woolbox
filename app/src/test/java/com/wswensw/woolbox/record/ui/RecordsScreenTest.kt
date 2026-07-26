@@ -200,6 +200,44 @@ class RecordsScreenTest {
         assertEquals(false, crossedGoalThreshold(0.0, 1.0, null))
     }
 
+    @Test
+    fun focusHeroSeedsAndResetsToTheDefaultValue() {
+        val item = recordItem(id = 1, name = "Water", priority = 1, period = null)
+            .copy(defaultValue = 0.2, stepValue = 0.1, unit = "L")
+
+        assertEquals("0.2", focusRecordSeed(item))
+        assertEquals("0.3", com.wswensw.woolbox.record.model.stepRecordValue(focusRecordSeed(item), item.stepValue, 1))
+    }
+
+    @Test
+    fun focusHeroOnlyEnablesAValidIdleSubmit() {
+        assertEquals(0.2, checkNotNull(focusRecordValue(" 0.2 ")), 0.0)
+        assertEquals(null, focusRecordValue("0"))
+        assertEquals(null, focusRecordValue("invalid"))
+        assertEquals(true, focusRecordCanSubmit("0.2", saving = false))
+        assertEquals(false, focusRecordCanSubmit("0.2", saving = true))
+        assertEquals(false, focusRecordCanSubmit("0", saving = false))
+    }
+
+    @Test
+    fun focusHeroUsesTheCorrectCumulativeLabelForEveryGoalMode() {
+        val noGoal = recordItem(id = 1, name = "Water", priority = 1, period = null)
+            .copy(unit = "L")
+        val daily = recordItem(id = 2, name = "Read", priority = 1, period = GoalPeriod.DAY)
+            .copy(goalValue = 10.0, unit = "pages")
+        val days7 = recordItem(id = 3, name = "Train", priority = 1, period = GoalPeriod.DAYS_7)
+            .copy(goalValue = 3.0, unit = "hours")
+
+        assertEquals("1.5 L", focusCumulativeLabel(noGoal, 1.5))
+        assertEquals("4 / 10 pages", focusCumulativeLabel(daily, 4.0))
+        assertEquals("7 days · 2 / 3 hours", focusCumulativeLabel(days7, 2.0))
+    }
+
+    @Test
+    fun queuedFocusReasonHasNoVisibleLabel() {
+        assertEquals("", focusReasonLabel(com.wswensw.woolbox.record.model.FocusReason.Queued))
+    }
+
 
     private fun recordItem(
         id: Long,

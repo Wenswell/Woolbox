@@ -132,9 +132,10 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
 
     // Shared by the task progress Sheet and the focus card so completing a
     // subtask gives the same haptics and parent-done Snackbar either way.
-    val completeStep: (TodoTask, TodoStep) -> Unit = { task, step ->
+    val completeStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit = { task, step, onResult ->
         val parentCompleting = task.steps.all { it.id == step.id || it.isCompleted }
         recordsViewModel.setStepCompleted(step.id, true) { error ->
+            onResult(error)
             if (error == null) {
                 hapticFeedback.performHapticFeedback(
                     if (parentCompleting) {
@@ -307,7 +308,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 },
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
-                                onQuickRecord = { item, value -> recordValue(item, value) {} },
+                                onQuickRecord = recordValue,
                                 onCompleteStep = completeStep,
                                 onDeferTarget = recordsViewModel::deferTarget,
                                 onOpenMeasurement = { item ->
