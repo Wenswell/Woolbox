@@ -20,12 +20,17 @@ data class TodoTask(
     val createdAt: Long,
     val updatedAt: Long,
     val steps: List<TodoStep>,
+    val windows: List<RecordWindow> = emptyList(),
 ) {
     val isCompleted: Boolean
         get() = completedAt != null
 
     val completedStepCount: Int
         get() = steps.count(TodoStep::isCompleted)
+
+    /** First unfinished subtask in fixed position order. */
+    val nextStep: TodoStep?
+        get() = steps.firstOrNull { !it.isCompleted }
 }
 
 data class TodoStep(

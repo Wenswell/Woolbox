@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,10 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.validatedTaskTitle
+import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
@@ -51,7 +54,7 @@ fun TaskDetailScreen(
     task: TodoTask?,
     loading: Boolean,
     onBack: () -> Unit,
-    onSave: (String, TaskHorizon, (String?) -> Unit) -> Unit,
+    onSave: (String, TaskHorizon, List<RecordWindow>, (String?) -> Unit) -> Unit,
     onCreateStep: (String, (String?) -> Unit) -> Unit,
     onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
@@ -85,6 +88,11 @@ fun TaskDetailScreen(
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
     var horizonName by rememberSaveable(task.id) { mutableStateOf(task.horizon.name) }
     val horizon = TaskHorizon.valueOf(horizonName)
+    var windows by rememberSaveable(task.id) {
+        mutableStateOf(task.windows.map { "${it.startMinute},${it.endMinute}" })
+    }
+    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
+    val parsedWindows = windows.map(::decodeWindow)
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var savingTitle by rememberSaveable { mutableStateOf(false) }
@@ -112,15 +120,21 @@ fun TaskDetailScreen(
             errorMessage = "Check the highlighted field."
             return
         }
-        if (normalizedTitle == task.title && horizon == task.horizon) return
+        val normalizedWindows = runCatching { validatedWindows(parsedWindows) }.getOrElse { error ->
+            errorMessage = error.message ?: "Suggested times are invalid."
+            return
+        }
         savingTitle = true
-        onSave(normalizedTitle, horizon) { error ->
+        onSave(normalizedTitle, horizon, normalizedWindows) { error ->
             savingTitle = false
             errorMessage = error
         }
     }
 
-    val titleDirty = title.trim() != task.title || horizon != task.horizon
+    val savedWindows = task.windows.map { it.startMinute to it.endMinute }
+    val titleDirty = title.trim() != task.title ||
+        horizon != task.horizon ||
+        parsedWindows.map { it.startMinute to it.endMinute } != savedWindows
     AppRouteScaffold(
         title = "Edit task",
         onBack = onBack,
@@ -206,6 +220,18 @@ fun TaskDetailScreen(
             }
         }
 
+        AppSection(title = "Recommendation") {
+            SuggestedTimeFields(
+                windows = parsedWindows,
+                enabled = !savingTitle,
+                onEditTime = { timeEditTarget = it },
+                onRemove = { index ->
+                    windows = windows.toMutableList().also { it.removeAt(index) }
+                },
+                onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
+            )
+        }
+
         errorMessage?.let { message ->
             Text(
                 text = message,
@@ -214,6 +240,18 @@ fun TaskDetailScreen(
             )
         }
         Spacer(Modifier.height(16.dp))
+    }
+
+    timeEditTarget?.let { target ->
+        val window = parsedWindows.getOrNull(target.index) ?: return@let
+        RecordTimePickerDialog(
+            initialMinute = if (target.start) window.startMinute else window.endMinute,
+            onDismiss = { timeEditTarget = null },
+            onConfirm = { minute ->
+                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
+                timeEditTarget = null
+            },
+        )
     }
 
     if (creatingStep) {

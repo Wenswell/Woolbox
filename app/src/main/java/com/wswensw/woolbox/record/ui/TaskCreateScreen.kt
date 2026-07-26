@@ -22,13 +22,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.validatedTaskTitle
+import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
@@ -36,13 +39,22 @@ import com.wswensw.woolbox.ui.AppStyle
 @Composable
 fun TaskCreateScreen(
     onBack: () -> Unit,
-    onCreate: (title: String, stepTitles: List<String>, horizon: TaskHorizon, onResult: (String?) -> Unit) -> Unit,
+    onCreate: (
+        title: String,
+        stepTitles: List<String>,
+        horizon: TaskHorizon,
+        windows: List<RecordWindow>,
+        onResult: (String?) -> Unit,
+    ) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
     var horizonName by rememberSaveable { mutableStateOf(TaskHorizon.TODAY.name) }
     val horizon = TaskHorizon.valueOf(horizonName)
     var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
+    var windows by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
+    val parsedWindows = windows.map(::decodeWindow)
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -58,8 +70,12 @@ fun TaskCreateScreen(
             errorMessage = error.message ?: "Each subtask needs a title."
             return
         }
+        val normalizedWindows = runCatching { validatedWindows(parsedWindows) }.getOrElse { error ->
+            errorMessage = error.message ?: "Suggested times are invalid."
+            return
+        }
         saving = true
-        onCreate(normalizedTitle, normalizedSteps, horizon) { error ->
+        onCreate(normalizedTitle, normalizedSteps, horizon, normalizedWindows) { error ->
             saving = false
             errorMessage = error
         }
@@ -178,6 +194,17 @@ fun TaskCreateScreen(
                 )
             }
         }
+        AppSection(title = "Recommendation") {
+            SuggestedTimeFields(
+                windows = parsedWindows,
+                enabled = !saving,
+                onEditTime = { timeEditTarget = it },
+                onRemove = { index ->
+                    windows = windows.toMutableList().also { it.removeAt(index) }
+                },
+                onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
+            )
+        }
         errorMessage?.let { message ->
             Spacer(Modifier.height(8.dp))
             Text(
@@ -186,5 +213,17 @@ fun TaskCreateScreen(
                 modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
         }
+    }
+
+    timeEditTarget?.let { target ->
+        val window = parsedWindows.getOrNull(target.index) ?: return@let
+        RecordTimePickerDialog(
+            initialMinute = if (target.start) window.startMinute else window.endMinute,
+            onDismiss = { timeEditTarget = null },
+            onConfirm = { minute ->
+                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
+                timeEditTarget = null
+            },
+        )
     }
 }

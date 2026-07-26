@@ -9,6 +9,7 @@ import {
   recordItems,
   recordWindows,
   todoSteps,
+  todoTaskWindows,
   todoTasks,
 } from "./schema.js";
 
@@ -18,6 +19,7 @@ type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordWindowRow = typeof recordWindows.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
 type TodoTaskRow = typeof todoTasks.$inferSelect;
+type TodoTaskWindowRow = typeof todoTaskWindows.$inferSelect;
 type TodoStepRow = typeof todoSteps.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
 
@@ -75,6 +77,7 @@ interface TaskAuditSnapshot {
   title: string;
   horizon: string;
   completedAt: number | null;
+  windows: Array<{ startMinute: number; endMinute: number }>;
   stepCount?: number;
   stepIds?: number[];
 }
@@ -424,11 +427,19 @@ export class RecordsService {
         })))
         .returning({ id: todoSteps.id, title: todoSteps.title })
         .all();
+      if (input.windows.length > 0) {
+        tx.insert(todoTaskWindows)
+          .values(input.windows.map((window) => ({ ...window, taskId: task.id })))
+          .run();
+      }
       this.writeAudit(tx, {
         action: "TASK_CREATED",
         entityType: "TASK",
         entityId: task.id,
-        after: { ...taskSnapshot({ id: task.id, title: input.title, horizon: input.horizon, completedAt: null }), stepCount: steps.length },
+        after: {
+          ...taskSnapshot({ id: task.id, title: input.title, horizon: input.horizon, completedAt: null }, input.windows),
+          stepCount: steps.length,
+        },
         createdAt: now,
       });
       for (const step of steps) {
@@ -450,13 +461,20 @@ export class RecordsService {
       const current = this.requireTask(tx, id);
       const now = this.now();
       const updated = { ...current, title: input.title, horizon: input.horizon, updatedAt: now };
+      const currentWindows = tx.select().from(todoTaskWindows).where(eq(todoTaskWindows.taskId, id)).all();
       tx.update(todoTasks).set({ title: input.title, horizon: input.horizon, updatedAt: now }).where(eq(todoTasks.id, id)).run();
+      tx.delete(todoTaskWindows).where(eq(todoTaskWindows.taskId, id)).run();
+      if (input.windows.length > 0) {
+        tx.insert(todoTaskWindows)
+          .values(input.windows.map((window) => ({ ...window, taskId: id })))
+          .run();
+      }
       this.writeAudit(tx, {
         action: "TASK_UPDATED",
         entityType: "TASK",
         entityId: id,
-        before: taskSnapshot(current),
-        after: taskSnapshot(updated),
+        before: taskSnapshot(current, currentWindows),
+        after: taskSnapshot(updated, input.windows),
         createdAt: now,
       });
     });
@@ -471,15 +489,16 @@ export class RecordsService {
         .from(todoSteps)
         .where(eq(todoSteps.taskId, id))
         .get()!.value;
+      const windows = tx.select().from(todoTaskWindows).where(eq(todoTaskWindows.taskId, id)).all();
       this.writeAudit(tx, {
         action: "TASK_DELETED",
         entityType: "TASK",
         entityId: id,
-        before: { ...taskSnapshot(task), stepCount },
+        before: { ...taskSnapshot(task, windows), stepCount },
         createdAt: this.now(),
       });
       tx.delete(todoTasks).where(eq(todoTasks.id, id)).run();
-      return task;
+      return { ...task, windows };
     });
   }
 
@@ -605,12 +624,13 @@ export class RecordsService {
           .run();
       });
       tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, taskId)).run();
+      const windows = tx.select().from(todoTaskWindows).where(eq(todoTaskWindows.taskId, taskId)).all();
       this.writeAudit(tx, {
         action: "TASK_STEPS_REORDERED",
         entityType: "TASK",
         entityId: taskId,
-        before: { id: task.id, title: task.title, horizon: task.horizon, completedAt: task.completedAt, stepIds: before },
-        after: { id: task.id, title: task.title, horizon: task.horizon, completedAt: task.completedAt, stepIds },
+        before: { ...taskSnapshot(task, windows), stepIds: before },
+        after: { ...taskSnapshot(task, windows), stepIds },
         createdAt: now,
       });
     });
@@ -647,10 +667,11 @@ export class RecordsService {
 
   private attachSteps(tasks: TodoTaskRow[]) {
     if (tasks.length === 0) return [];
+    const taskIds = tasks.map((task) => task.id);
     const steps = this.db
       .select()
       .from(todoSteps)
-      .where(inArray(todoSteps.taskId, tasks.map((task) => task.id)))
+      .where(inArray(todoSteps.taskId, taskIds))
       .orderBy(asc(todoSteps.taskId), asc(todoSteps.position), asc(todoSteps.id))
       .all();
     const stepsByTask = new Map<number, TodoStepRow[]>();
@@ -659,7 +680,23 @@ export class RecordsService {
       taskSteps.push(step);
       stepsByTask.set(step.taskId, taskSteps);
     }
-    return tasks.map((task) => ({ ...task, steps: stepsByTask.get(task.id) ?? [] }));
+    const windows = this.db
+      .select()
+      .from(todoTaskWindows)
+      .where(inArray(todoTaskWindows.taskId, taskIds))
+      .orderBy(asc(todoTaskWindows.startMinute), asc(todoTaskWindows.endMinute), asc(todoTaskWindows.id))
+      .all();
+    const windowsByTask = new Map<number, TodoTaskWindowRow[]>();
+    for (const window of windows) {
+      const taskWindows = windowsByTask.get(window.taskId) ?? [];
+      taskWindows.push(window);
+      windowsByTask.set(window.taskId, taskWindows);
+    }
+    return tasks.map((task) => ({
+      ...task,
+      steps: stepsByTask.get(task.id) ?? [],
+      windows: windowsByTask.get(task.id) ?? [],
+    }));
   }
 
   private requireTask(tx: RecordsTransaction, id: number) {
@@ -797,12 +834,18 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
   };
 }
 
-function taskSnapshot(task: { id: number; title: string; horizon: string; completedAt: number | null }) {
+function taskSnapshot(
+  task: { id: number; title: string; horizon: string; completedAt: number | null },
+  windows: Array<Pick<TodoTaskWindowRow, "startMinute" | "endMinute">> = [],
+): TaskAuditSnapshot {
   return {
     id: task.id,
     title: task.title,
     horizon: task.horizon,
     completedAt: task.completedAt,
+    windows: windows
+      .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }))
+      .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute),
   };
 }
 

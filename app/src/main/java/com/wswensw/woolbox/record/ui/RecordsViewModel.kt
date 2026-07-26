@@ -13,6 +13,7 @@ import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.RecordsClock
+import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
@@ -205,10 +206,16 @@ class RecordsViewModel(
         }
     }
 
-    fun createTask(title: String, stepTitles: List<String>, horizon: TaskHorizon, onResult: (taskId: Long?, error: String?) -> Unit) {
+    fun createTask(
+        title: String,
+        stepTitles: List<String>,
+        horizon: TaskHorizon,
+        windows: List<RecordWindow>,
+        onResult: (taskId: Long?, error: String?) -> Unit,
+    ) {
         viewModelScope.launch {
             writeAndRefresh(
-                action = { repository.createTask(title, stepTitles, horizon) },
+                action = { repository.createTask(title, stepTitles, horizon, windows) },
                 onWritten = { taskId -> onResult(taskId, null) },
             ).onFailure { failure ->
                 onResult(null, failure.message ?: "Unable to create task.")
@@ -216,11 +223,17 @@ class RecordsViewModel(
         }
     }
 
-    fun updateTask(taskId: Long, title: String, horizon: TaskHorizon, onResult: (String?) -> Unit) = runTaskAction(
+    fun updateTask(
+        taskId: Long,
+        title: String,
+        horizon: TaskHorizon,
+        windows: List<RecordWindow>,
+        onResult: (String?) -> Unit,
+    ) = runTaskAction(
         onResult = onResult,
         failureMessage = "Unable to update task.",
     ) {
-        repository.updateTask(taskId, title, horizon)
+        repository.updateTask(taskId, title, horizon, windows)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(

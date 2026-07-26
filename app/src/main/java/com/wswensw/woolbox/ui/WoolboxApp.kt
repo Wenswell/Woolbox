@@ -60,6 +60,8 @@ import com.wswensw.woolbox.record.ui.ManageRecordsScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
+import com.wswensw.woolbox.record.model.TodoStep
+import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
@@ -126,6 +128,31 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
     val recordsClock = recordsViewModel.clock.collectAsStateWithLifecycle()
+
+    // Shared by the task progress Sheet and the Now band chips so completing a
+    // subtask gives the same haptics and parent-done Snackbar either way.
+    val completeStep: (TodoTask, TodoStep) -> Unit = { task, step ->
+        val parentCompleting = task.steps.all { it.id == step.id || it.isCompleted }
+        recordsViewModel.setStepCompleted(step.id, true) { error ->
+            if (error == null) {
+                hapticFeedback.performHapticFeedback(
+                    if (parentCompleting) {
+                        HapticFeedbackType.LongPress
+                    } else {
+                        HapticFeedbackType.ContextClick
+                    },
+                )
+                if (parentCompleting) {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "${task.title} done",
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     // Shared by the record Sheet and the root page quick-record chips so both
     // produce the same haptics, goal detection and undo.
@@ -259,6 +286,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
                                 onQuickRecord = { item, value -> recordValue(item, value) {} },
+                                onCompleteStep = completeStep,
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
@@ -451,8 +479,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             composable(AppRoutes.TASK_NEW) {
                 TaskCreateScreen(
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, stepTitles, horizon, onResult ->
-                        recordsViewModel.createTask(title, stepTitles, horizon) { taskId, error ->
+                    onCreate = { title, stepTitles, horizon, windows, onResult ->
+                        recordsViewModel.createTask(title, stepTitles, horizon, windows) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -468,8 +496,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     task = recordsState.findTask(taskId),
                     loading = recordsState.isLoading,
                     onBack = { navController.popBackStack() },
-                    onSave = { title, horizon, onResult ->
-                        recordsViewModel.updateTask(taskId, title, horizon, onResult)
+                    onSave = { title, horizon, windows, onResult ->
+                        recordsViewModel.updateTask(taskId, title, horizon, windows, onResult)
                     },
                     onCreateStep = { title, onResult ->
                         recordsViewModel.createStep(taskId, title, onResult)

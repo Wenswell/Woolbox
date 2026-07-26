@@ -418,49 +418,15 @@ fun AccumulateItemFormScreen(
         }
 
         AppSection(title = "Recommendation") {
-            parsedWindows.forEachIndexed { index, window ->
-                Row(
-                    modifier = Modifier.formField(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(
-                        onClick = { timeEditTarget = TimeEditTarget(index, start = true) },
-                        enabled = !saving,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(formatMinute(window.startMinute))
-                    }
-                    Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(
-                        onClick = { timeEditTarget = TimeEditTarget(index, start = false) },
-                        enabled = !saving,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(formatMinute(window.endMinute))
-                    }
-                    IconButton(
-                        enabled = !saving,
-                        onClick = { windows = windows.toMutableList().also { it.removeAt(index) } },
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close_24),
-                            contentDescription = "Remove suggested time",
-                        )
-                    }
-                }
-            }
-            OutlinedButton(
-                onClick = {
-                    val start = parsedWindows.lastOrNull()?.endMinute ?: 9 * 60
-                    val end = (start + 60) % (24 * 60)
-                    windows = windows + "$start,$end"
-                },
+            SuggestedTimeFields(
+                windows = parsedWindows,
                 enabled = !saving,
-                modifier = Modifier.formField(),
-            ) {
-                Text("Add suggested time")
-            }
+                onEditTime = { timeEditTarget = it },
+                onRemove = { index ->
+                    windows = windows.toMutableList().also { it.removeAt(index) }
+                },
+                onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
+            )
             OutlinedTextField(
                 value = priority,
                 onValueChange = {
@@ -491,18 +457,12 @@ fun AccumulateItemFormScreen(
     }
 
     timeEditTarget?.let { target ->
-        val window = parsedWindows[target.index]
+        val window = parsedWindows.getOrNull(target.index) ?: return@let
         RecordTimePickerDialog(
             initialMinute = if (target.start) window.startMinute else window.endMinute,
             onDismiss = { timeEditTarget = null },
             onConfirm = { minute ->
-                val updated = parsedWindows.toMutableList()
-                updated[target.index] = if (target.start) {
-                    window.copy(startMinute = minute)
-                } else {
-                    window.copy(endMinute = minute)
-                }
-                windows = updated.map { "${it.startMinute},${it.endMinute}" }
+                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
                 timeEditTarget = null
             },
         )

@@ -43,6 +43,7 @@ export interface TaskTitleInput {
 
 export interface TaskWriteInput extends TaskTitleInput {
   horizon: TaskHorizon;
+  windows: RecordWindowInput[];
 }
 
 export interface TaskCreateInput extends TaskWriteInput {
@@ -77,11 +78,7 @@ export function parseItemInput(value: unknown): RecordItemInput {
   requireRule(name.length > 0, "Name is required.");
   requireRule(unit.length > 0, "Unit is required.");
   requirePositive(stepValue, "Step");
-  requireRule(Array.isArray(windowsValue), "Windows must be an array.");
-
-  const windows = windowsValue.map((window) => parseWindowInput(window));
-  const uniqueWindows = new Set(windows.map(({ startMinute, endMinute }) => `${startMinute}:${endMinute}`));
-  requireRule(uniqueWindows.size === windows.length, "Suggested time windows must be unique.");
+  const windows = parseWindowsInput(windowsValue);
 
   if (mode === "ACCUMULATE") {
     requirePositive(defaultValue, "Default value");
@@ -142,12 +139,17 @@ export function parseTaskInput(value: unknown): TaskTitleInput {
 export function parseTaskWriteInput(value: unknown): TaskWriteInput {
   const input = objectInput(value);
   const { title } = parseTaskInput(input);
-  return { title, horizon: parseTaskHorizon(input.horizon) };
+  return {
+    title,
+    horizon: parseTaskHorizon(input.horizon),
+    // Tasks predate suggested windows, so an absent list means none.
+    windows: parseWindowsInput(input.windows, true),
+  };
 }
 
 export function parseTaskCreateInput(value: unknown): TaskCreateInput {
   const input = objectInput(value);
-  const { title, horizon } = parseTaskWriteInput(input);
+  const { title, horizon, windows } = parseTaskWriteInput(input);
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
   const steps = input.steps.map((value) => {
     requireRule(typeof value === "string", "Subtask titles must be strings.");
@@ -155,7 +157,7 @@ export function parseTaskCreateInput(value: unknown): TaskCreateInput {
     requireRule(step.length > 0, "Subtask titles are required.");
     return step;
   });
-  return { title, horizon, steps };
+  return { title, horizon, windows, steps };
 }
 
 export function parseCompleted(value: unknown): boolean {
@@ -197,6 +199,47 @@ export function parseArchived(value: unknown): boolean {
 export function parseIsoDate(value: unknown, label: string): string {
   requireRule(typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isRealDate(value), `${label} is invalid.`);
   return value;
+}
+
+export const MINUTES_PER_DAY = 24 * 60;
+export const MAX_WINDOW_COVERAGE_MINUTES = 12 * 60;
+
+/**
+ * Suggested windows must stay a hint about *now*, so their union has to leave
+ * most of the day uncovered. Overlapping windows are counted once.
+ */
+export function windowCoverageMinutes(windows: RecordWindowInput[]): number {
+  const segments: Array<[number, number]> = [];
+  for (const { startMinute, endMinute } of windows) {
+    if (startMinute < endMinute) {
+      segments.push([startMinute, endMinute]);
+    } else {
+      segments.push([startMinute, MINUTES_PER_DAY]);
+      segments.push([0, endMinute]);
+    }
+  }
+  segments.sort((left, right) => left[0] - right[0]);
+  let covered = 0;
+  let cursor = 0;
+  for (const [start, end] of segments) {
+    if (end <= cursor) continue;
+    covered += end - Math.max(start, cursor);
+    cursor = end;
+  }
+  return covered;
+}
+
+function parseWindowsInput(value: unknown, optional = false): RecordWindowInput[] {
+  if (optional && value === undefined) return [];
+  requireRule(Array.isArray(value), "Windows must be an array.");
+  const windows = value.map((window) => parseWindowInput(window));
+  const unique = new Set(windows.map(({ startMinute, endMinute }) => `${startMinute}:${endMinute}`));
+  requireRule(unique.size === windows.length, "Suggested time windows must be unique.");
+  requireRule(
+    windowCoverageMinutes(windows) < MAX_WINDOW_COVERAGE_MINUTES,
+    "Suggested times must cover less than 12 hours.",
+  );
+  return windows;
 }
 
 function parseWindowInput(value: unknown): RecordWindowInput {

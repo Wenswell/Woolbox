@@ -64,6 +64,7 @@ import com.wswensw.woolbox.record.model.emptyRecentDayValues
 import com.wswensw.woolbox.record.model.hasSuggestedWindows
 import com.wswensw.woolbox.record.model.isGoalSatisfied
 import com.wswensw.woolbox.record.model.nextNowSuggestion
+import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.recentDayPieProgress
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
@@ -72,6 +73,7 @@ import com.wswensw.woolbox.record.model.RecordNowSuggestion
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.model.TaskHorizon
+import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.ui.AppStyle
 import java.time.format.DateTimeFormatter
@@ -94,6 +96,7 @@ fun RecordsScreen(
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
     onQuickRecord: (RecordItem, Double) -> Unit,
+    onCompleteStep: (TodoTask, TodoStep) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
     onOpenTask: (TodoTask) -> Unit,
     modifier: Modifier = Modifier,
@@ -113,7 +116,7 @@ fun RecordsScreen(
         .filter { it.mode == RecordMode.MEASUREMENT }
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
-    val lastRecordMinutes = lastRecordMinutes(state.entries)
+    val recordMinutes = todayRecordMinutes(state.entries)
     val listState = rememberLazyListState()
     var pauseDecorativeMotion by remember { mutableStateOf(false) }
     LaunchedEffect(listState) {
@@ -175,17 +178,20 @@ fun RecordsScreen(
                 )
                 // Visibility stays time independent so the band never appears or
                 // disappears mid-minute; only its contents follow the clock.
-                if (dayOverview.isVisible || hasSuggestedWindows(accumulateItems)) {
+                if (dayOverview.isVisible || hasSuggestedWindows(accumulateItems, openTasks)) {
                     item {
                         RecordsNowBand(
                             clock = clock,
                             overview = dayOverview,
                             accumulateItems = accumulateItems,
+                            tasks = openTasks,
                             todayValues = todayValues,
+                            recordMinutes = recordMinutes,
                             goalValues = state.goalValues,
                             recentDayValues = state.recentDayValues,
                             onQuickRecord = onQuickRecord,
                             onOpenItem = onRecordItem,
+                            onCompleteStep = onCompleteStep,
                         )
                     }
                 }
@@ -297,7 +303,7 @@ fun RecordsScreen(
                                     todayValue = todayValues[item.id] ?: 0.0,
                                     goalCumulative = state.goalValues[item.id],
                                     recentDayValues = state.recentDayValues[item.id],
-                                    lastRecordMinute = lastRecordMinutes[item.id],
+                                    lastRecordMinute = recordMinutes[item.id]?.maxOrNull(),
                                     onClick = { onRecordItem(item) },
                                     modifier = Modifier.weight(1f),
                                 )
@@ -838,11 +844,14 @@ private fun RecordsNowBand(
     clock: State<RecordsClock>,
     overview: RecordsDayOverview,
     accumulateItems: List<RecordItem>,
+    tasks: List<TodoTask>,
     todayValues: Map<Long, Double>,
+    recordMinutes: Map<Long, List<Int>>,
     goalValues: Map<Long, Double>,
     recentDayValues: Map<Long, List<Double>>,
     onQuickRecord: (RecordItem, Double) -> Unit,
     onOpenItem: (RecordItem) -> Unit,
+    onCompleteStep: (TodoTask, TodoStep) -> Unit,
 ) {
     val now = clock.value
     val satisfied: (RecordItem) -> Boolean = { item ->
@@ -851,12 +860,16 @@ private fun RecordsNowBand(
     val active = activeNowSuggestions(
         items = accumulateItems,
         minuteOfDay = now.minuteOfDay,
+        tasks = tasks,
+        recordedMinutes = recordMinutes,
         isSatisfied = satisfied,
     )
     val next = if (active.isEmpty()) {
         nextNowSuggestion(
             items = accumulateItems,
             minuteOfDay = now.minuteOfDay,
+            tasks = tasks,
+            recordedMinutes = recordMinutes,
             isSatisfied = satisfied,
         )
     } else {
@@ -900,15 +913,19 @@ private fun RecordsNowBand(
                 active.forEach { suggestion ->
                     NowSuggestionChip(
                         suggestion = suggestion,
-                        colorProgress = accumulateColorProgress(
-                            item = suggestion.item,
-                            cumulative = goalValues[suggestion.item.id]
-                                ?: todayValues[suggestion.item.id]
-                                ?: 0.0,
-                            recentDayValues = recentDayValues[suggestion.item.id],
-                        ),
+                        colorProgress = when (val target = suggestion.target) {
+                            is NowTarget.Accumulate -> accumulateColorProgress(
+                                item = target.item,
+                                cumulative = goalValues[target.item.id]
+                                    ?: todayValues[target.item.id]
+                                    ?: 0.0,
+                                recentDayValues = recentDayValues[target.item.id],
+                            )
+                            is NowTarget.Task -> taskColorProgress(target.task)
+                        },
                         onQuickRecord = onQuickRecord,
                         onOpenItem = onOpenItem,
+                        onCompleteStep = onCompleteStep,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -916,7 +933,7 @@ private fun RecordsNowBand(
         } else if (next != null) {
             Text(
                 text = "Next · ${formatMinute(next.window.startMinute)} " +
-                    "${displayRecordName(next.item.name)} · in ${formatMinuteSpan(next.startsInMinutes)}",
+                    "${nowTargetLabel(next.target)} · in ${formatMinuteSpan(next.startsInMinutes)}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -963,19 +980,33 @@ private fun NowSuggestionChip(
     colorProgress: Float,
     onQuickRecord: (RecordItem, Double) -> Unit,
     onOpenItem: (RecordItem) -> Unit,
+    onCompleteStep: (TodoTask, TodoStep) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val item = suggestion.item
     val colors = recordProgressColors(progress = colorProgress)
-    val quickValue = item.defaultValue?.takeIf { it.isFinite() && it > 0.0 }
-    val label = if (quickValue != null) {
-        "${displayRecordName(item.name)} +${formatValue(quickValue)}"
-    } else {
-        displayRecordName(item.name)
+    val target = suggestion.target
+    val quickValue = (target as? NowTarget.Accumulate)
+        ?.item
+        ?.defaultValue
+        ?.takeIf { it.isFinite() && it > 0.0 }
+    val label = when (target) {
+        is NowTarget.Accumulate -> if (quickValue != null) {
+            "${displayRecordName(target.item.name)} +${formatValue(quickValue)}"
+        } else {
+            displayRecordName(target.item.name)
+        }
+        is NowTarget.Task -> "${target.task.title} · ${target.step.title}"
     }
     Surface(
         onClick = {
-            if (quickValue != null) onQuickRecord(item, quickValue) else onOpenItem(item)
+            when (target) {
+                is NowTarget.Accumulate -> if (quickValue != null) {
+                    onQuickRecord(target.item, quickValue)
+                } else {
+                    onOpenItem(target.item)
+                }
+                is NowTarget.Task -> onCompleteStep(target.task, target.step)
+            }
         },
         modifier = modifier.heightIn(min = 44.dp),
         shape = CircleShape,
@@ -995,6 +1026,11 @@ private fun NowSuggestionChip(
             )
         }
     }
+}
+
+internal fun nowTargetLabel(target: NowTarget): String = when (target) {
+    is NowTarget.Accumulate -> displayRecordName(target.item.name)
+    is NowTarget.Task -> "${target.task.title} · ${target.step.title}"
 }
 
 internal fun recordsDayLabel(clock: RecordsClock): String =
@@ -1092,8 +1128,8 @@ internal fun goalItems(items: List<RecordItem>, period: GoalPeriod? = null): Lis
 internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =
     entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) -> itemEntries.sumOf(RecordEntry::value) }
 
-/** Local minute of the latest entry each item received today. */
-internal fun lastRecordMinutes(entries: List<RecordEntry>): Map<Long, Int> =
+/** Local minutes each item was recorded at today. */
+internal fun todayRecordMinutes(entries: List<RecordEntry>): Map<Long, List<Int>> =
     entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) ->
-        itemEntries.maxOf(RecordEntry::localMinute)
+        itemEntries.map(RecordEntry::localMinute)
     }

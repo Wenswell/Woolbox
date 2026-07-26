@@ -31,7 +31,7 @@ class RecordNowTest {
 
         val active = activeNowSuggestions(listOf(morning, evening), minuteOfDay = 9 * 60)
 
-        assertEquals(listOf(1L), active.map { it.item.id })
+        assertEquals(listOf(1L), active.map { it.item?.id })
         assertEquals(60, active.single().endsInMinutes)
         assertEquals(0, active.single().startsInMinutes)
     }
@@ -43,7 +43,7 @@ class RecordNowTest {
 
         val active = activeNowSuggestions(listOf(closingLater, closingSoon), minuteOfDay = 9 * 60)
 
-        assertEquals(listOf(1L, 2L), active.map { it.item.id })
+        assertEquals(listOf(1L, 2L), active.map { it.item?.id })
     }
 
     @Test
@@ -53,7 +53,7 @@ class RecordNowTest {
 
         assertEquals(
             listOf(1L, 2L),
-            activeNowSuggestions(listOf(overnight, other), minuteOfDay = 30).map { it.item.id },
+            activeNowSuggestions(listOf(overnight, other), minuteOfDay = 30).map { it.item?.id },
         )
         assertEquals(
             1,
@@ -74,6 +74,40 @@ class RecordNowTest {
         )
 
         assertTrue(active.isEmpty())
+    }
+
+    @Test
+    fun activeSuggestionsDropWindowsThatAlreadyGotAnEntryToday() {
+        val item = accumulate(
+            id = 1,
+            name = "Water",
+            windows = listOf(8 * 60 to 10 * 60, 12 * 60 to 14 * 60),
+        )
+        val recorded = mapOf(1L to listOf(9 * 60 + 5))
+
+        assertTrue(
+            activeNowSuggestions(listOf(item), minuteOfDay = 9 * 60 + 30, recordedMinutes = recorded)
+                .isEmpty(),
+        )
+        // A different window of the same item still stands on its own.
+        assertEquals(
+            listOf(1L),
+            activeNowSuggestions(listOf(item), minuteOfDay = 13 * 60, recordedMinutes = recorded)
+                .map { it.item?.id },
+        )
+    }
+
+    @Test
+    fun nextSuggestionSkipsWindowsThatAlreadyGotAnEntryToday() {
+        val item = accumulate(id = 1, name = "Water", windows = listOf(10 * 60 to 11 * 60))
+
+        assertNull(
+            nextNowSuggestion(
+                items = listOf(item),
+                minuteOfDay = 9 * 60,
+                recordedMinutes = mapOf(1L to listOf(10 * 60 + 30)),
+            ),
+        )
     }
 
     @Test
@@ -105,13 +139,157 @@ class RecordNowTest {
     }
 
     @Test
-    fun hasSuggestedWindowsOnlyCountsAccumulateItems() {
+    fun hasSuggestedWindowsCountsAccumulateItemsAndTasks() {
         val withWindow = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
         val withoutWindow = accumulate(id = 2, name = "Walk", windows = emptyList())
 
         assertTrue(hasSuggestedWindows(listOf(withoutWindow, withWindow)))
         assertEquals(false, hasSuggestedWindows(listOf(withoutWindow)))
+        assertTrue(
+            hasSuggestedWindows(
+                items = listOf(withoutWindow),
+                tasks = listOf(task(id = 1, windows = listOf(8 * 60 to 9 * 60))),
+            ),
+        )
     }
+
+    @Test
+    fun activeSuggestionsIncludeTasksWithTheirNextStep() {
+        val scheduled = task(
+            id = 5,
+            title = "Morning routine",
+            windows = listOf(8 * 60 to 9 * 60),
+            stepTitles = listOf("Stretch", "Shower"),
+        )
+
+        val active = activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(scheduled))
+
+        val target = active.single().target as NowTarget.Task
+        assertEquals(5L, target.task.id)
+        assertEquals("Stretch", target.step.title)
+        assertEquals(30, active.single().endsInMinutes)
+    }
+
+    @Test
+    fun activeTaskSuggestionsAdvanceToTheNextUnfinishedStep() {
+        val partly = task(
+            id = 5,
+            windows = listOf(8 * 60 to 9 * 60),
+            stepTitles = listOf("Stretch", "Shower"),
+            completedStepCount = 1,
+        )
+
+        val target = activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(partly))
+            .single()
+            .target as NowTarget.Task
+        assertEquals("Shower", target.step.title)
+    }
+
+    @Test
+    fun activeSuggestionsSkipCompletedAndUnscheduledTasks() {
+        val done = task(
+            id = 5,
+            windows = listOf(8 * 60 to 9 * 60),
+            stepTitles = listOf("Stretch"),
+            completedStepCount = 1,
+        )
+        val unscheduled = task(id = 6, windows = emptyList(), stepTitles = listOf("Later"))
+
+        assertTrue(
+            activeNowSuggestions(
+                items = emptyList(),
+                minuteOfDay = 8 * 60 + 30,
+                tasks = listOf(done, unscheduled),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun taskSuggestionsRankAboveAccumulatesClosingAtTheSameTime() {
+        val item = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
+        val scheduled = task(id = 5, title = "Routine", windows = listOf(8 * 60 to 9 * 60))
+
+        val active = activeNowSuggestions(
+            items = listOf(item),
+            minuteOfDay = 8 * 60 + 30,
+            tasks = listOf(scheduled),
+        )
+
+        assertTrue(active.first().target is NowTarget.Task)
+    }
+
+    @Test
+    fun nextSuggestionCoversUpcomingTaskWindows() {
+        val scheduled = task(id = 5, title = "Routine", windows = listOf(10 * 60 to 11 * 60))
+
+        val next = nextNowSuggestion(emptyList(), minuteOfDay = 9 * 60, tasks = listOf(scheduled))
+
+        assertEquals(60, next?.startsInMinutes)
+        assertTrue(next?.target is NowTarget.Task)
+    }
+
+    @Test
+    fun windowCoverageCountsOverlapsOnceAndWrapsMidnight() {
+        assertEquals(0, windowCoverageMinutes(emptyList()))
+        assertEquals(120, windowCoverageMinutes(listOf(window(8 * 60, 10 * 60))))
+        assertEquals(
+            480,
+            windowCoverageMinutes(listOf(window(8 * 60, 15 * 60), window(10 * 60, 16 * 60))),
+        )
+        assertEquals(360, windowCoverageMinutes(listOf(window(23 * 60, 5 * 60))))
+    }
+
+    @Test
+    fun validatedWindowsRejectRepeatsEqualBoundsAndWideCoverage() {
+        assertEquals(
+            listOf(window(8 * 60, 10 * 60)),
+            validatedWindows(listOf(window(8 * 60, 10 * 60))),
+        )
+        assertThrows { validatedWindows(listOf(window(8 * 60, 8 * 60))) }
+        assertThrows {
+            validatedWindows(listOf(window(8 * 60, 10 * 60), window(8 * 60, 10 * 60)))
+        }
+        assertThrows { validatedWindows(listOf(window(0, MAX_WINDOW_COVERAGE_MINUTES))) }
+        // Exactly at the cap is rejected; one minute under is accepted.
+        assertEquals(
+            1,
+            validatedWindows(listOf(window(0, MAX_WINDOW_COVERAGE_MINUTES - 1))).size,
+        )
+    }
+
+    private fun assertThrows(block: () -> Unit) {
+        val failure = runCatching(block).exceptionOrNull()
+        assertTrue(failure is RecordValidationException)
+    }
+
+    private fun window(startMinute: Int, endMinute: Int) =
+        RecordWindow(startMinute = startMinute, endMinute = endMinute)
+
+    private fun task(
+        id: Long,
+        title: String = "Task $id",
+        windows: List<Pair<Int, Int>>,
+        stepTitles: List<String> = listOf("Step"),
+        completedStepCount: Int = 0,
+    ) = TodoTask(
+        id = id,
+        title = title,
+        horizon = TaskHorizon.TODAY,
+        completedAt = if (completedStepCount >= stepTitles.size) 1L else null,
+        createdAt = 0,
+        updatedAt = 0,
+        steps = stepTitles.mapIndexed { index, stepTitle ->
+            TodoStep(
+                id = id * 100 + index,
+                taskId = id,
+                title = stepTitle,
+                completedAt = if (index < completedStepCount) 1L else null,
+                createdAt = 0,
+                updatedAt = 0,
+            )
+        },
+        windows = windows.map { (start, end) -> RecordWindow(startMinute = start, endMinute = end) },
+    )
 
     @Test
     fun minuteSpansAreCompact() {

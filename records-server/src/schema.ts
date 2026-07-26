@@ -92,6 +92,19 @@ export const todoSteps = sqliteTable(
   ],
 );
 
+export const todoTaskWindows = sqliteTable(
+  "todo_task_windows",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => todoTasks.id, { onDelete: "cascade" }),
+    startMinute: integer("start_minute").notNull(),
+    endMinute: integer("end_minute").notNull(),
+  },
+  (table) => [index("todo_task_windows_task_id_index").on(table.taskId)],
+);
+
 export const recordAuditLogs = sqliteTable(
   "record_audit_logs",
   {
