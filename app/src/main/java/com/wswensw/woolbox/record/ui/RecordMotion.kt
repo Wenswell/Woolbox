@@ -16,6 +16,9 @@ enum class MotionMode(
 
 internal val LocalMotionMode = staticCompositionLocalOf { MotionMode.SYSTEM }
 
+/** True while the Records root list is scrolling; freezes decorative item motion. */
+internal val LocalPauseDecorativeMotion = staticCompositionLocalOf { false }
+
 @Composable
 internal fun prefersReducedMotion(): Boolean {
     val context = LocalContext.current

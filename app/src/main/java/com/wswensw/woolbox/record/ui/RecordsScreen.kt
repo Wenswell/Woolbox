@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DateRange
@@ -35,8 +36,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,8 +96,14 @@ fun RecordsScreen(
         .filter { it.mode == RecordMode.MEASUREMENT }
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
+    val listState = rememberLazyListState()
+    val pauseDecorativeMotion by remember {
+        derivedStateOf { listState.isScrollInProgress }
+    }
 
+    CompositionLocalProvider(LocalPauseDecorativeMotion provides pauseDecorativeMotion) {
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = AppStyle.spacing.pageHorizontal,
@@ -294,6 +304,7 @@ fun RecordsScreen(
                 }
             }
         }
+    }
     }
 }
 

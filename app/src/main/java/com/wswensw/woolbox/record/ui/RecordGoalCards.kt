@@ -78,23 +78,35 @@ internal fun LiquidProgressFill(
     reduceMotion: Boolean = false,
 ) {
     val target = progress.coerceIn(0f, 1f)
+    val pauseDecorativeMotion = LocalPauseDecorativeMotion.current
     val animatedProgress by animateFloatAsState(
         targetValue = target,
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
         label = "LiquidProgressFillLevel",
     )
-    val transition = rememberInfiniteTransition(label = "LiquidProgressWave")
-    val animatedPhase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2f * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "LiquidProgressPhase",
-    )
-    val waveActive = !reduceMotion && target > 0.001f && target < 0.999f
-    val phase = if (waveActive) animatedPhase else 0f
+    val waveActive = !reduceMotion &&
+        !pauseDecorativeMotion &&
+        target > 0.001f &&
+        target < 0.999f
+    // Keep the infinite clock out of composition while scrolling or idle so it
+    // does not schedule per-frame work for off-need cards.
+    val phase = if (waveActive) {
+        val transition = rememberInfiniteTransition(label = "LiquidProgressWave")
+        val animatedPhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2f * PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2800, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "LiquidProgressPhase",
+        )
+        animatedPhase
+    } else {
+        0f
+    }
+    val frontPath = remember { Path() }
+    val backPath = remember { Path() }
     val densityAmp = 3.dp
     val densityAmpBack = 2.dp
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -104,6 +116,7 @@ internal fun LiquidProgressFill(
         val amp = if (!waveActive) 0f else densityAmp.toPx()
         val ampBack = if (!waveActive) 0f else densityAmpBack.toPx()
         drawLiquidLayer(
+            path = backPath,
             progress = animatedProgress,
             phase = phase + 1.1f,
             amplitude = ampBack,
@@ -111,6 +124,7 @@ internal fun LiquidProgressFill(
             color = fillColor.copy(alpha = backAlpha),
         )
         drawLiquidLayer(
+            path = frontPath,
             progress = animatedProgress,
             phase = phase,
             amplitude = amp,
@@ -121,6 +135,7 @@ internal fun LiquidProgressFill(
 }
 
 private fun DrawScope.drawLiquidLayer(
+    path: Path,
     progress: Float,
     phase: Float,
     amplitude: Float,
@@ -131,13 +146,22 @@ private fun DrawScope.drawLiquidLayer(
     val height = size.height
     if (width <= 0f || height <= 0f) return
     val level = height * (1f - progress.coerceIn(0f, 1f))
-    val path = Path()
+    path.reset()
     path.moveTo(0f, height)
     path.lineTo(0f, level)
-    val steps = (width / 3f).toInt().coerceIn(24, 96)
+    // Cap samples: card-width waves do not need ~1 sample / 3px.
+    val steps = if (amplitude <= 0.01f) {
+        1
+    } else {
+        (width / 4f).toInt().coerceIn(16, 40)
+    }
     for (i in 0..steps) {
         val x = width * i / steps
-        val y = level + amplitude * sin((2.0 * PI * waves * (x / width) + phase)).toFloat()
+        val y = if (amplitude <= 0.01f) {
+            level
+        } else {
+            level + amplitude * sin((2.0 * PI * waves * (x / width) + phase)).toFloat()
+        }
         path.lineTo(x, y)
     }
     path.lineTo(width, height)
@@ -165,20 +189,31 @@ internal fun SegmentedProgressFill(
 ) {
     val safeTotal = stepFilled.size.coerceAtLeast(0)
     val safeCompleted = stepFilled.count { it }
+    val pauseDecorativeMotion = LocalPauseDecorativeMotion.current
     val stripePhase = remember { Animatable(0f) }
     val animateStripes = safeCompleted in 1 until safeTotal && !reduceMotion
-    LaunchedEffect(animateStripes) {
+    LaunchedEffect(animateStripes, pauseDecorativeMotion) {
         if (!animateStripes) {
             stripePhase.snapTo(0f)
             return@LaunchedEffect
         }
+        // Keep the current phase while the list scrolls; resume from here.
+        if (pauseDecorativeMotion) return@LaunchedEffect
         // One stripe period per loop; snap-back is invisible because the
-        // pattern repeats every period.
-        stripePhase.snapTo(0f)
+        // pattern repeats every period. Duration scales with remaining phase
+        // so resume after scroll keeps constant speed.
         while (true) {
+            val remaining = (1f - stripePhase.value).coerceIn(0f, 1f)
+            if (remaining <= 0.0001f) {
+                stripePhase.snapTo(0f)
+                continue
+            }
             stripePhase.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 5_600, easing = LinearEasing),
+                animationSpec = tween(
+                    durationMillis = (5_600 * remaining).toInt().coerceAtLeast(16),
+                    easing = LinearEasing,
+                ),
             )
             stripePhase.snapTo(0f)
         }
@@ -255,16 +290,16 @@ private fun DrawScope.drawDiagonalStripes(
     periodPx: Float,
     shiftPx: Float,
 ) {
+    val path = Path()
     val extent = size.width + size.height + periodPx
     var x = -size.height - periodPx + shiftPx
     while (x < extent) {
-        val path = Path().apply {
-            moveTo(x, size.height)
-            lineTo(x + stripeWidthPx, size.height)
-            lineTo(x + stripeWidthPx + size.height, 0f)
-            lineTo(x + size.height, 0f)
-            close()
-        }
+        path.reset()
+        path.moveTo(x, size.height)
+        path.lineTo(x + stripeWidthPx, size.height)
+        path.lineTo(x + stripeWidthPx + size.height, 0f)
+        path.lineTo(x + size.height, 0f)
+        path.close()
         drawPath(path = path, color = stripeColor)
         x += periodPx
     }
