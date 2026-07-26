@@ -294,7 +294,7 @@ export class RecordsService {
       .all();
     if (rows.length === 0) return [];
     const itemsById = new Map(rows.map((item) => [item.id, item]));
-    const itemIds = sql.join(rows.map((item) => sql`${item.id}`));
+    const itemIds = sql.join(rows.map((item) => sql`${item.id}`), sql`, `);
     const entries = this.db.all<RecordEntryRow>(sql`
       SELECT entry.id, entry.item_id AS itemId, entry.occurred_at AS occurredAt,
              entry.local_date AS localDate, entry.local_minute AS localMinute,

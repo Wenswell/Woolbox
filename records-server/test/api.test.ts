@@ -279,12 +279,22 @@ describe("Records API", () => {
       unit: "°C",
       windows: [],
     }));
+    await createItem(itemInput({
+      name: "Weight",
+      mode: "MEASUREMENT",
+      defaultValue: null,
+      minValue: 0,
+      maxValue: 300,
+      unit: "kg",
+      windows: [],
+    }));
     await createItem(itemInput({ name: "Archived" }));
-    await archiveItems([3], true);
+    await archiveItems([4], true);
     await createTask({ title: "Pack", steps: ["Bag"] });
     await createEntry(entryInput({ itemId: 1, localDate: "2026-07-19", value: 2 }));
     await createEntry(entryInput({ itemId: 2, occurredAt: 20, value: 3 }));
     await createEntry(entryInput({ itemId: 2, occurredAt: 30, value: 4 }));
+    await createEntry(entryInput({ itemId: 3, occurredAt: 40, value: 70 }));
 
     const response = await app.inject({
       method: "GET",
@@ -296,10 +306,14 @@ describe("Records API", () => {
       items: [
         { id: 2, name: "Temperature", archived: false },
         { id: 1, name: "Water", archived: false },
+        { id: 3, name: "Weight", archived: false },
       ],
       tasks: [{ id: 1, title: "Pack", horizon: "TODAY", steps: [{ title: "Bag" }] }],
       accumulateEntries: [{ itemId: 1, value: 2, itemMode: "ACCUMULATE" }],
-      latestMeasurementEntries: [{ itemId: 2, value: 4, itemMode: "MEASUREMENT" }],
+      latestMeasurementEntries: [
+        { itemId: 2, value: 4, itemMode: "MEASUREMENT" },
+        { itemId: 3, value: 70, itemMode: "MEASUREMENT" },
+      ],
     });
     expect(response.json().items).not.toContainEqual(expect.objectContaining({ name: "Archived" }));
   });

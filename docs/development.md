@@ -92,7 +92,7 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `RecordsScreenTest` | Records 首字符与标题裁剪、待办排序、管理列表模式隔离、目标周期分组、进度边界、今日累计和下一个子事项。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
-| `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办事务、审计快照、根页 overview、模式筛选和批量 API。 |
+| `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办事务、审计快照、含多个 Measurement 最新值的根页 overview、模式筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页筛选、只读流水、审计日志、记录项模式和归档/恢复。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
