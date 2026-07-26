@@ -37,12 +37,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,8 @@ import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.ui.AppStyle
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 private val GridCardHeight = 120.dp
 private val GridCardSpacing = 8.dp
@@ -97,8 +100,17 @@ fun RecordsScreen(
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
     val listState = rememberLazyListState()
-    val pauseDecorativeMotion by remember {
-        derivedStateOf { listState.isScrollInProgress }
+    var pauseDecorativeMotion by remember { mutableStateOf(false) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collectLatest { scrolling ->
+                if (scrolling) {
+                    pauseDecorativeMotion = true
+                } else {
+                    delay(300)
+                    pauseDecorativeMotion = false
+                }
+            }
     }
 
     CompositionLocalProvider(LocalPauseDecorativeMotion provides pauseDecorativeMotion) {
