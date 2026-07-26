@@ -54,9 +54,9 @@ fun TaskDetailScreen(
     task: TodoTask?,
     loading: Boolean,
     onBack: () -> Unit,
-    onSave: (String, TaskHorizon, List<RecordWindow>, (String?) -> Unit) -> Unit,
-    onCreateStep: (String, (String?) -> Unit) -> Unit,
-    onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
+    onSave: (String, TaskHorizon, (String?) -> Unit) -> Unit,
+    onCreateStep: (String, List<RecordWindow>, (String?) -> Unit) -> Unit,
+    onUpdateStep: (TodoStep, String, List<RecordWindow>, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
     onDeleteStep: (TodoStep, (String?) -> Unit) -> Unit,
     onReorderSteps: (List<Long>, (String?) -> Unit) -> Unit,
@@ -88,11 +88,6 @@ fun TaskDetailScreen(
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
     var horizonName by rememberSaveable(task.id) { mutableStateOf(task.horizon.name) }
     val horizon = TaskHorizon.valueOf(horizonName)
-    var windows by rememberSaveable(task.id) {
-        mutableStateOf(task.windows.map { "${it.startMinute},${it.endMinute}" })
-    }
-    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
-    val parsedWindows = windows.map(::decodeWindow)
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var savingTitle by rememberSaveable { mutableStateOf(false) }
@@ -120,21 +115,15 @@ fun TaskDetailScreen(
             errorMessage = "Check the highlighted field."
             return
         }
-        val normalizedWindows = runCatching { validatedWindows(parsedWindows) }.getOrElse { error ->
-            errorMessage = error.message ?: "Suggested times are invalid."
-            return
-        }
+        if (normalizedTitle == task.title && horizon == task.horizon) return
         savingTitle = true
-        onSave(normalizedTitle, horizon, normalizedWindows) { error ->
+        onSave(normalizedTitle, horizon) { error ->
             savingTitle = false
             errorMessage = error
         }
     }
 
-    val savedWindows = task.windows.map { it.startMinute to it.endMinute }
-    val titleDirty = title.trim() != task.title ||
-        horizon != task.horizon ||
-        parsedWindows.map { it.startMinute to it.endMinute } != savedWindows
+    val titleDirty = title.trim() != task.title || horizon != task.horizon
     AppRouteScaffold(
         title = "Edit task",
         onBack = onBack,
@@ -220,18 +209,6 @@ fun TaskDetailScreen(
             }
         }
 
-        AppSection(title = "Recommendation") {
-            SuggestedTimeFields(
-                windows = parsedWindows,
-                enabled = !savingTitle,
-                onEditTime = { timeEditTarget = it },
-                onRemove = { index ->
-                    windows = windows.toMutableList().also { it.removeAt(index) }
-                },
-                onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
-            )
-        }
-
         errorMessage?.let { message ->
             Text(
                 text = message,
@@ -242,25 +219,14 @@ fun TaskDetailScreen(
         Spacer(Modifier.height(16.dp))
     }
 
-    timeEditTarget?.let { target ->
-        val window = parsedWindows.getOrNull(target.index) ?: return@let
-        RecordTimePickerDialog(
-            initialMinute = if (target.start) window.startMinute else window.endMinute,
-            onDismiss = { timeEditTarget = null },
-            onConfirm = { minute ->
-                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
-                timeEditTarget = null
-            },
-        )
-    }
-
     if (creatingStep) {
-        TaskTitleDialog(
+        TaskStepDialog(
             title = "New subtask",
             initialTitle = "",
+            initialWindows = emptyList(),
             onDismiss = { creatingStep = false },
-            onSave = { value, onResult ->
-                onCreateStep(value) { error ->
+            onSave = { value, stepWindows, onResult ->
+                onCreateStep(value, stepWindows) { error ->
                     onResult(error)
                     if (error == null) creatingStep = false
                 }
@@ -269,12 +235,13 @@ fun TaskDetailScreen(
     }
     val editingStep = task.steps.firstOrNull { it.id == editingStepId }
     if (editingStep != null) {
-        TaskTitleDialog(
+        TaskStepDialog(
             title = "Edit subtask",
             initialTitle = editingStep.title,
+            initialWindows = editingStep.windows,
             onDismiss = { editingStepId = null },
-            onSave = { value, onResult ->
-                onUpdateStep(editingStep, value) { error ->
+            onSave = { value, stepWindows, onResult ->
+                onUpdateStep(editingStep, value, stepWindows) { error ->
                     onResult(error)
                     if (error == null) editingStepId = null
                 }
@@ -355,14 +322,24 @@ private fun TaskStepRow(
     }
 }
 
+/**
+ * Title plus suggested times for one subtask. Windows live on the subtask
+ * because that is the thing scheduled and completed.
+ */
 @Composable
-private fun TaskTitleDialog(
+private fun TaskStepDialog(
     title: String,
     initialTitle: String,
+    initialWindows: List<RecordWindow>,
     onDismiss: () -> Unit,
-    onSave: (String, (String?) -> Unit) -> Unit,
+    onSave: (String, List<RecordWindow>, (String?) -> Unit) -> Unit,
 ) {
     var value by rememberSaveable(initialTitle) { mutableStateOf(initialTitle) }
+    var windows by rememberSaveable(initialTitle) {
+        mutableStateOf(initialWindows.map { "${it.startMinute},${it.endMinute}" })
+    }
+    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
+    val parsedWindows = windows.map(::decodeWindow)
     var valueError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -383,6 +360,23 @@ private fun TaskTitleDialog(
                     supportingText = valueError?.let { message -> { Text(message) } },
                     singleLine = true,
                 )
+                Text(
+                    text = "Suggested times",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                SuggestedTimeFields(
+                    windows = parsedWindows,
+                    enabled = !saving,
+                    onEditTime = { timeEditTarget = it },
+                    onRemove = { index ->
+                        windows = windows.toMutableList().also { it.removeAt(index) }
+                    },
+                    onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
+                    horizontalPadding = 0.dp,
+                )
                 errorMessage?.let { message ->
                     Text(
                         text = message,
@@ -399,9 +393,13 @@ private fun TaskTitleDialog(
                         valueError = error.message
                         return@TextButton
                     }
+                    val normalizedWindows = runCatching { validatedWindows(parsedWindows) }.getOrElse { error ->
+                        errorMessage = error.message ?: "Suggested times are invalid."
+                        return@TextButton
+                    }
                     saving = true
                     errorMessage = null
-                    onSave(normalized) { error ->
+                    onSave(normalized, normalizedWindows) { error ->
                         saving = false
                         errorMessage = error
                     }
@@ -415,6 +413,18 @@ private fun TaskTitleDialog(
             TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
         },
     )
+
+    timeEditTarget?.let { target ->
+        val window = parsedWindows.getOrNull(target.index) ?: return@let
+        RecordTimePickerDialog(
+            initialMinute = if (target.start) window.startMinute else window.endMinute,
+            onDismiss = { timeEditTarget = null },
+            onConfirm = { minute ->
+                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
+                timeEditTarget = null
+            },
+        )
+    }
 }
 
 @Composable

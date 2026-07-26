@@ -470,77 +470,86 @@ describe("Records API", () => {
     expect(foreign.statusCode).toBe(400);
   });
 
-  it("stores task suggested windows and audits their changes", async () => {
+  it("stores subtask suggested windows and audits their changes", async () => {
     const created = await createTask({
       title: "Morning routine",
-      steps: ["Stretch"],
-      windows: [{ startMinute: 480, endMinute: 540 }],
+      steps: [{ title: "Stretch", windows: [{ startMinute: 480, endMinute: 540 }] }, "Shower"],
     });
     expect(created.statusCode).toBe(201);
-    expect(created.json().task).toMatchObject({
-      windows: [{ id: 1, taskId: 1, startMinute: 480, endMinute: 540 }],
-    });
+    expect(created.json().task.steps).toMatchObject([
+      { title: "Stretch", windows: [{ id: 1, stepId: 1, startMinute: 480, endMinute: 540 }] },
+      { title: "Shower", windows: [] },
+    ]);
     expect((await getTasks())[0]).toMatchObject({
-      windows: [{ startMinute: 480, endMinute: 540 }],
+      steps: [{ title: "Stretch", windows: [{ startMinute: 480, endMinute: 540 }] }, { windows: [] }],
     });
 
     const updated = await app.inject({
       method: "PUT",
-      url: "/api/tasks/1",
-      payload: { title: "Morning routine", horizon: "TODAY", windows: [{ startMinute: 420, endMinute: 480 }] },
+      url: "/api/steps/1",
+      payload: { title: "Stretch", windows: [{ startMinute: 420, endMinute: 480 }] },
     });
     expect(updated.statusCode).toBe(200);
-    expect(updated.json().task.windows).toMatchObject([{ startMinute: 420, endMinute: 480 }]);
+    expect(updated.json().step.windows).toMatchObject([{ startMinute: 420, endMinute: 480 }]);
 
     const logs = (await app.inject({ method: "GET", url: "/api/audit-logs" })).json().logs as Array<{
       action: string;
       before: { windows?: unknown } | null;
       after: { windows?: unknown } | null;
     }>;
-    const taskUpdated = logs.find((log) => log.action === "TASK_UPDATED")!;
-    expect(taskUpdated.before?.windows).toEqual([{ startMinute: 480, endMinute: 540 }]);
-    expect(taskUpdated.after?.windows).toEqual([{ startMinute: 420, endMinute: 480 }]);
+    const stepUpdated = logs.find((log) => log.action === "STEP_UPDATED")!;
+    expect(stepUpdated.before?.windows).toEqual([{ startMinute: 480, endMinute: 540 }]);
+    expect(stepUpdated.after?.windows).toEqual([{ startMinute: 420, endMinute: 480 }]);
+    const stepCreated = logs.filter((log) => log.action === "STEP_CREATED");
+    expect(stepCreated.at(-1)?.after?.windows).toEqual([{ startMinute: 480, endMinute: 540 }]);
   });
 
-  it("keeps tasks without windows working and cascades window deletes", async () => {
+  it("adds subtask windows through the step endpoint and cascades deletes", async () => {
     const created = await createTask({ title: "Pack", steps: ["Bag"] });
     expect(created.statusCode).toBe(201);
-    expect(created.json().task.windows).toEqual([]);
+    expect(created.json().task.steps[0].windows).toEqual([]);
+    const taskId = created.json().task.id as number;
 
-    const withWindow = await createTask({
-      title: "Evening",
-      steps: ["Read"],
+    const added = await createStep(taskId, {
+      title: "Evening check",
       windows: [{ startMinute: 1200, endMinute: 1320 }],
     });
-    expect(withWindow.statusCode).toBe(201);
-    const taskId = withWindow.json().task.id as number;
+    expect(added.statusCode).toBe(201);
+    expect(added.json().step.windows).toMatchObject([{ startMinute: 1200, endMinute: 1320 }]);
+    const stepId = added.json().step.id as number;
+
+    expect((await app.inject({ method: "DELETE", url: `/api/steps/${stepId}` })).statusCode).toBe(200);
+    const remaining = (await getTasks())[0] as { steps: Array<{ id: number }> };
+    expect(remaining.steps.map((step) => step.id)).toEqual([1]);
 
     expect((await app.inject({ method: "DELETE", url: `/api/tasks/${taskId}` })).statusCode).toBe(200);
-    expect((await getTasks()).map((task) => task.id)).toEqual([1]);
+    expect(await getTasks()).toEqual([]);
   });
 
-  it("rejects task windows that repeat, are invalid, or cover half the day", async () => {
+  it("rejects subtask windows that repeat, are invalid, or cover half the day", async () => {
     const duplicate = await createTask({
       title: "Dup",
-      steps: ["A"],
-      windows: [
-        { startMinute: 480, endMinute: 540 },
-        { startMinute: 480, endMinute: 540 },
+      steps: [
+        {
+          title: "A",
+          windows: [
+            { startMinute: 480, endMinute: 540 },
+            { startMinute: 480, endMinute: 540 },
+          ],
+        },
       ],
     });
     expect(duplicate.statusCode).toBe(400);
 
     const equal = await createTask({
       title: "Equal",
-      steps: ["A"],
-      windows: [{ startMinute: 480, endMinute: 480 }],
+      steps: [{ title: "A", windows: [{ startMinute: 480, endMinute: 480 }] }],
     });
     expect(equal.statusCode).toBe(400);
 
     const wide = await createTask({
       title: "Wide",
-      steps: ["A"],
-      windows: [{ startMinute: 0, endMinute: 1439 }],
+      steps: [{ title: "A", windows: [{ startMinute: 0, endMinute: 1439 }] }],
     });
     expect(wide.statusCode).toBe(400);
     expect(wide.json().error.message).toBe("Suggested times must cover less than 12 hours.");

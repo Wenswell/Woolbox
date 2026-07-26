@@ -8,6 +8,7 @@ import com.wswensw.woolbox.record.data.RecordRepository
 import com.wswensw.woolbox.record.data.RecordsUiPreferences
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.data.RecordsSnapshot
+import com.wswensw.woolbox.record.data.TodoStepDraft
 import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
@@ -208,14 +209,13 @@ class RecordsViewModel(
 
     fun createTask(
         title: String,
-        stepTitles: List<String>,
+        steps: List<TodoStepDraft>,
         horizon: TaskHorizon,
-        windows: List<RecordWindow>,
         onResult: (taskId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
             writeAndRefresh(
-                action = { repository.createTask(title, stepTitles, horizon, windows) },
+                action = { repository.createTask(title, steps, horizon) },
                 onWritten = { taskId -> onResult(taskId, null) },
             ).onFailure { failure ->
                 onResult(null, failure.message ?: "Unable to create task.")
@@ -223,17 +223,11 @@ class RecordsViewModel(
         }
     }
 
-    fun updateTask(
-        taskId: Long,
-        title: String,
-        horizon: TaskHorizon,
-        windows: List<RecordWindow>,
-        onResult: (String?) -> Unit,
-    ) = runTaskAction(
+    fun updateTask(taskId: Long, title: String, horizon: TaskHorizon, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessage = "Unable to update task.",
     ) {
-        repository.updateTask(taskId, title, horizon, windows)
+        repository.updateTask(taskId, title, horizon)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
@@ -243,18 +237,28 @@ class RecordsViewModel(
         repository.deleteTask(taskId)
     }
 
-    fun createStep(taskId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+    fun createStep(
+        taskId: Long,
+        title: String,
+        windows: List<RecordWindow>,
+        onResult: (String?) -> Unit,
+    ) = runTaskAction(
         onResult = onResult,
         failureMessage = "Unable to add subtask.",
     ) {
-        repository.createStep(taskId, title)
+        repository.createStep(taskId, title, windows)
     }
 
-    fun updateStep(stepId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+    fun updateStep(
+        stepId: Long,
+        title: String,
+        windows: List<RecordWindow>,
+        onResult: (String?) -> Unit,
+    ) = runTaskAction(
         onResult = onResult,
         failureMessage = "Unable to update subtask.",
     ) {
-        repository.updateStep(stepId, title)
+        repository.updateStep(stepId, title, windows)
     }
 
     fun setStepCompleted(stepId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(

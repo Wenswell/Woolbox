@@ -48,8 +48,8 @@ const positionColumn = database.prepare("SELECT name FROM pragma_table_info('tod
 if (!positionColumn) throw new Error("Todo step position migration is missing.");
 const horizonColumn = database.prepare("SELECT name FROM pragma_table_info('todo_tasks') WHERE name = 'horizon'").get();
 if (!horizonColumn) throw new Error("Todo task horizon migration is missing.");
-const taskWindowsTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'todo_task_windows'").get();
-if (!taskWindowsTable) throw new Error("Todo task windows migration is missing.");
+const stepWindowsTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'todo_step_windows'").get();
+if (!stepWindowsTable) throw new Error("Todo step windows migration is missing.");
 console.log("Database schema verified.");
 NODE
 echo "Records deployment verified."

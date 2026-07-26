@@ -136,10 +136,10 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | --- | --- |
 | `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值或 Measurement 最小值/最大值、步进、单位、目标、优先级、归档状态和时间戳。 |
 | `record_windows` | 保存记录项推荐区间的起止分钟；`itemId` 建索引并随父项级联删除。 |
-| `todo_task_windows` | 保存待办推荐区间的起止分钟；`taskId` 建索引并随待办级联删除。规则与 `record_windows` 一致。 |
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
 | `todo_tasks` | 保存待办标题、horizon（`TODAY`/`LATER`）、完成时间、创建/更新时间；按创建时间与 horizon 索引。 |
 | `todo_steps` | 保存待办的一级子事项、列表位置 `position`、完成时间、创建/更新时间；`taskId` 外键级联删除；列表按 `(taskId, position)` 排序，另保留 `(taskId, createdAt)` 索引。 |
+| `todo_step_windows` | 保存子事项推荐区间的起止分钟；`stepId` 建索引并随子事项级联删除。规则与 `record_windows` 一致，快照随子事项返回。 |
 | `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TASK`、`STEP` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表，删除业务数据后审计历史仍保留。 |
 
 服务端在事务内校验并写入记录项及完整时间段集合。累计记录使用正数流水、可选目标与推荐时间段；测量记录固定为数字，要求有限的最小值、最大值和正步进，且只接受闭区间内的步进值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型、单位和 Measurement 范围必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。记录项更新先比较规范化快照，无变化时不写表或审计；其他成功写操作在同一事务插入一条审计日志。日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。

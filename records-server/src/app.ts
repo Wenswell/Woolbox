@@ -14,7 +14,7 @@ import {
   parseOptionalId,
   parseOptionalRecordMode,
   parseTaskCreateInput,
-  parseTaskInput,
+  parseStepInput,
   parseTaskWriteInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
@@ -118,7 +118,7 @@ export function buildApp(options: BuildAppOptions) {
   app.post("/api/tasks/:id/steps", (request, reply) => {
     const step = records.createStep(
       parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseTaskInput(request.body),
+      parseStepInput(request.body),
     );
     return reply.status(201).send({ step });
   });
@@ -134,7 +134,7 @@ export function buildApp(options: BuildAppOptions) {
   app.put("/api/steps/:id", (request) => ({
     step: records.updateStep(
       parseId((request.params as { id?: unknown }).id, "Step ID"),
-      parseTaskInput(request.body),
+      parseStepInput(request.body),
     ),
   }));
 

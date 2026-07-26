@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordItemInput, RecordMode, TaskCreateInput, TaskTitleInput, TaskWriteInput } from "./domain.js";
+import type { RecordEntryInput, RecordItemInput, RecordMode, StepInput, TaskCreateInput, TaskTitleInput, TaskWriteInput } from "./domain.js";
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
@@ -9,7 +9,7 @@ import {
   recordItems,
   recordWindows,
   todoSteps,
-  todoTaskWindows,
+  todoStepWindows,
   todoTasks,
 } from "./schema.js";
 
@@ -19,7 +19,7 @@ type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordWindowRow = typeof recordWindows.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
 type TodoTaskRow = typeof todoTasks.$inferSelect;
-type TodoTaskWindowRow = typeof todoTaskWindows.$inferSelect;
+type TodoStepWindowRow = typeof todoStepWindows.$inferSelect;
 type TodoStepRow = typeof todoSteps.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
 
@@ -77,7 +77,6 @@ interface TaskAuditSnapshot {
   title: string;
   horizon: string;
   completedAt: number | null;
-  windows: Array<{ startMinute: number; endMinute: number }>;
   stepCount?: number;
   stepIds?: number[];
 }
@@ -88,6 +87,7 @@ interface StepAuditSnapshot {
   taskTitle: string;
   title: string;
   completedAt: number | null;
+  windows: Array<{ startMinute: number; endMinute: number }>;
 }
 
 type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot;
@@ -405,7 +405,7 @@ export class RecordsService {
   getStep(id: number) {
     const step = this.db.select().from(todoSteps).where(eq(todoSteps.id, id)).get();
     if (!step) throw new ApiError(404, "Step not found.");
-    return step;
+    return { ...step, windows: this.stepWindows([id]).get(id) ?? [] };
   }
 
   createTask(input: TaskCreateInput) {
@@ -417,9 +417,9 @@ export class RecordsService {
         .returning({ id: todoTasks.id })
         .get();
       const steps = tx.insert(todoSteps)
-        .values(input.steps.map((title, position) => ({
+        .values(input.steps.map((step, position) => ({
           taskId: task.id,
-          title,
+          title: step.title,
           position,
           completedAt: null,
           createdAt: now,
@@ -427,30 +427,35 @@ export class RecordsService {
         })))
         .returning({ id: todoSteps.id, title: todoSteps.title })
         .all();
-      if (input.windows.length > 0) {
-        tx.insert(todoTaskWindows)
-          .values(input.windows.map((window) => ({ ...window, taskId: task.id })))
-          .run();
+      const stepWindows = input.steps.flatMap((step, position) =>
+        step.windows.map((window) => ({ ...window, stepId: steps[position]!.id })),
+      );
+      if (stepWindows.length > 0) {
+        tx.insert(todoStepWindows).values(stepWindows).run();
       }
       this.writeAudit(tx, {
         action: "TASK_CREATED",
         entityType: "TASK",
         entityId: task.id,
         after: {
-          ...taskSnapshot({ id: task.id, title: input.title, horizon: input.horizon, completedAt: null }, input.windows),
+          ...taskSnapshot({ id: task.id, title: input.title, horizon: input.horizon, completedAt: null }),
           stepCount: steps.length,
         },
         createdAt: now,
       });
-      for (const step of steps) {
+      steps.forEach((step, position) => {
         this.writeAudit(tx, {
           action: "STEP_CREATED",
           entityType: "STEP",
           entityId: step.id,
-          after: stepSnapshot({ id: step.id, taskId: task.id, title: step.title, completedAt: null }, input.title),
+          after: stepSnapshot(
+            { id: step.id, taskId: task.id, title: step.title, completedAt: null },
+            input.title,
+            input.steps[position]!.windows,
+          ),
           createdAt: now,
         });
-      }
+      });
       return task.id;
     });
     return this.getTask(id);
@@ -461,20 +466,13 @@ export class RecordsService {
       const current = this.requireTask(tx, id);
       const now = this.now();
       const updated = { ...current, title: input.title, horizon: input.horizon, updatedAt: now };
-      const currentWindows = tx.select().from(todoTaskWindows).where(eq(todoTaskWindows.taskId, id)).all();
       tx.update(todoTasks).set({ title: input.title, horizon: input.horizon, updatedAt: now }).where(eq(todoTasks.id, id)).run();
-      tx.delete(todoTaskWindows).where(eq(todoTaskWindows.taskId, id)).run();
-      if (input.windows.length > 0) {
-        tx.insert(todoTaskWindows)
-          .values(input.windows.map((window) => ({ ...window, taskId: id })))
-          .run();
-      }
       this.writeAudit(tx, {
         action: "TASK_UPDATED",
         entityType: "TASK",
         entityId: id,
-        before: taskSnapshot(current, currentWindows),
-        after: taskSnapshot(updated, input.windows),
+        before: taskSnapshot(current),
+        after: taskSnapshot(updated),
         createdAt: now,
       });
     });
@@ -489,20 +487,19 @@ export class RecordsService {
         .from(todoSteps)
         .where(eq(todoSteps.taskId, id))
         .get()!.value;
-      const windows = tx.select().from(todoTaskWindows).where(eq(todoTaskWindows.taskId, id)).all();
       this.writeAudit(tx, {
         action: "TASK_DELETED",
         entityType: "TASK",
         entityId: id,
-        before: { ...taskSnapshot(task, windows), stepCount },
+        before: { ...taskSnapshot(task), stepCount },
         createdAt: this.now(),
       });
       tx.delete(todoTasks).where(eq(todoTasks.id, id)).run();
-      return { ...task, windows };
+      return task;
     });
   }
 
-  createStep(taskId: number, input: TaskTitleInput) {
+  createStep(taskId: number, input: StepInput) {
     const id = this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
       const now = this.now();
@@ -513,11 +510,20 @@ export class RecordsService {
         .values({ taskId, title: input.title, position, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoSteps.id })
         .get();
+      if (input.windows.length > 0) {
+        tx.insert(todoStepWindows)
+          .values(input.windows.map((window) => ({ ...window, stepId: step.id })))
+          .run();
+      }
       this.writeAudit(tx, {
         action: "STEP_CREATED",
         entityType: "STEP",
         entityId: step.id,
-        after: stepSnapshot({ id: step.id, taskId, title: input.title, completedAt: null }, task.title),
+        after: stepSnapshot(
+          { id: step.id, taskId, title: input.title, completedAt: null },
+          task.title,
+          input.windows,
+        ),
         createdAt: now,
       });
       this.setTaskCompletion(tx, task, false, now);
@@ -526,19 +532,26 @@ export class RecordsService {
     return this.getStep(id);
   }
 
-  updateStep(id: number, input: TaskTitleInput) {
+  updateStep(id: number, input: StepInput) {
     this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
       const now = this.now();
+      const currentWindows = tx.select().from(todoStepWindows).where(eq(todoStepWindows.stepId, id)).all();
       const updated = { ...step, title: input.title, updatedAt: now };
       tx.update(todoSteps).set({ title: input.title, updatedAt: now }).where(eq(todoSteps.id, id)).run();
+      tx.delete(todoStepWindows).where(eq(todoStepWindows.stepId, id)).run();
+      if (input.windows.length > 0) {
+        tx.insert(todoStepWindows)
+          .values(input.windows.map((window) => ({ ...window, stepId: id })))
+          .run();
+      }
       this.writeAudit(tx, {
         action: "STEP_UPDATED",
         entityType: "STEP",
         entityId: id,
-        before: stepSnapshot(step, task.title),
-        after: stepSnapshot(updated, task.title),
+        before: stepSnapshot(step, task.title, currentWindows),
+        after: stepSnapshot(updated, task.title, input.windows),
         createdAt: now,
       });
     });
@@ -624,13 +637,12 @@ export class RecordsService {
           .run();
       });
       tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, taskId)).run();
-      const windows = tx.select().from(todoTaskWindows).where(eq(todoTaskWindows.taskId, taskId)).all();
       this.writeAudit(tx, {
         action: "TASK_STEPS_REORDERED",
         entityType: "TASK",
         entityId: taskId,
-        before: { ...taskSnapshot(task, windows), stepIds: before },
-        after: { ...taskSnapshot(task, windows), stepIds },
+        before: { ...taskSnapshot(task), stepIds: before },
+        after: { ...taskSnapshot(task), stepIds },
         createdAt: now,
       });
     });
@@ -665,6 +677,24 @@ export class RecordsService {
     return rows.map((row) => ({ ...row, windows: grouped.get(row.id) ?? [] }));
   }
 
+  /** Suggested windows for the given steps, oldest start first. */
+  private stepWindows(stepIds: number[]) {
+    const grouped = new Map<number, TodoStepWindowRow[]>();
+    if (stepIds.length === 0) return grouped;
+    const windows = this.db
+      .select()
+      .from(todoStepWindows)
+      .where(inArray(todoStepWindows.stepId, stepIds))
+      .orderBy(asc(todoStepWindows.startMinute), asc(todoStepWindows.endMinute), asc(todoStepWindows.id))
+      .all();
+    for (const window of windows) {
+      const stepWindows = grouped.get(window.stepId) ?? [];
+      stepWindows.push(window);
+      grouped.set(window.stepId, stepWindows);
+    }
+    return grouped;
+  }
+
   private attachSteps(tasks: TodoTaskRow[]) {
     if (tasks.length === 0) return [];
     const taskIds = tasks.map((task) => task.id);
@@ -680,22 +710,13 @@ export class RecordsService {
       taskSteps.push(step);
       stepsByTask.set(step.taskId, taskSteps);
     }
-    const windows = this.db
-      .select()
-      .from(todoTaskWindows)
-      .where(inArray(todoTaskWindows.taskId, taskIds))
-      .orderBy(asc(todoTaskWindows.startMinute), asc(todoTaskWindows.endMinute), asc(todoTaskWindows.id))
-      .all();
-    const windowsByTask = new Map<number, TodoTaskWindowRow[]>();
-    for (const window of windows) {
-      const taskWindows = windowsByTask.get(window.taskId) ?? [];
-      taskWindows.push(window);
-      windowsByTask.set(window.taskId, taskWindows);
-    }
+    const windowsByStep = this.stepWindows(steps.map((step) => step.id));
     return tasks.map((task) => ({
       ...task,
-      steps: stepsByTask.get(task.id) ?? [],
-      windows: windowsByTask.get(task.id) ?? [],
+      steps: (stepsByTask.get(task.id) ?? []).map((step) => ({
+        ...step,
+        windows: windowsByStep.get(step.id) ?? [],
+      })),
     }));
   }
 
@@ -834,24 +855,25 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
   };
 }
 
-function taskSnapshot(
-  task: { id: number; title: string; horizon: string; completedAt: number | null },
-  windows: Array<Pick<TodoTaskWindowRow, "startMinute" | "endMinute">> = [],
-): TaskAuditSnapshot {
+function taskSnapshot(task: { id: number; title: string; horizon: string; completedAt: number | null }): TaskAuditSnapshot {
   return {
     id: task.id,
     title: task.title,
     horizon: task.horizon,
     completedAt: task.completedAt,
-    windows: windows
-      .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }))
-      .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute),
   };
+}
+
+function sortedWindows(windows: Array<Pick<TodoStepWindowRow, "startMinute" | "endMinute">>) {
+  return windows
+    .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }))
+    .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
 }
 
 function stepSnapshot(
   step: Pick<TodoStepRow, "id" | "taskId" | "title" | "completedAt">,
   taskTitle: string,
+  windows: Array<Pick<TodoStepWindowRow, "startMinute" | "endMinute">> = [],
 ): StepAuditSnapshot {
   return {
     id: step.id,
@@ -859,6 +881,7 @@ function stepSnapshot(
     taskTitle,
     title: step.title,
     completedAt: step.completedAt,
+    windows: sortedWindows(windows),
   };
 }
 

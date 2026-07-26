@@ -33,7 +33,8 @@ data class RecordsClock(
 
 /**
  * What a suggestion acts on. Accumulate items write their default value;
- * tasks complete their next unfinished subtask.
+ * subtasks are completed. Windows belong to the subtask, not the task, so a
+ * task can be suggested at several different times of day.
  */
 sealed interface NowTarget {
     val name: String
@@ -49,12 +50,13 @@ sealed interface NowTarget {
     }
 
     data class Task(val task: TodoTask, val step: TodoStep) : NowTarget {
-        override val name: String get() = task.title
-        // Tasks carry no priority field; rank them above equal-time items so a
-        // scheduled task is not buried under accumulates.
+        // The subtask is what gets done, so it leads the label and the sort.
+        override val name: String get() = step.title
+        // Subtasks carry no priority field; rank them above equal-time items so
+        // a scheduled subtask is not buried under accumulates.
         override val priority: Int get() = 1
 
-        // Tasks retire through step completion, not through entries.
+        // Subtasks retire through completion, not through entries.
         override val recordKey: Long? get() = null
     }
 }
@@ -75,12 +77,13 @@ data class RecordNowSuggestion(
 
 fun hasSuggestedWindows(items: List<RecordItem>, tasks: List<TodoTask> = emptyList()): Boolean =
     items.any { it.mode == RecordMode.ACCUMULATE && it.windows.isNotEmpty() } ||
-        tasks.any { it.windows.isNotEmpty() }
+        tasks.any { task -> task.steps.any { it.windows.isNotEmpty() } }
 
 /**
- * Accumulate items and open tasks that carry suggested windows, as one list of
- * candidates. Satisfied accumulates, completed tasks and tasks whose windows
- * already produced work today are left out by the callers' filters.
+ * Accumulate items and scheduled subtasks as one list of candidates. Each
+ * unfinished subtask carrying windows stands on its own, so a task with a
+ * morning and an evening subtask is suggested at both times. Satisfied
+ * accumulates and completed subtasks are left out.
  */
 private fun nowTargets(
     items: List<RecordItem>,
@@ -92,16 +95,18 @@ private fun nowTargets(
         if (item.windows.isNotEmpty()) add(NowTarget.Accumulate(item) to item.windows)
     }
     for (task in tasks) {
-        if (task.isCompleted || task.windows.isEmpty()) continue
-        val step = task.nextStep ?: continue
-        add(NowTarget.Task(task, step) to task.windows)
+        for (step in task.steps) {
+            if (step.isCompleted || step.windows.isEmpty()) continue
+            add(NowTarget.Task(task, step) to step.windows)
+        }
     }
 }
 
 /**
- * Accumulate items whose suggested window contains [minuteOfDay], soonest to
- * close first. A window that already received one of [recordedMinutes] today
- * is done and drops out, so a suggestion never survives acting on it.
+ * Accumulate items and subtasks whose suggested window contains [minuteOfDay],
+ * soonest to close first. An accumulate window that already received one of
+ * [recordedMinutes] today is done and drops out, so a suggestion never
+ * survives acting on it.
  */
 fun activeNowSuggestions(
     items: List<RecordItem>,

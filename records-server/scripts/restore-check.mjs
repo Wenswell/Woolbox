@@ -29,6 +29,7 @@ try {
       "record_entries",
       "todo_tasks",
       "todo_steps",
+      "todo_step_windows",
       "record_audit_logs",
     ]) {
       if (!tables.includes(table)) throw new Error(`Restored database is missing ${table}.`);

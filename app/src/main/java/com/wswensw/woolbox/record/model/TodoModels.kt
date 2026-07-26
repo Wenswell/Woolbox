@@ -20,7 +20,6 @@ data class TodoTask(
     val createdAt: Long,
     val updatedAt: Long,
     val steps: List<TodoStep>,
-    val windows: List<RecordWindow> = emptyList(),
 ) {
     val isCompleted: Boolean
         get() = completedAt != null
@@ -40,6 +39,7 @@ data class TodoStep(
     val completedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
+    val windows: List<RecordWindow> = emptyList(),
 ) {
     val isCompleted: Boolean
         get() = completedAt != null

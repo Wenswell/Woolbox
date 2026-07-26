@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
@@ -28,7 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.wswensw.woolbox.record.model.RecordWindow
+import com.wswensw.woolbox.record.data.TodoStepDraft
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.record.model.validatedWindows
@@ -41,9 +42,8 @@ fun TaskCreateScreen(
     onBack: () -> Unit,
     onCreate: (
         title: String,
-        stepTitles: List<String>,
+        steps: List<TodoStepDraft>,
         horizon: TaskHorizon,
-        windows: List<RecordWindow>,
         onResult: (String?) -> Unit,
     ) -> Unit,
     modifier: Modifier = Modifier,
@@ -52,9 +52,9 @@ fun TaskCreateScreen(
     var horizonName by rememberSaveable { mutableStateOf(TaskHorizon.TODAY.name) }
     val horizon = TaskHorizon.valueOf(horizonName)
     var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
-    var windows by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
-    val parsedWindows = windows.map(::decodeWindow)
+    // One encoded window list per subtask position, moved and removed with it.
+    var stepWindows by rememberSaveable { mutableStateOf(listOf(emptyList<String>())) }
+    var windowEditStep by remember { mutableStateOf<Int?>(null) }
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -66,16 +66,21 @@ fun TaskCreateScreen(
             errorMessage = "Check the highlighted field."
             return
         }
-        val normalizedSteps = runCatching { stepTitles.map(::validatedTaskTitle) }.getOrElse { error ->
+        val normalizedSteps = runCatching {
+            stepTitles.mapIndexed { index, stepTitle ->
+                TodoStepDraft(
+                    title = validatedTaskTitle(stepTitle),
+                    windows = validatedWindows(
+                        stepWindows.getOrElse(index) { emptyList() }.map(::decodeWindow),
+                    ),
+                )
+            }
+        }.getOrElse { error ->
             errorMessage = error.message ?: "Each subtask needs a title."
             return
         }
-        val normalizedWindows = runCatching { validatedWindows(parsedWindows) }.getOrElse { error ->
-            errorMessage = error.message ?: "Suggested times are invalid."
-            return
-        }
         saving = true
-        onCreate(normalizedTitle, normalizedSteps, horizon, normalizedWindows) { error ->
+        onCreate(normalizedTitle, normalizedSteps, horizon) { error ->
             saving = false
             errorMessage = error
         }
@@ -150,9 +155,26 @@ fun TaskCreateScreen(
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
+                    IconButton(
+                        onClick = { windowEditStep = index },
+                        enabled = !saving,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = "Suggested times for subtask ${index + 1}",
+                            tint = if (stepWindows.getOrElse(index) { emptyList() }.isEmpty()) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                    }
                     if (stepTitles.size > 1) {
                         IconButton(
-                            onClick = { stepTitles = stepTitles.moveItem(index, index - 1) },
+                            onClick = {
+                                stepTitles = stepTitles.moveItem(index, index - 1)
+                                stepWindows = stepWindows.moveItem(index, index - 1)
+                            },
                             enabled = !saving && index > 0,
                         ) {
                             Icon(
@@ -161,7 +183,10 @@ fun TaskCreateScreen(
                             )
                         }
                         IconButton(
-                            onClick = { stepTitles = stepTitles.moveItem(index, index + 1) },
+                            onClick = {
+                                stepTitles = stepTitles.moveItem(index, index + 1)
+                                stepWindows = stepWindows.moveItem(index, index + 1)
+                            },
                             enabled = !saving && index < stepTitles.lastIndex,
                         ) {
                             Icon(
@@ -172,6 +197,7 @@ fun TaskCreateScreen(
                         FilledTonalIconButton(
                             onClick = {
                                 stepTitles = stepTitles.filterIndexed { itemIndex, _ -> itemIndex != index }
+                                stepWindows = stepWindows.filterIndexed { itemIndex, _ -> itemIndex != index }
                             },
                             enabled = !saving,
                         ) {
@@ -184,7 +210,10 @@ fun TaskCreateScreen(
                 }
             }
             FilledTonalIconButton(
-                onClick = { stepTitles = stepTitles + "" },
+                onClick = {
+                    stepTitles = stepTitles + ""
+                    stepWindows = stepWindows + listOf(emptyList())
+                },
                 enabled = !saving,
                 modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal),
             ) {
@@ -193,17 +222,6 @@ fun TaskCreateScreen(
                     contentDescription = "Add subtask",
                 )
             }
-        }
-        AppSection(title = "Recommendation") {
-            SuggestedTimeFields(
-                windows = parsedWindows,
-                enabled = !saving,
-                onEditTime = { timeEditTarget = it },
-                onRemove = { index ->
-                    windows = windows.toMutableList().also { it.removeAt(index) }
-                },
-                onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
-            )
         }
         errorMessage?.let { message ->
             Spacer(Modifier.height(8.dp))
@@ -215,14 +233,18 @@ fun TaskCreateScreen(
         }
     }
 
-    timeEditTarget?.let { target ->
-        val window = parsedWindows.getOrNull(target.index) ?: return@let
-        RecordTimePickerDialog(
-            initialMinute = if (target.start) window.startMinute else window.endMinute,
-            onDismiss = { timeEditTarget = null },
-            onConfirm = { minute ->
-                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
-                timeEditTarget = null
+    windowEditStep?.let { index ->
+        val encoded = stepWindows.getOrElse(index) { emptyList() }
+        SuggestedTimeDialog(
+            stepLabel = stepTitles.getOrNull(index)?.trim()?.takeIf(String::isNotEmpty)
+                ?: "Subtask ${index + 1}",
+            initialWindows = encoded.map(::decodeWindow),
+            onDismiss = { windowEditStep = null },
+            onConfirm = { updated ->
+                stepWindows = stepWindows.mapIndexed { itemIndex, value ->
+                    if (itemIndex == index) updated.map { it.encode() } else value
+                }
+                windowEditStep = null
             },
         )
     }

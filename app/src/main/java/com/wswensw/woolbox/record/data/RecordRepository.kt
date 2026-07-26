@@ -51,6 +51,12 @@ data class RecordsConnection(
     val username: String,
 )
 
+/** A subtask being created, with the times of day it is suggested at. */
+data class TodoStepDraft(
+    val title: String,
+    val windows: List<RecordWindow> = emptyList(),
+)
+
 data class RecordsSnapshot(
     val activeItems: List<RecordItem>,
     val entries: List<RecordEntry>,
@@ -153,12 +159,10 @@ class RecordRepository(context: Context) {
 
     suspend fun createTask(
         title: String,
-        stepTitles: List<String>,
+        steps: List<TodoStepDraft>,
         horizon: TaskHorizon,
-        windows: List<RecordWindow> = emptyList(),
     ): Long = withContext(Dispatchers.IO) {
-        val normalizedSteps = stepTitles.map(::validatedTaskTitle)
-        if (normalizedSteps.isEmpty()) {
+        if (steps.isEmpty()) {
             throw RecordValidationException("At least one subtask is required.")
         }
         request(
@@ -167,24 +171,17 @@ class RecordRepository(context: Context) {
             body = JSONObject()
                 .put("title", validatedTaskTitle(title))
                 .put("horizon", horizon.name)
-                .put("windows", windowsJson(windows))
-                .put("steps", JSONArray(normalizedSteps)),
+                .put("steps", JSONArray(steps.map(::stepJson))),
         ).getJSONObject("task").getLong("id")
     }
 
-    suspend fun updateTask(
-        taskId: Long,
-        title: String,
-        horizon: TaskHorizon,
-        windows: List<RecordWindow> = emptyList(),
-    ) = withContext(Dispatchers.IO) {
+    suspend fun updateTask(taskId: Long, title: String, horizon: TaskHorizon) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "tasks/$taskId",
             body = JSONObject()
                 .put("title", validatedTaskTitle(title))
-                .put("horizon", horizon.name)
-                .put("windows", windowsJson(windows)),
+                .put("horizon", horizon.name),
         )
         Unit
     }
@@ -194,19 +191,27 @@ class RecordRepository(context: Context) {
         Unit
     }
 
-    suspend fun createStep(taskId: Long, title: String): Long = withContext(Dispatchers.IO) {
+    suspend fun createStep(
+        taskId: Long,
+        title: String,
+        windows: List<RecordWindow> = emptyList(),
+    ): Long = withContext(Dispatchers.IO) {
         request(
             "POST",
             "tasks/$taskId/steps",
-            body = JSONObject().put("title", validatedTaskTitle(title)),
+            body = stepJson(TodoStepDraft(title = title, windows = windows)),
         ).getJSONObject("step").getLong("id")
     }
 
-    suspend fun updateStep(stepId: Long, title: String) = withContext(Dispatchers.IO) {
+    suspend fun updateStep(
+        stepId: Long,
+        title: String,
+        windows: List<RecordWindow> = emptyList(),
+    ) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "steps/$stepId",
-            body = JSONObject().put("title", validatedTaskTitle(title)),
+            body = stepJson(TodoStepDraft(title = title, windows = windows)),
         )
         Unit
     }
@@ -329,6 +334,10 @@ private fun parseEntry(value: JSONObject) = RecordEntry(
     itemValueType = RecordValueType.valueOf(value.getString("itemValueType")),
 )
 
+private fun stepJson(step: TodoStepDraft) = JSONObject()
+    .put("title", validatedTaskTitle(step.title))
+    .put("windows", windowsJson(step.windows))
+
 private fun windowsJson(windows: List<RecordWindow>) = JSONArray(
     validatedWindows(windows).map { window ->
         JSONObject()
@@ -351,7 +360,6 @@ private fun parseTask(value: JSONObject) = TodoTask(
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
     steps = value.getJSONArray("steps").mapObjects(::parseStep),
-    windows = value.getJSONArray("windows").mapObjects(::parseWindow),
 )
 
 private fun parseStep(value: JSONObject) = TodoStep(
@@ -361,6 +369,7 @@ private fun parseStep(value: JSONObject) = TodoStep(
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
+    windows = value.getJSONArray("windows").mapObjects(::parseWindow),
 )
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =

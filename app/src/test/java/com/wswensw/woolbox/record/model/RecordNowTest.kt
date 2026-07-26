@@ -139,7 +139,7 @@ class RecordNowTest {
     }
 
     @Test
-    fun hasSuggestedWindowsCountsAccumulateItemsAndTasks() {
+    fun hasSuggestedWindowsCountsAccumulateItemsAndSubtasks() {
         val withWindow = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 10 * 60))
         val withoutWindow = accumulate(id = 2, name = "Walk", windows = emptyList())
 
@@ -148,52 +148,59 @@ class RecordNowTest {
         assertTrue(
             hasSuggestedWindows(
                 items = listOf(withoutWindow),
-                tasks = listOf(task(id = 1, windows = listOf(8 * 60 to 9 * 60))),
+                tasks = listOf(task(id = 1, stepWindows = listOf(listOf(8 * 60 to 9 * 60)))),
             ),
         )
     }
 
     @Test
-    fun activeSuggestionsIncludeTasksWithTheirNextStep() {
+    fun activeSuggestionsUseTheScheduledSubtaskNotTheFirstOne() {
+        // Only the second subtask is scheduled, so it is the one suggested even
+        // though the first is still unfinished.
         val scheduled = task(
             id = 5,
             title = "Morning routine",
-            windows = listOf(8 * 60 to 9 * 60),
             stepTitles = listOf("Stretch", "Shower"),
+            stepWindows = listOf(emptyList(), listOf(8 * 60 to 9 * 60)),
         )
 
         val active = activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(scheduled))
 
         val target = active.single().target as NowTarget.Task
         assertEquals(5L, target.task.id)
-        assertEquals("Stretch", target.step.title)
+        assertEquals("Shower", target.step.title)
         assertEquals(30, active.single().endsInMinutes)
     }
 
     @Test
-    fun activeTaskSuggestionsAdvanceToTheNextUnfinishedStep() {
-        val partly = task(
+    fun eachScheduledSubtaskIsItsOwnSuggestion() {
+        val scheduled = task(
             id = 5,
-            windows = listOf(8 * 60 to 9 * 60),
-            stepTitles = listOf("Stretch", "Shower"),
-            completedStepCount = 1,
+            stepTitles = listOf("Morning pill", "Evening pill"),
+            stepWindows = listOf(listOf(8 * 60 to 9 * 60), listOf(20 * 60 to 21 * 60)),
         )
 
-        val target = activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(partly))
-            .single()
-            .target as NowTarget.Task
-        assertEquals("Shower", target.step.title)
+        assertEquals(
+            listOf("Morning pill"),
+            activeNowSuggestions(emptyList(), minuteOfDay = 8 * 60 + 30, tasks = listOf(scheduled))
+                .map { (it.target as NowTarget.Task).step.title },
+        )
+        assertEquals(
+            listOf("Evening pill"),
+            activeNowSuggestions(emptyList(), minuteOfDay = 20 * 60 + 30, tasks = listOf(scheduled))
+                .map { (it.target as NowTarget.Task).step.title },
+        )
     }
 
     @Test
-    fun activeSuggestionsSkipCompletedAndUnscheduledTasks() {
+    fun activeSuggestionsSkipCompletedAndUnscheduledSubtasks() {
         val done = task(
             id = 5,
-            windows = listOf(8 * 60 to 9 * 60),
             stepTitles = listOf("Stretch"),
+            stepWindows = listOf(listOf(8 * 60 to 9 * 60)),
             completedStepCount = 1,
         )
-        val unscheduled = task(id = 6, windows = emptyList(), stepTitles = listOf("Later"))
+        val unscheduled = task(id = 6, stepTitles = listOf("Later"), stepWindows = listOf(emptyList()))
 
         assertTrue(
             activeNowSuggestions(
@@ -205,9 +212,9 @@ class RecordNowTest {
     }
 
     @Test
-    fun taskSuggestionsRankAboveAccumulatesClosingAtTheSameTime() {
+    fun subtaskSuggestionsRankAboveAccumulatesClosingAtTheSameTime() {
         val item = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
-        val scheduled = task(id = 5, title = "Routine", windows = listOf(8 * 60 to 9 * 60))
+        val scheduled = task(id = 5, stepWindows = listOf(listOf(8 * 60 to 9 * 60)))
 
         val active = activeNowSuggestions(
             items = listOf(item),
@@ -219,13 +226,17 @@ class RecordNowTest {
     }
 
     @Test
-    fun nextSuggestionCoversUpcomingTaskWindows() {
-        val scheduled = task(id = 5, title = "Routine", windows = listOf(10 * 60 to 11 * 60))
+    fun nextSuggestionCoversUpcomingSubtaskWindows() {
+        val scheduled = task(
+            id = 5,
+            stepTitles = listOf("Take meds"),
+            stepWindows = listOf(listOf(10 * 60 to 11 * 60)),
+        )
 
         val next = nextNowSuggestion(emptyList(), minuteOfDay = 9 * 60, tasks = listOf(scheduled))
 
         assertEquals(60, next?.startsInMinutes)
-        assertTrue(next?.target is NowTarget.Task)
+        assertEquals("Take meds", (next?.target as NowTarget.Task).step.title)
     }
 
     @Test
@@ -268,8 +279,8 @@ class RecordNowTest {
     private fun task(
         id: Long,
         title: String = "Task $id",
-        windows: List<Pair<Int, Int>>,
         stepTitles: List<String> = listOf("Step"),
+        stepWindows: List<List<Pair<Int, Int>>> = emptyList(),
         completedStepCount: Int = 0,
     ) = TodoTask(
         id = id,
@@ -286,9 +297,10 @@ class RecordNowTest {
                 completedAt = if (index < completedStepCount) 1L else null,
                 createdAt = 0,
                 updatedAt = 0,
+                windows = stepWindows.getOrElse(index) { emptyList() }
+                    .map { (start, end) -> RecordWindow(startMinute = start, endMinute = end) },
             )
         },
-        windows = windows.map { (start, end) -> RecordWindow(startMinute = start, endMinute = end) },
     )
 
     @Test

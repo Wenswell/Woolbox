@@ -41,13 +41,17 @@ export interface TaskTitleInput {
   title: string;
 }
 
-export interface TaskWriteInput extends TaskTitleInput {
-  horizon: TaskHorizon;
+/** A subtask and the times of day it is suggested at. */
+export interface StepInput extends TaskTitleInput {
   windows: RecordWindowInput[];
 }
 
+export interface TaskWriteInput extends TaskTitleInput {
+  horizon: TaskHorizon;
+}
+
 export interface TaskCreateInput extends TaskWriteInput {
-  steps: string[];
+  steps: StepInput[];
 }
 
 export class ApiError extends Error {
@@ -136,28 +140,34 @@ export function parseTaskInput(value: unknown): TaskTitleInput {
   return { title };
 }
 
+/**
+ * A subtask, given either as a bare title string or as an object with a title
+ * and suggested windows. Subtasks predate windows, so an absent list is none.
+ */
+export function parseStepInput(value: unknown): StepInput {
+  if (typeof value === "string") {
+    const title = value.trim();
+    requireRule(title.length > 0, "Subtask titles are required.");
+    return { title, windows: [] };
+  }
+  const input = objectInput(value);
+  const title = stringField(input, "title").trim();
+  requireRule(title.length > 0, "Subtask titles are required.");
+  return { title, windows: parseWindowsInput(input.windows, true) };
+}
+
 export function parseTaskWriteInput(value: unknown): TaskWriteInput {
   const input = objectInput(value);
   const { title } = parseTaskInput(input);
-  return {
-    title,
-    horizon: parseTaskHorizon(input.horizon),
-    // Tasks predate suggested windows, so an absent list means none.
-    windows: parseWindowsInput(input.windows, true),
-  };
+  return { title, horizon: parseTaskHorizon(input.horizon) };
 }
 
 export function parseTaskCreateInput(value: unknown): TaskCreateInput {
   const input = objectInput(value);
-  const { title, horizon, windows } = parseTaskWriteInput(input);
+  const { title, horizon } = parseTaskWriteInput(input);
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
-  const steps = input.steps.map((value) => {
-    requireRule(typeof value === "string", "Subtask titles must be strings.");
-    const step = value.trim();
-    requireRule(step.length > 0, "Subtask titles are required.");
-    return step;
-  });
-  return { title, horizon, windows, steps };
+  const steps = input.steps.map(parseStepInput);
+  return { title, horizon, steps };
 }
 
 export function parseCompleted(value: unknown): boolean {

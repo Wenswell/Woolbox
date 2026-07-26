@@ -479,8 +479,8 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             composable(AppRoutes.TASK_NEW) {
                 TaskCreateScreen(
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, stepTitles, horizon, windows, onResult ->
-                        recordsViewModel.createTask(title, stepTitles, horizon, windows) { taskId, error ->
+                    onCreate = { title, steps, horizon, onResult ->
+                        recordsViewModel.createTask(title, steps, horizon) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -496,14 +496,14 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     task = recordsState.findTask(taskId),
                     loading = recordsState.isLoading,
                     onBack = { navController.popBackStack() },
-                    onSave = { title, horizon, windows, onResult ->
-                        recordsViewModel.updateTask(taskId, title, horizon, windows, onResult)
+                    onSave = { title, horizon, onResult ->
+                        recordsViewModel.updateTask(taskId, title, horizon, onResult)
                     },
-                    onCreateStep = { title, onResult ->
-                        recordsViewModel.createStep(taskId, title, onResult)
+                    onCreateStep = { title, windows, onResult ->
+                        recordsViewModel.createStep(taskId, title, windows, onResult)
                     },
-                    onUpdateStep = { step, title, onResult ->
-                        recordsViewModel.updateStep(step.id, title, onResult)
+                    onUpdateStep = { step, title, windows, onResult ->
+                        recordsViewModel.updateStep(step.id, title, windows, onResult)
                     },
                     onToggleStep = { step, completed ->
                         recordsViewModel.setStepCompleted(step.id, completed)

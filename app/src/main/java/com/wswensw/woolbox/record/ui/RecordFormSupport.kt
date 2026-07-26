@@ -1,6 +1,7 @@
 package com.wswensw.woolbox.record.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,13 +16,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.MINUTES_PER_DAY
 import com.wswensw.woolbox.record.model.RecordWindow
+import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.record.model.windowCoverageMinutes
 import com.wswensw.woolbox.ui.AppStyle
 import java.util.Locale
@@ -75,10 +82,14 @@ internal fun SuggestedTimeFields(
     onEditTime: (TimeEditTarget) -> Unit,
     onRemove: (Int) -> Unit,
     onAdd: () -> Unit,
+    horizontalPadding: Dp = AppStyle.spacing.pageHorizontal,
 ) {
+    val fieldModifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = horizontalPadding, vertical = 8.dp)
     windows.forEachIndexed { index, window ->
         Row(
-            modifier = Modifier.formField(),
+            modifier = fieldModifier,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -111,7 +122,7 @@ internal fun SuggestedTimeFields(
     OutlinedButton(
         onClick = onAdd,
         enabled = enabled,
-        modifier = Modifier.formField(),
+        modifier = fieldModifier,
     ) {
         Text("Add suggested time")
     }
@@ -119,17 +130,90 @@ internal fun SuggestedTimeFields(
         text = suggestedTimeSummary(windows),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(
-            start = AppStyle.spacing.pageHorizontal,
-            end = AppStyle.spacing.pageHorizontal,
-            bottom = 8.dp,
-        ),
+        modifier = Modifier.padding(start = horizontalPadding, end = horizontalPadding, bottom = 8.dp),
     )
+}
+
+/**
+ * Standalone editor for one subtask's suggested times, used by `New task`
+ * where the subtask has no id yet. Validation runs on confirm so the caller
+ * only ever receives a legal list.
+ */
+@Composable
+internal fun SuggestedTimeDialog(
+    stepLabel: String,
+    initialWindows: List<RecordWindow>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<RecordWindow>) -> Unit,
+) {
+    var windows by remember { mutableStateOf(initialWindows.map { it.encode() }) }
+    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val parsedWindows = windows.map(::decodeWindow)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stepLabel) },
+        text = {
+            Column {
+                SuggestedTimeFields(
+                    windows = parsedWindows,
+                    enabled = true,
+                    onEditTime = { timeEditTarget = it },
+                    onRemove = { index ->
+                        windows = windows.toMutableList().also { it.removeAt(index) }
+                        errorMessage = null
+                    },
+                    onAdd = {
+                        windows = windows + nextSuggestedWindow(parsedWindows).encode()
+                        errorMessage = null
+                    },
+                    horizontalPadding = 0.dp,
+                )
+                errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    runCatching { validatedWindows(parsedWindows) }.fold(
+                        onSuccess = onConfirm,
+                        onFailure = { error ->
+                            errorMessage = error.message ?: "Suggested times are invalid."
+                        },
+                    )
+                },
+            ) {
+                Text("Done")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+
+    timeEditTarget?.let { target ->
+        val window = parsedWindows.getOrNull(target.index) ?: return@let
+        RecordTimePickerDialog(
+            initialMinute = if (target.start) window.startMinute else window.endMinute,
+            onDismiss = { timeEditTarget = null },
+            onConfirm = { minute ->
+                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
+                errorMessage = null
+                timeEditTarget = null
+            },
+        )
+    }
 }
 
 /** Explains what the configured windows will do on the Records root page. */
 internal fun suggestedTimeSummary(windows: List<RecordWindow>): String {
-    if (windows.isEmpty()) return "No suggested times. This never appears in the Now band."
+    if (windows.isEmpty()) return "No suggested times. Never appears in the Now band."
     val coverage = windowCoverageMinutes(windows)
     val hours = coverage / 60
     val minutes = coverage % 60

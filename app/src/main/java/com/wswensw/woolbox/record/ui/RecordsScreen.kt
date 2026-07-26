@@ -995,7 +995,7 @@ private fun NowSuggestionChip(
         } else {
             displayRecordName(target.item.name)
         }
-        is NowTarget.Task -> "${target.task.title} · ${target.step.title}"
+        is NowTarget.Task -> "${target.step.title} · ${target.task.title}"
     }
     Surface(
         onClick = {
@@ -1030,7 +1030,7 @@ private fun NowSuggestionChip(
 
 internal fun nowTargetLabel(target: NowTarget): String = when (target) {
     is NowTarget.Accumulate -> displayRecordName(target.item.name)
-    is NowTarget.Task -> "${target.task.title} · ${target.step.title}"
+    is NowTarget.Task -> "${target.step.title} · ${target.task.title}"
 }
 
 internal fun recordsDayLabel(clock: RecordsClock): String =
