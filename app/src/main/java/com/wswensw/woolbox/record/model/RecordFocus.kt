@@ -76,12 +76,61 @@ sealed interface FocusReason {
     }
 }
 
-/** One entry in the focus queue: what to do, and why it is here. */
+/**
+ * One entry in the focus queue: what to do, and why it is here.
+ * A deferred entry keeps its reason and sorts last, because being unable to act
+ * now is not the same as having nothing to do.
+ */
 data class FocusCandidate(
     val target: NowTarget,
     val reason: FocusReason,
     val window: RecordWindow? = null,
+    val isDeferred: Boolean = false,
 )
+
+/**
+ * Targets pushed to the queue's tail, and the local day that was true for.
+ * Deferral is a statement about today, so a new day discards it rather than
+ * carrying a stale decision forward.
+ */
+data class DeferredTargets(
+    val date: LocalDate,
+    val keys: Set<String>,
+) {
+    /** The keys still in force on [today]; a different day defers nothing. */
+    fun on(today: LocalDate): Set<String> = if (date == today) keys else emptySet()
+
+    companion object {
+        fun none(): DeferredTargets = DeferredTargets(date = LocalDate.MIN, keys = emptySet())
+    }
+}
+
+/**
+ * Whether anything could enter the queue today, decided without the clock so
+ * the card never appears or disappears on a minute tick.
+ */
+fun hasFocusCommitments(
+    items: List<RecordItem>,
+    tasks: List<TodoTask>,
+    goalValues: Map<Long, Double> = emptyMap(),
+    todayValues: Map<Long, Double> = emptyMap(),
+    habitMinutes: Map<Long, Int> = emptyMap(),
+): Boolean {
+    val hasItem = items.any { item ->
+        if (item.mode != RecordMode.ACCUMULATE) return@any false
+        val hasGoal = item.goalValue != null && item.goalPeriod != null
+        if (hasGoal && isGoalSatisfied(item, goalValues[item.id] ?: todayValues[item.id] ?: 0.0)) {
+            return@any false
+        }
+        hasGoal || item.windows.isNotEmpty() || habitMinutes.containsKey(item.id)
+    }
+    if (hasItem) return true
+    return tasks.any { task ->
+        task.steps.any { step ->
+            !step.isCompleted && (step.windows.isNotEmpty() || task.horizon == TaskHorizon.TODAY)
+        }
+    }
+}
 
 /**
  * Everything open, strongest reason first. Only commitments take part: an
@@ -100,23 +149,44 @@ fun focusQueue(
     todayMinutes: Map<Long, List<Int>> = emptyMap(),
     habitMinutes: Map<Long, Int> = emptyMap(),
     itemStreaks: Map<Long, Int> = emptyMap(),
-): List<FocusCandidate> = buildList {
-    for (item in items) {
-        if (item.mode != RecordMode.ACCUMULATE) continue
-        addAll(accumulateCandidate(item, clock, goalValues, todayValues, todayMinutes, habitMinutes, itemStreaks))
-    }
-    for (task in tasks) {
-        for (step in task.steps) {
-            if (step.isCompleted) continue
-            addAll(stepCandidate(task, step, clock))
+    deferred: DeferredTargets = DeferredTargets.none(),
+): List<FocusCandidate> {
+    val deferredKeys = deferred.on(clock.date)
+    return buildList {
+        for (item in items) {
+            if (item.mode != RecordMode.ACCUMULATE) continue
+            addAll(accumulateCandidate(item, clock, goalValues, todayValues, todayMinutes, habitMinutes, itemStreaks))
+        }
+        for (task in tasks) {
+            for (step in task.steps) {
+                if (step.isCompleted) continue
+                addAll(stepCandidate(task, step, clock))
+            }
         }
     }
-}.sortedWith(
-    compareByDescending<FocusCandidate> { it.reason.rank }
-        .thenBy { it.reason.urgency }
-        .thenByDescending { it.target.priority }
-        .thenBy { it.target.name.lowercase(Locale.ROOT) },
-)
+        .map { candidate ->
+            if (focusTargetKey(candidate.target) in deferredKeys) {
+                candidate.copy(isDeferred = true)
+            } else {
+                candidate
+            }
+        }
+        .sortedWith(
+            // Deferral outranks every reason: it is the user's own call about
+            // right now, and reasons only estimate that.
+            compareBy<FocusCandidate> { it.isDeferred }
+                .thenByDescending { it.reason.rank }
+                .thenBy { it.reason.urgency }
+                .thenByDescending { it.target.priority }
+                .thenBy { it.target.name.lowercase(Locale.ROOT) },
+        )
+}
+
+/** Stable identity for a target across snapshots, for deferral and animation. */
+fun focusTargetKey(target: NowTarget): String = when (target) {
+    is NowTarget.Accumulate -> "item:${target.item.id}"
+    is NowTarget.Task -> "step:${target.step.id}"
+}
 
 private fun accumulateCandidate(
     item: RecordItem,

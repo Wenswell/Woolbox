@@ -13,8 +13,11 @@ import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
+import com.wswensw.woolbox.record.model.DeferredTargets
+import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.StreakDays
+import com.wswensw.woolbox.record.model.focusTargetKey
 import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class RecordsUiState(
@@ -41,6 +45,7 @@ data class RecordsUiState(
     val habitMinutes: Map<Long, Int> = emptyMap(),
     val itemStreaks: Map<Long, Int> = emptyMap(),
     val goalStreak: StreakDays = StreakDays(days = 0, atHistoryLimit = false),
+    val deferredTargets: DeferredTargets = DeferredTargets.none(),
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
@@ -67,6 +72,9 @@ class RecordsViewModel(
     }
 
     private val error = MutableStateFlow<String?>(null)
+    // Deferral is a decision about today only, so it lives with the process and
+    // is discarded by date rather than persisted and later reconciled.
+    private val deferredTargets = MutableStateFlow(DeferredTargets.none())
     private val _measurementPreview = MutableStateFlow(MeasurementPreviewUiState())
     private val recordsOperations = RecordsOperationCoordinator()
     private var measurementPreviewRequestId = 0L
@@ -98,10 +106,12 @@ class RecordsViewModel(
         repository.snapshot,
         repository.connection,
         error,
-    ) { snapshot, connection, message ->
+        deferredTargets,
+    ) { snapshot, connection, message, deferred ->
         (snapshot?.toUiState() ?: RecordsUiState()).copy(
             isLoading = snapshot == null && message == null,
             connection = connection,
+            deferredTargets = deferred,
             error = message,
         )
     }.stateIn(
@@ -112,6 +122,15 @@ class RecordsViewModel(
 
     fun refresh() {
         recordsOperations.refresh(viewModelScope) { refreshSnapshot() }
+    }
+
+    /** Sends a target to the back of today's queue. A new day clears the set. */
+    fun deferTarget(target: NowTarget) {
+        val today = LocalDate.now()
+        deferredTargets.update { current ->
+            val keys = current.on(today) + focusTargetKey(target)
+            DeferredTargets(date = today, keys = keys)
+        }
     }
 
     private suspend fun refreshSnapshot(): Result<Unit> {

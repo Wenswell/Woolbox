@@ -61,7 +61,7 @@ import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.dayRing
 import com.wswensw.woolbox.record.model.emptyRecentDayValues
-import com.wswensw.woolbox.record.model.focusQueue
+import com.wswensw.woolbox.record.model.hasFocusCommitments
 import com.wswensw.woolbox.record.model.isGoalSatisfied
 import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.recentDayPieProgress
@@ -95,6 +95,7 @@ fun RecordsScreen(
     onRecordItem: (RecordItem) -> Unit,
     onQuickRecord: (RecordItem, Double) -> Unit,
     onCompleteStep: (TodoTask, TodoStep) -> Unit,
+    onDeferTarget: (NowTarget) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
     onOpenTask: (TodoTask) -> Unit,
     modifier: Modifier = Modifier,
@@ -115,19 +116,16 @@ fun RecordsScreen(
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
     val recordMinutes = todayRecordMinutes(state.entries)
-    // The queue tracks the clock; everything else here is snapshot derived.
-    val focusQueue = focusQueue(
+    val ring = dayRing(items = accumulateItems, tasks = openTasks, goalValues = state.goalValues)
+    // Decided without the clock, so the card never appears or disappears on a
+    // minute tick; only its contents follow time.
+    val hasFocus = ring.isVisible || hasFocusCommitments(
         items = accumulateItems,
         tasks = openTasks,
-        clock = clock.value,
         goalValues = state.goalValues,
         todayValues = todayValues,
-        todayMinutes = recordMinutes,
         habitMinutes = state.habitMinutes,
-        itemStreaks = state.itemStreaks,
     )
-    val ring = dayRing(items = accumulateItems, tasks = openTasks, goalValues = state.goalValues)
-    val windowStarts = focusWindowStarts(items = accumulateItems, tasks = openTasks)
     val listState = rememberLazyListState()
     var pauseDecorativeMotion by remember { mutableStateOf(false) }
     LaunchedEffect(listState) {
@@ -182,14 +180,20 @@ fun RecordsScreen(
                         )
                     }
                 }
-                if (ring.isVisible || focusQueue.isNotEmpty()) {
+                if (hasFocus) {
                     item {
                         RecordsFocusCard(
                             clock = clock,
-                            queue = focusQueue,
+                            items = accumulateItems,
+                            tasks = openTasks,
                             ring = ring,
                             streak = state.goalStreak,
-                            windowStarts = windowStarts,
+                            goalValues = state.goalValues,
+                            todayValues = todayValues,
+                            todayMinutes = recordMinutes,
+                            habitMinutes = state.habitMinutes,
+                            itemStreaks = state.itemStreaks,
+                            deferred = state.deferredTargets,
                             colorProgressOf = { target ->
                                 when (target) {
                                     is NowTarget.Accumulate -> accumulateColorProgress(
@@ -208,6 +212,7 @@ fun RecordsScreen(
                             onQuickRecord = onQuickRecord,
                             onOpenItem = onRecordItem,
                             onCompleteStep = onCompleteStep,
+                            onDefer = onDeferTarget,
                         )
                     }
                     item { Spacer(Modifier.height(4.dp)) }

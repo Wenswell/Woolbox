@@ -1,8 +1,16 @@
 package com.wswensw.woolbox.record.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,15 +30,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.model.DayRing
+import com.wswensw.woolbox.record.model.DeferredTargets
 import com.wswensw.woolbox.record.model.FocusCandidate
 import com.wswensw.woolbox.record.model.FocusReason
 import com.wswensw.woolbox.record.model.MINUTES_PER_DAY
@@ -56,6 +69,8 @@ import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.StreakDays
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.focusQueue
+import com.wswensw.woolbox.record.model.focusTargetKey
 import com.wswensw.woolbox.record.model.forwardMinutes
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -72,17 +87,40 @@ private const val FOCUS_QUEUE_PREVIEW = 3
 @Composable
 internal fun RecordsFocusCard(
     clock: State<RecordsClock>,
-    queue: List<FocusCandidate>,
+    items: List<RecordItem>,
+    tasks: List<TodoTask>,
     ring: DayRing,
     streak: StreakDays,
-    windowStarts: List<Int>,
+    goalValues: Map<Long, Double>,
+    todayValues: Map<Long, Double>,
+    todayMinutes: Map<Long, List<Int>>,
+    habitMinutes: Map<Long, Int>,
+    itemStreaks: Map<Long, Int>,
+    deferred: DeferredTargets,
     colorProgressOf: (NowTarget) -> Float,
     quickValueOf: (RecordItem) -> Double?,
     onQuickRecord: (RecordItem, Double) -> Unit,
     onOpenItem: (RecordItem) -> Unit,
     onCompleteStep: (TodoTask, TodoStep) -> Unit,
+    onDefer: (NowTarget) -> Unit,
 ) {
+    // The clock is read here and nowhere above, so a minute tick recomposes this
+    // card alone and leaves the section list untouched.
     val now = clock.value
+    val queue = remember(now, items, tasks, goalValues, todayValues, todayMinutes, habitMinutes, itemStreaks, deferred) {
+        focusQueue(
+            items = items,
+            tasks = tasks,
+            clock = now,
+            goalValues = goalValues,
+            todayValues = todayValues,
+            todayMinutes = todayMinutes,
+            habitMinutes = habitMinutes,
+            itemStreaks = itemStreaks,
+            deferred = deferred,
+        )
+    }
+    val windowStarts = remember(items, tasks) { focusWindowStarts(items = items, tasks = tasks) }
     val lead = queue.firstOrNull()
     val rest = queue.drop(1).take(FOCUS_QUEUE_PREVIEW)
     val leadColors = lead
@@ -122,20 +160,43 @@ internal fun RecordsFocusCard(
                 if (streak.isVisible) StreakBadge(streak = streak)
             }
             DayTimeline(fraction = now.dayFraction, windowStarts = windowStarts, minuteOfDay = now.minuteOfDay)
-            if (lead == null) {
-                DayClearedRow(ring = ring)
-            } else {
-                FocusLeadAction(
-                    candidate = lead,
-                    colors = leadColors,
-                    quickValueOf = quickValueOf,
-                    onQuickRecord = onQuickRecord,
-                    onOpenItem = onOpenItem,
-                    onCompleteStep = onCompleteStep,
-                )
-                rest.forEach { candidate ->
+            // Promotion is the card's one load-bearing motion: the entry taken
+            // leaves upward and its successor rises into the lead slot.
+            val instant = prefersReducedMotion() || LocalPauseDecorativeMotion.current
+            AnimatedContent(
+                targetState = lead,
+                transitionSpec = {
+                    if (instant) {
+                        (fadeIn(tween(0)) togetherWith fadeOut(tween(0))).using(SizeTransform(clip = false))
+                    } else {
+                        val enter = slideInVertically(tween(220)) { height -> height / 2 } +
+                            fadeIn(tween(220))
+                        val exit = slideOutVertically(tween(180)) { height -> -height / 2 } +
+                            fadeOut(tween(180))
+                        (enter togetherWith exit).using(SizeTransform(clip = false))
+                    }
+                },
+                label = "FocusLead",
+            ) { candidate ->
+                if (candidate == null) {
+                    DayClearedRow(ring = ring)
+                } else {
+                    FocusLeadAction(
+                        candidate = candidate,
+                        colors = leadColors,
+                        quickValueOf = quickValueOf,
+                        onQuickRecord = onQuickRecord,
+                        onOpenItem = onOpenItem,
+                        onCompleteStep = onCompleteStep,
+                        onDefer = onDefer,
+                    )
+                }
+            }
+            rest.forEach { candidate ->
+                key(focusTargetKey(candidate.target)) {
                     FocusQueueRow(
                         candidate = candidate,
+                        instant = instant,
                         quickValueOf = quickValueOf,
                         onQuickRecord = onQuickRecord,
                         onOpenItem = onOpenItem,
@@ -156,6 +217,7 @@ private fun FocusLeadAction(
     onQuickRecord: (RecordItem, Double) -> Unit,
     onOpenItem: (RecordItem) -> Unit,
     onCompleteStep: (TodoTask, TodoStep) -> Unit,
+    onDefer: (NowTarget) -> Unit,
 ) {
     val quickValue = (candidate.target as? NowTarget.Accumulate)?.item?.let(quickValueOf)
     Surface(
@@ -187,6 +249,21 @@ private fun FocusLeadAction(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // Deferring is available only on the lead, because it is the only
+            // entry making a claim about right now.
+            if (!candidate.isDeferred) {
+                IconButton(
+                    onClick = { onDefer(candidate.target) },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ArrowDownward,
+                        contentDescription = "Not now · ${focusTargetLabel(candidate.target)}",
+                        tint = colors.onContainer.copy(alpha = 0.55f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -209,6 +286,7 @@ private fun FocusLeadAction(
 @Composable
 private fun FocusQueueRow(
     candidate: FocusCandidate,
+    instant: Boolean,
     quickValueOf: (RecordItem) -> Double?,
     onQuickRecord: (RecordItem, Double) -> Unit,
     onOpenItem: (RecordItem) -> Unit,
@@ -219,7 +297,8 @@ private fun FocusQueueRow(
         onClick = { candidate.act(quickValue, onQuickRecord, onOpenItem, onCompleteStep) },
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp),
+            .heightIn(min = 44.dp)
+            .then(if (instant) Modifier else Modifier.animateContentSize()),
         shape = RoundedCornerShape(12.dp),
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,

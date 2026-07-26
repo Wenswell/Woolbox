@@ -285,6 +285,122 @@ class RecordFocusTest {
     }
 
     @Test
+    fun deferredEntriesSortLastNoMatterHowStrongTheirReason() {
+        val due = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
+        val queued = dailyGoal(id = 2, name = "Walk", goal = 4.0)
+
+        val queue = focusQueue(
+            items = listOf(due, queued),
+            tasks = emptyList(),
+            clock = clock(8 * 60 + 30),
+            goalValues = mapOf(2L to 4.0 * 0.5),
+            deferred = DeferredTargets(date = today, keys = setOf("item:1")),
+        )
+
+        // Due-now is the strongest reason and still goes last once deferred.
+        assertEquals(listOf(2L, 1L), queue.map { itemId(it) })
+        assertTrue(queue.last().isDeferred)
+        // The reason survives deferral; it is postponed, not reclassified.
+        assertTrue(queue.last().reason is FocusReason.DueNow)
+    }
+
+    @Test
+    fun deferringEveryEntryLeavesTheQueuePopulated() {
+        val first = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
+        val second = accumulate(id = 2, name = "Walk", windows = listOf(8 * 60 to 10 * 60))
+
+        val queue = focusQueue(
+            items = listOf(first, second),
+            tasks = emptyList(),
+            clock = clock(8 * 60 + 30),
+            deferred = DeferredTargets(date = today, keys = setOf("item:1", "item:2")),
+        )
+
+        assertEquals(2, queue.size)
+        assertTrue(queue.all { it.isDeferred })
+        // Relative order among deferred entries still follows their reasons.
+        assertEquals(listOf(1L, 2L), queue.map { itemId(it) })
+    }
+
+    @Test
+    fun deferralExpiresWithTheLocalDay() {
+        val due = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
+        val yesterday = DeferredTargets(date = today.minusDays(1), keys = setOf("item:1"))
+
+        assertTrue(yesterday.on(today).isEmpty())
+        assertEquals(
+            false,
+            focusQueue(listOf(due), emptyList(), clock(8 * 60 + 30), deferred = yesterday)
+                .single().isDeferred,
+        )
+    }
+
+    @Test
+    fun subtaskDeferralUsesTheSubtaskIdentity() {
+        val scheduled = task(
+            id = 5,
+            stepTitles = listOf("Morning pill", "Evening pill"),
+            stepWindows = listOf(listOf(8 * 60 to 9 * 60), listOf(8 * 60 to 10 * 60)),
+        )
+        val firstStepKey = focusTargetKey(NowTarget.Task(scheduled, scheduled.steps.first()))
+
+        val queue = focusQueue(
+            items = emptyList(),
+            tasks = listOf(scheduled),
+            clock = clock(8 * 60 + 30),
+            deferred = DeferredTargets(date = today, keys = setOf(firstStepKey)),
+        )
+
+        // Deferring one subtask leaves its sibling in the same task untouched.
+        assertEquals(listOf("Evening pill", "Morning pill"), queue.map { stepTitle(it) })
+        assertEquals(false, queue.first().isDeferred)
+    }
+
+    @Test
+    fun targetKeysSeparateItemsFromSubtasks() {
+        val item = accumulate(id = 7, name = "Water", windows = emptyList())
+        val step = task(id = 7, stepTitles = listOf("Step")).steps.single()
+
+        assertEquals("item:7", focusTargetKey(NowTarget.Accumulate(item)))
+        assertEquals("step:700", focusTargetKey(NowTarget.Task(task(id = 7), step)))
+    }
+
+    @Test
+    fun focusCommitmentsDoNotDependOnTheClock() {
+        val windowed = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
+
+        // True at every hour, so the card never appears or vanishes on a tick.
+        assertTrue(hasFocusCommitments(listOf(windowed), emptyList()))
+        assertTrue(
+            hasFocusCommitments(
+                items = listOf(accumulate(id = 2, name = "Walk", windows = emptyList())),
+                tasks = emptyList(),
+                habitMinutes = mapOf(2L to 9 * 60),
+            ),
+        )
+        assertTrue(hasFocusCommitments(emptyList(), listOf(task(id = 5))))
+    }
+
+    @Test
+    fun focusCommitmentsIgnoreWhatCanNeverQueue() {
+        val goalless = accumulate(id = 1, name = "Walk", windows = emptyList())
+        val reached = dailyGoal(id = 2, name = "Water", goal = 8.0)
+        val measurement = accumulate(id = 3, name = "Weight", windows = listOf(8 * 60 to 9 * 60))
+            .copy(mode = RecordMode.MEASUREMENT)
+        val doneTask = task(id = 5, stepTitles = listOf("Stretch"), completedStepCount = 1)
+        val laterTask = task(id = 6, stepTitles = listOf("Someday"), horizon = TaskHorizon.LATER)
+
+        assertEquals(
+            false,
+            hasFocusCommitments(
+                items = listOf(goalless, reached, measurement),
+                tasks = listOf(doneTask, laterTask),
+                goalValues = mapOf(2L to 9.0),
+            ),
+        )
+    }
+
+    @Test
     fun dayRingCountsTodaySubtasksAndDailyGoals() {
         val goal = dailyGoal(id = 1, name = "Water", goal = 8.0)
         val weekly = dailyGoal(id = 2, name = "Run", goal = 20.0).copy(goalPeriod = GoalPeriod.DAYS_7)

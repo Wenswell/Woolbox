@@ -309,6 +309,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onRecordItem = { recordSheetItemId = it.id },
                                 onQuickRecord = { item, value -> recordValue(item, value) {} },
                                 onCompleteStep = completeStep,
+                                onDeferTarget = recordsViewModel::deferTarget,
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
