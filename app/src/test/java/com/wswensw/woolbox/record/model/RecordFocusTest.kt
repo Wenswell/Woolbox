@@ -258,7 +258,7 @@ class RecordFocusTest {
             stepWindows = listOf(listOf(8 * 60 to 9 * 60)),
             completedStepCount = 1,
         )
-        val later = task(id = 6, stepTitles = listOf("Someday"), horizon = TaskHorizon.LATER)
+        val later = task(id = 6, stepTitles = listOf("Someday"), plannedDate = null)
 
         assertTrue(focusQueue(emptyList(), listOf(done, later), clock(8 * 60 + 30)).isEmpty())
     }
@@ -272,6 +272,52 @@ class RecordFocusTest {
         )
 
         assertTrue(focusQueue(emptyList(), listOf(scheduled), clock(9 * 60)).isEmpty())
+    }
+
+    @Test
+    fun taskWindowsAreAnchoredToTheirPlannedDate() {
+        val scheduled = task(
+            id = 5,
+            stepWindows = listOf(listOf(8 * 60 to 9 * 60)),
+        )
+
+        assertTrue(
+            focusQueue(
+                items = emptyList(),
+                tasks = listOf(scheduled),
+                clock = clock(8 * 60 + 30, today.plusDays(1)),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun overnightTaskWindowsCarryOnlyIntoTheNextDay() {
+        val overnight = task(
+            id = 5,
+            stepWindows = listOf(listOf(23 * 60 to 60)),
+        )
+
+        assertEquals(
+            FocusReason.DueNow(30),
+            focusQueue(emptyList(), listOf(overnight), clock(30, today.plusDays(1))).single().reason,
+        )
+        assertTrue(
+            focusQueue(emptyList(), listOf(overnight), clock(61, today.plusDays(1))).isEmpty(),
+        )
+    }
+
+    @Test
+    fun onlyTasksPlannedForTodayBecomeGeneralQueueWork() {
+        val todayTask = task(id = 1)
+        val overdue = task(id = 2, plannedDate = today.minusDays(1))
+        val future = task(id = 3, plannedDate = today.plusDays(1))
+        val later = task(id = 4, plannedDate = null)
+
+        assertEquals(
+            listOf("Step"),
+            focusQueue(emptyList(), listOf(todayTask, overdue, future, later), clock(9 * 60))
+                .map(::stepTitle),
+        )
     }
 
     @Test
@@ -370,15 +416,16 @@ class RecordFocusTest {
         val windowed = accumulate(id = 1, name = "Water", windows = listOf(8 * 60 to 9 * 60))
 
         // True at every hour, so the card never appears or vanishes on a tick.
-        assertTrue(hasFocusCommitments(listOf(windowed), emptyList()))
+        assertTrue(hasFocusCommitments(listOf(windowed), emptyList(), today))
         assertTrue(
             hasFocusCommitments(
                 items = listOf(accumulate(id = 2, name = "Walk", windows = emptyList())),
                 tasks = emptyList(),
+                today = today,
                 habitMinutes = mapOf(2L to 9 * 60),
             ),
         )
-        assertTrue(hasFocusCommitments(emptyList(), listOf(task(id = 5))))
+        assertTrue(hasFocusCommitments(emptyList(), listOf(task(id = 5)), today))
     }
 
     @Test
@@ -388,13 +435,14 @@ class RecordFocusTest {
         val measurement = accumulate(id = 3, name = "Weight", windows = listOf(8 * 60 to 9 * 60))
             .copy(mode = RecordMode.MEASUREMENT)
         val doneTask = task(id = 5, stepTitles = listOf("Stretch"), completedStepCount = 1)
-        val laterTask = task(id = 6, stepTitles = listOf("Someday"), horizon = TaskHorizon.LATER)
+        val laterTask = task(id = 6, stepTitles = listOf("Someday"), plannedDate = null)
 
         assertEquals(
             false,
             hasFocusCommitments(
                 items = listOf(goalless, reached, measurement),
                 tasks = listOf(doneTask, laterTask),
+                today = today,
                 goalValues = mapOf(2L to 9.0),
             ),
         )
@@ -405,24 +453,27 @@ class RecordFocusTest {
         val goal = dailyGoal(id = 1, name = "Water", goal = 8.0)
         val weekly = dailyGoal(id = 2, name = "Run", goal = 20.0).copy(goalPeriod = GoalPeriod.DAYS_7)
         val todayTask = task(id = 5, stepTitles = listOf("A", "B"), completedStepCount = 1)
-        val later = task(id = 6, stepTitles = listOf("C"), horizon = TaskHorizon.LATER)
+        val completedTodayTask = task(id = 6, stepTitles = listOf("C"), completedStepCount = 1)
+        val later = task(id = 7, stepTitles = listOf("D"), plannedDate = null)
 
         val ring = dayRing(
             items = listOf(goal, weekly),
-            tasks = listOf(todayTask, later),
+            tasks = listOf(todayTask, completedTodayTask, later),
             goalValues = mapOf(1L to 8.0, 2L to 0.0),
+            today = today,
         )
 
-        // Two subtasks plus one daily goal; the 7-day goal and later task are out.
-        assertEquals(3, ring.total)
-        assertEquals(2, ring.closed)
+        // Three subtasks plus one daily goal; completed task steps remain in the
+        // ring, while the 7-day goal and Later task stay out.
+        assertEquals(4, ring.total)
+        assertEquals(3, ring.closed)
         assertEquals(false, ring.isComplete)
         assertTrue(ring.isVisible)
     }
 
     @Test
     fun emptyDayRingIsHiddenRatherThanComplete() {
-        val ring = dayRing(emptyList(), emptyList(), emptyMap())
+        val ring = dayRing(emptyList(), emptyList(), emptyMap(), today)
 
         assertEquals(false, ring.isVisible)
         assertEquals(false, ring.isComplete)
@@ -565,7 +616,8 @@ class RecordFocusTest {
         assertTrue(habitMinutes(measurements, today).isEmpty())
     }
 
-    private fun clock(minuteOfDay: Int) = RecordsClock(date = today, minuteOfDay = minuteOfDay)
+    private fun clock(minuteOfDay: Int, date: LocalDate = today) =
+        RecordsClock(date = date, minuteOfDay = minuteOfDay)
 
     private fun itemId(candidate: FocusCandidate): Long? =
         (candidate.target as? NowTarget.Accumulate)?.item?.id
@@ -598,11 +650,11 @@ class RecordFocusTest {
         stepTitles: List<String> = listOf("Step"),
         stepWindows: List<List<Pair<Int, Int>>> = emptyList(),
         completedStepCount: Int = 0,
-        horizon: TaskHorizon = TaskHorizon.TODAY,
+        plannedDate: LocalDate? = today,
     ) = TodoTask(
         id = id,
         title = title,
-        horizon = horizon,
+        plannedDate = plannedDate,
         completedAt = if (completedStepCount >= stepTitles.size) 1L else null,
         createdAt = 0,
         updatedAt = 0,

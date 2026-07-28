@@ -14,27 +14,34 @@ describe("Records migrations", () => {
     if (directory) rmSync(directory, { recursive: true, force: true });
   });
 
-  it("upgrades a database that already applied task windows migration 0009", async () => {
+  it("upgrades a database with task horizons to date-planned tasks", async () => {
     directory = mkdtempSync(join(tmpdir(), "records-migration-test-"));
     const databaseFile = join(directory, "records.sqlite");
     const publishedMigrations = join(directory, "published-migrations");
     const sourceMigrations = resolve(import.meta.dirname, "../drizzle");
     mkdirSync(join(publishedMigrations, "meta"), { recursive: true });
 
-    for (let index = 0; index <= 9; index += 1) {
+    for (let index = 0; index <= 10; index += 1) {
       const filename = readMigrationFilename(sourceMigrations, index);
       copyFileSync(join(sourceMigrations, filename), join(publishedMigrations, filename));
     }
     const journal = JSON.parse(readFileSync(join(sourceMigrations, "meta/_journal.json"), "utf8"));
     writeFileSync(
       join(publishedMigrations, "meta/_journal.json"),
-      JSON.stringify({ ...journal, entries: journal.entries.slice(0, 10) }),
+      JSON.stringify({ ...journal, entries: journal.entries.slice(0, 11) }),
     );
 
     const sqlite = new Database(databaseFile);
     migrate(drizzle(sqlite), { migrationsFolder: publishedMigrations });
-    expect(tableNames(sqlite)).toContain("todo_task_windows");
-    expect(tableNames(sqlite)).not.toContain("todo_step_windows");
+    const taskId = sqlite.prepare(
+      "INSERT INTO todo_tasks (title, horizon, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+    ).run("Legacy task", "TODAY", null, 1, 1).lastInsertRowid;
+    const stepId = sqlite.prepare(
+      "INSERT INTO todo_steps (task_id, title, position, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run(taskId, "Legacy step", 0, null, 1, 1).lastInsertRowid;
+    sqlite.prepare(
+      "INSERT INTO todo_step_windows (step_id, start_minute, end_minute) VALUES (?, ?, ?)",
+    ).run(stepId, 480, 540);
     sqlite.close();
 
     const app = buildApp({ databaseFile });
@@ -48,6 +55,10 @@ describe("Records migrations", () => {
     const migrated = new Database(databaseFile, { readonly: true });
     expect(tableNames(migrated)).toContain("todo_step_windows");
     expect(tableNames(migrated)).not.toContain("todo_task_windows");
+    expect(columnNames(migrated, "todo_tasks")).toContain("planned_date");
+    expect(columnNames(migrated, "todo_tasks")).not.toContain("horizon");
+    expect(migrated.prepare("SELECT planned_date AS plannedDate FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({ plannedDate: null });
+    expect(migrated.prepare("SELECT COUNT(*) AS value FROM todo_step_windows").get()).toEqual({ value: 0 });
     migrated.close();
   });
 });
@@ -59,6 +70,12 @@ function readMigrationFilename(migrationsDirectory: string, index: number): stri
 
 function tableNames(database: Database.Database): string[] {
   return database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .all()
+    .map((row) => (row as { name: string }).name);
+}
+
+function columnNames(database: Database.Database, table: string): string[] {
+  return database.prepare(`SELECT name FROM pragma_table_info('${table}')`)
     .all()
     .map((row) => (row as { name: string }).name);
 }

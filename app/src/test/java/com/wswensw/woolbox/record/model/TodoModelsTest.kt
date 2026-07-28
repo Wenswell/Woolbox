@@ -1,5 +1,6 @@
 package com.wswensw.woolbox.record.model
 
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -12,8 +13,8 @@ class TodoModelsTest {
         val task = TodoTask(
             id = 1,
             title = "Prepare trip",
-            horizon = com.wswensw.woolbox.record.model.TaskHorizon.TODAY,
-        completedAt = null,
+            plannedDate = LocalDate.of(2026, 7, 26),
+            completedAt = null,
             createdAt = 0,
             updatedAt = 0,
             steps = listOf(
@@ -31,5 +32,24 @@ class TodoModelsTest {
     fun normalizesAndRequiresTaskTitles() {
         assertEquals("Prepare trip", validatedTaskTitle("  Prepare trip  "))
         assertThrows(RecordValidationException::class.java) { validatedTaskTitle(" ") }
+    }
+
+    @Test
+    fun derivesTaskBucketFromPlannedDate() {
+        val today = LocalDate.of(2026, 7, 26)
+        val task = TodoTask(
+            id = 1,
+            title = "Plan",
+            plannedDate = today,
+            completedAt = null,
+            createdAt = 0,
+            updatedAt = 0,
+            steps = emptyList(),
+        )
+
+        assertEquals(TaskDateBucket.OVERDUE, task.copy(plannedDate = today.minusDays(1)).dateBucket(today))
+        assertEquals(TaskDateBucket.TODAY, task.dateBucket(today))
+        assertEquals(TaskDateBucket.LATER, task.copy(plannedDate = today.plusDays(1)).dateBucket(today))
+        assertEquals(TaskDateBucket.LATER, task.copy(plannedDate = null).dateBucket(today))
     }
 }

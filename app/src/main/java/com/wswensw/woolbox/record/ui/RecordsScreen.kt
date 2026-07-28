@@ -70,10 +70,12 @@ import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
-import com.wswensw.woolbox.record.model.TaskHorizon
+import com.wswensw.woolbox.record.model.TaskDateBucket
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.dateBucket
 import com.wswensw.woolbox.ui.AppStyle
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -86,6 +88,7 @@ private val GridCardSpacing = 8.dp
 fun RecordsScreen(
     state: RecordsUiState,
     clock: State<RecordsClock>,
+    today: LocalDate,
     rootTaskPreviewLimit: RootTaskPreviewLimit,
     onManageTasks: () -> Unit,
     onManageAccumulates: () -> Unit,
@@ -103,8 +106,9 @@ fun RecordsScreen(
     var completedTasksExpanded by rememberSaveable { mutableStateOf(false) }
     var laterTasksExpanded by rememberSaveable { mutableStateOf(false) }
     val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
-    val todayTasks = openTasks.filter { it.horizon == TaskHorizon.TODAY }
-    val laterTasks = openTasks.filter { it.horizon == TaskHorizon.LATER }
+    val overdueTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
+    val todayTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.TODAY }
+    val laterTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.LATER }
     val previewLimit = rootTaskPreviewLimit.count
     val completedTasks = state.tasks
         .filter(TodoTask::isCompleted)
@@ -116,12 +120,18 @@ fun RecordsScreen(
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
     val recordMinutes = todayRecordMinutes(state.entries)
-    val ring = dayRing(items = accumulateItems, tasks = openTasks, goalValues = state.goalValues)
+    val ring = dayRing(
+        items = accumulateItems,
+        tasks = state.tasks,
+        goalValues = state.goalValues,
+        today = today,
+    )
     // Decided without the clock, so the card never appears or disappears on a
     // minute tick; only its contents follow time.
     val hasFocus = ring.isVisible || hasFocusCommitments(
         items = accumulateItems,
         tasks = openTasks,
+        today = today,
         goalValues = state.goalValues,
         todayValues = todayValues,
         habitMinutes = state.habitMinutes,
@@ -234,7 +244,21 @@ fun RecordsScreen(
                         )
                     }
                 } else {
-                    item { TaskHorizonHeader(title = "Today", count = todayTasks.size) }
+                    if (overdueTasks.isNotEmpty()) {
+                        item { TaskGroupHeader(title = "Overdue", count = overdueTasks.size) }
+                        val visibleOverdue = previewLimit?.let { overdueTasks.take(it) } ?: overdueTasks
+                        items(visibleOverdue, key = { "overdue-${it.id}" }) { task ->
+                            TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
+                        }
+                        if (previewLimit != null && overdueTasks.size > previewLimit) {
+                            item {
+                                TextButton(onClick = onManageTasks) {
+                                    Text("+${overdueTasks.size - previewLimit} more in Manage")
+                                }
+                            }
+                        }
+                    }
+                    item { TaskGroupHeader(title = "Today", count = todayTasks.size) }
                     if (todayTasks.isEmpty()) {
                         item {
                             Text(
@@ -258,7 +282,7 @@ fun RecordsScreen(
                     }
                     if (laterTasks.isNotEmpty()) {
                         item {
-                            TaskHorizonHeader(
+                            TaskGroupHeader(
                                 title = "Later",
                                 count = laterTasks.size,
                                 expanded = laterTasksExpanded,
@@ -436,7 +460,7 @@ private fun CompletedTasksHeader(
 
 
 @Composable
-private fun TaskHorizonHeader(
+private fun TaskGroupHeader(
     title: String,
     count: Int,
     expanded: Boolean? = null,

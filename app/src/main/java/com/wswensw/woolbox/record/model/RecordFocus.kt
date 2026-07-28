@@ -106,12 +106,13 @@ data class DeferredTargets(
 }
 
 /**
- * Whether anything could enter the queue today, decided without the clock so
- * the card never appears or disappears on a minute tick.
+ * Whether anything could enter the queue today, decided without the minute
+ * clock so the card never appears or disappears on a minute tick.
  */
 fun hasFocusCommitments(
     items: List<RecordItem>,
     tasks: List<TodoTask>,
+    today: LocalDate,
     goalValues: Map<Long, Double> = emptyMap(),
     todayValues: Map<Long, Double> = emptyMap(),
     habitMinutes: Map<Long, Int> = emptyMap(),
@@ -127,7 +128,9 @@ fun hasFocusCommitments(
     if (hasItem) return true
     return tasks.any { task ->
         task.steps.any { step ->
-            !step.isCompleted && (step.windows.isNotEmpty() || task.horizon == TaskHorizon.TODAY)
+            val carriesIntoToday = task.plannedDate == today.minusDays(1) &&
+                step.windows.any(RecordWindow::crossesMidnight)
+            !step.isCompleted && (task.plannedDate == today || carriesIntoToday)
         }
     }
 }
@@ -246,9 +249,10 @@ private fun accumulateCandidate(
 }
 
 private fun stepCandidate(task: TodoTask, step: TodoStep, clock: RecordsClock): List<FocusCandidate> {
+    val plannedDate = task.plannedDate ?: return emptyList()
     val target = NowTarget.Task(task, step)
     val openWindow = step.windows
-        .filter { isMinuteInWindow(clock.minuteOfDay, it.startMinute, it.endMinute) }
+        .filter { window -> window.isOpenFor(plannedDate, clock) }
         .minByOrNull { forwardMinutes(clock.minuteOfDay, it.endMinute) }
     if (openWindow != null) {
         return listOf(
@@ -260,10 +264,21 @@ private fun stepCandidate(task: TodoTask, step: TodoStep, clock: RecordsClock): 
         )
     }
     // A scheduled subtask belongs to its windows; an unscheduled one belongs to
-    // today. Later tasks without a window are not a commitment for right now.
-    if (step.windows.isNotEmpty() || task.horizon != TaskHorizon.TODAY) return emptyList()
+    // its planned date. A task never becomes today's work merely by crossing
+    // midnight.
+    if (step.windows.isNotEmpty() || plannedDate != clock.date) return emptyList()
     return listOf(FocusCandidate(target, FocusReason.Queued))
 }
+
+/** A task window is anchored to its task date and may only carry into tomorrow. */
+private fun RecordWindow.isOpenFor(plannedDate: LocalDate, clock: RecordsClock): Boolean = when {
+    !crossesMidnight() -> clock.date == plannedDate && clock.minuteOfDay in startMinute until endMinute
+    clock.date == plannedDate -> clock.minuteOfDay >= startMinute
+    clock.date == plannedDate.plusDays(1) -> clock.minuteOfDay < endMinute
+    else -> false
+}
+
+private fun RecordWindow.crossesMidnight(): Boolean = startMinute > endMinute
 
 /** Today's commitments and how many are closed, driving the day ring. */
 data class DayRing(
@@ -279,15 +294,16 @@ data class DayRing(
 }
 
 /**
- * Today's commitments: every subtask of a today task, and every daily goal.
- * Seven-day goals and later tasks are not today's ring.
+ * Today's commitments: every subtask planned for today, and every daily goal.
+ * Seven-day goals and tasks scheduled for another date are not today's ring.
  */
 fun dayRing(
     items: List<RecordItem>,
     tasks: List<TodoTask>,
     goalValues: Map<Long, Double>,
+    today: LocalDate,
 ): DayRing {
-    val steps = tasks.filter { it.horizon == TaskHorizon.TODAY }.flatMap(TodoTask::steps)
+    val steps = tasks.filter { it.plannedDate == today }.flatMap(TodoTask::steps)
     val dailyGoals = items.filter { item ->
         item.mode == RecordMode.ACCUMULATE && item.goalPeriod == GoalPeriod.DAY && item.goalValue != null
     }

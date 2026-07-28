@@ -5,8 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +19,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +37,11 @@ import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.record.model.windowCoverageMinutes
 import com.wswensw.woolbox.ui.AppStyle
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 internal data class TimeEditTarget(
@@ -70,6 +81,117 @@ internal fun RecordTimePickerDialog(
 internal fun Modifier.formField(): Modifier =
     fillMaxWidth().padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp)
 
+/** Shared schedule controls for task forms. A date answers which day; windows answer what time. */
+@Composable
+internal fun TaskScheduleFields(
+    plannedDate: LocalDate?,
+    today: LocalDate,
+    hasSuggestedTimes: Boolean,
+    enabled: Boolean,
+    onPlannedDateChange: (LocalDate?) -> Unit,
+) {
+    var pickingDate by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterChip(
+            selected = plannedDate == today,
+            onClick = { onPlannedDateChange(today) },
+            enabled = enabled,
+            label = { Text("Today") },
+        )
+        FilterChip(
+            selected = plannedDate == null,
+            onClick = { onPlannedDateChange(null) },
+            enabled = enabled && !hasSuggestedTimes,
+            label = { Text("Later") },
+        )
+    }
+    OutlinedButton(
+        onClick = { pickingDate = true },
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
+    ) {
+        Icon(imageVector = Icons.Outlined.DateRange, contentDescription = null)
+        Text(
+            text = plannedDate?.let { taskDateLabel(it, today) } ?: "Choose date",
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+    if (hasSuggestedTimes) {
+        Text(
+            text = "Remove suggested times before moving this task to Later.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(
+                start = AppStyle.spacing.pageHorizontal,
+                end = AppStyle.spacing.pageHorizontal,
+                bottom = 4.dp,
+            ),
+        )
+    }
+    if (pickingDate) {
+        TaskDatePickerDialog(
+            initialDate = plannedDate ?: today,
+            onDismiss = { pickingDate = false },
+            onConfirm = { selectedDate ->
+                onPlannedDateChange(selectedDate)
+                pickingDate = false
+            },
+        )
+    }
+}
+
+internal fun taskDateLabel(date: LocalDate, today: LocalDate): String = when (date) {
+    today -> "Today"
+    else -> TaskDateFormatter.format(date)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TaskDatePickerDialog(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit,
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialDate.utcStartMillis())
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    state.selectedDateMillis?.let { selectedMillis ->
+                        onConfirm(selectedMillis.toUtcLocalDate())
+                    }
+                },
+                enabled = state.selectedDateMillis != null,
+            ) {
+                Text("Done")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    ) {
+        DatePicker(state = state, showModeToggle = false)
+    }
+}
+
+private fun LocalDate.utcStartMillis(): Long =
+    atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+private fun Long.toUtcLocalDate(): LocalDate =
+    Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+
+private val TaskDateFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
+
 /**
  * Suggested time window rows plus their add action, shared by the accumulate
  * and task forms. Each row opens the time picker through [onEditTime]; the
@@ -83,6 +205,7 @@ internal fun SuggestedTimeFields(
     onRemove: (Int) -> Unit,
     onAdd: () -> Unit,
     horizontalPadding: Dp = AppStyle.spacing.pageHorizontal,
+    summary: String = suggestedTimeSummary(windows),
 ) {
     val fieldModifier = Modifier
         .fillMaxWidth()
@@ -127,7 +250,7 @@ internal fun SuggestedTimeFields(
         Text("Add suggested time")
     }
     Text(
-        text = suggestedTimeSummary(windows),
+        text = summary,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
         modifier = Modifier.padding(start = horizontalPadding, end = horizontalPadding, bottom = 8.dp),
@@ -168,6 +291,7 @@ internal fun SuggestedTimeDialog(
                         errorMessage = null
                     },
                     horizontalPadding = 0.dp,
+                    summary = taskSuggestedTimeSummary(parsedWindows),
                 )
                 errorMessage?.let { message ->
                     Text(
@@ -214,11 +338,19 @@ internal fun SuggestedTimeDialog(
 /** Explains what the configured windows will do on the Records root page. */
 internal fun suggestedTimeSummary(windows: List<RecordWindow>): String {
     if (windows.isEmpty()) return "No suggested times. Never appears in the Now band."
+    return "Shown in the Now band for ${suggestedTimeSpan(windows)} of the day."
+}
+
+internal fun taskSuggestedTimeSummary(windows: List<RecordWindow>): String {
+    if (windows.isEmpty()) return "No suggested times. Queued on the task date."
+    return "Shown in the Now band on the task date for ${suggestedTimeSpan(windows)}."
+}
+
+private fun suggestedTimeSpan(windows: List<RecordWindow>): String {
     val coverage = windowCoverageMinutes(windows)
     val hours = coverage / 60
     val minutes = coverage % 60
-    val span = if (hours == 0) "${minutes}m" else "${hours}h ${minutes}m"
-    return "Shown in the Now band for $span of the day."
+    return if (hours == 0) "${minutes}m" else "${hours}h ${minutes}m"
 }
 
 /** Default window appended by the add action: one hour after the last end. */

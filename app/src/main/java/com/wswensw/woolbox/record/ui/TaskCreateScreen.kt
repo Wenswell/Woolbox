@@ -13,7 +13,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,27 +29,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.data.TodoStepDraft
-import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
+import java.time.LocalDate
 
 @Composable
 fun TaskCreateScreen(
+    today: LocalDate,
     onBack: () -> Unit,
     onCreate: (
         title: String,
         steps: List<TodoStepDraft>,
-        horizon: TaskHorizon,
+        plannedDate: LocalDate?,
         onResult: (String?) -> Unit,
     ) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
-    var horizonName by rememberSaveable { mutableStateOf(TaskHorizon.TODAY.name) }
-    val horizon = TaskHorizon.valueOf(horizonName)
+    var plannedDateValue by rememberSaveable { mutableStateOf<String?>(today.toString()) }
+    val plannedDate = plannedDateValue?.let(LocalDate::parse)
     var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
     // One encoded window list per subtask position, moved and removed with it.
     var stepWindows by rememberSaveable { mutableStateOf(listOf(emptyList<String>())) }
@@ -80,7 +80,7 @@ fun TaskCreateScreen(
             return
         }
         saving = true
-        onCreate(normalizedTitle, normalizedSteps, horizon) { error ->
+        onCreate(normalizedTitle, normalizedSteps, plannedDate) { error ->
             saving = false
             errorMessage = error
         }
@@ -118,23 +118,23 @@ fun TaskCreateScreen(
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TaskHorizon.entries.forEach { option ->
-                    FilterChip(
-                        selected = horizon == option,
-                        onClick = { horizonName = option.name },
-                        enabled = !saving,
-                        label = { Text(option.label) },
-                    )
-                }
-            }
+            TaskScheduleFields(
+                plannedDate = plannedDate,
+                today = today,
+                hasSuggestedTimes = stepWindows.any { windows -> windows.isNotEmpty() },
+                enabled = !saving,
+                onPlannedDateChange = { selectedDate -> plannedDateValue = selectedDate?.toString() },
+            )
         }
         AppSection(title = "Subtasks") {
+            if (plannedDate == null) {
+                Text(
+                    text = "Set a task date to add suggested times.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
+                )
+            }
             stepTitles.forEachIndexed { index, stepTitle ->
                 Row(
                     modifier = Modifier
@@ -155,19 +155,21 @@ fun TaskCreateScreen(
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(
-                        onClick = { windowEditStep = index },
-                        enabled = !saving,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Schedule,
-                            contentDescription = "Suggested times for subtask ${index + 1}",
-                            tint = if (stepWindows.getOrElse(index) { emptyList() }.isEmpty()) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                        )
+                    if (plannedDate != null) {
+                        IconButton(
+                            onClick = { windowEditStep = index },
+                            enabled = !saving,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = "Suggested times for subtask ${index + 1}",
+                                tint = if (stepWindows.getOrElse(index) { emptyList() }.isEmpty()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            )
+                        }
                     }
                     if (stepTitles.size > 1) {
                         IconButton(
@@ -233,7 +235,7 @@ fun TaskCreateScreen(
         }
     }
 
-    windowEditStep?.let { index ->
+    windowEditStep?.takeIf { plannedDate != null }?.let { index ->
         val encoded = stepWindows.getOrElse(index) { emptyList() }
         SuggestedTimeDialog(
             stepLabel = stepTitles.getOrNull(index)?.trim()?.takeIf(String::isNotEmpty)

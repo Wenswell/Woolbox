@@ -115,8 +115,8 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 | 区域 | 唯一职责 |
 | --- | --- |
 | `Focus` | 列表首行无外框区域：`labelLarge` 单行显示 `EEE d MMM · HH:mm · closed/total today`，连续天数直接追加；下方为 `2dp` 已过时间规则。队首使用 `16dp` 圆角的全宽 Hero：累计复用液面填充，显示名称、有效理由、累计值、`−` / `+` 步进与独立确认图标；子事项复用父待办的分段进度，显示子事项、待办、有效理由和独立复选框。更多菜单只在未延后队首提供 `Not now`。后续行为透明导航行：累计行打开记录 Sheet，子事项行打开进度 Sheet，并在前置复选框完成。`queued` 不显示理由。队列为空时使用 `Day closed` / `Nothing due right now` 完成卡。 |
-| `Tasks` | `Today`/`Later` 分组；全宽卡按子事项分段竖条，未完成格固定使用 Accumulate 0% 的卡底色，完成格使用任务进度底色并弹出填充，格间透明露出页面底色；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
-| `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron）；顶栏加号新建；编辑路由负责标题、子事项增删排序和删除；子事项的推荐时段在其编辑 Dialog 内配置。 |
+| `Tasks` | 未完成任务按 `Overdue`、`Today`、`Later` 分组；Overdue 与 Today 展开，Later 可折叠。全宽卡按子事项分段竖条，未完成格固定使用 Accumulate 0% 的卡底色，完成格使用任务进度底色并弹出填充，格间透明露出页面底色；预览条数可配；已完成折叠。点卡打开进度 Sheet。 |
+| `Manage tasks` / `Edit task` | 管理页展示全部任务（进度色卡 + chevron 和计划日期状态）；顶栏加号新建；编辑路由负责标题、计划日期、子事项增删排序和删除；子事项的推荐时段在其编辑 Dialog 内配置。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
 | `Accumulate` | 2 列 grid，卡高约 `120dp`；整卡自下而上液面进度（双层正弦波，可减动画）；弱化名称 + 主值；日目标：旗帜 + 近 7 日达标饼；7 日目标：滚动近 7 日累计 / 目标；日历图标 + `· 7 days` 文案 + 与 7 饼同宽的 7 段独立描边进度（两端 A=6dp、切口/填充 B=1.5dp，高 8dp、缝 2dp，满额完成绿）；点卡打开快速记录 Sheet。 |
@@ -145,7 +145,7 @@ Records 根页：无页头大标题；同一 `LazyColumn` 三分区，顺序 **T
 
 `Manage accumulates` 与 `Manage measurements` 使用相同的标准路由骨架；每页顶栏仅提供本模式新建入口，编辑路由固定为本模式表单。
 
-Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删排序和删除任务只在 `Edit task`。`New task` 同样可调整子事项顺序，每个子事项行右侧的时钟图标打开该子事项的时段编辑 Dialog（已配置时图标用 primary）。累计表单、`New task` 的时段 Dialog 与 `Edit task` 的子事项 Dialog 共用 `SuggestedTimeFields`：起止时间按钮、删除、`Add suggested time`，下方一行说明当前配置在 `Now` 时间条中占当日多长时间；Dialog 内水平内边距为 `0dp`。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
+Task progress Sheet 只显示子事项复选框和完成时间；标题、计划日期、子事项增删排序和删除任务只在 `Edit task`。`New task` 与 `Edit task` 共用 Today/Later Chip 和独立整行日期按钮，日期选择使用 Material DatePicker。Later 任务隐藏子事项时钟图标；已有时段时 Later Chip 禁用。`New task` 同样可调整子事项顺序，已选日期时每个子事项行右侧的时钟图标打开该子事项的时段编辑 Dialog（已配置时图标用 primary）。累计表单、`New task` 的时段 Dialog 与 `Edit task` 的子事项 Dialog 共用 `SuggestedTimeFields`：起止时间按钮、删除、`Add suggested time`，任务 Dialog 的说明明确时段仅在计划日进入 `Now`；Dialog 内水平内边距为 `0dp`。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 

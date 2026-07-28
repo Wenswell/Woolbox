@@ -19,7 +19,6 @@ import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,7 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.model.RecordWindow
-import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.validatedTaskTitle
@@ -48,13 +46,15 @@ import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
+import java.time.LocalDate
 
 @Composable
 fun TaskDetailScreen(
     task: TodoTask?,
     loading: Boolean,
+    today: LocalDate,
     onBack: () -> Unit,
-    onSave: (String, TaskHorizon, (String?) -> Unit) -> Unit,
+    onSave: (String, LocalDate?, (String?) -> Unit) -> Unit,
     onCreateStep: (String, List<RecordWindow>, (String?) -> Unit) -> Unit,
     onUpdateStep: (TodoStep, String, List<RecordWindow>, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
@@ -86,8 +86,8 @@ fun TaskDetailScreen(
     }
 
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
-    var horizonName by rememberSaveable(task.id) { mutableStateOf(task.horizon.name) }
-    val horizon = TaskHorizon.valueOf(horizonName)
+    var plannedDateValue by rememberSaveable(task.id) { mutableStateOf(task.plannedDate?.toString()) }
+    val plannedDate = plannedDateValue?.let(LocalDate::parse)
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var savingTitle by rememberSaveable { mutableStateOf(false) }
@@ -115,15 +115,19 @@ fun TaskDetailScreen(
             errorMessage = "Check the highlighted field."
             return
         }
-        if (normalizedTitle == task.title && horizon == task.horizon) return
+        if (normalizedTitle == task.title && plannedDate == task.plannedDate) return
         savingTitle = true
-        onSave(normalizedTitle, horizon) { error ->
+        onSave(normalizedTitle, plannedDate) { error ->
             savingTitle = false
             errorMessage = error
         }
     }
 
-    val titleDirty = title.trim() != task.title || horizon != task.horizon
+    val titleDirty = title.trim() != task.title || plannedDate != task.plannedDate
+    val hasSuggestedTimes = task.steps.any { it.windows.isNotEmpty() }
+    // Task date and subtask windows are separate writes. A new date must be
+    // saved before the server can accept a window for a previously Later task.
+    val canEditSuggestedTimes = task.plannedDate != null && plannedDate != null
     AppRouteScaffold(
         title = "Edit task",
         onBack = onBack,
@@ -160,24 +164,24 @@ fun TaskDetailScreen(
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TaskHorizon.entries.forEach { option ->
-                    FilterChip(
-                        selected = horizon == option,
-                        onClick = { horizonName = option.name },
-                        enabled = !savingTitle,
-                        label = { Text(option.label) },
-                    )
-                }
-            }
+            TaskScheduleFields(
+                plannedDate = plannedDate,
+                today = today,
+                hasSuggestedTimes = hasSuggestedTimes,
+                enabled = !savingTitle,
+                onPlannedDateChange = { selectedDate -> plannedDateValue = selectedDate?.toString() },
+            )
         }
 
         AppSection(title = "Subtasks") {
+            if (!canEditSuggestedTimes) {
+                Text(
+                    text = "Save a task date before adding suggested times.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
+                )
+            }
             task.steps.forEachIndexed { index, step ->
                 TaskStepRow(
                     step = step,
@@ -224,6 +228,7 @@ fun TaskDetailScreen(
             title = "New subtask",
             initialTitle = "",
             initialWindows = emptyList(),
+            showSuggestedTimes = canEditSuggestedTimes,
             onDismiss = { creatingStep = false },
             onSave = { value, stepWindows, onResult ->
                 onCreateStep(value, stepWindows) { error ->
@@ -239,6 +244,7 @@ fun TaskDetailScreen(
             title = "Edit subtask",
             initialTitle = editingStep.title,
             initialWindows = editingStep.windows,
+            showSuggestedTimes = canEditSuggestedTimes,
             onDismiss = { editingStepId = null },
             onSave = { value, stepWindows, onResult ->
                 onUpdateStep(editingStep, value, stepWindows) { error ->
@@ -331,6 +337,7 @@ private fun TaskStepDialog(
     title: String,
     initialTitle: String,
     initialWindows: List<RecordWindow>,
+    showSuggestedTimes: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, List<RecordWindow>, (String?) -> Unit) -> Unit,
 ) {
@@ -360,23 +367,26 @@ private fun TaskStepDialog(
                     supportingText = valueError?.let { message -> { Text(message) } },
                     singleLine = true,
                 )
-                Text(
-                    text = "Suggested times",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-                SuggestedTimeFields(
-                    windows = parsedWindows,
-                    enabled = !saving,
-                    onEditTime = { timeEditTarget = it },
-                    onRemove = { index ->
-                        windows = windows.toMutableList().also { it.removeAt(index) }
-                    },
-                    onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
-                    horizontalPadding = 0.dp,
-                )
+                if (showSuggestedTimes) {
+                    Text(
+                        text = "Suggested times",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                    SuggestedTimeFields(
+                        windows = parsedWindows,
+                        enabled = !saving,
+                        onEditTime = { timeEditTarget = it },
+                        onRemove = { index ->
+                            windows = windows.toMutableList().also { it.removeAt(index) }
+                        },
+                        onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
+                        horizontalPadding = 0.dp,
+                        summary = taskSuggestedTimeSummary(parsedWindows),
+                    )
+                }
                 errorMessage?.let { message ->
                     Text(
                         text = message,
@@ -393,7 +403,9 @@ private fun TaskStepDialog(
                         valueError = error.message
                         return@TextButton
                     }
-                    val normalizedWindows = runCatching { validatedWindows(parsedWindows) }.getOrElse { error ->
+                    val normalizedWindows = runCatching {
+                        validatedWindows(if (showSuggestedTimes) parsedWindows else emptyList())
+                    }.getOrElse { error ->
                         errorMessage = error.message ?: "Suggested times are invalid."
                         return@TextButton
                     }

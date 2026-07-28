@@ -308,7 +308,7 @@ describe("Records API", () => {
         { id: 1, name: "Water", archived: false },
         { id: 3, name: "Weight", archived: false },
       ],
-      tasks: [{ id: 1, title: "Pack", horizon: "TODAY", steps: [{ title: "Bag" }] }],
+      tasks: [{ id: 1, title: "Pack", plannedDate: "2026-07-20", steps: [{ title: "Bag" }] }],
       accumulateEntries: [{ itemId: 1, value: 2, itemMode: "ACCUMULATE" }],
       latestMeasurementEntries: [
         { itemId: 2, value: 4, itemMode: "MEASUREMENT" },
@@ -351,7 +351,7 @@ describe("Records API", () => {
     expect(created.json().task).toMatchObject({
       id: 1,
       title: "Prepare trip",
-      horizon: "TODAY",
+      plannedDate: "2026-07-20",
       completedAt: null,
       steps: [
         { id: 1, title: "Book train", completedAt: null },
@@ -394,10 +394,10 @@ describe("Records API", () => {
     expect((await app.inject({ method: "DELETE", url: "/api/steps/2" })).statusCode).toBe(200);
     expect((await app.inject({ method: "DELETE", url: "/api/steps/3" })).statusCode).toBe(400);
 
-    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey", horizon: "LATER" } });
+    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey", plannedDate: null } });
     expect(renamed.statusCode).toBe(200);
     expect(renamed.json().task.title).toBe("Prepare journey");
-    expect(renamed.json().task.horizon).toBe("LATER");
+    expect(renamed.json().task.plannedDate).toBeNull();
     expect((await getAuditLogs()).map((log) => log.action)).toContain("TASK_COMPLETED");
     expect((await getAuditLogs()).map((log) => log.action)).toContain("STEP_REOPENED");
   });
@@ -531,6 +531,46 @@ describe("Records API", () => {
     expect(stepCreated.at(-1)?.after?.windows).toEqual([{ startMinute: 480, endMinute: 540 }]);
   });
 
+  it("requires a task date for subtask suggested times", async () => {
+    const unplanned = await createTask({
+      title: "Later task",
+      plannedDate: null,
+      steps: [{ title: "Read", windows: [{ startMinute: 480, endMinute: 540 }] }],
+    });
+    expect(unplanned.statusCode).toBe(400);
+    expect(unplanned.json().error.message).toBe("Suggested times require a task date.");
+
+    const task = await createTask({ title: "Inbox", plannedDate: null, steps: ["Read"] });
+    expect(task.statusCode).toBe(201);
+    const addWindow = await createStep(1, {
+      title: "Timed",
+      windows: [{ startMinute: 480, endMinute: 540 }],
+    });
+    expect(addWindow.statusCode).toBe(400);
+    expect(addWindow.json().error.message).toBe("Suggested times require a task date.");
+
+    const dated = await app.inject({
+      method: "PUT",
+      url: "/api/tasks/1",
+      payload: { title: "Inbox", plannedDate: "2026-07-21" },
+    });
+    expect(dated.statusCode).toBe(200);
+    const savedWindow = await app.inject({
+      method: "PUT",
+      url: "/api/steps/1",
+      payload: { title: "Read", windows: [{ startMinute: 480, endMinute: 540 }] },
+    });
+    expect(savedWindow.statusCode).toBe(200);
+
+    const moveLater = await app.inject({
+      method: "PUT",
+      url: "/api/tasks/1",
+      payload: { title: "Inbox", plannedDate: null },
+    });
+    expect(moveLater.statusCode).toBe(400);
+    expect(moveLater.json().error.message).toBe("Remove suggested times before moving a task to Later.");
+  });
+
   it("adds subtask windows through the step endpoint and cascades deletes", async () => {
     const created = await createTask({ title: "Pack", steps: ["Bag"] });
     expect(created.statusCode).toBe(201);
@@ -614,7 +654,7 @@ describe("Records API", () => {
     return app.inject({
       method: "POST",
       url: "/api/tasks",
-      payload: { horizon: "TODAY", ...payload },
+      payload: { plannedDate: "2026-07-20", ...payload },
     });
   }
 

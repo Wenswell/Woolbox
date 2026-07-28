@@ -7,6 +7,7 @@ import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -173,8 +174,8 @@ class RecordsScreenTest {
         val task = TodoTask(
             id = 1,
             title = "Plan",
-            horizon = com.wswensw.woolbox.record.model.TaskHorizon.TODAY,
-        completedAt = null,
+            plannedDate = LocalDate.of(2026, 7, 26),
+            completedAt = null,
             createdAt = 0,
             updatedAt = 0,
             steps = listOf(
@@ -330,7 +331,7 @@ private fun todoTask(id: Long, completedSteps: Int, totalSteps: Int): TodoTask {
     return TodoTask(
         id = id,
         title = "Task $id",
-        horizon = com.wswensw.woolbox.record.model.TaskHorizon.TODAY,
+        plannedDate = LocalDate.of(2026, 7, 26),
         completedAt = if (completedSteps >= totalSteps && totalSteps > 0) 1L else null,
         createdAt = 1L,
         updatedAt = 1L,

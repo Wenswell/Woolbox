@@ -13,9 +13,7 @@ import com.wswensw.woolbox.record.model.RecordValidationException
 import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TodoStep
-import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
-import com.wswensw.woolbox.record.model.parseTaskHorizon
 import com.wswensw.woolbox.record.model.FOCUS_HISTORY_DAYS
 import com.wswensw.woolbox.record.model.StreakDays
 import com.wswensw.woolbox.record.model.dailyGoalStreak
@@ -175,7 +173,7 @@ class RecordRepository(context: Context) {
     suspend fun createTask(
         title: String,
         steps: List<TodoStepDraft>,
-        horizon: TaskHorizon,
+        plannedDate: LocalDate?,
     ): Long = withContext(Dispatchers.IO) {
         if (steps.isEmpty()) {
             throw RecordValidationException("At least one subtask is required.")
@@ -183,20 +181,22 @@ class RecordRepository(context: Context) {
         request(
             "POST",
             "tasks",
-            body = JSONObject()
-                .put("title", validatedTaskTitle(title))
-                .put("horizon", horizon.name)
-                .put("steps", JSONArray(steps.map(::stepJson))),
+            body = JSONObject().apply {
+                put("title", validatedTaskTitle(title))
+                putNullable("plannedDate", plannedDate?.toString())
+                put("steps", JSONArray(steps.map(::stepJson)))
+            },
         ).getJSONObject("task").getLong("id")
     }
 
-    suspend fun updateTask(taskId: Long, title: String, horizon: TaskHorizon) = withContext(Dispatchers.IO) {
+    suspend fun updateTask(taskId: Long, title: String, plannedDate: LocalDate?) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "tasks/$taskId",
-            body = JSONObject()
-                .put("title", validatedTaskTitle(title))
-                .put("horizon", horizon.name),
+            body = JSONObject().apply {
+                put("title", validatedTaskTitle(title))
+                putNullable("plannedDate", plannedDate?.toString())
+            },
         )
         Unit
     }
@@ -370,7 +370,7 @@ private fun parseWindow(value: JSONObject) = RecordWindow(
 private fun parseTask(value: JSONObject) = TodoTask(
     id = value.getLong("id"),
     title = value.getString("title"),
-    horizon = parseTaskHorizon(value.getString("horizon")),
+    plannedDate = value.nullableString("plannedDate")?.let(LocalDate::parse),
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),

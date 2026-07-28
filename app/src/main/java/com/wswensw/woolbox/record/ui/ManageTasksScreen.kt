@@ -32,13 +32,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.record.model.TaskDateBucket
 import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.dateBucket
 import com.wswensw.woolbox.ui.AppLazyRouteScaffold
 import com.wswensw.woolbox.ui.AppStyle
+import java.time.LocalDate
 
 @Composable
 fun ManageTasksScreen(
     state: RecordsUiState,
+    today: LocalDate,
     onBack: () -> Unit,
     onCreate: () -> Unit,
     onEdit: (Long) -> Unit,
@@ -84,6 +88,7 @@ fun ManageTasksScreen(
             else -> items(state.tasks, key = TodoTask::id) { task ->
                 TaskManageCard(
                     task = task,
+                    today = today,
                     onClick = { onEdit(task.id) },
                     modifier = Modifier
                         .padding(horizontal = AppStyle.spacing.pageHorizontal)
@@ -97,6 +102,7 @@ fun ManageTasksScreen(
 @Composable
 private fun TaskManageCard(
     task: TodoTask,
+    today: LocalDate,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -171,7 +177,7 @@ private fun TaskManageCard(
                         )
                     }
                     Text(
-                        text = "${task.horizon.label} · $completed / $total subtasks",
+                        text = "${taskScheduleLabel(task, today)} · $completed / $total subtasks",
                         color = contentColor.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -195,5 +201,16 @@ private fun TaskManageCard(
                 )
             }
         }
+    }
+}
+
+private fun taskScheduleLabel(task: TodoTask, today: LocalDate): String {
+    val plannedDate = task.plannedDate ?: return "Later"
+    if (task.isCompleted) return taskDateLabel(plannedDate, today)
+    return when (task.dateBucket(today)) {
+        TaskDateBucket.OVERDUE -> "Overdue · ${taskDateLabel(plannedDate, today)}"
+        TaskDateBucket.TODAY,
+        TaskDateBucket.LATER,
+        -> taskDateLabel(plannedDate, today)
     }
 }

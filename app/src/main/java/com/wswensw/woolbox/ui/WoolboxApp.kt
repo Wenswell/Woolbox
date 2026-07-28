@@ -113,6 +113,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
+    val recordsToday by recordsViewModel.today.collectAsStateWithLifecycle()
     val rootTaskPreviewLimit by recordsViewModel.rootTaskPreviewLimit.collectAsStateWithLifecycle()
     val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
     val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
@@ -200,8 +201,9 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     // ring is the day's own result, so it does not wait for a screen to notice.
     val dayRing = dayRing(
         items = recordsState.activeItems,
-        tasks = recordsState.tasks.filterNot(TodoTask::isCompleted),
+        tasks = recordsState.tasks,
         goalValues = recordsState.goalValues,
+        today = recordsToday,
     )
     // Starts from whatever is already true, so opening the app on an
     // already-closed day says nothing; only the crossing is worth announcing.
@@ -290,6 +292,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
                                 clock = recordsClock,
+                                today = recordsToday,
                                 rootTaskPreviewLimit = rootTaskPreviewLimit,
                                 onManageTasks = {
                                     taskSheetId = null
@@ -462,6 +465,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             composable(AppRoutes.MANAGE_TASKS) {
                 ManageTasksScreen(
                     state = recordsState,
+                    today = recordsToday,
                     onBack = { navController.popBackStack() },
                     onCreate = { navController.navigate(AppRoutes.TASK_NEW) },
                     onEdit = { taskId -> navController.navigate(AppRoutes.taskDetail(taskId)) },
@@ -502,9 +506,10 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             }
             composable(AppRoutes.TASK_NEW) {
                 TaskCreateScreen(
+                    today = recordsToday,
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, steps, horizon, onResult ->
-                        recordsViewModel.createTask(title, steps, horizon) { taskId, error ->
+                    onCreate = { title, steps, plannedDate, onResult ->
+                        recordsViewModel.createTask(title, steps, plannedDate) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -519,9 +524,10 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 TaskDetailScreen(
                     task = recordsState.findTask(taskId),
                     loading = recordsState.isLoading,
+                    today = recordsToday,
                     onBack = { navController.popBackStack() },
-                    onSave = { title, horizon, onResult ->
-                        recordsViewModel.updateTask(taskId, title, horizon, onResult)
+                    onSave = { title, plannedDate, onResult ->
+                        recordsViewModel.updateTask(taskId, title, plannedDate, onResult)
                     },
                     onCreateStep = { title, windows, onResult ->
                         recordsViewModel.createStep(taskId, title, windows, onResult)

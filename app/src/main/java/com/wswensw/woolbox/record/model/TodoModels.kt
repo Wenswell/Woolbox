@@ -1,21 +1,19 @@
 package com.wswensw.woolbox.record.model
 
-enum class TaskHorizon {
+import java.time.LocalDate
+
+/** A task's derived position relative to the local date being viewed. */
+enum class TaskDateBucket {
+    OVERDUE,
     TODAY,
     LATER,
-    ;
-
-    val label: String
-        get() = when (this) {
-            TODAY -> "Today"
-            LATER -> "Later"
-        }
 }
 
 data class TodoTask(
     val id: Long,
     val title: String,
-    val horizon: TaskHorizon,
+    /** The local date this task belongs to, or null when it is unscheduled. */
+    val plannedDate: LocalDate?,
     val completedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
@@ -30,6 +28,12 @@ data class TodoTask(
     /** First unfinished subtask in fixed position order. */
     val nextStep: TodoStep?
         get() = steps.firstOrNull { !it.isCompleted }
+}
+
+fun TodoTask.dateBucket(today: LocalDate): TaskDateBucket = when {
+    plannedDate == null || plannedDate.isAfter(today) -> TaskDateBucket.LATER
+    plannedDate.isBefore(today) -> TaskDateBucket.OVERDUE
+    else -> TaskDateBucket.TODAY
 }
 
 data class TodoStep(
@@ -50,8 +54,3 @@ fun validatedTaskTitle(value: String): String {
     if (title.isEmpty()) throw RecordValidationException("Title is required.")
     return title
 }
-
-fun parseTaskHorizon(value: String): TaskHorizon =
-    runCatching { TaskHorizon.valueOf(value) }.getOrElse {
-        throw RecordValidationException("Horizon is invalid.")
-    }

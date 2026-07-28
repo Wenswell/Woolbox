@@ -105,7 +105,10 @@ export function auditChanges(log: RecordAuditLog): string {
     isTaskSnapshot(before) &&
     isTaskSnapshot(after)
   ) {
-    return fieldChange("Title", before.title, after.title) ?? "No visible field changes.";
+    return [
+      fieldChange("Title", before.title, after.title),
+      fieldChange("Planned date", taskDateLabel(before), taskDateLabel(after)),
+    ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
   }
   if (
     log.action === "STEP_UPDATED" &&
@@ -155,9 +158,16 @@ function entryDescription(entry: EntryAuditSnapshot): string {
 }
 
 function taskDescription(task: TaskAuditSnapshot): string {
-  return task.stepCount === undefined
+  const schedule = taskDateLabel(task);
+  const description = task.stepCount === undefined
     ? task.title
     : `${task.title}; ${task.stepCount} subtasks`;
+  return schedule === null ? description : `${description}; ${schedule}`;
+}
+
+function taskDateLabel(task: TaskAuditSnapshot): string | null {
+  if (!("plannedDate" in task)) return null;
+  return task.plannedDate === null ? "Later" : task.plannedDate ?? null;
 }
 
 function stepDescription(step: StepAuditSnapshot): string {

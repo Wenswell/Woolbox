@@ -75,7 +75,7 @@ interface EntryAuditSnapshot {
 interface TaskAuditSnapshot {
   id: number;
   title: string;
-  horizon: string;
+  plannedDate: string | null;
   completedAt: number | null;
   stepCount?: number;
   stepIds?: number[];
@@ -413,7 +413,7 @@ export class RecordsService {
       const now = this.now();
       const task = tx
         .insert(todoTasks)
-        .values({ title: input.title, horizon: input.horizon, completedAt: null, createdAt: now, updatedAt: now })
+        .values({ title: input.title, plannedDate: input.plannedDate, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoTasks.id })
         .get();
       const steps = tx.insert(todoSteps)
@@ -438,7 +438,7 @@ export class RecordsService {
         entityType: "TASK",
         entityId: task.id,
         after: {
-          ...taskSnapshot({ id: task.id, title: input.title, horizon: input.horizon, completedAt: null }),
+          ...taskSnapshot({ id: task.id, title: input.title, plannedDate: input.plannedDate, completedAt: null }),
           stepCount: steps.length,
         },
         createdAt: now,
@@ -464,9 +464,10 @@ export class RecordsService {
   updateTask(id: number, input: TaskWriteInput) {
     this.db.transaction((tx) => {
       const current = this.requireTask(tx, id);
+      if (input.plannedDate === null) this.requireTaskWithoutSuggestedTimes(tx, id);
       const now = this.now();
-      const updated = { ...current, title: input.title, horizon: input.horizon, updatedAt: now };
-      tx.update(todoTasks).set({ title: input.title, horizon: input.horizon, updatedAt: now }).where(eq(todoTasks.id, id)).run();
+      const updated = { ...current, title: input.title, plannedDate: input.plannedDate, updatedAt: now };
+      tx.update(todoTasks).set({ title: input.title, plannedDate: input.plannedDate, updatedAt: now }).where(eq(todoTasks.id, id)).run();
       this.writeAudit(tx, {
         action: "TASK_UPDATED",
         entityType: "TASK",
@@ -502,6 +503,7 @@ export class RecordsService {
   createStep(taskId: number, input: StepInput) {
     const id = this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
+      this.requireTaskDateForSuggestedTimes(task, input.windows);
       const now = this.now();
       const existing = tx.select().from(todoSteps).where(eq(todoSteps.taskId, taskId)).all();
       const position = existing.reduce((max, step) => Math.max(max, step.position), -1) + 1;
@@ -536,6 +538,7 @@ export class RecordsService {
     this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
+      this.requireTaskDateForSuggestedTimes(task, input.windows);
       const now = this.now();
       const currentWindows = tx.select().from(todoStepWindows).where(eq(todoStepWindows.stepId, id)).all();
       const updated = { ...step, title: input.title, updatedAt: now };
@@ -732,6 +735,28 @@ export class RecordsService {
     return step;
   }
 
+  private requireTaskDateForSuggestedTimes(task: TodoTaskRow, windows: StepInput["windows"]) {
+    if (task.plannedDate === null && windows.length > 0) {
+      throw new ApiError(400, "Suggested times require a task date.");
+    }
+  }
+
+  private requireTaskWithoutSuggestedTimes(tx: RecordsTransaction, taskId: number) {
+    const stepIds = tx
+      .select({ id: todoSteps.id })
+      .from(todoSteps)
+      .where(eq(todoSteps.taskId, taskId))
+      .all()
+      .map((step) => step.id);
+    if (stepIds.length === 0) return;
+    const hasSuggestedTimes = tx
+      .select({ id: todoStepWindows.id })
+      .from(todoStepWindows)
+      .where(inArray(todoStepWindows.stepId, stepIds))
+      .get() !== undefined;
+    if (hasSuggestedTimes) throw new ApiError(400, "Remove suggested times before moving a task to Later.");
+  }
+
   private reconcileTaskCompletion(tx: RecordsTransaction, task: TodoTaskRow, now: number) {
     const steps = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
     if (steps.length === 0) throw new ApiError(500, "Task must have at least one subtask.");
@@ -855,11 +880,11 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
   };
 }
 
-function taskSnapshot(task: { id: number; title: string; horizon: string; completedAt: number | null }): TaskAuditSnapshot {
+function taskSnapshot(task: { id: number; title: string; plannedDate: string | null; completedAt: number | null }): TaskAuditSnapshot {
   return {
     id: task.id,
     title: task.title,
-    horizon: task.horizon,
+    plannedDate: task.plannedDate,
     completedAt: task.completedAt,
   };
 }

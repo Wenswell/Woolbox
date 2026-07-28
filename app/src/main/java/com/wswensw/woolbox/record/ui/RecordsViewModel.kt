@@ -19,12 +19,13 @@ import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.StreakDays
 import com.wswensw.woolbox.record.model.focusTargetKey
 import com.wswensw.woolbox.record.model.RecordWindow
-import com.wswensw.woolbox.record.model.TaskHorizon
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,6 +101,16 @@ class RecordsViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = RecordsClock.now(),
+        )
+
+    /** Local date derived from [clock] without emitting every minute. */
+    val today: StateFlow<LocalDate> = clock
+        .map { clock -> clock.date }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = clock.value.date,
         )
 
     val uiState: StateFlow<RecordsUiState> = combine(
@@ -236,12 +247,12 @@ class RecordsViewModel(
     fun createTask(
         title: String,
         steps: List<TodoStepDraft>,
-        horizon: TaskHorizon,
+        plannedDate: LocalDate?,
         onResult: (taskId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
             writeAndRefresh(
-                action = { repository.createTask(title, steps, horizon) },
+                action = { repository.createTask(title, steps, plannedDate) },
                 onWritten = { taskId -> onResult(taskId, null) },
             ).onFailure { failure ->
                 onResult(null, failure.message ?: "Unable to create task.")
@@ -249,11 +260,11 @@ class RecordsViewModel(
         }
     }
 
-    fun updateTask(taskId: Long, title: String, horizon: TaskHorizon, onResult: (String?) -> Unit) = runTaskAction(
+    fun updateTask(taskId: Long, title: String, plannedDate: LocalDate?, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessage = "Unable to update task.",
     ) {
-        repository.updateTask(taskId, title, horizon)
+        repository.updateTask(taskId, title, plannedDate)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(

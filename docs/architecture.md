@@ -45,7 +45,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 组合待办、活跃记录项、今天流水、最新测量值、目标累计、近 7 日每日累计值，以及由近 30 天流水推导的习惯时刻、单项连续天数和日目标连续天数；使用进程级 `OkHttpClient` 通过 HTTPS API 读写服务端，凭据由 Keystore 加密存储。根页用单一 overview 快照原子发布；详情按范围单独拉取测量流水。另发布与快照分离的分钟对齐时钟 `StateFlow`：只在页面订阅时运行，本地日期变化时按新日期重新拉取快照，请求前先记账目标日期以避免失败后每分钟重试。 |
+| `RecordsViewModel` / `RecordRepository` | 组合待办、活跃记录项、今天流水、最新测量值、目标累计、近 7 日每日累计值，以及由近 30 天流水推导的习惯时刻、单项连续天数和日目标连续天数；使用进程级 `OkHttpClient` 通过 HTTPS API 读写服务端，凭据由 Keystore 加密存储。根页用单一 overview 快照原子发布；详情按范围单独拉取测量流水。另发布与快照分离的分钟对齐时钟 `StateFlow`，并去重派生本地日期：只在页面订阅时运行，本地日期变化时按新日期重新拉取快照，请求前先记账目标日期以避免失败后每分钟重试。 |
 
 ## 命令状态机
 
@@ -137,7 +137,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值或 Measurement 最小值/最大值、步进、单位、目标、优先级、归档状态和时间戳。 |
 | `record_windows` | 保存记录项推荐区间的起止分钟；`itemId` 建索引并随父项级联删除。 |
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
-| `todo_tasks` | 保存待办标题、horizon（`TODAY`/`LATER`）、完成时间、创建/更新时间；按创建时间与 horizon 索引。 |
+| `todo_tasks` | 保存待办标题、可空 `planned_date`（ISO 本地日期）、完成时间、创建/更新时间；按创建时间与 `planned_date` 索引。 |
 | `todo_steps` | 保存待办的一级子事项、列表位置 `position`、完成时间、创建/更新时间；`taskId` 外键级联删除；列表按 `(taskId, position)` 排序，另保留 `(taskId, createdAt)` 索引。 |
 | `todo_step_windows` | 保存子事项推荐区间的起止分钟；`stepId` 建索引并随子事项级联删除。规则与 `record_windows` 一致，快照随子事项返回。 |
 | `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TASK`、`STEP` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表，删除业务数据后审计历史仍保留。 |
@@ -146,7 +146,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。日期查询和 Android 今天列表使用固化字段，设备后续切换时区不会改变历史分组；列表通过当前记录项名称、模式、单位和类型联表展示。`GET /api/overview` 接受起止本地日期，一次返回活跃记录项、待办、范围内累计流水和每个活跃 Measurement 的最新流水；最新值在数据库侧批量查询。Android 请求近 30 天范围，由 overview 原子生成根页快照、今天列表、7 日目标累计、近 7 日每日累计值、习惯时刻与连续天数；范围由客户端决定，服务端不假设窗口长度；点卡按需拉取最近 24 小时流水用于预览。快照只存在当前进程。ViewModel 用同一互斥区串行根页读写：重叠后台刷新只执行一个，写操作等待当前刷新结束，完成写入后再请求新 overview；刷新失败更新同步错误，但不改变已完成写入的结果。删除接口仅供短时撤销和 PC 批量管理使用。
 
-待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
+待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。`planned_date` 为 null 时服务端拒绝创建或保存子事项推荐时段；任务时段在 Android 端以计划日期锚定，跨午夜最多延续到次日。旧版 `horizon` 数据迁移为无日期待办并清除旧时段，避免将无日期时段解释为每日重复。服务端还提供 PC 管理页静态资源、日期范围和记录项筛选、流水批量删除、审计日志游标查询，以及记录项批量归档/恢复。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
 
 ## App 更新
 
