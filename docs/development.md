@@ -98,6 +98,28 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 
+## 功能交付
+
+功能变更按以下顺序完成：
+
+1. 开发并运行与改动相称的本地测试。
+2. 创建本地 commit；APK 内容变更已在该提交中递增版本并核对 `output-metadata.json`。
+3. 涉及服务端 schema 或 API 契约时，先部署服务端：
+
+   ```bash
+   cd records-server
+   pnpm deploy
+   ```
+
+   对不可逆数据迁移，先按 [`records-server/deploy/README.md`](../records-server/deploy/README.md) 创建并验证一份新的远端备份。该命令执行服务端测试、构建、远端同步、服务重启、迁移 schema 和 overview 契约校验。
+4. 发布与待测 APK 相同的通道：`pnpm run publish:debug` 或 `pnpm run publish:release`。发布脚本必须通过远端 manifest、APK `200` 与 `content-length` 校验。
+5. 将构建类型、版本、manifest URL 和 APK 大小校验结果写入 README，提交发布记录。
+6. 用户使用已发布 APK 完成真机验收。真机验收不由 JVM、服务端或发布脚本替代。
+
+服务端契约变更必须在 APK 发布前完成第 3 步，防止客户端调用尚未上线的 API。
+
+Git push 不属于上述交付前置条件；只在用户明确要求且已有明确 remote 时执行，不猜测或临时创建 remote。
+
 ## 版本与发布
 
 任何 APK 内容或默认行为变更都必须递增 `app/build.gradle.kts` 的 `versionCode` 和 `versionName`，并同步 README。debug 和 release 使用独立更新通道：

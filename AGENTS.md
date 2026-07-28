@@ -38,6 +38,7 @@
 - 纯文档或不进入 APK 的本地辅助文件可保持版本不变。升版本时同步 README 当前版本，并重新构建对应 APK 核对 `output-metadata.json`。
 - 更新通道按 `debug` 和 `release` 隔离：debug 只检查、下载、安装、生成和发布 debug APK；release 只处理 release APK。每个通道发布版本化 APK 和固定 `latest.json`；发布成功必须校验远端 manifest、APK `200` 和 `content-length`。release 只允许发布已签名 APK。
 - 功能版本升级的完成条件包括对应构建类型的远端发布与校验；提交信息或 README 必须记录构建类型、版本、manifest URL 和 APK 大小校验结果。
+- 功能交付顺序固定为：开发、定向测试、提交；涉及服务端 schema 或 API 契约时先执行 `cd records-server && pnpm deploy` 完成远端迁移与健康校验；再执行 `pnpm run publish:<debug|release>` 发布对应 APK；发布记录提交后进入真机验收。不得让依赖新服务端契约的 APK 先于服务端部署。
 
 ## 文档同步
 

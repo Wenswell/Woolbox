@@ -83,6 +83,8 @@ pnpm run publish:debug
 
 `pnpm run publish:debug` 一次完成 debug APK 构建、`latest.json` 生成、版本化 APK 上传和远端校验。release 使用 `pnpm run publish:release`，只处理 release 包。远端校验要求见 [开发指南](docs/development.md)。
 
+功能交付顺序为开发、测试、提交、服务迁移（涉及服务端契约时）、对应通道 APK 发布和真机验收；完整命令与边界见[开发指南](docs/development.md#功能交付)。
+
 ## 更新版本
 
 | 构建类型 | 当前发布版本 |
