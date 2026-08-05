@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
@@ -87,6 +88,7 @@ import com.wswensw.woolbox.tool.ui.CopyHistoryScreen
 import com.wswensw.woolbox.tool.ui.CopyHistoryViewModel
 import com.wswensw.woolbox.tool.ui.ToolViewModel
 import com.wswensw.woolbox.update.AppUpdateManager
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 private enum class MainTab(
@@ -101,6 +103,14 @@ private enum class MainTab(
 @Composable
 fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val context = LocalContext.current
+    val taskDoneTemplate = stringResource(R.string.task_done)
+    val goalReachedTemplate = stringResource(R.string.goal_reached)
+    val recordedItemTemplate = stringResource(R.string.recorded_item)
+    val undoLabel = stringResource(R.string.action_undo)
+    val accessibilityAlreadyEnabledMessage = stringResource(R.string.accessibility_already_enabled)
+    val copyHistorySavedMessage = stringResource(R.string.copy_history_saved)
+    val copyHistoryDeletedMessage = stringResource(R.string.copy_history_deleted)
+    val savedAppDeletedMessage = stringResource(R.string.saved_app_deleted)
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
     val copyHistoryViewModel: CopyHistoryViewModel = viewModel()
@@ -149,7 +159,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 if (parentCompleting) {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(
-                            message = context.getString(R.string.task_done, task.title),
+                            message = taskDoneTemplate.formatLocalized(task.title),
                             duration = SnackbarDuration.Short,
                         )
                     }
@@ -183,11 +193,11 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     val label = displayRecordName(item.name)
                     val result = snackbarHostState.showSnackbar(
                         message = if (goalJustReached) {
-                            context.getString(R.string.goal_reached, label)
+                            goalReachedTemplate.formatLocalized(label)
                         } else {
-                            context.getString(R.string.recorded_item, label)
+                            recordedItemTemplate.formatLocalized(label)
                         },
-                        actionLabel = context.getString(R.string.action_undo),
+                        actionLabel = undoLabel,
                         duration = SnackbarDuration.Short,
                     )
                     if (result == SnackbarResult.ActionPerformed) {
@@ -206,6 +216,11 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         goalValues = recordsState.goalValues,
         today = recordsToday,
     )
+    val dayClosedMessage = pluralStringResource(
+        R.plurals.day_closed,
+        dayRing.total,
+        dayRing.total,
+    )
     // Starts from whatever is already true, so opening the app on an
     // already-closed day says nothing; only the crossing is worth announcing.
     var ringWasComplete by remember { mutableStateOf(dayRing.isComplete) }
@@ -215,11 +230,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         if (!justClosed) return@LaunchedEffect
         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
         snackbarHostState.showSnackbar(
-            message = context.resources.getQuantityString(
-                R.plurals.day_closed,
-                dayRing.total,
-                dayRing.total,
-            ),
+            message = dayClosedMessage,
             duration = SnackbarDuration.Short,
         )
     }
@@ -290,7 +301,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onOpenOledShield = { navController.navigate(AppRoutes.OLED_SHIELD) },
                                 onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                                 onAccessibilityAlreadyEnabled = {
-                                    context.showMessage(context.getString(R.string.accessibility_already_enabled))
+                                    context.showMessage(accessibilityAlreadyEnabledMessage)
                                 },
                             )
 
@@ -412,7 +423,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onSave = { id, state, onResult ->
                         copyHistoryViewModel.save(id, state) { error ->
                             if (error == null) {
-                                context.showMessage(context.getString(R.string.copy_history_saved))
+                                context.showMessage(copyHistorySavedMessage)
                             }
                             onResult(error)
                         }
@@ -425,7 +436,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onDelete = { id, onResult ->
                         copyHistoryViewModel.delete(id) { error ->
                             if (error == null) {
-                                context.showMessage(context.getString(R.string.copy_history_deleted))
+                                context.showMessage(copyHistoryDeletedMessage)
                             }
                             onResult(error)
                         }
@@ -470,7 +481,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                     onDeleteProfile = { packageName ->
                         toolViewModel.deleteOledProfile(packageName)
-                        context.showMessage(context.getString(R.string.saved_app_deleted))
+                        context.showMessage(savedAppDeletedMessage)
                     },
                 )
             }
@@ -675,7 +686,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     if (parentCompleting) {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = context.getString(R.string.task_done, task.title),
+                                                message = taskDoneTemplate.formatLocalized(task.title),
                                                 duration = SnackbarDuration.Short,
                                             )
                                         }
@@ -700,11 +711,10 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 if (entryId != null) {
                                     coroutineScope.launch {
                                         val result = snackbarHostState.showSnackbar(
-                                            message = context.getString(
-                                                R.string.recorded_item,
+                                            message = recordedItemTemplate.formatLocalized(
                                                 displayRecordName(item.name),
                                             ),
-                                            actionLabel = context.getString(R.string.action_undo),
+                                            actionLabel = undoLabel,
                                             duration = SnackbarDuration.Short,
                                         )
                                         if (result == SnackbarResult.ActionPerformed) {
@@ -784,6 +794,9 @@ private fun Context.copyToClipboard(text: String) {
 private fun Context.showMessage(message: String) {
     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
+
+private fun String.formatLocalized(vararg args: Any): String =
+    String.format(Locale.getDefault(), this, *args)
 
 @Composable
 private fun BottomNavigationBar(
