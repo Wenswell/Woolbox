@@ -66,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -226,7 +227,7 @@ private fun AppRouteTopBar(
                 IconButton(onClick = onBack) {
                     Icon(
                         painter = painterResource(R.drawable.ic_arrow_back_24),
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.navigation_back),
                     )
                 }
             },
@@ -595,7 +596,7 @@ fun AppInfoDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         },
     )

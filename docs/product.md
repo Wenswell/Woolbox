@@ -34,6 +34,10 @@ Tile 用于不离开目标应用的快速启动。点击后系统面板收起，
 
 Setting 打开时检查当前 build type 的 `latest.json`：debug 只检查、下载和安装 debug APK；release 只检查、下载和安装 release APK。Updates 显示当前构建类型和版本号。当前版本低于远端版本时，区域显示版本和大小；用户确认下载后，App 下载版本化 APK、校验大小与 SHA-256，并将通过校验的文件交给 Android 安装器。未授予“安装未知应用”权限时，App 打开对应系统设置；授权返回后用户再次确认安装。系统安装器始终要求用户确认，App 不会静默安装或绕过签名校验。
 
+### 应用语言
+
+Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选择后立即重建当前 Activity 并应用对应 Android 资源；`Follow system` 清除应用语言覆盖。Android 13 及以上与系统“应用语言”设置使用同一状态，Android 12 由 AppCompat 保存选择。用户输入的任务、记录名称与服务端错误正文保持原文。
+
 ## 状态语义
 
 | 页面状态 | 条件 | 用户操作 |
@@ -192,4 +196,5 @@ Setting 打开时检查当前 build type 的 `latest.json`：debug 只检查、�
 - 累计记录与子事项的推荐时段并集达到 12 小时时保存被拒绝，客户端与服务端返回同一条文案。
 - Android 新建记录后 PC 刷新可见；PC Entries 可删除但不可编辑，Logs 可查看每次成功写操作的变更快照；Android `Tasks` 的子事项创建、完成时间、父项进度与 Manage tasks 的 Completed 内容，以及根页 Accumulate/Measurement 两列网格中的累计记录、Measurement 闭区间滑块、24 小时原始图表点位和短时撤销均符合上述规则。
 - Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
+- Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。

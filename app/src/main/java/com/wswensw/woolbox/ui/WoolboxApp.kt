@@ -118,6 +118,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
     val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.RECORDS) }
+    var languageMode by rememberSaveable { mutableStateOf(LanguageMode.current()) }
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
     var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -148,7 +149,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 if (parentCompleting) {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(
-                            message = "${task.title} done",
+                            message = context.getString(R.string.task_done, task.title),
                             duration = SnackbarDuration.Short,
                         )
                     }
@@ -182,11 +183,11 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     val label = displayRecordName(item.name)
                     val result = snackbarHostState.showSnackbar(
                         message = if (goalJustReached) {
-                            "Goal reached · $label"
+                            context.getString(R.string.goal_reached, label)
                         } else {
-                            "Recorded $label."
+                            context.getString(R.string.recorded_item, label)
                         },
-                        actionLabel = "Undo",
+                        actionLabel = context.getString(R.string.action_undo),
                         duration = SnackbarDuration.Short,
                     )
                     if (result == SnackbarResult.ActionPerformed) {
@@ -214,7 +215,11 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         if (!justClosed) return@LaunchedEffect
         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
         snackbarHostState.showSnackbar(
-            message = "Day closed · ${dayRing.total} done",
+            message = context.resources.getQuantityString(
+                R.plurals.day_closed,
+                dayRing.total,
+                dayRing.total,
+            ),
             duration = SnackbarDuration.Short,
         )
     }
@@ -285,7 +290,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onOpenOledShield = { navController.navigate(AppRoutes.OLED_SHIELD) },
                                 onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                                 onAccessibilityAlreadyEnabled = {
-                                    context.showMessage("Accessibility service is already enabled.")
+                                    context.showMessage(context.getString(R.string.accessibility_already_enabled))
                                 },
                             )
 
@@ -325,13 +330,18 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             )
 
                             MainTab.SETTING -> SettingScreen(
+                                languageMode = languageMode,
+                                onLanguageModeChange = {
+                                    languageMode = it
+                                    it.apply()
+                                },
                                 themeMode = themeMode,
                                 onThemeModeChange = { themeMode = it },
                                 motionMode = motionMode,
                                 onMotionModeChange = { motionMode = it },
                                 recordsConnection = recordsState.connection.username
                                     .takeIf { recordsState.connection.isConfigured }
-                                    ?: "Not configured",
+                                    ?: stringResource(R.string.not_configured),
                                 onOpenRecordsConnection = {
                                     navController.navigate(AppRoutes.RECORDS_CONNECTION)
                                 },
@@ -401,7 +411,9 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                     onSave = { id, state, onResult ->
                         copyHistoryViewModel.save(id, state) { error ->
-                            if (error == null) context.showMessage("Copy history saved.")
+                            if (error == null) {
+                                context.showMessage(context.getString(R.string.copy_history_saved))
+                            }
                             onResult(error)
                         }
                     },
@@ -413,7 +425,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onDelete = { id, onResult ->
                         copyHistoryViewModel.delete(id) { error ->
                             if (error == null) {
-                                context.showMessage("Copy history deleted.")
+                                context.showMessage(context.getString(R.string.copy_history_deleted))
                             }
                             onResult(error)
                         }
@@ -458,7 +470,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                     onDeleteProfile = { packageName ->
                         toolViewModel.deleteOledProfile(packageName)
-                        context.showMessage("Saved app deleted.")
+                        context.showMessage(context.getString(R.string.saved_app_deleted))
                     },
                 )
             }
@@ -663,7 +675,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     if (parentCompleting) {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = "${task.title} done",
+                                                message = context.getString(R.string.task_done, task.title),
                                                 duration = SnackbarDuration.Short,
                                             )
                                         }
@@ -688,8 +700,11 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 if (entryId != null) {
                                     coroutineScope.launch {
                                         val result = snackbarHostState.showSnackbar(
-                                            message = "Recorded ${displayRecordName(item.name)}.",
-                                            actionLabel = "Undo",
+                                            message = context.getString(
+                                                R.string.recorded_item,
+                                                displayRecordName(item.name),
+                                            ),
+                                            actionLabel = context.getString(R.string.action_undo),
                                             duration = SnackbarDuration.Short,
                                         )
                                         if (result == SnackbarResult.ActionPerformed) {
@@ -740,10 +755,10 @@ private tailrec fun Context.findActivity(): Activity = when (this) {
 
 private fun Context.showTileRequestResult(result: TileRequestResult) {
     val message = when (result) {
-        TileRequestResult.ADDED -> "Tile added"
-        TileRequestResult.ALREADY_ADDED -> "Tile already added"
-        TileRequestResult.NOT_ADDED -> "Tile was not added"
-        TileRequestResult.ERROR -> "Unable to add tile"
+        TileRequestResult.ADDED -> getString(R.string.tile_added)
+        TileRequestResult.ALREADY_ADDED -> getString(R.string.tile_already_added)
+        TileRequestResult.NOT_ADDED -> getString(R.string.tile_not_added)
+        TileRequestResult.ERROR -> getString(R.string.tile_add_failed)
     }
     showMessage(message)
 }
@@ -751,9 +766,9 @@ private fun Context.showTileRequestResult(result: TileRequestResult) {
 private fun Context.showToolLaunchResult(result: ToolLaunchResult) {
     val message = when (result) {
         ToolLaunchResult.Accepted -> return
-        ToolLaunchResult.ServiceUnavailable -> "Accessibility service is not connected."
-        ToolLaunchResult.TargetAppUnavailable -> "Target app is not available."
-        ToolLaunchResult.TargetLaunchFailed -> "Unable to open target app."
+        ToolLaunchResult.ServiceUnavailable -> getString(R.string.accessibility_not_connected)
+        ToolLaunchResult.TargetAppUnavailable -> getString(R.string.target_app_unavailable)
+        ToolLaunchResult.TargetLaunchFailed -> getString(R.string.target_app_open_failed)
     }
     showMessage(message)
 }
@@ -763,7 +778,7 @@ private fun Context.copyToClipboard(text: String) {
     getSystemService(ClipboardManager::class.java).setPrimaryClip(
         ClipData.newPlainText("Global Copy", text),
     )
-    showMessage("Copied to clipboard.")
+    showMessage(getString(R.string.copied_to_clipboard))
 }
 
 private fun Context.showMessage(message: String) {

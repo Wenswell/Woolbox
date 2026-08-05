@@ -7,6 +7,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.tool.service.ToolActivity
 import com.wswensw.woolbox.tool.service.ToolServiceState
@@ -21,13 +22,13 @@ fun ToolsScreen(
     modifier: Modifier = Modifier,
 ) {
     AppPage(
-        title = "Tools",
-        subtitle = "Accessibility tools for the active app.",
+        title = stringResource(R.string.tools_title),
+        subtitle = stringResource(R.string.tools_subtitle),
         modifier = modifier,
     ) {
-        AppSection(title = "Access") {
+        AppSection(title = stringResource(R.string.tools_access)) {
             AppListItem(
-                title = "Accessibility service",
+                title = stringResource(R.string.tools_accessibility_service),
                 subtitle = state.accessibilityStatus(),
                 leadingContent = {
                     Icon(
@@ -52,9 +53,9 @@ fun ToolsScreen(
             )
         }
 
-        AppSection(title = "Available") {
+        AppSection(title = stringResource(R.string.tools_available)) {
             AppListItem(
-                title = "Global Copy",
+                title = stringResource(R.string.global_copy_tile_label),
                 subtitle = state.globalCopyStatus(),
                 iconRes = R.drawable.ic_content_copy_24,
                 navigate = true,
@@ -62,7 +63,7 @@ fun ToolsScreen(
             )
             AppDivider()
             AppListItem(
-                title = "OLED shield",
+                title = stringResource(R.string.oled_shield_tile_label),
                 subtitle = state.oledStatus(),
                 iconRes = R.drawable.ic_oled_shield_24,
                 navigate = true,
@@ -73,20 +74,23 @@ fun ToolsScreen(
     }
 }
 
+@Composable
 private fun ToolServiceState.globalCopyStatus(): String = when (activeTool) {
-    ToolActivity.COPY_PREPARING -> "Preparing"
-    ToolActivity.COPY_ACTIVE -> "Active"
-    else -> "Ready"
+    ToolActivity.COPY_PREPARING -> stringResource(R.string.status_preparing)
+    ToolActivity.COPY_ACTIVE -> stringResource(R.string.status_active)
+    else -> stringResource(R.string.status_ready)
 }
 
+@Composable
 private fun ToolServiceState.oledStatus(): String = when (activeTool) {
-    ToolActivity.OLED_PREPARING -> "Preparing"
-    ToolActivity.OLED_ACTIVE -> "Active"
-    else -> "Ready"
+    ToolActivity.OLED_PREPARING -> stringResource(R.string.status_preparing)
+    ToolActivity.OLED_ACTIVE -> stringResource(R.string.status_active)
+    else -> stringResource(R.string.status_ready)
 }
 
+@Composable
 private fun ToolServiceState.accessibilityStatus(): String = when {
-    isServiceConnected -> "Connected"
-    isAccessibilityEnabled -> "Waiting for service"
-    else -> "Not enabled"
+    isServiceConnected -> stringResource(R.string.status_connected)
+    isAccessibilityEnabled -> stringResource(R.string.status_waiting_for_service)
+    else -> stringResource(R.string.status_not_enabled)
 }

@@ -21,8 +21,8 @@ android {
         targetSdk {
             version = release(36)
         }
-        versionCode = 30
-        versionName = "0.1.29"
+        versionCode = 31
+        versionName = "0.1.30"
     }
 
     buildFeatures {
@@ -73,6 +73,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)

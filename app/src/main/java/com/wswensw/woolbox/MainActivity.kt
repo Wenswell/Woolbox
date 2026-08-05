@@ -2,17 +2,17 @@ package com.wswensw.woolbox
 
 import android.content.ActivityNotFoundException
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
 import com.wswensw.woolbox.tool.service.ToolServiceController
 import com.wswensw.woolbox.ui.WoolboxApp
 import com.wswensw.woolbox.update.AppUpdateManager
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private var pendingToolCommand: ExternalToolCommand? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {

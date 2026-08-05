@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.tool.model.OledShieldConfig
@@ -56,12 +58,12 @@ fun GlobalCopyRoute(
     onRequestTile: () -> Unit,
 ) {
     AppRouteScaffold(
-        title = "Global Copy",
+        title = stringResource(R.string.global_copy_tile_label),
         onBack = onBack,
     ) {
-        AppSection(title = "Actions") {
+        AppSection(title = stringResource(R.string.section_actions)) {
             AppListItem(
-                title = "Start Global Copy",
+                title = stringResource(R.string.global_copy_start),
                 subtitle = if (state.isServiceConnected) {
                     state.globalCopyStatus()
                 } else {
@@ -79,13 +81,13 @@ fun GlobalCopyRoute(
         }
 
 
-        AppSection(title = "Quick settings") {
+        AppSection(title = stringResource(R.string.section_quick_settings)) {
             AppListItem(
-                title = "Global Copy tile",
+                title = stringResource(R.string.global_copy_tile),
                 subtitle = if (tileRequestAvailable) {
-                    "Add a Quick Settings tile"
+                    stringResource(R.string.tile_add)
                 } else {
-                    "Add from system Quick Settings editor"
+                    stringResource(R.string.tile_add_from_system)
                 },
                 leadingContent = {
                     AppListLeadingIcon(
@@ -99,13 +101,13 @@ fun GlobalCopyRoute(
         }
 
 
-        AppSection(title = "History") {
+        AppSection(title = stringResource(R.string.section_history)) {
             AppListItem(
-                title = "Captured text",
-                subtitle = when (historyCount) {
-                    0 -> "No captures yet"
-                    1 -> "1 capture"
-                    else -> "$historyCount captures"
+                title = stringResource(R.string.captured_text),
+                subtitle = if (historyCount == 0) {
+                    stringResource(R.string.no_captures)
+                } else {
+                    pluralStringResource(R.plurals.capture_count, historyCount, historyCount)
                 },
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.History)
@@ -134,12 +136,12 @@ fun OledShieldRoute(
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
 
     AppRouteScaffold(
-        title = "OLED shield",
+        title = stringResource(R.string.oled_shield_tile_label),
         onBack = onBack,
     ) {
-        AppSection(title = "Actions") {
+        AppSection(title = stringResource(R.string.section_actions)) {
             AppListItem(
-                title = "Show shield",
+                title = stringResource(R.string.oled_show_shield),
                 subtitle = state.oledStatus(),
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.DarkMode)
@@ -149,13 +151,13 @@ fun OledShieldRoute(
         }
 
 
-        AppSection(title = "Quick settings") {
+        AppSection(title = stringResource(R.string.section_quick_settings)) {
             AppListItem(
-                title = "OLED shield tile",
+                title = stringResource(R.string.oled_tile),
                 subtitle = if (tileRequestAvailable) {
-                    "Add a Quick Settings tile"
+                    stringResource(R.string.tile_add)
                 } else {
-                    "Add from system Quick Settings editor"
+                    stringResource(R.string.tile_add_from_system)
                 },
                 leadingContent = {
                     AppListLeadingIcon(
@@ -169,7 +171,7 @@ fun OledShieldRoute(
         }
 
 
-        AppSection(title = "Default shield") {
+        AppSection(title = stringResource(R.string.oled_default_shield)) {
             Column(
                 modifier = Modifier.padding(
                     horizontal = AppStyle.spacing.pageHorizontal,
@@ -178,21 +180,21 @@ fun OledShieldRoute(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OledDefaultSlider(
-                    label = "Opacity",
+                    label = stringResource(R.string.oled_opacity),
                     value = defaultConfig.opacityPercent,
                     onValueChange = { value ->
                         onConfigChange { config -> config.copy(opacityPercent = value) }
                     },
                 )
                 OledDefaultSlider(
-                    label = "Width",
+                    label = stringResource(R.string.oled_width),
                     value = defaultConfig.widthPercent,
                     onValueChange = { value ->
                         onConfigChange { config -> config.copy(widthPercent = value) }
                     },
                 )
                 OledDefaultSlider(
-                    label = "Height",
+                    label = stringResource(R.string.oled_height),
                     value = defaultConfig.heightPercent,
                     onValueChange = { value ->
                         onConfigChange { config -> config.copy(heightPercent = value) }
@@ -205,7 +207,7 @@ fun OledShieldRoute(
                     FilledTonalIconButton(onClick = onSaveDefaultConfig) {
                         Icon(
                             imageVector = Icons.Rounded.Check,
-                            contentDescription = "Save default",
+                            contentDescription = stringResource(R.string.oled_save_default),
                         )
                     }
                 }
@@ -213,10 +215,10 @@ fun OledShieldRoute(
         }
 
 
-        AppSection(title = "Saved apps") {
+        AppSection(title = stringResource(R.string.oled_saved_apps)) {
             if (profiles.isEmpty()) {
                 Text(
-                    text = "No saved apps yet.",
+                    text = stringResource(R.string.oled_no_saved_apps),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(
                         horizontal = AppStyle.spacing.pageHorizontal,
@@ -243,9 +245,9 @@ fun OledShieldRoute(
         val profile = profiles.firstOrNull { it.profile.packageName == packageName }
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete saved app?") },
+            title = { Text(stringResource(R.string.oled_delete_saved_app)) },
             text = {
-                Text("The saved OLED shield configuration for ${profile?.appName ?: packageName} will be removed.")
+                Text(stringResource(R.string.oled_delete_saved_app_body, profile?.appName ?: packageName))
             },
             confirmButton = {
                 TextButton(
@@ -254,12 +256,12 @@ fun OledShieldRoute(
                         pendingDelete = null
                     },
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             },
         )
@@ -275,15 +277,24 @@ private fun OledProfileRow(
 ) {
     val config = profile.profile.config
     val enableAvailable = serviceConnected && profile.isLaunchable
+    val availability = when {
+        !profile.isLaunchable -> stringResource(R.string.oled_unavailable)
+        !serviceConnected -> stringResource(R.string.oled_accessibility_required)
+        else -> null
+    }
+    val values = stringResource(
+        R.string.oled_profile_values,
+        config.opacityPercent,
+        config.widthPercent,
+        config.heightPercent,
+    )
+    val recorded = stringResource(R.string.oled_recorded_at, formatProfileTime(profile.profile.recordedAt))
     val subtitle = buildString {
         when {
-            !profile.isLaunchable -> appendLine("Unavailable")
-            !serviceConnected -> appendLine("Accessibility required")
+            availability != null -> appendLine(availability)
         }
-        appendLine(
-            "Opacity ${config.opacityPercent}% · Width ${config.widthPercent}% · Height ${config.heightPercent}%",
-        )
-        append("Recorded ${formatProfileTime(profile.profile.recordedAt)}")
+        appendLine(values)
+        append(recorded)
     }.trimEnd()
 
     AppListItem(
@@ -305,13 +316,13 @@ private fun OledProfileRow(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_play_arrow_24),
-                        contentDescription = "Enable ${profile.appName}",
+                        contentDescription = stringResource(R.string.oled_enable_app, profile.appName),
                     )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
                         painter = painterResource(R.drawable.ic_delete_24),
-                        contentDescription = "Delete ${profile.appName}",
+                        contentDescription = stringResource(R.string.oled_delete_app, profile.appName),
                     )
                 }
             }
@@ -352,22 +363,25 @@ private fun OledDefaultSlider(
     }
 }
 
+@Composable
 private fun ToolServiceState.accessibilityStatus(): String = when {
-    isServiceConnected -> "Connected"
-    isAccessibilityEnabled -> "Waiting for service"
-    else -> "Not enabled"
+    isServiceConnected -> stringResource(R.string.status_connected)
+    isAccessibilityEnabled -> stringResource(R.string.status_waiting_for_service)
+    else -> stringResource(R.string.status_not_enabled)
 }
 
+@Composable
 private fun ToolServiceState.globalCopyStatus(): String = when (activeTool) {
-    ToolActivity.COPY_PREPARING -> "Preparing"
-    ToolActivity.COPY_ACTIVE -> "Active"
-    else -> "Ready"
+    ToolActivity.COPY_PREPARING -> stringResource(R.string.status_preparing)
+    ToolActivity.COPY_ACTIVE -> stringResource(R.string.status_active)
+    else -> stringResource(R.string.status_ready)
 }
 
+@Composable
 private fun ToolServiceState.oledStatus(): String = when (activeTool) {
-    ToolActivity.OLED_PREPARING -> "Preparing"
-    ToolActivity.OLED_ACTIVE -> "Active"
-    else -> "Ready"
+    ToolActivity.OLED_PREPARING -> stringResource(R.string.status_preparing)
+    ToolActivity.OLED_ACTIVE -> stringResource(R.string.status_active)
+    else -> stringResource(R.string.status_ready)
 }
 
 private fun formatProfileTime(epochMillis: Long): String = DateTimeFormatter

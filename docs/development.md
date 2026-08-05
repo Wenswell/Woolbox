@@ -27,6 +27,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records 三分区、管理页和 Sheet 接线。 |
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
+| `res/values*/strings.xml`、`res/xml/locales_config.xml` | 默认英文、简体中文资源与系统应用语言声明；新增可见文案从资源读取。 |
 | `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、任务/测量预览 Sheet、管理页、记录 Sheet 和记录项表单。 |
 | `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
@@ -172,6 +173,7 @@ node --check tools/publish-update.mjs
 18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 19. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
 20. 发布 debug 通道后，在低版本 debug APK 打开 Setting；确认自动检查显示远端版本。确认下载 Dialog 的版本和大小；下载完成后断网重试安装仍复用并校验缓存。首次安装打开“安装未知应用”授权，返回后再次选择安装，确认 Android 安装器要求用户确认；篡改缓存 APK 后确认安装前会重新下载，非同包名、非同 build type 或非 `dl.1662803.xyz` manifest 均被拒绝。
+21. 在 Setting → Language 依次选择 `English`、`简体中文` 和 `Follow system`，确认 Activity 重建后底栏、Setting、Tools、工具详情与系统 Tile 标签使用目标语言；重启应用确认选择保持，并检查两种语言下列表副文案不截断关键状态。
 
 ## 设备诊断
 

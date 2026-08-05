@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -13,14 +14,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.BuildConfig
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.update.AppUpdatePhase
 import com.wswensw.woolbox.update.AppUpdateUiState
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun SettingScreen(
+    languageMode: LanguageMode,
+    onLanguageModeChange: (LanguageMode) -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     motionMode: MotionMode,
@@ -35,6 +42,25 @@ fun SettingScreen(
     onOpenInstallSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val languageLabels = mapOf(
+        LanguageMode.SYSTEM to stringResource(R.string.language_follow_system),
+        LanguageMode.ENGLISH to stringResource(R.string.language_english),
+        LanguageMode.SIMPLIFIED_CHINESE to stringResource(R.string.language_simplified_chinese),
+    )
+    val themeLabels = mapOf(
+        ThemeMode.SYSTEM to stringResource(R.string.theme_follow_system),
+        ThemeMode.LIGHT to stringResource(R.string.theme_light),
+        ThemeMode.DARK to stringResource(R.string.theme_dark),
+    )
+    val motionLabels = mapOf(
+        MotionMode.SYSTEM to stringResource(R.string.motion_follow_system),
+        MotionMode.ON to stringResource(R.string.motion_on),
+        MotionMode.OFF to stringResource(R.string.motion_off),
+    )
+    val previewLabels = RootTaskPreviewLimit.entries.associateWith { limit ->
+        limit.count?.toString() ?: stringResource(R.string.option_all)
+    }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     var showMotionDialog by rememberSaveable { mutableStateOf(false) }
     var showPreviewLimitDialog by rememberSaveable { mutableStateOf(false) }
@@ -42,22 +68,30 @@ fun SettingScreen(
     var showDownloadConfirmation by rememberSaveable { mutableStateOf(false) }
 
     AppPage(
-        title = "Setting",
-        subtitle = "Appearance and app information.",
+        title = stringResource(R.string.setting_title),
+        subtitle = stringResource(R.string.setting_subtitle),
         modifier = modifier,
     ) {
-        AppSection(title = "Appearance") {
+        AppSection(title = stringResource(R.string.setting_appearance)) {
             AppListItem(
-                title = "Theme",
-                subtitle = themeMode.label,
+                title = stringResource(R.string.setting_language),
+                subtitle = languageLabels.getValue(languageMode),
+                leadingContent = {
+                    AppListLeadingIcon(imageVector = Icons.Outlined.Translate)
+                },
+                onClick = { showLanguageDialog = true },
+            )
+            AppListItem(
+                title = stringResource(R.string.setting_theme),
+                subtitle = themeLabels.getValue(themeMode),
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Palette)
                 },
                 onClick = { showThemeDialog = true },
             )
             AppListItem(
-                title = "Motion",
-                subtitle = motionMode.label,
+                title = stringResource(R.string.setting_motion),
+                subtitle = motionLabels.getValue(motionMode),
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Info)
                 },
@@ -65,9 +99,9 @@ fun SettingScreen(
             )
         }
 
-        AppSection(title = "Records") {
+        AppSection(title = stringResource(R.string.setting_records)) {
             AppListItem(
-                title = "Connection",
+                title = stringResource(R.string.setting_connection),
                 subtitle = recordsConnection,
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Link)
@@ -76,8 +110,8 @@ fun SettingScreen(
                 onClick = onOpenRecordsConnection,
             )
             AppListItem(
-                title = "Root task preview",
-                subtitle = rootTaskPreviewLimit.label,
+                title = stringResource(R.string.setting_root_task_preview),
+                subtitle = previewLabels.getValue(rootTaskPreviewLimit),
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Info)
                 },
@@ -85,9 +119,9 @@ fun SettingScreen(
             )
         }
 
-        AppSection(title = "About") {
+        AppSection(title = stringResource(R.string.setting_about)) {
             AppListItem(
-                title = "Version",
+                title = stringResource(R.string.setting_version),
                 subtitle = BuildConfig.VERSION_NAME,
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Info)
@@ -96,9 +130,9 @@ fun SettingScreen(
             )
         }
 
-        AppSection(title = "Updates") {
+        AppSection(title = stringResource(R.string.setting_updates)) {
             AppListItem(
-                title = "Current version",
+                title = stringResource(R.string.setting_current_version),
                 subtitle = "${BuildConfig.BUILD_TYPE} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 leadingContent = {
                     AppListLeadingIcon(imageVector = Icons.Outlined.Info)
@@ -109,10 +143,10 @@ fun SettingScreen(
             if (updateState.hasUpdate) {
                 val updateVersion = "${BuildConfig.BUILD_TYPE} ${updateState.availableVersionName}"
                 val title = when (updateState.phase) {
-                    AppUpdatePhase.DOWNLOADED -> "Install $updateVersion"
-                    AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION -> "Allow installs"
-                    AppUpdatePhase.INSTALLING -> "Installing $updateVersion"
-                    else -> "Update $updateVersion"
+                    AppUpdatePhase.DOWNLOADED -> stringResource(R.string.update_install_version, updateVersion)
+                    AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION -> stringResource(R.string.update_allow_installs)
+                    AppUpdatePhase.INSTALLING -> stringResource(R.string.update_installing_version, updateVersion)
+                    else -> stringResource(R.string.update_version, updateVersion)
                 }
                 val onClick = when (updateState.phase) {
                     AppUpdatePhase.AVAILABLE,
@@ -133,7 +167,7 @@ fun SettingScreen(
                 )
             } else if (updateState.status != "Check for updates.") {
                 AppListItem(
-                    title = "Update status",
+                    title = stringResource(R.string.setting_update_status),
                     subtitle = updateState.status,
                     leadingContent = {
                         AppListLeadingIcon(imageVector = Icons.Outlined.Info)
@@ -143,12 +177,23 @@ fun SettingScreen(
         }
     }
 
+    if (showLanguageDialog) {
+        AppSingleChoiceDialog(
+            title = stringResource(R.string.setting_language),
+            options = LanguageMode.entries,
+            selected = languageMode,
+            label = languageLabels::getValue,
+            onSelected = onLanguageModeChange,
+            onDismiss = { showLanguageDialog = false },
+        )
+    }
+
     if (showThemeDialog) {
         AppSingleChoiceDialog(
-            title = "Theme",
+            title = stringResource(R.string.setting_theme),
             options = ThemeMode.entries,
             selected = themeMode,
-            label = { it.label },
+            label = themeLabels::getValue,
             onSelected = onThemeModeChange,
             onDismiss = { showThemeDialog = false },
         )
@@ -156,10 +201,10 @@ fun SettingScreen(
 
     if (showMotionDialog) {
         AppSingleChoiceDialog(
-            title = "Motion",
+            title = stringResource(R.string.setting_motion),
             options = MotionMode.entries,
             selected = motionMode,
-            label = { it.label },
+            label = motionLabels::getValue,
             onSelected = onMotionModeChange,
             onDismiss = { showMotionDialog = false },
         )
@@ -167,10 +212,10 @@ fun SettingScreen(
 
     if (showPreviewLimitDialog) {
         AppSingleChoiceDialog(
-            title = "Root task preview",
+            title = stringResource(R.string.setting_root_task_preview),
             options = RootTaskPreviewLimit.entries,
             selected = rootTaskPreviewLimit,
-            label = { it.label },
+            label = previewLabels::getValue,
             onSelected = onRootTaskPreviewLimitChange,
             onDismiss = { showPreviewLimitDialog = false },
         )
@@ -178,8 +223,13 @@ fun SettingScreen(
 
     if (showVersionDialog) {
         AppInfoDialog(
-            title = "Version",
-            body = "Version: ${BuildConfig.VERSION_NAME}\nVersion code: ${BuildConfig.VERSION_CODE}\nPackage: ${BuildConfig.APPLICATION_ID}",
+            title = stringResource(R.string.setting_version),
+            body = stringResource(
+                R.string.version_details,
+                BuildConfig.VERSION_NAME,
+                BuildConfig.VERSION_CODE,
+                BuildConfig.APPLICATION_ID,
+            ),
             onDismiss = { showVersionDialog = false },
         )
     }
@@ -188,14 +238,24 @@ fun SettingScreen(
         val isDownloaded = updateState.phase == AppUpdatePhase.DOWNLOADED
         AlertDialog(
             onDismissRequest = { showDownloadConfirmation = false },
-            title = { Text(if (isDownloaded) "Install update" else "Download update") },
+            title = {
+                Text(stringResource(if (isDownloaded) R.string.install_update else R.string.download_update))
+            },
             text = {
                 Text(
                     if (isDownloaded) {
-                        "Open Android installer for ${BuildConfig.BUILD_TYPE} ${updateState.availableVersionName}?"
+                        stringResource(
+                            R.string.install_update_question,
+                            BuildConfig.BUILD_TYPE,
+                            updateState.availableVersionName,
+                        )
                     } else {
-                        "Download ${BuildConfig.BUILD_TYPE} ${updateState.availableVersionName} " +
-                            "(${updateState.availableSizeBytes.formatUpdateBytes()}) and open Android installer?"
+                        stringResource(
+                            R.string.download_update_question,
+                            BuildConfig.BUILD_TYPE,
+                            updateState.availableVersionName,
+                            updateState.availableSizeBytes.formatUpdateBytes(),
+                        )
                     },
                 )
             },
@@ -206,20 +266,20 @@ fun SettingScreen(
                         onDownloadAndInstall()
                     },
                 ) {
-                    Text(if (isDownloaded) "Install" else "Download")
+                    Text(stringResource(if (isDownloaded) R.string.action_install else R.string.action_download))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDownloadConfirmation = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             },
         )
     }
 }
 
-private fun Long.formatUpdateBytes(): String = when {
+private fun Long.formatUpdateBytes(locale: Locale = Locale.getDefault()): String = when {
     this < 1024L -> "$this B"
-    this < 1024L * 1024L -> "%.1f KiB".format(java.util.Locale.US, this / 1024.0)
-    else -> "%.2f MiB".format(java.util.Locale.US, this / (1024.0 * 1024.0))
+    this < 1024L * 1024L -> "${NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 1 }.format(this / 1024.0)} KiB"
+    else -> "${NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 2 }.format(this / (1024.0 * 1024.0))} MiB"
 }
