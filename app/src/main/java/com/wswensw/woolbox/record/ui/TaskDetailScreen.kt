@@ -38,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
@@ -64,7 +66,7 @@ fun TaskDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     if (task == null) {
-        AppRouteScaffold(title = "Edit task", onBack = onBack, modifier = modifier) {
+        AppRouteScaffold(title = stringResource(R.string.edit_task), onBack = onBack, modifier = modifier) {
             if (loading) {
                 Box(
                     modifier = Modifier
@@ -76,7 +78,7 @@ fun TaskDetailScreen(
                 }
             } else {
                 Text(
-                    text = "Task not found.",
+                    text = stringResource(R.string.task_not_found),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(AppStyle.spacing.pageHorizontal),
                 )
@@ -96,6 +98,7 @@ fun TaskDetailScreen(
     var deletingStepId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingTask by rememberSaveable { mutableStateOf(false) }
     var reordering by rememberSaveable { mutableStateOf(false) }
+    val checkFieldsMessage = stringResource(R.string.error_check_fields)
 
     fun moveStep(fromIndex: Int, toIndex: Int) {
         if (reordering || toIndex !in task.steps.indices) return
@@ -112,7 +115,7 @@ fun TaskDetailScreen(
         errorMessage = null
         val normalizedTitle = runCatching { validatedTaskTitle(title) }.getOrElse { error ->
             titleError = error.message
-            errorMessage = "Check the highlighted field."
+            errorMessage = checkFieldsMessage
             return
         }
         if (normalizedTitle == task.title && plannedDate == task.plannedDate) return
@@ -129,12 +132,12 @@ fun TaskDetailScreen(
     // saved before the server can accept a window for a previously Later task.
     val canEditSuggestedTimes = task.plannedDate != null && plannedDate != null
     AppRouteScaffold(
-        title = "Edit task",
+        title = stringResource(R.string.edit_task),
         onBack = onBack,
         modifier = modifier,
         actions = {
             FilledTonalIconButton(onClick = { deletingTask = true }) {
-                Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Delete task")
+                Icon(imageVector = Icons.Rounded.Delete, contentDescription = stringResource(R.string.delete_task))
             }
             Spacer(Modifier.width(4.dp))
             FilledTonalIconButton(
@@ -143,12 +146,12 @@ fun TaskDetailScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = if (savingTitle) "Saving" else "Save title",
+                    contentDescription = stringResource(if (savingTitle) R.string.saving else R.string.save_title),
                 )
             }
         },
     ) {
-        AppSection(title = "Title") {
+        AppSection(title = stringResource(R.string.field_title)) {
             OutlinedTextField(
                 value = title,
                 onValueChange = {
@@ -156,7 +159,7 @@ fun TaskDetailScreen(
                     titleError = null
                 },
                 enabled = !savingTitle,
-                label = { Text("Title") },
+                label = { Text(stringResource(R.string.field_title)) },
                 isError = titleError != null,
                 supportingText = titleError?.let { message -> { Text(message) } },
                 singleLine = true,
@@ -173,10 +176,10 @@ fun TaskDetailScreen(
             )
         }
 
-        AppSection(title = "Subtasks") {
+        AppSection(title = stringResource(R.string.subtasks)) {
             if (!canEditSuggestedTimes) {
                 Text(
-                    text = "Save a task date before adding suggested times.",
+                    text = stringResource(R.string.save_task_date_first),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
@@ -208,7 +211,7 @@ fun TaskDetailScreen(
                 horizontalArrangement = Arrangement.End,
             ) {
                 FilledTonalIconButton(onClick = { creatingStep = true }) {
-                    Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add subtask")
+                    Icon(imageVector = Icons.Rounded.Add, contentDescription = stringResource(R.string.add_subtask))
                 }
             }
         }
@@ -225,7 +228,7 @@ fun TaskDetailScreen(
 
     if (creatingStep) {
         TaskStepDialog(
-            title = "New subtask",
+            title = stringResource(R.string.new_subtask),
             initialTitle = "",
             initialWindows = emptyList(),
             showSuggestedTimes = canEditSuggestedTimes,
@@ -241,7 +244,7 @@ fun TaskDetailScreen(
     val editingStep = task.steps.firstOrNull { it.id == editingStepId }
     if (editingStep != null) {
         TaskStepDialog(
-            title = "Edit subtask",
+            title = stringResource(R.string.edit_subtask),
             initialTitle = editingStep.title,
             initialWindows = editingStep.windows,
             showSuggestedTimes = canEditSuggestedTimes,
@@ -257,7 +260,7 @@ fun TaskDetailScreen(
     val deletingStep = task.steps.firstOrNull { it.id == deletingStepId }
     if (deletingStep != null) {
         DeleteConfirmationDialog(
-            title = "Delete subtask?",
+            title = stringResource(R.string.delete_subtask_question),
             onDismiss = { deletingStepId = null },
             onConfirm = { onResult ->
                 onDeleteStep(deletingStep) { error ->
@@ -269,7 +272,7 @@ fun TaskDetailScreen(
     }
     if (deletingTask) {
         DeleteConfirmationDialog(
-            title = "Delete task?",
+            title = stringResource(R.string.delete_task_question),
             onDismiss = { deletingTask = false },
             onConfirm = { onResult ->
                 onDeleteTask { error ->
@@ -314,16 +317,16 @@ private fun TaskStepRow(
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-            Icon(imageVector = Icons.Rounded.KeyboardArrowUp, contentDescription = "Move subtask up")
+            Icon(imageVector = Icons.Rounded.KeyboardArrowUp, contentDescription = stringResource(R.string.move_subtask_up_generic))
         }
         IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-            Icon(imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = "Move subtask down")
+            Icon(imageVector = Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.move_subtask_down_generic))
         }
         IconButton(onClick = onEdit) {
-            Icon(imageVector = Icons.Rounded.Edit, contentDescription = "Edit subtask")
+            Icon(imageVector = Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit_subtask))
         }
         IconButton(onClick = onDelete, enabled = canDelete) {
-            Icon(imageVector = Icons.Rounded.Delete, contentDescription = "Delete subtask")
+            Icon(imageVector = Icons.Rounded.Delete, contentDescription = stringResource(R.string.delete_subtask))
         }
     }
 }
@@ -350,6 +353,7 @@ private fun TaskStepDialog(
     var valueError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
+    val invalidSuggestedTimesMessage = stringResource(R.string.invalid_suggested_times)
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(title) },
@@ -362,14 +366,14 @@ private fun TaskStepDialog(
                         valueError = null
                     },
                     enabled = !saving,
-                    label = { Text("Title") },
+                    label = { Text(stringResource(R.string.field_title)) },
                     isError = valueError != null,
                     supportingText = valueError?.let { message -> { Text(message) } },
                     singleLine = true,
                 )
                 if (showSuggestedTimes) {
                     Text(
-                        text = "Suggested times",
+                        text = stringResource(R.string.suggested_time),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
@@ -406,7 +410,7 @@ private fun TaskStepDialog(
                     val normalizedWindows = runCatching {
                         validatedWindows(if (showSuggestedTimes) parsedWindows else emptyList())
                     }.getOrElse { error ->
-                        errorMessage = error.message ?: "Suggested times are invalid."
+                        errorMessage = error.message ?: invalidSuggestedTimesMessage
                         return@TextButton
                     }
                     saving = true
@@ -418,11 +422,11 @@ private fun TaskStepDialog(
                 },
                 enabled = !saving,
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !saving) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 
@@ -462,11 +466,11 @@ private fun DeleteConfirmationDialog(
                 },
                 enabled = !saving,
             ) {
-                Text("Delete")
+                Text(stringResource(R.string.action_delete))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !saving) { Text(stringResource(R.string.action_cancel)) }
         },
         text = errorMessage?.let { message ->
             { Text(text = message, color = MaterialTheme.colorScheme.error) }

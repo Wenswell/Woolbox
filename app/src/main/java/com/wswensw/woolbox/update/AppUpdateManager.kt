@@ -6,8 +6,10 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.provider.Settings
 import com.wswensw.woolbox.BuildConfig
+import com.wswensw.woolbox.R
+import com.wswensw.woolbox.ui.UiText
+import com.wswensw.woolbox.ui.uiText
 import java.io.File
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +34,7 @@ data class AppUpdateUiState(
     val availableVersionCode: Long? = null,
     val availableVersionName: String = "",
     val availableSizeBytes: Long = 0L,
-    val status: String = "Check for updates.",
+    val status: UiText = uiText(R.string.update_check_prompt),
     val isInstallPermissionGranted: Boolean = false,
 ) {
     val isBusy: Boolean
@@ -70,7 +72,7 @@ object AppUpdateManager {
                     state.phase
                 },
                 status = if (state.phase == AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION && granted) {
-                    "Update ready to install."
+                    uiText(R.string.update_ready_install)
                 } else {
                     state.status
                 },
@@ -95,7 +97,7 @@ object AppUpdateManager {
         requireInitialized()
         val manifest = latestManifest
         if (manifest == null) {
-            mutableState.update { it.copy(status = "Check for updates first.") }
+            mutableState.update { it.copy(status = uiText(R.string.update_check_first)) }
             return
         }
         if (!beginOperation()) return
@@ -131,7 +133,7 @@ object AppUpdateManager {
                     mutableState.update {
                         it.copy(
                             phase = AppUpdatePhase.DOWNLOADED,
-                            status = "Install confirmation is unavailable.",
+                            status = uiText(R.string.update_confirmation_unavailable),
                         )
                     }
                     return
@@ -139,7 +141,7 @@ object AppUpdateManager {
                 mutableState.update {
                     it.copy(
                         phase = AppUpdatePhase.INSTALLING,
-                        status = "Confirm installation in Android installer.",
+                        status = uiText(R.string.update_confirm_installer),
                     )
                 }
                 context.startActivity(confirmationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -148,7 +150,7 @@ object AppUpdateManager {
             PackageInstaller.STATUS_SUCCESS -> {
                 latestManifest = null
                 mutableState.value = AppUpdateUiState(
-                    status = "Installed $versionName.",
+                    status = uiText(R.string.update_installed, versionName),
                     isInstallPermissionGranted = appContext.packageManager.canRequestPackageInstalls(),
                 )
             }
@@ -168,7 +170,7 @@ object AppUpdateManager {
         mutableState.update {
             it.copy(
                 phase = AppUpdatePhase.CHECKING,
-                status = "Checking for updates.",
+                status = uiText(R.string.update_checking),
                 isInstallPermissionGranted = appContext.packageManager.canRequestPackageInstalls(),
             )
         }
@@ -178,7 +180,8 @@ object AppUpdateManager {
             manifest == null -> {
                 latestManifest = null
                 mutableState.value = AppUpdateUiState(
-                    status = result.exceptionOrNull()?.message ?: "Update check failed.",
+                    status = result.exceptionOrNull()?.message?.let(UiText::Dynamic)
+                        ?: uiText(R.string.update_check_failed),
                     isInstallPermissionGranted = appContext.packageManager.canRequestPackageInstalls(),
                 )
             }
@@ -186,7 +189,11 @@ object AppUpdateManager {
             manifest.versionCode <= BuildConfig.VERSION_CODE -> {
                 latestManifest = null
                 mutableState.value = AppUpdateUiState(
-                    status = "Already up to date: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}).",
+                    status = uiText(
+                        R.string.update_up_to_date,
+                        BuildConfig.VERSION_NAME,
+                        BuildConfig.VERSION_CODE,
+                    ),
                     isInstallPermissionGranted = appContext.packageManager.canRequestPackageInstalls(),
                 )
             }
@@ -200,9 +207,9 @@ object AppUpdateManager {
                     availableVersionName = manifest.versionName,
                     availableSizeBytes = manifest.sizeBytes,
                     status = if (cachedApk == null) {
-                        "Update ${manifest.versionName} is available."
+                        uiText(R.string.update_available, manifest.versionName)
                     } else {
-                        "Update ${manifest.versionName} is ready to install."
+                        uiText(R.string.update_ready, manifest.versionName)
                     },
                     isInstallPermissionGranted = appContext.packageManager.canRequestPackageInstalls(),
                 )
@@ -216,7 +223,7 @@ object AppUpdateManager {
             mutableState.update {
                 it.copy(
                     phase = AppUpdatePhase.WAITING_FOR_INSTALL_PERMISSION,
-                    status = "Allow installs for Woolbox in system settings.",
+                    status = uiText(R.string.update_allow_system),
                     isInstallPermissionGranted = false,
                 )
             }
@@ -226,7 +233,7 @@ object AppUpdateManager {
         mutableState.update {
             it.copy(
                 phase = AppUpdatePhase.INSTALLING,
-                status = "Preparing ${manifest.versionName} for installation.",
+                status = uiText(R.string.update_preparing, manifest.versionName),
                 isInstallPermissionGranted = true,
             )
         }
@@ -235,7 +242,7 @@ object AppUpdateManager {
                 mutableState.update {
                     it.copy(
                         phase = AppUpdatePhase.DOWNLOADED,
-                        status = error.message ?: "Unable to install update.",
+                        status = error.message?.let(UiText::Dynamic) ?: uiText(R.string.update_install_failed),
                     )
                 }
             }
@@ -245,7 +252,7 @@ object AppUpdateManager {
         mutableState.update {
             it.copy(
                 phase = AppUpdatePhase.DOWNLOADING,
-                status = "Downloading ${manifest.versionName}.",
+                status = uiText(R.string.update_downloading, manifest.versionName),
             )
         }
         val destination = updateFile(manifest)
@@ -263,7 +270,7 @@ object AppUpdateManager {
                 mutableState.update {
                     it.copy(
                         phase = AppUpdatePhase.DOWNLOADED,
-                        status = "Downloaded ${manifest.versionName}.",
+                        status = uiText(R.string.update_downloaded, manifest.versionName),
                     )
                 }
                 apkFile
@@ -272,7 +279,7 @@ object AppUpdateManager {
                 mutableState.update {
                     it.copy(
                         phase = AppUpdatePhase.AVAILABLE,
-                        status = error.message ?: "Unable to download update.",
+                        status = error.message?.let(UiText::Dynamic) ?: uiText(R.string.update_download_failed),
                     )
                 }
                 null
@@ -282,7 +289,7 @@ object AppUpdateManager {
 
     private fun beginOperation(): Boolean {
         if (mutableState.value.isBusy || !operationInFlight.compareAndSet(false, true)) {
-            mutableState.update { it.copy(status = "Update operation already running.") }
+            mutableState.update { it.copy(status = uiText(R.string.update_operation_busy)) }
             return false
         }
         return true
@@ -311,28 +318,38 @@ object AppUpdateManager {
         check(::appContext.isInitialized) { "AppUpdateManager.initialize(context) must run first." }
     }
 
-    private fun AppUpdateDownloadProgress.statusFor(versionName: String): String {
+    private fun AppUpdateDownloadProgress.statusFor(versionName: String): UiText {
         val percent = (bytesDownloaded * 100.0 / totalBytes).coerceIn(0.0, 100.0)
-        return "Downloading $versionName: ${bytesDownloaded.formatBytes()} / ${totalBytes.formatBytes()} " +
-            "(${"%.0f".format(Locale.US, percent)}%) · ${bytesPerSecond.formatBytes()}/s"
+        val locale = appContext.resources.configuration.locales[0]
+        return uiText(
+            R.string.update_download_progress,
+            versionName,
+            bytesDownloaded.formatBytes(),
+            totalBytes.formatBytes(),
+            "%.0f".format(locale, percent),
+            bytesPerSecond.formatBytes(),
+        )
     }
 
-    private fun Long.formatBytes(): String = when {
-        this < 1024L -> "$this B"
-        this < 1024L * 1024L -> "%.1f KiB".format(Locale.US, this / 1024.0)
-        else -> "%.2f MiB".format(Locale.US, this / (1024.0 * 1024.0))
-    }
-
-    private fun installFailureMessage(status: Int, statusMessage: String): String {
-        val label = when (status) {
-            PackageInstaller.STATUS_FAILURE_ABORTED -> "Install canceled."
-            PackageInstaller.STATUS_FAILURE_BLOCKED -> "Install blocked."
-            PackageInstaller.STATUS_FAILURE_CONFLICT -> "Install conflict."
-            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "Install incompatible."
-            PackageInstaller.STATUS_FAILURE_INVALID -> "Invalid APK."
-            PackageInstaller.STATUS_FAILURE_STORAGE -> "Install storage error."
-            else -> "Install failed."
+    private fun Long.formatBytes(): String {
+        val locale = appContext.resources.configuration.locales[0]
+        return when {
+            this < 1024L -> "$this B"
+            this < 1024L * 1024L -> "%.1f KiB".format(locale, this / 1024.0)
+            else -> "%.2f MiB".format(locale, this / (1024.0 * 1024.0))
         }
-        return if (statusMessage.isBlank()) label else "$label $statusMessage"
+    }
+
+    private fun installFailureMessage(status: Int, statusMessage: String): UiText {
+        val label = when (status) {
+            PackageInstaller.STATUS_FAILURE_ABORTED -> uiText(R.string.update_install_canceled)
+            PackageInstaller.STATUS_FAILURE_BLOCKED -> uiText(R.string.update_install_blocked)
+            PackageInstaller.STATUS_FAILURE_CONFLICT -> uiText(R.string.update_install_conflict)
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> uiText(R.string.update_install_incompatible)
+            PackageInstaller.STATUS_FAILURE_INVALID -> uiText(R.string.update_invalid_apk)
+            PackageInstaller.STATUS_FAILURE_STORAGE -> uiText(R.string.update_install_storage_error)
+            else -> uiText(R.string.update_install_failed_generic)
+        }
+        return if (statusMessage.isBlank()) label else uiText(R.string.update_failure_detail, label, UiText.Dynamic(statusMessage))
     }
 }

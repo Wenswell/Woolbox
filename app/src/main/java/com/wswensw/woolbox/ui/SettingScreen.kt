@@ -21,6 +21,7 @@ import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.update.AppUpdatePhase
 import com.wswensw.woolbox.update.AppUpdateUiState
+import com.wswensw.woolbox.ui.UiText
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -60,6 +61,7 @@ fun SettingScreen(
     val previewLabels = RootTaskPreviewLimit.entries.associateWith { limit ->
         limit.count?.toString() ?: stringResource(R.string.option_all)
     }
+    val updateStatus = updateState.status.asString()
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     var showMotionDialog by rememberSaveable { mutableStateOf(false) }
@@ -158,17 +160,17 @@ fun SettingScreen(
                 }
                 AppListItem(
                     title = title,
-                    subtitle = updateState.status,
+                    subtitle = updateStatus,
                     leadingContent = {
                         AppListLeadingIcon(imageVector = Icons.Outlined.Info)
                     },
                     enabled = !updateState.isBusy,
                     onClick = onClick,
                 )
-            } else if (updateState.status != "Check for updates.") {
+            } else if (updateState.status != UiText.Resource(R.string.update_check_prompt)) {
                 AppListItem(
                     title = stringResource(R.string.setting_update_status),
-                    subtitle = updateState.status,
+                    subtitle = updateStatus,
                     leadingContent = {
                         AppListLeadingIcon(imageVector = Icons.Outlined.Info)
                     },

@@ -28,7 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
@@ -63,16 +65,16 @@ internal fun RecordTimePickerDialog(
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Suggested time") },
+        title = { Text(stringResource(R.string.suggested_time)) },
         text = { TimePicker(state = state) },
         confirmButton = {
             TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) {
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
@@ -102,13 +104,13 @@ internal fun TaskScheduleFields(
             selected = plannedDate == today,
             onClick = { onPlannedDateChange(today) },
             enabled = enabled,
-            label = { Text("Today") },
+            label = { Text(stringResource(R.string.today)) },
         )
         FilterChip(
             selected = plannedDate == null,
             onClick = { onPlannedDateChange(null) },
             enabled = enabled && !hasSuggestedTimes,
-            label = { Text("Later") },
+            label = { Text(stringResource(R.string.later)) },
         )
     }
     OutlinedButton(
@@ -120,13 +122,13 @@ internal fun TaskScheduleFields(
     ) {
         Icon(imageVector = Icons.Outlined.DateRange, contentDescription = null)
         Text(
-            text = plannedDate?.let { taskDateLabel(it, today) } ?: "Choose date",
+            text = plannedDate?.let { taskDateLabel(it, today) } ?: stringResource(R.string.choose_date),
             modifier = Modifier.padding(start = 8.dp),
         )
     }
     if (hasSuggestedTimes) {
         Text(
-            text = "Remove suggested times before moving this task to Later.",
+            text = stringResource(R.string.remove_suggested_times),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(
@@ -148,9 +150,13 @@ internal fun TaskScheduleFields(
     }
 }
 
-internal fun taskDateLabel(date: LocalDate, today: LocalDate): String = when (date) {
-    today -> "Today"
-    else -> TaskDateFormatter.format(date)
+@Composable
+internal fun taskDateLabel(date: LocalDate, today: LocalDate): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return when (date) {
+        today -> stringResource(R.string.today)
+        else -> TaskDateFormatter.withLocale(locale).format(date)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,11 +178,11 @@ private fun TaskDatePickerDialog(
                 },
                 enabled = state.selectedDateMillis != null,
             ) {
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     ) {
         DatePicker(state = state, showModeToggle = false)
@@ -190,7 +196,7 @@ private fun Long.toUtcLocalDate(): LocalDate =
     Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 
 private val TaskDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
+    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
 
 /**
  * Suggested time window rows plus their add action, shared by the accumulate
@@ -223,7 +229,7 @@ internal fun SuggestedTimeFields(
             ) {
                 Text(formatMinute(window.startMinute))
             }
-            Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.time_to), color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedButton(
                 onClick = { onEditTime(TimeEditTarget(index, start = false)) },
                 enabled = enabled,
@@ -237,7 +243,7 @@ internal fun SuggestedTimeFields(
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_close_24),
-                    contentDescription = "Remove suggested time",
+                    contentDescription = stringResource(R.string.remove_suggested_time),
                 )
             }
         }
@@ -247,7 +253,7 @@ internal fun SuggestedTimeFields(
         enabled = enabled,
         modifier = fieldModifier,
     ) {
-        Text("Add suggested time")
+        Text(stringResource(R.string.add_suggested_time))
     }
     Text(
         text = summary,
@@ -269,6 +275,7 @@ internal fun SuggestedTimeDialog(
     onDismiss: () -> Unit,
     onConfirm: (List<RecordWindow>) -> Unit,
 ) {
+    val invalidSuggestedTimes = stringResource(R.string.invalid_suggested_times)
     var windows by remember { mutableStateOf(initialWindows.map { it.encode() }) }
     var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -308,16 +315,16 @@ internal fun SuggestedTimeDialog(
                     runCatching { validatedWindows(parsedWindows) }.fold(
                         onSuccess = onConfirm,
                         onFailure = { error ->
-                            errorMessage = error.message ?: "Suggested times are invalid."
+                            errorMessage = error.message ?: invalidSuggestedTimes
                         },
                     )
                 },
             ) {
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 
@@ -336,21 +343,28 @@ internal fun SuggestedTimeDialog(
 }
 
 /** Explains what the configured windows will do on the Records root page. */
+@Composable
 internal fun suggestedTimeSummary(windows: List<RecordWindow>): String {
-    if (windows.isEmpty()) return "No suggested times. Never appears in the Now band."
-    return "Shown in the Now band for ${suggestedTimeSpan(windows)} of the day."
+    if (windows.isEmpty()) return stringResource(R.string.no_suggested_times)
+    return stringResource(R.string.suggested_time_shown, suggestedTimeSpan(windows))
 }
 
+@Composable
 internal fun taskSuggestedTimeSummary(windows: List<RecordWindow>): String {
-    if (windows.isEmpty()) return "No suggested times. Queued on the task date."
-    return "Shown in the Now band on the task date for ${suggestedTimeSpan(windows)}."
+    if (windows.isEmpty()) return stringResource(R.string.no_task_suggested_times)
+    return stringResource(R.string.task_suggested_time_shown, suggestedTimeSpan(windows))
 }
 
+@Composable
 private fun suggestedTimeSpan(windows: List<RecordWindow>): String {
     val coverage = windowCoverageMinutes(windows)
     val hours = coverage / 60
     val minutes = coverage % 60
-    return if (hours == 0) "${minutes}m" else "${hours}h ${minutes}m"
+    return if (hours == 0) {
+        stringResource(R.string.duration_minutes_short, minutes)
+    } else {
+        stringResource(R.string.duration_hours_minutes_short, hours, minutes)
+    }
 }
 
 /** Default window appended by the add action: one hour after the last end. */

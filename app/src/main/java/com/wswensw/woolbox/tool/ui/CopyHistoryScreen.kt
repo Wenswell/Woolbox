@@ -19,6 +19,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.tool.model.CopyHistoryEntry
@@ -42,7 +44,7 @@ fun CopyHistoryScreen(
     onOpen: (Long) -> Unit,
 ) {
     AppLazyRouteScaffold(
-        title = "Copy history",
+        title = stringResource(R.string.copy_history_title),
         onBack = onBack,
     ) {
         if (history.isEmpty()) {
@@ -54,7 +56,7 @@ fun CopyHistoryScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No copy history yet.",
+                        text = stringResource(R.string.copy_history_empty),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -132,8 +134,8 @@ fun CopyHistoryEditorScreen(
     if (pendingDelete) {
         AlertDialog(
             onDismissRequest = { pendingDelete = false },
-            title = { Text("Delete copy history?") },
-            text = { Text("This captured text and its saved edits will be removed.") },
+            title = { Text(stringResource(R.string.copy_history_delete_title)) },
+            text = { Text(stringResource(R.string.copy_history_delete_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -147,12 +149,12 @@ fun CopyHistoryEditorScreen(
                         }
                     },
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.action_cancel))
                 }
             },
         )
@@ -208,13 +210,15 @@ private fun CopyHistoryEditorContent(
         },
         saveEnabled = hasChanges && !isSaving,
         onDelete = onRequestDelete,
-        title = "Copy history",
+        title = stringResource(R.string.copy_history_title),
     )
 }
 
+@Composable
 private fun historySubtitle(summary: CopyHistorySummaryUi): String {
-    val meta = "${summary.blockCount} blocks · ${formatHistoryTime(summary.capturedAt)}"
-    val preview = summary.textPreview.ifBlank { "Empty draft" }
+    val blocks = pluralStringResource(R.plurals.copy_block_count, summary.blockCount, summary.blockCount)
+    val meta = "$blocks · ${formatHistoryTime(summary.capturedAt)}"
+    val preview = summary.textPreview.ifBlank { stringResource(R.string.copy_history_empty_draft) }
     return "$meta\n$preview"
 }
 

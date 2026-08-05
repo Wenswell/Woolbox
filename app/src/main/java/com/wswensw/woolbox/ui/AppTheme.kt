@@ -13,12 +13,10 @@ import androidx.compose.ui.platform.LocalContext
 import com.wswensw.woolbox.record.ui.LocalMotionMode
 import com.wswensw.woolbox.record.ui.MotionMode
 
-enum class ThemeMode(
-    val label: String,
-) {
-    SYSTEM("Follow system"),
-    LIGHT("Light"),
-    DARK("Dark"),
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK,
 }
 
 fun ThemeMode.resolvedDarkTheme(systemDarkTheme: Boolean): Boolean = when (this) {

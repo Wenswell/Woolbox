@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -59,6 +60,7 @@ fun RecordSheet(
     }
     var saving by rememberSaveable { mutableStateOf(false) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    val positiveValueMessage = stringResource(R.string.error_positive_value)
     val parsedValue = valueText.trim().toDoubleOrNull()
     val canConfirm = !saving &&
         parsedValue != null &&
@@ -90,7 +92,7 @@ fun RecordSheet(
                 onConfirm = {
                     val value = valueText.trim().toDoubleOrNull()
                     if (value == null || !value.isFinite() || value <= 0) {
-                        errorMessage = "Value must be a positive number."
+                        errorMessage = positiveValueMessage
                     } else {
                         saving = true
                         errorMessage = null
@@ -108,7 +110,7 @@ fun RecordSheet(
             if (entries.isNotEmpty()) {
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    text = "Today",
+                    text = stringResource(R.string.today),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
@@ -249,7 +251,7 @@ private fun ValueInput(
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_remove_24),
-                contentDescription = "Decrease by ${formatValue(item.stepValue)}",
+                contentDescription = stringResource(R.string.decrease_by, formatValue(item.stepValue)),
             )
         }
         OutlinedTextField(
@@ -257,7 +259,7 @@ private fun ValueInput(
             onValueChange = onValueChange,
             enabled = editable,
             isError = errorMessage != null,
-            label = { Text("Value") },
+            label = { Text(stringResource(R.string.field_value)) },
             suffix = { Text(item.unit) },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
@@ -275,12 +277,12 @@ private fun ValueInput(
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_add_24),
-                contentDescription = "Increase by ${formatValue(item.stepValue)}",
+                contentDescription = stringResource(R.string.increase_by, formatValue(item.stepValue)),
             )
         }
     }
     Text(
-        text = "Step ${formatValue(item.stepValue)} ${item.unit}",
+        text = stringResource(R.string.step_value_unit, formatValue(item.stepValue), item.unit),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
         textAlign = TextAlign.Center,
@@ -309,6 +311,6 @@ private fun ValueInput(
             contentDescription = null,
         )
         Spacer(Modifier.width(8.dp))
-        Text(if (saving) "Saving" else "Record")
+        Text(stringResource(if (saving) R.string.saving else R.string.action_record))
     }
 }

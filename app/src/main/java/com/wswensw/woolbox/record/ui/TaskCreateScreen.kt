@@ -28,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.TodoStepDraft
 import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.record.model.validatedWindows
@@ -58,12 +60,14 @@ fun TaskCreateScreen(
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
+    val checkFieldsMessage = stringResource(R.string.error_check_fields)
+    val eachSubtaskTitleMessage = stringResource(R.string.each_subtask_title)
 
     fun submit() {
         errorMessage = null
         val normalizedTitle = runCatching { validatedTaskTitle(title) }.getOrElse { error ->
             titleError = error.message
-            errorMessage = "Check the highlighted field."
+            errorMessage = checkFieldsMessage
             return
         }
         val normalizedSteps = runCatching {
@@ -76,7 +80,7 @@ fun TaskCreateScreen(
                 )
             }
         }.getOrElse { error ->
-            errorMessage = error.message ?: "Each subtask needs a title."
+            errorMessage = error.message ?: eachSubtaskTitleMessage
             return
         }
         saving = true
@@ -87,7 +91,7 @@ fun TaskCreateScreen(
     }
 
     AppRouteScaffold(
-        title = "New task",
+        title = stringResource(R.string.new_task),
         onBack = onBack,
         modifier = modifier,
         actions = {
@@ -97,12 +101,12 @@ fun TaskCreateScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = if (saving) "Saving" else "Save",
+                    contentDescription = stringResource(if (saving) R.string.saving else R.string.action_save),
                 )
             }
         },
     ) {
-        AppSection(title = "Task") {
+        AppSection(title = stringResource(R.string.task_title)) {
             OutlinedTextField(
                 value = title,
                 onValueChange = {
@@ -110,7 +114,7 @@ fun TaskCreateScreen(
                     titleError = null
                 },
                 enabled = !saving,
-                label = { Text("Title") },
+                label = { Text(stringResource(R.string.field_title)) },
                 isError = titleError != null,
                 supportingText = titleError?.let { message -> { Text(message) } },
                 singleLine = true,
@@ -126,10 +130,10 @@ fun TaskCreateScreen(
                 onPlannedDateChange = { selectedDate -> plannedDateValue = selectedDate?.toString() },
             )
         }
-        AppSection(title = "Subtasks") {
+        AppSection(title = stringResource(R.string.subtasks)) {
             if (plannedDate == null) {
                 Text(
-                    text = "Set a task date to add suggested times.",
+                    text = stringResource(R.string.set_task_date_for_times),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
@@ -151,7 +155,7 @@ fun TaskCreateScreen(
                             }
                         },
                         enabled = !saving,
-                        label = { Text("Subtask ${index + 1}") },
+                        label = { Text(stringResource(R.string.subtask_number, index + 1)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -162,7 +166,7 @@ fun TaskCreateScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Schedule,
-                                contentDescription = "Suggested times for subtask ${index + 1}",
+                                contentDescription = stringResource(R.string.suggested_times_for_subtask, index + 1),
                                 tint = if (stepWindows.getOrElse(index) { emptyList() }.isEmpty()) {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 } else {
@@ -181,7 +185,7 @@ fun TaskCreateScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowUp,
-                                contentDescription = "Move subtask ${index + 1} up",
+                                contentDescription = stringResource(R.string.move_subtask_up, index + 1),
                             )
                         }
                         IconButton(
@@ -193,7 +197,7 @@ fun TaskCreateScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Move subtask ${index + 1} down",
+                                contentDescription = stringResource(R.string.move_subtask_down, index + 1),
                             )
                         }
                         FilledTonalIconButton(
@@ -205,7 +209,7 @@ fun TaskCreateScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Delete,
-                                contentDescription = "Remove subtask ${index + 1}",
+                                contentDescription = stringResource(R.string.remove_subtask, index + 1),
                             )
                         }
                     }
@@ -221,7 +225,7 @@ fun TaskCreateScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Add,
-                    contentDescription = "Add subtask",
+                    contentDescription = stringResource(R.string.add_subtask),
                 )
             }
         }
@@ -239,7 +243,7 @@ fun TaskCreateScreen(
         val encoded = stepWindows.getOrElse(index) { emptyList() }
         SuggestedTimeDialog(
             stepLabel = stepTitles.getOrNull(index)?.trim()?.takeIf(String::isNotEmpty)
-                ?: "Subtask ${index + 1}",
+                ?: stringResource(R.string.subtask_number, index + 1),
             initialWindows = encoded.map(::decodeWindow),
             onDismiss = { windowEditStep = null },
             onConfirm = { updated ->

@@ -25,9 +25,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.DEFAULT_NUMBER_UNIT
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
@@ -37,6 +39,7 @@ import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
+import java.util.Locale
 
 @Composable
 fun MeasurementItemFormScreen(
@@ -50,7 +53,7 @@ fun MeasurementItemFormScreen(
 ) {
     if (editing && item == null) {
         AppRouteScaffold(
-            title = "Edit measurement",
+            title = stringResource(R.string.edit_measurement),
             onBack = onBack,
             modifier = modifier,
         ) {
@@ -60,7 +63,7 @@ fun MeasurementItemFormScreen(
                 )
             } else {
                 Text(
-                    text = "Record item not found.",
+                    text = stringResource(R.string.record_item_not_found),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(AppStyle.spacing.pageHorizontal),
                 )
@@ -86,6 +89,16 @@ fun MeasurementItemFormScreen(
     var unitError by rememberSaveable { mutableStateOf<String?>(null) }
     var priorityError by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
+    val nameRequiredMessage = stringResource(R.string.error_name_required)
+    val unitRequiredMessage = stringResource(R.string.error_unit_required)
+    val priorityIntegerMessage = stringResource(R.string.error_priority_integer)
+    val checkFieldsMessage = stringResource(R.string.error_check_fields)
+    val finiteFieldTemplate = stringResource(R.string.error_finite_field)
+    val requiredFieldTemplate = stringResource(R.string.error_required_field)
+    val stepPositiveTemplate = stringResource(R.string.error_positive_field)
+    val minimumFieldLabel = stringResource(R.string.field_minimum)
+    val maximumFieldLabel = stringResource(R.string.field_maximum)
+    val stepFieldLabel = stringResource(R.string.field_step)
 
     fun clearFieldErrors() {
         nameError = null
@@ -100,26 +113,34 @@ fun MeasurementItemFormScreen(
         clearFieldErrors()
         var valid = true
         if (name.isBlank()) {
-            nameError = "Name is required."
+            nameError = nameRequiredMessage
             valid = false
         }
         if (unit.isBlank()) {
-            unitError = "Unit is required."
+            unitError = unitRequiredMessage
             valid = false
         }
         runCatching { parseRequiredFinite(minValue, "Minimum") }
             .onFailure {
-                minError = it.message
+                minError = String.format(
+                    Locale.getDefault(),
+                    if (minValue.isBlank()) requiredFieldTemplate else finiteFieldTemplate,
+                    minimumFieldLabel,
+                )
                 valid = false
             }
         runCatching { parseRequiredFinite(maxValue, "Maximum") }
             .onFailure {
-                maxError = it.message
+                maxError = String.format(
+                    Locale.getDefault(),
+                    if (maxValue.isBlank()) requiredFieldTemplate else finiteFieldTemplate,
+                    maximumFieldLabel,
+                )
                 valid = false
             }
         runCatching { parsePositive(stepValue, "Step") }
             .onFailure {
-                stepError = it.message
+                stepError = String.format(Locale.getDefault(), stepPositiveTemplate, stepFieldLabel)
                 valid = false
             }
         runCatching {
@@ -136,7 +157,7 @@ fun MeasurementItemFormScreen(
             valid = false
         }
         if (priority.toIntOrNull() == null) {
-            priorityError = "Priority must be an integer."
+            priorityError = priorityIntegerMessage
             valid = false
         }
         return valid
@@ -156,7 +177,7 @@ fun MeasurementItemFormScreen(
     fun submit() {
         errorMessage = null
         if (!validateFields()) {
-            errorMessage = "Check the highlighted fields."
+            errorMessage = checkFieldsMessage
             return
         }
         val draft = RecordItemDraft(
@@ -182,7 +203,7 @@ fun MeasurementItemFormScreen(
     }
 
     AppRouteScaffold(
-        title = if (editing) "Edit measurement" else "New measurement",
+        title = stringResource(if (editing) R.string.edit_measurement else R.string.new_measurement),
         onBack = onBack,
         modifier = modifier,
         actions = {
@@ -192,7 +213,7 @@ fun MeasurementItemFormScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = if (saving) "Saving" else "Save",
+                    contentDescription = stringResource(if (saving) R.string.saving else R.string.action_save),
                 )
             }
         },
@@ -222,7 +243,9 @@ fun MeasurementItemFormScreen(
                             maxLines = 1,
                         )
                         Text(
-                            text = if (editing) "Editing measurement" else "New measurement",
+                            text = stringResource(
+                                if (editing) R.string.editing_measurement else R.string.new_measurement,
+                            ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -231,7 +254,7 @@ fun MeasurementItemFormScreen(
             }
         }
 
-        AppSection(title = "Details") {
+        AppSection(title = stringResource(R.string.record_details)) {
             OutlinedTextField(
                 value = name,
                 onValueChange = {
@@ -239,7 +262,7 @@ fun MeasurementItemFormScreen(
                     nameError = null
                 },
                 enabled = !saving,
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.field_name)) },
                 isError = nameError != null,
                 supportingText = nameError?.let { message ->
                     { Text(message) }
@@ -251,14 +274,14 @@ fun MeasurementItemFormScreen(
                 value = description,
                 onValueChange = { description = it },
                 enabled = !saving,
-                label = { Text("Description") },
+                label = { Text(stringResource(R.string.field_description)) },
                 minLines = 2,
                 maxLines = 4,
                 modifier = Modifier.formField(),
             )
         }
 
-        AppSection(title = "Measurement") {
+        AppSection(title = stringResource(R.string.record_measurement)) {
             Row(
                 modifier = Modifier.formField(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -270,7 +293,7 @@ fun MeasurementItemFormScreen(
                         minError = null
                     },
                     enabled = !fieldsLocked && !saving,
-                    label = { Text("Minimum") },
+                    label = { Text(stringResource(R.string.field_minimum)) },
                     isError = minError != null,
                     supportingText = minError?.let { message ->
                         { Text(message) }
@@ -286,7 +309,7 @@ fun MeasurementItemFormScreen(
                         maxError = null
                     },
                     enabled = !fieldsLocked && !saving,
-                    label = { Text("Maximum") },
+                    label = { Text(stringResource(R.string.field_maximum)) },
                     isError = maxError != null,
                     supportingText = maxError?.let { message ->
                         { Text(message) }
@@ -303,7 +326,7 @@ fun MeasurementItemFormScreen(
                     stepError = null
                 },
                 enabled = !fieldsLocked && !saving,
-                label = { Text("Step") },
+                label = { Text(stringResource(R.string.field_step)) },
                 isError = stepError != null,
                 supportingText = stepError?.let { message ->
                     { Text(message) }
@@ -319,7 +342,7 @@ fun MeasurementItemFormScreen(
                     unitError = null
                 },
                 enabled = !fieldsLocked && !saving,
-                label = { Text("Unit") },
+                label = { Text(stringResource(R.string.field_unit)) },
                 isError = unitError != null,
                 supportingText = unitError?.let { message ->
                     { Text(message) }
@@ -334,10 +357,10 @@ fun MeasurementItemFormScreen(
                     priorityError = null
                 },
                 enabled = !saving,
-                label = { Text("Priority") },
+                label = { Text(stringResource(R.string.field_priority)) },
                 isError = priorityError != null,
                 supportingText = {
-                    Text(priorityError ?: "Higher values appear first.")
+                    Text(priorityError ?: stringResource(R.string.higher_values_first))
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,

@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.tool.model.OledShieldConfig
@@ -303,28 +304,28 @@ internal fun OledControlPanel(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "OLED shield",
+                    text = stringResource(R.string.oled_shield_tile_label),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 IconButton(onClick = onClosePanel) {
                     Icon(
                         painter = painterResource(R.drawable.ic_close_24),
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.action_close),
                     )
                 }
             }
             OledSliderRow(
-                label = "Opacity",
+                label = stringResource(R.string.oled_opacity),
                 value = config.opacityPercent,
                 onValueChange = onOpacityChange,
             )
             OledSliderRow(
-                label = "Width",
+                label = stringResource(R.string.oled_width),
                 value = config.widthPercent,
                 onValueChange = onWidthChange,
             )
             OledSliderRow(
-                label = "Height",
+                label = stringResource(R.string.oled_height),
                 value = config.heightPercent,
                 onValueChange = onHeightChange,
             )
@@ -336,13 +337,13 @@ internal fun OledControlPanel(
                 IconButton(onClick = onHideShield) {
                     Icon(
                         imageVector = Icons.Outlined.VisibilityOff,
-                        contentDescription = "Hide shield",
+                        contentDescription = stringResource(R.string.oled_hide_shield),
                     )
                 }
                 FilledTonalIconButton(onClick = onSave) {
                     Icon(
                         imageVector = Icons.Rounded.Check,
-                        contentDescription = "Save",
+                        contentDescription = stringResource(R.string.action_save),
                     )
                 }
             }

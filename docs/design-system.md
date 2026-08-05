@@ -108,6 +108,8 @@ Quick Settings 行在 Android 13 及以上整行执行系统添加请求，不�
 
 Setting 的 `Appearance` 区域提供 Language、Theme 和 Motion。Language 使用单选 Dialog，选项为 `Follow system`、`English`、`简体中文`；语言名称使用自身语言显示。Motion 可选 `Follow system`、`On`、`Off`，统一控制 Records 的渐变、弹出和液面动画。`Updates` 区域使用标准 `AppListItem`：`Current version` 的副文案显示构建类型和版本号，并触发对应通道的检查；发现更新后显示一个包含构建类型和版本号的动作行，下载与安装阶段在副文案呈现状态。下载动作先用标准确认 Dialog 显示版本与文件大小；完成下载后同一动作行进入安装。等待来源安装授权时动作行进入系统设置。检查、下载和安装期间禁用重复操作。
 
+用户可见文案从 Android 资源读取，默认英文位于 `values/strings.xml`，简体中文位于 `values-zh-rCN/strings.xml`。数量使用 `plurals`，日期、时间和数值使用当前 Locale；用户输入与服务端返回正文不翻译。后台更新状态使用 `UiText.Resource` 保存资源与参数，切换语言后按新配置重新解析。
+
 Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，复用 `AppListItem`：40dp 应用图标、名称、状态/参数/时间副文案、Enable/Delete 图标操作；无服务时副文案提示 `Accessibility required`，应用不可用时提示 `Unavailable`。
 
 ## Records 组合

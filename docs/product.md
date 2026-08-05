@@ -36,7 +36,7 @@ Setting 打开时检查当前 build type 的 `latest.json`：debug 只检查、�
 
 ### 应用语言
 
-Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选择后立即重建当前 Activity 并应用对应 Android 资源；`Follow system` 清除应用语言覆盖。Android 13 及以上与系统“应用语言”设置使用同一状态，Android 12 由 AppCompat 保存选择。用户输入的任务、记录名称与服务端错误正文保持原文。
+Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选择后立即重建当前 Activity 并应用对应 Android 资源；`Follow system` 清除应用语言覆盖。Android 13 及以上与系统“应用语言”设置使用同一状态，Android 12 由 AppCompat 保存选择。应用页面、覆盖层、系统 Tile、本地状态与错误使用目标语言；用户输入的任务、记录名称与服务端错误正文保持原文。
 
 ## 状态语义
 

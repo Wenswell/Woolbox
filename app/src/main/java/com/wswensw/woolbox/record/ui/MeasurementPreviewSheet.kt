@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -47,6 +48,7 @@ import com.patrykandpatrick.vico.compose.common.ProvideVicoTheme
 import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 import com.patrykandpatrick.vico.compose.m3.common.rememberM3VicoTheme
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.measurementStepCount
@@ -55,6 +57,7 @@ import com.wswensw.woolbox.ui.AppStyle
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,13 +97,13 @@ fun MeasurementPreviewSheet(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } ?: Text(
-                text = "No measurements in the last 24 hours.",
+                text = stringResource(R.string.no_measurements_24h),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
 
             Text(
-                text = "Record",
+                text = stringResource(R.string.action_record),
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
@@ -126,7 +129,7 @@ fun MeasurementPreviewSheet(
                 enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (saving) "Recording" else "Record")
+                Text(stringResource(if (saving) R.string.recording else R.string.action_record))
             }
             errorMessage?.let { message ->
                 Text(
@@ -137,7 +140,7 @@ fun MeasurementPreviewSheet(
             }
 
             Text(
-                text = "Last 24 hours",
+                text = stringResource(R.string.last_24_hours),
                 color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
@@ -161,7 +164,7 @@ fun MeasurementPreviewSheet(
 
             if (sortedEntries.isNotEmpty()) {
                 Text(
-                    text = "Entries",
+                    text = stringResource(R.string.entries),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
@@ -227,7 +230,7 @@ private fun MeasurementPreviewChart(entries: List<RecordEntry>, unit: String) {
         CartesianValueFormatter { _, value, _ ->
             Instant.ofEpochMilli(value.toLong())
                 .atZone(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))
+                .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(Locale.getDefault()))
         }
     }
     val markerLabel = rememberTextComponent(
@@ -298,4 +301,7 @@ private fun MeasurementPreviewEntryRow(entry: RecordEntry, unit: String) {
 internal fun measurementDateTimeLabel(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis)
         .atZone(ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm", Locale.getDefault()))
+        .format(
+            DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+                .withLocale(Locale.getDefault()),
+        )

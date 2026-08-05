@@ -6,12 +6,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 
-enum class MotionMode(
-    val label: String,
-) {
-    SYSTEM("Follow system"),
-    ON("On"),
-    OFF("Off"),
+enum class MotionMode {
+    SYSTEM,
+    ON,
+    OFF,
 }
 
 internal val LocalMotionMode = staticCompositionLocalOf { MotionMode.SYSTEM }

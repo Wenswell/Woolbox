@@ -31,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.TaskDateBucket
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.dateBucket
@@ -49,12 +51,12 @@ fun ManageTasksScreen(
     modifier: Modifier = Modifier,
 ) {
     AppLazyRouteScaffold(
-        title = "Manage tasks",
+        title = stringResource(R.string.manage_tasks),
         onBack = onBack,
         modifier = modifier,
         actions = {
             FilledTonalIconButton(onClick = onCreate) {
-                Icon(imageVector = Icons.Rounded.Add, contentDescription = "New task")
+                Icon(imageVector = Icons.Rounded.Add, contentDescription = stringResource(R.string.new_task))
             }
         },
     ) {
@@ -72,15 +74,15 @@ fun ManageTasksScreen(
             state.error != null && state.tasks.isEmpty() -> item {
                 RecordsStatusCard(
                     message = state.error,
-                    actionLabel = "Back",
+                    actionLabel = stringResource(R.string.navigation_back),
                     onAction = onBack,
                     modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal),
                 )
             }
             state.tasks.isEmpty() -> item {
                 RecordsStatusCard(
-                    message = "No tasks yet.",
-                    actionLabel = "Create task",
+                    message = stringResource(R.string.no_tasks),
+                    actionLabel = stringResource(R.string.create_task),
                     onAction = onCreate,
                     modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal),
                 )
@@ -204,11 +206,12 @@ private fun TaskManageCard(
     }
 }
 
+@Composable
 private fun taskScheduleLabel(task: TodoTask, today: LocalDate): String {
-    val plannedDate = task.plannedDate ?: return "Later"
+    val plannedDate = task.plannedDate ?: return stringResource(R.string.later)
     if (task.isCompleted) return taskDateLabel(plannedDate, today)
     return when (task.dateBucket(today)) {
-        TaskDateBucket.OVERDUE -> "Overdue · ${taskDateLabel(plannedDate, today)}"
+        TaskDateBucket.OVERDUE -> "${stringResource(R.string.overdue)} · ${taskDateLabel(plannedDate, today)}"
         TaskDateBucket.TODAY,
         TaskDateBucket.LATER,
         -> taskDateLabel(plannedDate, today)

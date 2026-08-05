@@ -53,9 +53,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,12 +70,14 @@ import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.StreakDays
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.focusQueue
 import com.wswensw.woolbox.record.model.focusTargetKey
 import com.wswensw.woolbox.record.model.stepRecordValue
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 private const val FOCUS_QUEUE_PREVIEW = 3
@@ -129,7 +133,7 @@ internal fun RecordsFocusCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = focusDateLabel(now, streak),
+                text = localizedFocusDateLabel(now, streak),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
@@ -138,7 +142,7 @@ internal fun RecordsFocusCard(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = focusDayStatusLabel(now, ring),
+                text = localizedFocusDayStatusLabel(now, ring),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
@@ -180,7 +184,7 @@ internal fun RecordsFocusCard(
         }
         if (rest.isNotEmpty()) {
             Text(
-                text = "Up next",
+                text = stringResource(R.string.focus_up_next),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
@@ -303,13 +307,13 @@ private fun AccumulateFocusHero(
             ) {
                 HeroHeader(
                     title = displayRecordName(item.name),
-                    reason = focusReasonLabel(candidate.reason),
+                    reason = localizedFocusReasonLabel(candidate.reason),
                     colors = colors,
                     canDefer = !candidate.isDeferred,
                     onDefer = { onDefer(candidate.target) },
                 )
                 Text(
-                    text = focusCumulativeLabel(item, cumulative),
+                    text = localizedFocusCumulativeLabel(item, cumulative),
                     color = colors.accent,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -327,7 +331,7 @@ private fun AccumulateFocusHero(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Remove,
-                            contentDescription = "Decrease by ${formatValue(item.stepValue)} ${item.unit}",
+                            contentDescription = stringResource(R.string.decrease_by, "${formatValue(item.stepValue)} ${item.unit}"),
                         )
                     }
                     Text(
@@ -343,7 +347,7 @@ private fun AccumulateFocusHero(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Add,
-                            contentDescription = "Increase by ${formatValue(item.stepValue)} ${item.unit}",
+                            contentDescription = stringResource(R.string.increase_by, "${formatValue(item.stepValue)} ${item.unit}"),
                         )
                     }
                     FilledIconButton(
@@ -364,7 +368,12 @@ private fun AccumulateFocusHero(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Check,
-                            contentDescription = "Record ${valueText.ifBlank { "0" }} ${item.unit} for ${displayRecordName(item.name)}",
+                            contentDescription = stringResource(
+                                R.string.record_value_for,
+                                valueText.ifBlank { "0" },
+                                item.unit,
+                                displayRecordName(item.name),
+                            ),
                         )
                     }
                 }
@@ -413,7 +422,7 @@ private fun TaskFocusHero(
             ) {
                 HeroHeader(
                     title = step.title,
-                    reason = focusReasonLabel(candidate.reason),
+                    reason = localizedFocusReasonLabel(candidate.reason),
                     colors = colors,
                     canDefer = !candidate.isDeferred,
                     onDefer = { onDefer(candidate.target) },
@@ -495,7 +504,7 @@ private fun HeroHeader(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Rounded.MoreVert,
-                        contentDescription = "More actions for $title",
+                        contentDescription = stringResource(R.string.more_actions_for, title),
                         tint = colors.onContainer.copy(alpha = 0.64f),
                     )
                 }
@@ -504,7 +513,7 @@ private fun HeroHeader(
                     onDismissRequest = { menuExpanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Not now") },
+                        text = { Text(stringResource(R.string.not_now)) },
                         onClick = {
                             menuExpanded = false
                             onDefer()
@@ -578,7 +587,7 @@ private fun FocusQueueRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = focusQueueSupportingLabel(candidate, cumulative),
+                    text = localizedFocusQueueSupportingLabel(candidate, cumulative),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -616,7 +625,7 @@ private fun DayClearedCard(ring: DayRing) {
                 modifier = Modifier.size(22.dp),
             )
             Text(
-                text = if (ring.isComplete) "Day closed" else "Nothing due right now",
+                text = stringResource(if (ring.isComplete) R.string.day_closed_short else R.string.nothing_due),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -688,6 +697,62 @@ internal fun focusDayStatusLabel(clock: RecordsClock, ring: DayRing): String = b
         append("${ring.closed}/${ring.total} today")
     } else {
         append("No daily goals")
+    }
+}
+
+@Composable
+private fun localizedFocusReasonLabel(reason: FocusReason): String = when (reason) {
+    is FocusReason.DueNow -> stringResource(R.string.due_minutes_left, formatMinuteSpan(reason.endsInMinutes))
+    is FocusReason.Habit -> stringResource(R.string.usually_at, formatMinute(reason.habitMinute))
+    is FocusReason.StreakRisk -> stringResource(R.string.streak_risk, reason.days)
+    is FocusReason.BehindPace -> stringResource(R.string.behind_percent, reason.percent)
+    FocusReason.Queued -> ""
+}
+
+@Composable
+private fun localizedFocusDateLabel(clock: RecordsClock, streak: StreakDays): String {
+    val locale = LocalConfiguration.current.locales[0]
+    val dateLabel = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+        .withLocale(locale)
+        .format(clock.date)
+    if (!streak.isVisible) return dateLabel
+    val streakLabel = stringResource(
+        if (streak.atHistoryLimit) R.string.streak_days_limited else R.string.streak_days,
+        streak.days,
+    )
+    return "$dateLabel · $streakLabel"
+}
+
+@Composable
+private fun localizedFocusDayStatusLabel(clock: RecordsClock, ring: DayRing): String {
+    val status = if (ring.isVisible) {
+        stringResource(R.string.today_progress, ring.closed, ring.total)
+    } else {
+        stringResource(R.string.no_daily_goals)
+    }
+    return "${formatMinute(clock.minuteOfDay)} · $status"
+}
+
+@Composable
+private fun localizedFocusCumulativeLabel(item: RecordItem, cumulative: Double): String {
+    val prefix = if (item.goalPeriod == GoalPeriod.DAYS_7) {
+        stringResource(R.string.period_seven_days) + " · "
+    } else {
+        ""
+    }
+    return if (item.goalValue != null && item.goalPeriod != null) {
+        "$prefix${formatValue(cumulative)} / ${formatValue(item.goalValue)} ${item.unit}"
+    } else {
+        "${formatValue(cumulative)} ${item.unit}"
+    }
+}
+
+@Composable
+private fun localizedFocusQueueSupportingLabel(candidate: FocusCandidate, cumulative: Double?): String {
+    val reason = localizedFocusReasonLabel(candidate.reason)
+    return when (val target = candidate.target) {
+        is NowTarget.Accumulate -> reason.ifEmpty { localizedFocusCumulativeLabel(target.item, cumulative ?: 0.0) }
+        is NowTarget.Task -> if (reason.isEmpty()) target.task.title else "${target.task.title} · $reason"
     }
 }
 

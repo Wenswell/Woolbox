@@ -1,9 +1,12 @@
 package com.wswensw.woolbox.record.ui
 
 import android.content.Context
+import android.content.res.Resources
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.RecordRepository
 import com.wswensw.woolbox.record.data.RecordsUiPreferences
 import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
@@ -65,6 +68,7 @@ data class MeasurementPreviewUiState(
 class RecordsViewModel(
     private val repository: RecordRepository,
     private val uiPreferences: RecordsUiPreferences,
+    private val resources: Resources,
 ) : ViewModel() {
     val rootTaskPreviewLimit = uiPreferences.rootTaskPreviewLimit
 
@@ -150,7 +154,7 @@ class RecordsViewModel(
         val date = LocalDate.now()
         loadedDate = date
         return runCatching { repository.refresh(date.toString()) }
-            .onFailure { error.value = it.message ?: "Unable to load records." }
+            .onFailure { error.value = it.localizedFailure(R.string.records_load_failed) }
             .onSuccess { error.value = null }
     }
 
@@ -178,7 +182,7 @@ class RecordsViewModel(
             }.fold(
                 onSuccess = { onResult(null) },
                 onFailure = { failure ->
-                    val message = failure.message ?: "Unable to connect to Records."
+                    val message = failure.localizedFailure(R.string.records_connect_failed)
                     error.value = message
                     onResult(message)
                 },
@@ -208,7 +212,7 @@ class RecordsViewModel(
                 action = { repository.saveItem(itemId, draft) },
                 onWritten = { onResult(null) },
             ).onFailure { failure ->
-                onResult(failure.message ?: "Unable to save record item.")
+                onResult(failure.localizedFailure(R.string.record_item_save_failed))
             }
         }
     }
@@ -227,7 +231,7 @@ class RecordsViewModel(
                     onResult(entryId, null)
                 },
             ).onFailure { failure ->
-                onResult(null, failure.message ?: "Unable to save record.")
+                onResult(null, failure.localizedFailure(R.string.record_save_failed))
             }
         }
     }
@@ -239,7 +243,7 @@ class RecordsViewModel(
                 action = { repository.deleteEntry(entryId) },
                 onWritten = { itemId?.let(::reloadMeasurementPreview) },
             ).onFailure { failure ->
-                onError(failure.message ?: "Unable to undo record.")
+                onError(failure.localizedFailure(R.string.record_undo_failed))
             }
         }
     }
@@ -255,21 +259,21 @@ class RecordsViewModel(
                 action = { repository.createTask(title, steps, plannedDate) },
                 onWritten = { taskId -> onResult(taskId, null) },
             ).onFailure { failure ->
-                onResult(null, failure.message ?: "Unable to create task.")
+                onResult(null, failure.localizedFailure(R.string.task_create_failed))
             }
         }
     }
 
     fun updateTask(taskId: Long, title: String, plannedDate: LocalDate?, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to update task.",
+        failureMessageRes = R.string.task_update_failed,
     ) {
         repository.updateTask(taskId, title, plannedDate)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to delete task.",
+        failureMessageRes = R.string.task_delete_failed,
     ) {
         repository.deleteTask(taskId)
     }
@@ -281,7 +285,7 @@ class RecordsViewModel(
         onResult: (String?) -> Unit,
     ) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to add subtask.",
+        failureMessageRes = R.string.subtask_add_failed,
     ) {
         repository.createStep(taskId, title, windows)
     }
@@ -293,28 +297,28 @@ class RecordsViewModel(
         onResult: (String?) -> Unit,
     ) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to update subtask.",
+        failureMessageRes = R.string.subtask_update_failed,
     ) {
         repository.updateStep(stepId, title, windows)
     }
 
     fun setStepCompleted(stepId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to update subtask.",
+        failureMessageRes = R.string.subtask_update_failed,
     ) {
         repository.setStepCompleted(stepId, completed)
     }
 
     fun deleteStep(stepId: Long, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to delete subtask.",
+        failureMessageRes = R.string.subtask_delete_failed,
     ) {
         repository.deleteStep(stepId)
     }
 
     fun reorderSteps(taskId: Long, stepIds: List<Long>, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
-        failureMessage = "Unable to reorder subtasks.",
+        failureMessageRes = R.string.subtask_reorder_failed,
     ) {
         repository.reorderSteps(taskId, stepIds)
     }
@@ -346,7 +350,7 @@ class RecordsViewModel(
                     if (requestId == measurementPreviewRequestId) {
                         _measurementPreview.value = MeasurementPreviewUiState(
                             itemId = itemId,
-                            error = failure.message ?: "Unable to load measurements.",
+                            error = failure.localizedFailure(R.string.measurements_load_failed),
                         )
                     }
                 },
@@ -362,7 +366,7 @@ class RecordsViewModel(
 
     private fun runTaskAction(
         onResult: (String?) -> Unit,
-        failureMessage: String,
+        @StringRes failureMessageRes: Int,
         action: suspend () -> Unit,
     ) {
         viewModelScope.launch {
@@ -370,12 +374,15 @@ class RecordsViewModel(
                 action = action,
                 onWritten = { onResult(null) },
             ).onFailure { failure ->
-                val message = failure.message ?: failureMessage
+                val message = failure.localizedFailure(failureMessageRes)
                 error.value = message
                 onResult(message)
             }
         }
     }
+
+    private fun Throwable.localizedFailure(@StringRes fallbackRes: Int): String =
+        message ?: resources.getString(fallbackRes)
 
     private companion object {
         const val MILLIS_PER_MINUTE = 60_000L
@@ -390,6 +397,7 @@ class RecordsViewModel(
             return RecordsViewModel(
                 repository = RecordRepository(applicationContext),
                 uiPreferences = RecordsUiPreferences(applicationContext),
+                resources = applicationContext.resources,
             ) as T
         }
     }

@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -74,7 +75,7 @@ fun ManageRecordsScreen(
             state.error != null && items.isEmpty() -> item {
                 RecordsStatusCard(
                     message = state.error,
-                    actionLabel = "Back",
+                    actionLabel = stringResource(R.string.navigation_back),
                     onAction = onBack,
                     modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal),
                 )
@@ -107,18 +108,19 @@ private data class ManageRecordsCopy(
     val newContentDescription: String,
 )
 
+@Composable
 private fun manageRecordsCopy(mode: RecordMode): ManageRecordsCopy = when (mode) {
     RecordMode.ACCUMULATE -> ManageRecordsCopy(
-        title = "Manage accumulates",
-        emptyMessage = "No accumulate items yet.",
-        actionLabel = "Create accumulate",
-        newContentDescription = "New accumulate",
+        title = stringResource(R.string.manage_accumulates),
+        emptyMessage = stringResource(R.string.no_accumulate_items),
+        actionLabel = stringResource(R.string.create_accumulate),
+        newContentDescription = stringResource(R.string.new_accumulate),
     )
     RecordMode.MEASUREMENT -> ManageRecordsCopy(
-        title = "Manage measurements",
-        emptyMessage = "No measurement items yet.",
-        actionLabel = "Create measurement",
-        newContentDescription = "New measurement",
+        title = stringResource(R.string.manage_measurements),
+        emptyMessage = stringResource(R.string.no_measurement_items),
+        actionLabel = stringResource(R.string.create_measurement),
+        newContentDescription = stringResource(R.string.new_measurement),
     )
 }
 
@@ -198,19 +200,34 @@ private fun ManageRecordCard(
     }
 }
 
+@Composable
 private fun RecordItem.measurementSummary(): String {
     if (mode == RecordMode.MEASUREMENT) {
         val min = minValue?.let(::formatValue) ?: "--"
         val max = maxValue?.let(::formatValue) ?: "--"
         return "$min–$max $unit · step ${formatValue(stepValue)}"
     }
-    val type = if (valueType == RecordValueType.NUMBER) "Number" else "Duration"
-    val default = defaultValue?.let(::formatValue) ?: "No default"
-    return "$type · default $default $unit · step ${formatValue(stepValue)}"
+    val type = if (valueType == RecordValueType.NUMBER) {
+        stringResource(R.string.record_number)
+    } else {
+        stringResource(R.string.record_duration)
+    }
+    val default = defaultValue?.let(::formatValue) ?: stringResource(R.string.record_no_default)
+    return "$type · ${stringResource(R.string.record_default, default)} $unit · ${stringResource(R.string.record_step, formatValue(stepValue))}"
 }
 
+@Composable
 internal fun RecordItem.goalSummary(): String? = goalValue?.let { target ->
-    "Target ${formatValue(target)} $unit / ${if (goalPeriod == GoalPeriod.DAY) "day" else "7 days"}"
+    stringResource(
+        R.string.record_target,
+        formatValue(target),
+        unit,
+        if (goalPeriod == GoalPeriod.DAY) {
+            stringResource(R.string.period_day)
+        } else {
+            stringResource(R.string.period_seven_days)
+        },
+    )
 }
 
 internal fun formatValue(value: Double): String =

@@ -786,7 +786,7 @@ private fun Context.showToolLaunchResult(result: ToolLaunchResult) {
 private fun Context.copyToClipboard(text: String) {
     check(text.isNotBlank()) { "Copy history text must not be blank." }
     getSystemService(ClipboardManager::class.java).setPrimaryClip(
-        ClipData.newPlainText("Global Copy", text),
+        ClipData.newPlainText(getString(R.string.global_copy_tile_label), text),
     )
     showMessage(getString(R.string.copied_to_clipboard))
 }

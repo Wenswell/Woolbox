@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,6 +52,7 @@ import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +67,7 @@ fun AccumulateItemFormScreen(
 ) {
     if (editing && item == null) {
         AppRouteScaffold(
-            title = "Edit accumulate",
+            title = stringResource(R.string.edit_accumulate),
             onBack = onBack,
             modifier = modifier,
         ) {
@@ -75,7 +77,7 @@ fun AccumulateItemFormScreen(
                 )
             } else {
                 Text(
-                    text = "Record item not found.",
+                    text = stringResource(R.string.record_item_not_found),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(AppStyle.spacing.pageHorizontal),
                 )
@@ -118,6 +120,14 @@ fun AccumulateItemFormScreen(
     var goalError by rememberSaveable { mutableStateOf<String?>(null) }
     var priorityError by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
+    val nameRequiredMessage = stringResource(R.string.error_name_required)
+    val unitRequiredMessage = stringResource(R.string.error_unit_required)
+    val priorityIntegerMessage = stringResource(R.string.error_priority_integer)
+    val checkFieldsMessage = stringResource(R.string.error_check_fields)
+    val positiveFieldTemplate = stringResource(R.string.error_positive_field)
+    val defaultFieldLabel = stringResource(R.string.field_default)
+    val stepFieldLabel = stringResource(R.string.field_step)
+    val goalFieldLabel = stringResource(R.string.field_goal_value)
 
     val valueType = RecordValueType.valueOf(valueTypeName)
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
@@ -136,32 +146,32 @@ fun AccumulateItemFormScreen(
         clearFieldErrors()
         var valid = true
         if (name.isBlank()) {
-            nameError = "Name is required."
+            nameError = nameRequiredMessage
             valid = false
         }
         if (unit.isBlank()) {
-            unitError = "Unit is required."
+            unitError = unitRequiredMessage
             valid = false
         }
         runCatching { parseOptionalPositive(defaultValue, "Default value") }
             .onFailure {
-                defaultError = it.message
+                defaultError = String.format(Locale.getDefault(), positiveFieldTemplate, defaultFieldLabel)
                 valid = false
             }
         runCatching { parsePositive(stepValue, "Step") }
             .onFailure {
-                stepError = it.message
+                stepError = String.format(Locale.getDefault(), positiveFieldTemplate, stepFieldLabel)
                 valid = false
             }
         if (goalEnabled) {
             runCatching { parsePositive(goalValue, "Goal") }
                 .onFailure {
-                    goalError = it.message
+                    goalError = String.format(Locale.getDefault(), positiveFieldTemplate, goalFieldLabel)
                     valid = false
                 }
         }
         if (priority.toIntOrNull() == null) {
-            priorityError = "Priority must be an integer."
+            priorityError = priorityIntegerMessage
             valid = false
         }
         return valid
@@ -177,7 +187,7 @@ fun AccumulateItemFormScreen(
     fun submit() {
         errorMessage = null
         if (!validateFields()) {
-            errorMessage = "Check the highlighted fields."
+            errorMessage = checkFieldsMessage
             return
         }
         val draft = RecordItemDraft(
@@ -201,7 +211,7 @@ fun AccumulateItemFormScreen(
     }
 
     AppRouteScaffold(
-        title = if (editing) "Edit accumulate" else "New accumulate",
+        title = stringResource(if (editing) R.string.edit_accumulate else R.string.new_accumulate),
         onBack = onBack,
         modifier = modifier,
         actions = {
@@ -211,7 +221,7 @@ fun AccumulateItemFormScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = if (saving) "Saving" else "Save",
+                    contentDescription = stringResource(if (saving) R.string.saving else R.string.action_save),
                 )
             }
         },
@@ -241,7 +251,9 @@ fun AccumulateItemFormScreen(
                             maxLines = 1,
                         )
                         Text(
-                            text = if (editing) "Editing accumulate" else "New accumulate",
+                            text = stringResource(
+                                if (editing) R.string.editing_accumulate else R.string.new_accumulate,
+                            ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -250,7 +262,7 @@ fun AccumulateItemFormScreen(
             }
         }
 
-        AppSection(title = "Details") {
+        AppSection(title = stringResource(R.string.record_details)) {
             OutlinedTextField(
                 value = name,
                 onValueChange = {
@@ -258,7 +270,7 @@ fun AccumulateItemFormScreen(
                     nameError = null
                 },
                 enabled = !saving,
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.field_name)) },
                 isError = nameError != null,
                 supportingText = nameError?.let { message ->
                     { Text(message) }
@@ -270,14 +282,14 @@ fun AccumulateItemFormScreen(
                 value = description,
                 onValueChange = { description = it },
                 enabled = !saving,
-                label = { Text("Description") },
+                label = { Text(stringResource(R.string.field_description)) },
                 minLines = 2,
                 maxLines = 4,
                 modifier = Modifier.formField(),
             )
         }
 
-        AppSection(title = "Measurement") {
+        AppSection(title = stringResource(R.string.record_measurement)) {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.formField()) {
                 RecordValueType.entries.forEachIndexed { index, type ->
                     SegmentedButton(
@@ -294,7 +306,13 @@ fun AccumulateItemFormScreen(
                         },
                         enabled = !fieldsLocked && !saving,
                         shape = SegmentedButtonDefaults.itemShape(index, RecordValueType.entries.size),
-                        label = { Text(if (type == RecordValueType.NUMBER) "Number" else "Duration") },
+                        label = {
+                            Text(
+                                stringResource(
+                                    if (type == RecordValueType.NUMBER) R.string.record_number else R.string.record_duration,
+                                ),
+                            )
+                        },
                     )
                 }
             }
@@ -309,7 +327,7 @@ fun AccumulateItemFormScreen(
                         defaultError = null
                     },
                     enabled = !saving,
-                    label = { Text("Default") },
+                    label = { Text(stringResource(R.string.field_default)) },
                     isError = defaultError != null,
                     supportingText = defaultError?.let { message ->
                         { Text(message) }
@@ -325,7 +343,7 @@ fun AccumulateItemFormScreen(
                         stepError = null
                     },
                     enabled = !saving,
-                    label = { Text("Step") },
+                    label = { Text(stringResource(R.string.field_step)) },
                     isError = stepError != null,
                     supportingText = stepError?.let { message ->
                         { Text(message) }
@@ -343,7 +361,7 @@ fun AccumulateItemFormScreen(
                         unitError = null
                     },
                     enabled = !fieldsLocked && !saving,
-                    label = { Text("Unit") },
+                    label = { Text(stringResource(R.string.field_unit)) },
                     isError = unitError != null,
                     supportingText = unitError?.let { message ->
                         { Text(message) }
@@ -366,7 +384,7 @@ fun AccumulateItemFormScreen(
             }
         }
 
-        AppSection(title = "Goal") {
+        AppSection(title = stringResource(R.string.record_goal)) {
             Row(
                 modifier = Modifier
                     .formField()
@@ -379,7 +397,7 @@ fun AccumulateItemFormScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Track a goal", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.track_a_goal), style = MaterialTheme.typography.bodyLarge)
                 Switch(
                     checked = goalEnabled,
                     onCheckedChange = null,
@@ -394,7 +412,7 @@ fun AccumulateItemFormScreen(
                         goalError = null
                     },
                     enabled = !saving,
-                    label = { Text("Goal value") },
+                    label = { Text(stringResource(R.string.field_goal_value)) },
                     isError = goalError != null,
                     supportingText = goalError?.let { message ->
                         { Text(message) }
@@ -410,14 +428,20 @@ fun AccumulateItemFormScreen(
                             onClick = { goalPeriodName = period.name },
                             enabled = !saving,
                             shape = SegmentedButtonDefaults.itemShape(index, GoalPeriod.entries.size),
-                            label = { Text(if (period == GoalPeriod.DAY) "Day" else "7 days") },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (period == GoalPeriod.DAY) R.string.period_day_title else R.string.period_seven_days,
+                                    ),
+                                )
+                            },
                         )
                     }
                 }
             }
         }
 
-        AppSection(title = "Recommendation") {
+        AppSection(title = stringResource(R.string.record_recommendation)) {
             SuggestedTimeFields(
                 windows = parsedWindows,
                 enabled = !saving,
@@ -434,10 +458,10 @@ fun AccumulateItemFormScreen(
                     priorityError = null
                 },
                 enabled = !saving,
-                label = { Text("Priority") },
+                label = { Text(stringResource(R.string.field_priority)) },
                 isError = priorityError != null,
                 supportingText = {
-                    Text(priorityError ?: "Higher values appear first.")
+                    Text(priorityError ?: stringResource(R.string.higher_values_first))
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,

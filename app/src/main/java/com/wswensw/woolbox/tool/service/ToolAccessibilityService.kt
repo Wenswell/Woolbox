@@ -211,7 +211,7 @@ class ToolAccessibilityService : AccessibilityService() {
                 ToolServiceStateStore.update { it.copy(activeTool = ToolActivity.NONE) }
                 Toast.makeText(
                     this@ToolAccessibilityService,
-                    "Unable to save copy history.",
+                    getString(com.wswensw.woolbox.R.string.copy_history_save_failed),
                     Toast.LENGTH_SHORT,
                 ).show()
                 refreshTiles()

@@ -52,11 +52,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RECENT_ACTIVE_DAYS
+import com.wswensw.woolbox.R
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -555,9 +557,9 @@ private fun GoalStatus(
                 )
                 Text(
                     text = if (percent > 100) {
-                        "Goal reached · $percent%"
+                        stringResource(R.string.goal_reached_percent, percent)
                     } else {
-                        "Goal reached"
+                        stringResource(R.string.goal_reached_plain)
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = color,
@@ -600,8 +602,8 @@ internal fun GoalProgressPanel(
     val colors = recordProgressColors(progress = progress, completed = reached)
     val progressColor = colors.accent
     val periodLabel = when (checkNotNull(item.goalPeriod)) {
-        GoalPeriod.DAY -> "today"
-        GoalPeriod.DAYS_7 -> "last 7 days"
+        GoalPeriod.DAY -> stringResource(R.string.period_today)
+        GoalPeriod.DAYS_7 -> stringResource(R.string.period_last_seven_days)
     }
 
     Column(modifier = modifier.fillMaxWidth()) {

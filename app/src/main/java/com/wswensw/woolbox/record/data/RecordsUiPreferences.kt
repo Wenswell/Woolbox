@@ -6,11 +6,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** Root open-task preview limit. null = show all. */
-enum class RootTaskPreviewLimit(val count: Int?, val label: String) {
-    THREE(3, "3"),
-    FIVE(5, "5"),
-    TEN(10, "10"),
-    ALL(null, "All"),
+enum class RootTaskPreviewLimit(val count: Int?) {
+    THREE(3),
+    FIVE(5),
+    TEN(10),
+    ALL(null),
     ;
 
     companion object {

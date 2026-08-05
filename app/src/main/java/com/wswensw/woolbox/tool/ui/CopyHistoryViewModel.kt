@@ -10,6 +10,7 @@ import com.wswensw.woolbox.tool.model.CopySessionScreen
 import com.wswensw.woolbox.tool.model.CopySessionUiState
 import com.wswensw.woolbox.tool.storage.CopyHistoryDatabase
 import com.wswensw.woolbox.tool.storage.CopyHistoryRepository
+import com.wswensw.woolbox.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,14 +49,14 @@ class CopyHistoryViewModel(application: Application) : AndroidViewModel(applicat
             runCatching { repository.get(historyId) }
                 .onSuccess { entry ->
                     if (entry == null) {
-                        onResult("Copy history entry no longer exists.")
+                        onResult(getApplication<Application>().getString(R.string.copy_history_missing))
                     } else {
                         mutableSelectedHistory.value = entry
                         onResult(null)
                     }
                 }
                 .onFailure { error ->
-                    onResult(error.message ?: "Unable to open copy history.")
+                    onResult(error.message ?: getApplication<Application>().getString(R.string.copy_history_open_failed))
                 }
         }
     }
@@ -77,7 +78,9 @@ class CopyHistoryViewModel(application: Application) : AndroidViewModel(applicat
                         ?.copy(session = state.copy(screen = CopySessionScreen.EDITOR))
                     onResult(null)
                 }
-                .onFailure { error -> onResult(error.message ?: "Unable to save copy history.") }
+                .onFailure { error ->
+                    onResult(error.message ?: getApplication<Application>().getString(R.string.copy_history_save_failed))
+                }
         }
     }
 
@@ -90,7 +93,9 @@ class CopyHistoryViewModel(application: Application) : AndroidViewModel(applicat
                     }
                     onResult(null)
                 }
-                .onFailure { error -> onResult(error.message ?: "Unable to delete copy history.") }
+                .onFailure { error ->
+                    onResult(error.message ?: getApplication<Application>().getString(R.string.copy_history_delete_failed))
+                }
         }
     }
 }
@@ -99,7 +104,8 @@ private fun Application.resolveSummary(summary: CopyHistorySummary): CopyHistory
     val appInfo = resolveAppDisplayInfo(summary.packageName)
     return CopyHistorySummaryUi(
         id = summary.id,
-        appName = appInfo?.name?.takeIf(String::isNotBlank) ?: "Unavailable app",
+        appName = appInfo?.name?.takeIf(String::isNotBlank)
+            ?: getString(R.string.unavailable_app),
         appIcon = appInfo?.icon,
         capturedAt = summary.capturedAt,
         textPreview = summary.textPreview,

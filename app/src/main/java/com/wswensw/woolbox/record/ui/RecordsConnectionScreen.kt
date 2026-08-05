@@ -17,10 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.RecordRepository
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
@@ -54,8 +56,8 @@ fun RecordsConnectionScreen(
         }
     }
 
-    AppRouteScaffold(title = "Records connection", onBack = onBack) {
-        AppSection(title = "Server") {
+    AppRouteScaffold(title = stringResource(R.string.records_connection_title), onBack = onBack) {
+        AppSection(title = stringResource(R.string.records_server)) {
             Text(
                 text = RecordRepository.BASE_URL,
                 style = MaterialTheme.typography.bodyMedium,
@@ -67,12 +69,12 @@ fun RecordsConnectionScreen(
             )
         }
 
-        AppSection(title = "Credentials") {
+        AppSection(title = stringResource(R.string.records_credentials)) {
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
                 enabled = !saving,
-                label = { Text("Username") },
+                label = { Text(stringResource(R.string.field_username)) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) },
@@ -89,7 +91,7 @@ fun RecordsConnectionScreen(
                 value = password,
                 onValueChange = { password = it },
                 enabled = !saving,
-                label = { Text("Password") },
+                label = { Text(stringResource(R.string.field_password)) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done,
@@ -132,7 +134,7 @@ fun RecordsConnectionScreen(
                     )
                     .heightIn(min = 52.dp),
             ) {
-                Text(if (saving) "Connecting" else "Save and connect")
+                Text(stringResource(if (saving) R.string.connecting else R.string.save_and_connect))
             }
         }
     }

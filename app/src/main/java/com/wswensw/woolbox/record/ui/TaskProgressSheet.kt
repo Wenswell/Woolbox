@@ -25,9 +25,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.ui.AppStyle
@@ -70,7 +72,12 @@ fun TaskProgressSheet(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "$completed / ${task.steps.size} subtasks",
+                text = pluralStringResource(
+                    R.plurals.subtasks_count,
+                    task.steps.size,
+                    completed,
+                    task.steps.size,
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
             )

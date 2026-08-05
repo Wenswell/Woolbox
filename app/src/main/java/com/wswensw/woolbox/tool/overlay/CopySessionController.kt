@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -147,12 +148,8 @@ class CopySessionController(
         if (text.isBlank()) return
 
         val clipboard = service.getSystemService(ClipboardManager::class.java)
-        clipboard.setPrimaryClip(ClipData.newPlainText("Global Copy", text))
-        Toast.makeText(
-            service,
-            "Copied to clipboard.",
-            Toast.LENGTH_SHORT,
-        ).show()
+        clipboard.setPrimaryClip(ClipData.newPlainText(service.getString(R.string.global_copy_tile_label), text))
+        Toast.makeText(service, service.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
         close()
     }
 
@@ -184,7 +181,7 @@ internal fun CopySessionPanel(
     onSave: (() -> Unit)? = null,
     saveEnabled: Boolean = true,
     onDelete: (() -> Unit)? = null,
-    title: String = "Global Copy",
+    title: String? = null,
 ) {
     val selectedCount = state.selectedIds.size
     val isSelectingText = state.screen == CopySessionScreen.TEXT_SELECTION
@@ -210,7 +207,11 @@ internal fun CopySessionPanel(
                     ),
                     title = {
                         Text(
-                            text = if (isSelectingText) "Select text" else title,
+                            text = if (isSelectingText) {
+                                stringResource(R.string.copy_select_text)
+                            } else {
+                                title ?: stringResource(R.string.global_copy_tile_label)
+                            },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -225,7 +226,9 @@ internal fun CopySessionPanel(
                                         R.drawable.ic_close_24
                                     },
                                 ),
-                                contentDescription = if (isSelectingText) "Back" else "Close",
+                                contentDescription = stringResource(
+                                    if (isSelectingText) R.string.navigation_back else R.string.action_close,
+                                ),
                             )
                         }
                     },
@@ -240,7 +243,9 @@ internal fun CopySessionPanel(
                                     } else {
                                         Icons.Outlined.SelectAll
                                     },
-                                    contentDescription = if (allSelected) "Clear" else "Select all",
+                                    contentDescription = stringResource(
+                                        if (allSelected) R.string.action_clear else R.string.action_select_all,
+                                    ),
                                 )
                             }
                         } else {
@@ -248,7 +253,7 @@ internal fun CopySessionPanel(
                                 IconButton(onClick = onDelete) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_delete_24),
-                                        contentDescription = "Delete",
+                                        contentDescription = stringResource(R.string.action_delete),
                                     )
                                 }
                             }
@@ -259,7 +264,7 @@ internal fun CopySessionPanel(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Check,
-                                        contentDescription = "Save",
+                                        contentDescription = stringResource(R.string.action_save),
                                     )
                                 }
                             }
@@ -297,7 +302,7 @@ internal fun CopySessionPanel(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Reading order",
+                                text = stringResource(R.string.copy_reading_order),
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodyLarge,
                             )
@@ -310,7 +315,7 @@ internal fun CopySessionPanel(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = onOpenTextSelection,
                         ) {
-                            Text("Select text ($selectedCount)")
+                            Text(stringResource(R.string.copy_select_text_count, selectedCount))
                         }
                         OutlinedTextField(
                             value = state.currentDraftText,
@@ -318,7 +323,7 @@ internal fun CopySessionPanel(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 180.dp),
-                            label = { Text("Text") },
+                            label = { Text(stringResource(R.string.copy_text_label)) },
                             minLines = 6,
                         )
                     }
@@ -350,7 +355,7 @@ private fun CopyBottomBar(
                 contentDescription = null,
             )
             Spacer(Modifier.width(8.dp))
-            Text("Copy")
+            Text(stringResource(R.string.action_copy))
         }
     }
 }
@@ -374,7 +379,7 @@ private fun CopyTextSelectionList(
                         .padding(24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("No accessible text in this window.")
+                    Text(stringResource(R.string.copy_no_accessible_text))
                 }
             }
         } else {

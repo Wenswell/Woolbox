@@ -51,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -168,7 +170,9 @@ fun RecordsScreen(
             state.error != null && !state.hasSnapshot -> item {
                 RecordsStatusCard(
                     message = state.error,
-                    actionLabel = if (state.connection.isConfigured) "Retry" else "Configure connection",
+                    actionLabel = stringResource(
+                        if (state.connection.isConfigured) R.string.action_retry else R.string.configure_connection,
+                    ),
                     onAction = if (state.connection.isConfigured) onRetry else onConfigureConnection,
                 )
             }
@@ -177,7 +181,7 @@ fun RecordsScreen(
                     item {
                         RecordsStatusCard(
                             message = state.error,
-                            actionLabel = "Retry",
+                            actionLabel = stringResource(R.string.action_retry),
                             onAction = onRetry,
                         )
                     }
@@ -222,7 +226,7 @@ fun RecordsScreen(
                 }
                 item {
                     RecordsSectionHeader(
-                        title = "Tasks",
+                        title = stringResource(R.string.records_tasks),
                         onManage = onManageTasks,
                     )
                 }
@@ -230,7 +234,7 @@ fun RecordsScreen(
                     item { EmptyTaskSummary() }
                 } else {
                     if (overdueTasks.isNotEmpty()) {
-                        item { TaskGroupHeader(title = "Overdue", count = overdueTasks.size) }
+                        item { TaskGroupHeader(title = stringResource(R.string.overdue), count = overdueTasks.size) }
                         val visibleOverdue = previewLimit?.let { overdueTasks.take(it) } ?: overdueTasks
                         items(visibleOverdue, key = { "overdue-${it.id}" }) { task ->
                             TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
@@ -238,13 +242,14 @@ fun RecordsScreen(
                         if (previewLimit != null && overdueTasks.size > previewLimit) {
                             item {
                                 TextButton(onClick = onManageTasks) {
-                                    Text("+${overdueTasks.size - previewLimit} more in Manage")
+                                    val more = overdueTasks.size - previewLimit
+                                    Text(pluralStringResource(R.plurals.more_in_manage, more, more))
                                 }
                             }
                         }
                     }
                     if (todayTasks.isNotEmpty()) {
-                        item { TaskGroupHeader(title = "Today", count = todayTasks.size) }
+                        item { TaskGroupHeader(title = stringResource(R.string.today), count = todayTasks.size) }
                         val visibleToday = previewLimit?.let { todayTasks.take(it) } ?: todayTasks
                         items(visibleToday, key = { "today-${it.id}" }) { task ->
                             TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
@@ -252,7 +257,8 @@ fun RecordsScreen(
                         if (previewLimit != null && todayTasks.size > previewLimit) {
                             item {
                                 TextButton(onClick = onManageTasks) {
-                                    Text("+${todayTasks.size - previewLimit} more in Manage")
+                                    val more = todayTasks.size - previewLimit
+                                    Text(pluralStringResource(R.plurals.more_in_manage, more, more))
                                 }
                             }
                         }
@@ -270,15 +276,15 @@ fun RecordsScreen(
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
                     RecordsSectionHeader(
-                        title = "Accumulate",
+                        title = stringResource(R.string.records_accumulate),
                         onManage = onManageAccumulates,
                     )
                 }
                 if (accumulateItems.isEmpty()) {
                     item {
                         RecordsStatusCard(
-                            message = "No accumulate items yet.",
-                            actionLabel = "Manage accumulates",
+                            message = stringResource(R.string.no_accumulate_items),
+                            actionLabel = stringResource(R.string.manage_accumulates),
                             onAction = onManageAccumulates,
                         )
                     }
@@ -307,15 +313,15 @@ fun RecordsScreen(
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
                     RecordsSectionHeader(
-                        title = "Measurement",
+                        title = stringResource(R.string.records_measurement),
                         onManage = onManageMeasurements,
                     )
                 }
                 if (measurementItems.isEmpty()) {
                     item {
                         RecordsStatusCard(
-                            message = "No measurement items yet.",
-                            actionLabel = "Manage measurements",
+                            message = stringResource(R.string.no_measurement_items),
+                            actionLabel = stringResource(R.string.manage_measurements),
                             onAction = onManageMeasurements,
                         )
                     }
@@ -395,13 +401,13 @@ private fun LaterTasksSummary(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Later",
+                    text = stringResource(R.string.later),
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "$count ${if (count == 1) "task" else "tasks"} scheduled later",
+                    text = pluralStringResource(R.plurals.tasks_scheduled_later, count, count),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -419,7 +425,7 @@ private fun LaterTasksSummary(
 @Composable
 private fun EmptyTaskSummary() {
     Text(
-        text = "No active tasks",
+        text = stringResource(R.string.no_active_tasks),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier
@@ -545,7 +551,7 @@ private fun TaskProgressCard(
                 }
                 if (nextStepTitle != null) {
                     Text(
-                        text = "Next · $nextStepTitle",
+                        text = stringResource(R.string.next_step, nextStepTitle),
                         color = cardContentColor.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -685,7 +691,9 @@ private fun AccumulateRailCard(
                             } else {
                                 Icons.Outlined.Flag
                             },
-                            contentDescription = if (isDays7Goal) "7-day goal" else "Daily goal",
+                            contentDescription = stringResource(
+                                if (isDays7Goal) R.string.seven_day_goal else R.string.daily_goal,
+                            ),
                             tint = progressColor,
                             modifier = Modifier.size(14.dp),
                         )
@@ -785,7 +793,8 @@ private fun MeasurementRailCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = latest?.let { measurementDateTimeLabel(it.occurredAt) } ?: "No measurements yet.",
+                    text = latest?.let { measurementDateTimeLabel(it.occurredAt) }
+                        ?: stringResource(R.string.no_measurements_yet),
                     color = colors.onContainer.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
