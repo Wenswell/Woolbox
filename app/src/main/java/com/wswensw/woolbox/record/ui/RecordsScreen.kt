@@ -144,7 +144,7 @@ fun RecordsScreen(
                 if (scrolling) {
                     pauseDecorativeMotion = true
                 } else {
-                    delay(300)
+                    delay(800)
                     pauseDecorativeMotion = false
                 }
             }
