@@ -1,12 +1,8 @@
 package com.wswensw.woolbox.record.ui
 
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -84,26 +80,32 @@ internal fun LiquidProgressFill(
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
         label = "LiquidProgressFillLevel",
     )
-    val waveActive = !reduceMotion &&
-        !pauseDecorativeMotion &&
+    val waveVisible = !reduceMotion &&
         target > 0.001f &&
         target < 0.999f
-    // Keep the infinite clock out of composition while scrolling or idle so it
-    // does not schedule per-frame work for off-need cards.
-    val phase = if (waveActive) {
-        val transition = rememberInfiniteTransition(label = "LiquidProgressWave")
-        val animatedPhase by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = (2f * PI).toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2800, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "LiquidProgressPhase",
-        )
-        animatedPhase
-    } else {
-        0f
+    val wavePeriod = (2f * PI).toFloat()
+    val wavePhase = remember { Animatable(0f) }
+    LaunchedEffect(waveVisible, pauseDecorativeMotion) {
+        if (!waveVisible) {
+            wavePhase.snapTo(0f)
+            return@LaunchedEffect
+        }
+        if (pauseDecorativeMotion) return@LaunchedEffect
+        while (true) {
+            val remaining = ((wavePeriod - wavePhase.value) / wavePeriod).coerceIn(0f, 1f)
+            if (remaining <= 0.0001f) {
+                wavePhase.snapTo(0f)
+                continue
+            }
+            wavePhase.animateTo(
+                targetValue = wavePeriod,
+                animationSpec = tween(
+                    durationMillis = (2_800 * remaining).toInt().coerceAtLeast(16),
+                    easing = LinearEasing,
+                ),
+            )
+            wavePhase.snapTo(0f)
+        }
     }
     val frontPath = remember { Path() }
     val backPath = remember { Path() }
@@ -113,12 +115,12 @@ internal fun LiquidProgressFill(
         if (animatedProgress <= 0.001f) return@Canvas
         val frontAlpha = if (animatedProgress >= 0.999f) 0.34f else 0.26f
         val backAlpha = if (animatedProgress >= 0.999f) 0.18f else 0.14f
-        val amp = if (!waveActive) 0f else densityAmp.toPx()
-        val ampBack = if (!waveActive) 0f else densityAmpBack.toPx()
+        val amp = if (!waveVisible) 0f else densityAmp.toPx()
+        val ampBack = if (!waveVisible) 0f else densityAmpBack.toPx()
         drawLiquidLayer(
             path = backPath,
             progress = animatedProgress,
-            phase = phase + 1.1f,
+            phase = wavePhase.value + 1.1f,
             amplitude = ampBack,
             waves = 1.15f,
             color = fillColor.copy(alpha = backAlpha),
@@ -126,7 +128,7 @@ internal fun LiquidProgressFill(
         drawLiquidLayer(
             path = frontPath,
             progress = animatedProgress,
-            phase = phase,
+            phase = wavePhase.value,
             amplitude = amp,
             waves = 1.0f,
             color = fillColor.copy(alpha = frontAlpha),

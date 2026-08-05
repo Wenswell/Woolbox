@@ -44,7 +44,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.26` (`versionCode 27`) |
+| 版本 | `0.1.27` (`versionCode 28`) |
 
 ## 目录
 
