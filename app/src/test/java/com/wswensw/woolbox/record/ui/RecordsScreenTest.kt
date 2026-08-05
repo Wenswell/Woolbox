@@ -1,10 +1,16 @@
 package com.wswensw.woolbox.record.ui
 
 import com.wswensw.woolbox.record.model.GoalPeriod
+import com.wswensw.woolbox.record.model.DayRing
+import com.wswensw.woolbox.record.model.FocusCandidate
+import com.wswensw.woolbox.record.model.FocusReason
+import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
+import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.RecordValueType
+import com.wswensw.woolbox.record.model.StreakDays
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
@@ -237,6 +243,59 @@ class RecordsScreenTest {
     @Test
     fun queuedFocusReasonHasNoVisibleLabel() {
         assertEquals("", focusReasonLabel(com.wswensw.woolbox.record.model.FocusReason.Queued))
+    }
+
+    @Test
+    fun focusStatusSeparatesEnglishDateFromDayProgress() {
+        val clock = RecordsClock(LocalDate.of(2026, 8, 5), 11 * 60 + 32)
+
+        assertEquals(
+            "Wed, 5 Aug · 3-day streak",
+            focusDateLabel(clock, StreakDays(days = 3, atHistoryLimit = false)),
+        )
+        assertEquals(
+            "Wed, 5 Aug · 30+ day streak",
+            focusDateLabel(clock, StreakDays(days = 30, atHistoryLimit = true)),
+        )
+        assertEquals("11:32 · 1/4 today", focusDayStatusLabel(clock, DayRing(closed = 1, total = 4)))
+        assertEquals("11:32 · No daily goals", focusDayStatusLabel(clock, DayRing(closed = 0, total = 0)))
+    }
+
+    @Test
+    fun upNextRowsAlwaysHaveSupportingContext() {
+        val accumulate = recordItem(id = 1, name = "Water", priority = 1, period = GoalPeriod.DAY)
+            .copy(goalValue = 10.0, unit = "L")
+        val task = TodoTask(
+            id = 2,
+            title = "Morning routine",
+            plannedDate = LocalDate.of(2026, 8, 5),
+            completedAt = null,
+            createdAt = 0,
+            updatedAt = 0,
+            steps = listOf(TodoStep(3, 2, "Brush", null, 0, 0)),
+        )
+
+        assertEquals(
+            "4 / 10 L",
+            focusQueueSupportingLabel(
+                FocusCandidate(NowTarget.Accumulate(accumulate), FocusReason.Queued),
+                cumulative = 4.0,
+            ),
+        )
+        assertEquals(
+            "Morning routine",
+            focusQueueSupportingLabel(
+                FocusCandidate(NowTarget.Task(task, task.steps.single()), FocusReason.Queued),
+                cumulative = null,
+            ),
+        )
+        assertEquals(
+            "Morning routine · 20m left",
+            focusQueueSupportingLabel(
+                FocusCandidate(NowTarget.Task(task, task.steps.single()), FocusReason.DueNow(20)),
+                cumulative = null,
+            ),
+        )
     }
 
 

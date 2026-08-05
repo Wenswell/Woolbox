@@ -27,14 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,7 +44,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -103,16 +100,11 @@ fun RecordsScreen(
     onOpenTask: (TodoTask) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var completedTasksExpanded by rememberSaveable { mutableStateOf(false) }
-    var laterTasksExpanded by rememberSaveable { mutableStateOf(false) }
     val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
     val overdueTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
     val todayTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.TODAY }
     val laterTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.LATER }
     val previewLimit = rootTaskPreviewLimit.count
-    val completedTasks = state.tasks
-        .filter(TodoTask::isCompleted)
-        .sortedByDescending(TodoTask::completedAt)
     val accumulateItems = orderedRecordItems(state.activeItems)
         .filter { it.mode == RecordMode.ACCUMULATE }
     val measurementItems = state.activeItems
@@ -231,18 +223,11 @@ fun RecordsScreen(
                 item {
                     RecordsSectionHeader(
                         title = "Tasks",
-                        manageContentDescription = "Manage tasks",
                         onManage = onManageTasks,
                     )
                 }
                 if (openTasks.isEmpty()) {
-                    item {
-                        RecordsStatusCard(
-                            message = "No open tasks.",
-                            actionLabel = "Manage tasks",
-                            onAction = onManageTasks,
-                        )
-                    }
+                    item { EmptyTaskSummary() }
                 } else {
                     if (overdueTasks.isNotEmpty()) {
                         item { TaskGroupHeader(title = "Overdue", count = overdueTasks.size) }
@@ -258,16 +243,8 @@ fun RecordsScreen(
                             }
                         }
                     }
-                    item { TaskGroupHeader(title = "Today", count = todayTasks.size) }
-                    if (todayTasks.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No today tasks.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    } else {
+                    if (todayTasks.isNotEmpty()) {
+                        item { TaskGroupHeader(title = "Today", count = todayTasks.size) }
                         val visibleToday = previewLimit?.let { todayTasks.take(it) } ?: todayTasks
                         items(visibleToday, key = { "today-${it.id}" }) { task ->
                             TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
@@ -282,41 +259,9 @@ fun RecordsScreen(
                     }
                     if (laterTasks.isNotEmpty()) {
                         item {
-                            TaskGroupHeader(
-                                title = "Later",
+                            LaterTasksSummary(
                                 count = laterTasks.size,
-                                expanded = laterTasksExpanded,
-                                onToggle = { laterTasksExpanded = !laterTasksExpanded },
-                            )
-                        }
-                        if (laterTasksExpanded) {
-                            val visibleLater = previewLimit?.let { laterTasks.take(it) } ?: laterTasks
-                            items(visibleLater, key = { "later-${it.id}" }) { task ->
-                                TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
-                            }
-                            if (previewLimit != null && laterTasks.size > previewLimit) {
-                                item {
-                                    TextButton(onClick = onManageTasks) {
-                                        Text("+${laterTasks.size - previewLimit} more in Manage")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (completedTasks.isNotEmpty()) {
-                    item {
-                        CompletedTasksHeader(
-                            count = completedTasks.size,
-                            expanded = completedTasksExpanded,
-                            onToggle = { completedTasksExpanded = !completedTasksExpanded },
-                        )
-                    }
-                    if (completedTasksExpanded) {
-                        items(completedTasks, key = { "done-${it.id}" }) { task ->
-                            TaskProgressCard(
-                                task = task,
-                                onOpen = { onOpenTask(task) },
+                                onClick = onManageTasks,
                             )
                         }
                     }
@@ -326,7 +271,6 @@ fun RecordsScreen(
                 item {
                     RecordsSectionHeader(
                         title = "Accumulate",
-                        manageContentDescription = "Manage accumulates",
                         onManage = onManageAccumulates,
                     )
                 }
@@ -364,7 +308,6 @@ fun RecordsScreen(
                 item {
                     RecordsSectionHeader(
                         title = "Measurement",
-                        manageContentDescription = "Manage measurements",
                         onManage = onManageMeasurements,
                     )
                 }
@@ -403,90 +346,104 @@ fun RecordsScreen(
 @Composable
 private fun RecordsSectionHeader(
     title: String,
-    manageContentDescription: String,
     onManage: () -> Unit,
 ) {
-    Row(
+    Surface(
+        onClick = onManage,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .heightIn(min = 48.dp),
+        color = Color.Transparent,
     ) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(
-            onClick = onManage,
-            modifier = Modifier.size(36.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
             Icon(
-                painter = painterResource(R.drawable.ic_settings_24),
-                contentDescription = manageContentDescription,
-                modifier = Modifier.size(18.dp),
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
             )
         }
     }
 }
 
 @Composable
-private fun CompletedTasksHeader(
+private fun LaterTasksSummary(
     count: Int,
-    expanded: Boolean,
-    onToggle: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp),
+        shape = RecordsCardShape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Text(
-            text = "Completed ($count)",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onToggle) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Later",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "$count ${if (count == 1) "task" else "tasks"} scheduled later",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Icon(
-                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                contentDescription = if (expanded) "Collapse completed tasks" else "Expand completed tasks",
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
             )
         }
     }
 }
 
+@Composable
+private fun EmptyTaskSummary() {
+    Text(
+        text = "No active tasks",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(vertical = 12.dp),
+    )
+}
 
 @Composable
-private fun TaskGroupHeader(
-    title: String,
-    count: Int,
-    expanded: Boolean? = null,
-    onToggle: (() -> Unit)? = null,
-) {
+private fun TaskGroupHeader(title: String, count: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp),
+            .padding(top = 4.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "$title ($count)",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
-        if (expanded != null && onToggle != null) {
-            IconButton(onClick = onToggle) {
-                Icon(
-                    imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = if (expanded) "Collapse $title" else "Expand $title",
-                )
-            }
-        }
     }
 }
 
@@ -529,7 +486,7 @@ private fun TaskProgressCard(
     Card(
         onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
-        shape = AppStyle.cardShape,
+        shape = RecordsCardShape,
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent,
             contentColor = cardContentColor,
@@ -655,7 +612,7 @@ private fun AccumulateRailCard(
     Card(
         onClick = onClick,
         modifier = modifier.height(GridCardHeight),
-        shape = AppStyle.cardShape,
+        shape = RecordsCardShape,
         colors = CardDefaults.cardColors(
             containerColor = container,
             contentColor = contentColor,
@@ -789,7 +746,7 @@ private fun MeasurementRailCard(
     Card(
         onClick = onOpen,
         modifier = modifier.height(GridCardHeight),
-        shape = AppStyle.cardShape,
+        shape = RecordsCardShape,
         colors = CardDefaults.cardColors(
             containerColor = container,
             contentColor = onContainer,

@@ -21,10 +21,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Card
@@ -34,6 +37,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,7 +73,6 @@ import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.focusQueue
 import com.wswensw.woolbox.record.model.focusTargetKey
 import com.wswensw.woolbox.record.model.stepRecordValue
-import com.wswensw.woolbox.ui.AppStyle
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -119,13 +123,27 @@ internal fun RecordsFocusCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = focusDayLabel(now, ring, streak),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = focusDateLabel(now, streak),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = focusDayStatusLabel(now, ring),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+        }
         DayElapsedRule(fraction = now.dayFraction)
         AnimatedContent(
             targetState = lead,
@@ -160,19 +178,42 @@ internal fun RecordsFocusCard(
                 )
             }
         }
-        rest.forEach { candidate ->
-            key(focusTargetKey(candidate.target)) {
-                FocusQueueRow(
-                    candidate = candidate,
-                    instant = instant,
-                    stepChanging = changingStepId != null,
-                    onOpenItem = onOpenItem,
-                    onOpenTask = onOpenTask,
-                    onCompleteStep = { task, step ->
-                        changingStepId = step.id
-                        onCompleteStep(task, step) { changingStepId = null }
-                    },
-                )
+        if (rest.isNotEmpty()) {
+            Text(
+                text = "Up next",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RecordsCardShape,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Column {
+                    rest.forEachIndexed { index, candidate ->
+                        key(focusTargetKey(candidate.target)) {
+                            FocusQueueRow(
+                                candidate = candidate,
+                                cumulative = (candidate.target as? NowTarget.Accumulate)?.item?.let(cumulativeOf),
+                                instant = instant,
+                                stepChanging = changingStepId != null,
+                                onOpenItem = onOpenItem,
+                                onOpenTask = onOpenTask,
+                                onCompleteStep = { task, step ->
+                                    changingStepId = step.id
+                                    onCompleteStep(task, step) { changingStepId = null }
+                                },
+                            )
+                            if (index < rest.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 60.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -185,7 +226,7 @@ private fun DayElapsedRule(fraction: Float) {
         modifier = Modifier
             .fillMaxWidth()
             .height(2.dp)
-            .clip(AppStyle.cardShape)
+            .clip(CircleShape)
             .background(track.copy(alpha = 0.14f)),
     ) {
         Box(
@@ -245,7 +286,7 @@ private fun AccumulateFocusHero(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppStyle.cardShape,
+        shape = RecordsCardShape,
         colors = CardDefaults.cardColors(containerColor = colors.container, contentColor = colors.onContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -257,8 +298,8 @@ private fun AccumulateFocusHero(
                 modifier = Modifier.fillMaxSize(),
             )
             Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 HeroHeader(
                     title = displayRecordName(item.name),
@@ -353,7 +394,7 @@ private fun TaskFocusHero(
     var errorMessage by rememberSaveable(step.id) { mutableStateOf<String?>(null) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppStyle.cardShape,
+        shape = RecordsCardShape,
         colors = CardDefaults.cardColors(containerColor = colors.container, contentColor = colors.onContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -367,8 +408,8 @@ private fun TaskFocusHero(
                 modifier = Modifier.fillMaxSize(),
             )
             Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 HeroHeader(
                     title = step.title,
@@ -478,6 +519,7 @@ private fun HeroHeader(
 @Composable
 private fun FocusQueueRow(
     candidate: FocusCandidate,
+    cumulative: Double?,
     instant: Boolean,
     stepChanging: Boolean,
     onOpenItem: (RecordItem) -> Unit,
@@ -494,18 +536,32 @@ private fun FocusQueueRow(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = 56.dp)
             .then(if (instant) Modifier else Modifier.animateContentSize()),
-        color = MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (target is NowTarget.Task) {
-                Checkbox(
+            when (target) {
+                is NowTarget.Accumulate -> Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.AddCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                is NowTarget.Task -> Checkbox(
                     checked = false,
                     enabled = !stepChanging,
                     onCheckedChange = { checked ->
@@ -513,21 +569,28 @@ private fun FocusQueueRow(
                     },
                 )
             }
-            Text(
-                text = focusTargetLabel(target),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            focusReasonLabel(candidate.reason).takeIf { it.isNotEmpty() }?.let { reason ->
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = reason,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
+                    text = focusTargetLabel(target),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = focusQueueSupportingLabel(candidate, cumulative),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
@@ -537,7 +600,7 @@ private fun DayClearedCard(ring: DayRing) {
     val colors = recordsDoneColors(dark = MaterialTheme.colorScheme.background.luminance() < 0.5f)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = AppStyle.cardShape,
+        shape = RecordsCardShape,
         colors = CardDefaults.cardColors(containerColor = colors.container, contentColor = colors.onContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -588,6 +651,20 @@ internal fun focusTargetLabel(target: NowTarget): String = when (target) {
     is NowTarget.Task -> target.step.title
 }
 
+internal fun focusQueueSupportingLabel(candidate: FocusCandidate, cumulative: Double?): String {
+    val reason = focusReasonLabel(candidate.reason)
+    return when (val target = candidate.target) {
+        is NowTarget.Accumulate -> reason.ifEmpty {
+            focusCumulativeLabel(target.item, cumulative ?: 0.0)
+        }
+        is NowTarget.Task -> if (reason.isEmpty()) {
+            target.task.title
+        } else {
+            "${target.task.title} · $reason"
+        }
+    }
+}
+
 internal fun focusReasonLabel(reason: FocusReason): String = when (reason) {
     is FocusReason.DueNow -> "${formatMinuteSpan(reason.endsInMinutes)} left"
     is FocusReason.Habit -> "usually ${formatMinute(reason.habitMinute)}"
@@ -596,19 +673,21 @@ internal fun focusReasonLabel(reason: FocusReason): String = when (reason) {
     FocusReason.Queued -> ""
 }
 
-internal fun focusDayLabel(clock: RecordsClock, ring: DayRing, streak: StreakDays): String = buildString {
+internal fun focusDateLabel(clock: RecordsClock, streak: StreakDays): String = buildString {
     append(DayLabelFormatter.format(clock.date))
-    append(" · ")
+    if (streak.isVisible) {
+        append(" · ")
+        append(if (streak.atHistoryLimit) "${streak.days}+ day streak" else "${streak.days}-day streak")
+    }
+}
+
+internal fun focusDayStatusLabel(clock: RecordsClock, ring: DayRing): String = buildString {
     append(formatMinute(clock.minuteOfDay))
     append(" · ")
     if (ring.isVisible) {
         append("${ring.closed}/${ring.total} today")
     } else {
         append("No daily goals")
-    }
-    if (streak.isVisible) {
-        append(" · ")
-        append(if (streak.atHistoryLimit) "${streak.days}+ days" else "${streak.days} days")
     }
 }
 
@@ -624,4 +703,4 @@ internal fun formatMinuteSpan(minutes: Int): String {
 }
 
 private val DayLabelFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
+    DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH)

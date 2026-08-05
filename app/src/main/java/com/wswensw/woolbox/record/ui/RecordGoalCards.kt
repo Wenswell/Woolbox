@@ -61,6 +61,7 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
+internal val RecordsCardShape = RoundedCornerShape(8.dp)
 
 /**
  * Bottom-up liquid progress fill for accumulate cards.
