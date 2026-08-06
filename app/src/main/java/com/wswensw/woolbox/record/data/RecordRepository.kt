@@ -11,7 +11,6 @@ import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordValidationException
 import com.wswensw.woolbox.record.model.RecordValueType
-import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.FOCUS_HISTORY_DAYS
@@ -25,7 +24,6 @@ import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.record.model.validated
 import com.wswensw.woolbox.record.model.validatedTaskTitle
-import com.wswensw.woolbox.record.model.validatedWindows
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.time.Instant
@@ -53,10 +51,8 @@ data class RecordsConnection(
     val username: String,
 )
 
-/** A subtask being created, with the times of day it is suggested at. */
 data class TodoStepDraft(
     val title: String,
-    val windows: List<RecordWindow> = emptyList(),
 )
 
 data class RecordsSnapshot(
@@ -134,7 +130,6 @@ class RecordRepository(context: Context) {
             putNullable("goalValue", draft.goalValue)
             putNullable("goalPeriod", draft.goalPeriod?.name)
             put("priority", draft.priority)
-            put("windows", windowsJson(draft.windows))
         }
         request(
             method = if (itemId == null) "POST" else "PUT",
@@ -209,24 +204,22 @@ class RecordRepository(context: Context) {
     suspend fun createStep(
         taskId: Long,
         title: String,
-        windows: List<RecordWindow> = emptyList(),
     ): Long = withContext(Dispatchers.IO) {
         request(
             "POST",
             "tasks/$taskId/steps",
-            body = stepJson(TodoStepDraft(title = title, windows = windows)),
+            body = stepJson(TodoStepDraft(title = title)),
         ).getJSONObject("step").getLong("id")
     }
 
     suspend fun updateStep(
         stepId: Long,
         title: String,
-        windows: List<RecordWindow> = emptyList(),
     ) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "steps/$stepId",
-            body = stepJson(TodoStepDraft(title = title, windows = windows)),
+            body = stepJson(TodoStepDraft(title = title)),
         )
         Unit
     }
@@ -320,14 +313,13 @@ private fun parseItem(value: JSONObject): RecordItem {
         goalPeriod = value.nullableString("goalPeriod")?.let(GoalPeriod::valueOf),
         priority = value.getInt("priority"),
         archived = value.getBoolean("archived"),
-        windows = value.getJSONArray("windows").mapObjects(::parseWindow),
         createdAt = value.getLong("createdAt"),
         updatedAt = value.getLong("updatedAt"),
     )
     if (item.mode == RecordMode.MEASUREMENT) {
         val minValue = item.minValue ?: throw RecordValidationException("Measurement minimum is missing from the server response.")
         val maxValue = item.maxValue ?: throw RecordValidationException("Measurement maximum is missing from the server response.")
-        if (item.valueType != RecordValueType.NUMBER || item.defaultValue != null || item.goalValue != null || item.goalPeriod != null || item.windows.isNotEmpty()) {
+        if (item.valueType != RecordValueType.NUMBER || item.defaultValue != null || item.goalValue != null || item.goalPeriod != null) {
             throw RecordValidationException("Measurement configuration is invalid in the server response.")
         }
         measurementStepCount(minValue, maxValue, item.stepValue)
@@ -351,21 +343,6 @@ private fun parseEntry(value: JSONObject) = RecordEntry(
 
 private fun stepJson(step: TodoStepDraft) = JSONObject()
     .put("title", validatedTaskTitle(step.title))
-    .put("windows", windowsJson(step.windows))
-
-private fun windowsJson(windows: List<RecordWindow>) = JSONArray(
-    validatedWindows(windows).map { window ->
-        JSONObject()
-            .put("startMinute", window.startMinute)
-            .put("endMinute", window.endMinute)
-    },
-)
-
-private fun parseWindow(value: JSONObject) = RecordWindow(
-    id = value.getLong("id"),
-    startMinute = value.getInt("startMinute"),
-    endMinute = value.getInt("endMinute"),
-)
 
 private fun parseTask(value: JSONObject) = TodoTask(
     id = value.getLong("id"),
@@ -384,7 +361,6 @@ private fun parseStep(value: JSONObject) = TodoStep(
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
-    windows = value.getJSONArray("windows").mapObjects(::parseWindow),
 )
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =

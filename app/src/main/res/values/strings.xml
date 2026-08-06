@@ -163,7 +163,6 @@
     <string name="record_details">Details</string>
     <string name="record_measurement">Measurement</string>
     <string name="record_goal">Goal</string>
-    <string name="record_recommendation">Recommendation</string>
     <string name="field_name">Name</string>
     <string name="field_description">Description</string>
     <string name="field_default">Default</string>
@@ -172,22 +171,13 @@
     <string name="field_goal_value">Goal value</string>
     <string name="field_priority">Priority</string>
     <string name="track_a_goal">Track a goal</string>
-    <string name="suggested_time">Suggested time</string>
     <string name="today">Today</string>
-    <string name="later">Later</string>
     <string name="overdue">Overdue</string>
+    <string name="planned">Planned</string>
+    <string name="unscheduled">Unscheduled</string>
+    <string name="completed">Completed</string>
     <string name="choose_date">Choose date</string>
-    <string name="remove_suggested_times">Remove suggested times before moving this task to Later.</string>
-    <string name="time_to">to</string>
-    <string name="remove_suggested_time">Remove suggested time</string>
-    <string name="add_suggested_time">Add suggested time</string>
-    <string name="no_suggested_times">No suggested times. Never appears in the Now band.</string>
-    <string name="suggested_time_shown">Shown in the Now band for %1$s of the day.</string>
-    <string name="no_task_suggested_times">No suggested times. Queued on the task date.</string>
-    <string name="task_suggested_time_shown">Shown in the Now band on the task date for %1$s.</string>
-    <string name="invalid_suggested_times">Suggested times are invalid.</string>
-    <string name="duration_minutes_short">%1$dm</string>
-    <string name="duration_hours_minutes_short">%1$dh %2$dm</string>
+    <string name="remove_date">Remove date</string>
     <string name="edit_accumulate">Edit accumulate</string>
     <string name="edit_measurement">Edit measurement</string>
     <string name="editing_accumulate">Editing accumulate</string>
@@ -215,9 +205,17 @@
         <item quantity="one">+%d more in Manage</item>
         <item quantity="other">+%d more in Manage</item>
     </plurals>
-    <plurals name="tasks_scheduled_later">
-        <item quantity="one">%d task scheduled later</item>
-        <item quantity="other">%d tasks scheduled later</item>
+    <plurals name="tasks_planned">
+        <item quantity="one">%d task planned for a future date</item>
+        <item quantity="other">%d tasks planned for future dates</item>
+    </plurals>
+    <plurals name="tasks_unscheduled">
+        <item quantity="one">%d task without a date</item>
+        <item quantity="other">%d tasks without dates</item>
+    </plurals>
+    <plurals name="days_overdue">
+        <item quantity="one">%d day overdue</item>
+        <item quantity="other">%d days overdue</item>
     </plurals>
     <plurals name="subtasks_count">
         <item quantity="one">%1$d / %2$d subtask</item>
@@ -241,15 +239,12 @@
     <string name="task_title">Task</string>
     <string name="field_title">Title</string>
     <string name="subtasks">Subtasks</string>
-    <string name="set_task_date_for_times">Set a task date to add suggested times.</string>
-    <string name="suggested_times_for_subtask">Suggested times for subtask %1$d</string>
     <string name="move_subtask_up">Move subtask %1$d up</string>
     <string name="move_subtask_down">Move subtask %1$d down</string>
     <string name="remove_subtask">Remove subtask %1$d</string>
     <string name="add_subtask">Add subtask</string>
     <string name="subtask_number">Subtask %1$d</string>
     <string name="each_subtask_title">Each subtask needs a title.</string>
-    <string name="save_task_date_first">Save a task date before adding suggested times.</string>
     <string name="new_subtask">New subtask</string>
     <string name="edit_subtask">Edit subtask</string>
     <string name="delete_subtask_question">Delete subtask?</string>
@@ -319,7 +314,6 @@
     <string name="streak_days">%1$d-day streak</string>
     <string name="streak_days_limited">%1$d+ day streak</string>
     <string name="today_progress">%1$d/%2$d today</string>
-    <string name="due_minutes_left">%1$s left</string>
     <string name="usually_at">usually %1$s</string>
     <string name="streak_risk">%1$d-day streak</string>
     <string name="behind_percent">behind · %1$d%%</string>

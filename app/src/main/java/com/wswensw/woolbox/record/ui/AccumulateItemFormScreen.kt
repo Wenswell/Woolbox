@@ -29,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -108,10 +107,6 @@ fun AccumulateItemFormScreen(
         mutableStateOf((item?.goalPeriod ?: GoalPeriod.DAY).name)
     }
     var priority by rememberSaveable(item?.id) { mutableStateOf(item?.priority?.toString() ?: "1") }
-    var windows by rememberSaveable(item?.id) {
-        mutableStateOf(item?.windows?.map { "${it.startMinute},${it.endMinute}" }.orEmpty())
-    }
-    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var nameError by rememberSaveable { mutableStateOf<String?>(null) }
     var defaultError by rememberSaveable { mutableStateOf<String?>(null) }
@@ -131,7 +126,6 @@ fun AccumulateItemFormScreen(
 
     val valueType = RecordValueType.valueOf(valueTypeName)
     val goalPeriod = GoalPeriod.valueOf(goalPeriodName)
-    val parsedWindows = windows.map(::decodeWindow)
 
     fun clearFieldErrors() {
         nameError = null
@@ -201,7 +195,6 @@ fun AccumulateItemFormScreen(
             goalValue = if (goalEnabled) parsePositive(goalValue, "Goal") else null,
             goalPeriod = goalPeriod.takeIf { goalEnabled },
             priority = checkNotNull(priority.toIntOrNull()),
-            windows = parsedWindows,
         )
         saving = true
         onSave(draft) { error ->
@@ -441,16 +434,7 @@ fun AccumulateItemFormScreen(
             }
         }
 
-        AppSection(title = stringResource(R.string.record_recommendation)) {
-            SuggestedTimeFields(
-                windows = parsedWindows,
-                enabled = !saving,
-                onEditTime = { timeEditTarget = it },
-                onRemove = { index ->
-                    windows = windows.toMutableList().also { it.removeAt(index) }
-                },
-                onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
-            )
+        AppSection(title = stringResource(R.string.field_priority)) {
             OutlinedTextField(
                 value = priority,
                 onValueChange = {
@@ -478,17 +462,5 @@ fun AccumulateItemFormScreen(
             )
         }
         Spacer(Modifier.height(16.dp))
-    }
-
-    timeEditTarget?.let { target ->
-        val window = parsedWindows.getOrNull(target.index) ?: return@let
-        RecordTimePickerDialog(
-            initialMinute = if (target.start) window.startMinute else window.endMinute,
-            onDismiss = { timeEditTarget = null },
-            onConfirm = { minute ->
-                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
-                timeEditTarget = null
-            },
-        )
     }
 }

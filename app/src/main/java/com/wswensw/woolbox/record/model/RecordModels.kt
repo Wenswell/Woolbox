@@ -15,12 +15,6 @@ enum class GoalPeriod {
     DAYS_7,
 }
 
-data class RecordWindow(
-    val id: Long = 0,
-    val startMinute: Int,
-    val endMinute: Int,
-)
-
 data class RecordItem(
     val id: Long,
     val name: String,
@@ -34,7 +28,6 @@ data class RecordItem(
     val goalPeriod: GoalPeriod?,
     val priority: Int,
     val archived: Boolean,
-    val windows: List<RecordWindow>,
     val createdAt: Long,
     val updatedAt: Long,
     val minValue: Double? = null,
@@ -52,7 +45,6 @@ data class RecordItemDraft(
     val goalValue: Double?,
     val goalPeriod: GoalPeriod?,
     val priority: Int,
-    val windows: List<RecordWindow>,
     val minValue: Double? = null,
     val maxValue: Double? = null,
 )

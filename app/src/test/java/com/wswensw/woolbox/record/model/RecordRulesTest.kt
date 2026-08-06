@@ -38,7 +38,6 @@ class RecordRulesTest {
             defaultValue = null,
             goalValue = null,
             goalPeriod = null,
-            windows = emptyList(),
             minValue = -20.0,
             maxValue = 20.0,
             stepValue = 0.5,
@@ -64,20 +63,6 @@ class RecordRulesTest {
     }
 
     @Test
-    fun rejectsDuplicateSuggestedWindows() {
-        val window = RecordWindow(startMinute = 9 * 60, endMinute = 10 * 60)
-
-        assertThrows(RecordValidationException::class.java) {
-            draft(windows = listOf(window, window)).validated()
-        }
-    }
-
-    @Test
-    fun matchesSuggestedWindowAcrossMidnight() {
-        assertTrue(isMinuteInWindow(30, 23 * 60, 2 * 60))
-    }
-
-    @Test
     fun stepsDecimalValuesWithoutFloatingPointNoise() {
         assertEquals("0.6", stepRecordValue("0.4", 0.2, 1))
         assertEquals("0.2", stepRecordValue("0.2", 0.2, -1))
@@ -93,8 +78,8 @@ class RecordRulesTest {
 
     @Test
     fun calculatesDailyAndDays7GoalValues() {
-        val daily = item(1, "Water", "", 0, 1).copy(goalValue = 8.0, goalPeriod = GoalPeriod.DAY)
-        val days7 = item(2, "Read", "", 0, 1).copy(goalValue = 10.0, goalPeriod = GoalPeriod.DAYS_7)
+        val daily = item(1, "Water").copy(goalValue = 8.0, goalPeriod = GoalPeriod.DAY)
+        val days7 = item(2, "Read").copy(goalValue = 10.0, goalPeriod = GoalPeriod.DAYS_7)
         // 2026-07-21 rolling window: 2026-07-15 .. 2026-07-21
         val values = goalValues(
             items = listOf(daily, days7),
@@ -124,7 +109,6 @@ class RecordRulesTest {
         goalValue: Double? = null,
         goalPeriod: GoalPeriod? = null,
         priority: Int = 1,
-        windows: List<RecordWindow> = emptyList(),
         minValue: Double? = null,
         maxValue: Double? = null,
     ) = RecordItemDraft(
@@ -138,15 +122,14 @@ class RecordRulesTest {
         goalValue = goalValue,
         goalPeriod = goalPeriod,
         priority = priority,
-        windows = windows,
         minValue = minValue,
         maxValue = maxValue,
     )
 
-    private fun item(id: Long, name: String, description: String, start: Int, end: Int) = RecordItem(
+    private fun item(id: Long, name: String) = RecordItem(
         id = id,
         name = name,
-        description = description,
+        description = "",
         valueType = RecordValueType.NUMBER,
         defaultValue = 1.0,
         stepValue = 1.0,
@@ -155,7 +138,6 @@ class RecordRulesTest {
         goalPeriod = null,
         priority = 1,
         archived = false,
-        windows = listOf(RecordWindow(startMinute = start, endMinute = end)),
         createdAt = 0,
         updatedAt = 0,
     )

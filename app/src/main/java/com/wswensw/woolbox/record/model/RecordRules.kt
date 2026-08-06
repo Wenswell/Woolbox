@@ -21,8 +21,6 @@ fun RecordItemDraft.validated(): RecordItemDraft {
     requireRecord(normalizedUnit.isNotEmpty(), "Unit is required.")
     requirePositive(stepValue, "Step")
 
-    val normalizedWindows = validatedWindows(windows)
-
     when (mode) {
         RecordMode.ACCUMULATE -> {
             requirePositive(defaultValue, "Default value")
@@ -44,7 +42,6 @@ fun RecordItemDraft.validated(): RecordItemDraft {
             val measurementMax = maxValue ?: throw RecordValidationException("Measurement minimum and maximum are required.")
             measurementStepCount(measurementMin, measurementMax, stepValue)
             requireRecord(goalValue == null && goalPeriod == null, "Measurements do not support goals.")
-            requireRecord(normalizedWindows.isEmpty(), "Measurements do not support suggested time windows.")
         }
     }
 
@@ -53,53 +50,7 @@ fun RecordItemDraft.validated(): RecordItemDraft {
         description = normalizedDescription,
         unit = normalizedUnit,
         goalPeriod = goalPeriod.takeIf { mode == RecordMode.ACCUMULATE && goalValue != null },
-        windows = normalizedWindows,
     )
-}
-
-/**
- * Normalizes suggested windows and enforces the same rules as the server:
- * valid bounds, start != end, no repeats, and a union below
- * [MAX_WINDOW_COVERAGE_MINUTES] so a suggestion still means "now".
- */
-fun validatedWindows(windows: List<RecordWindow>): List<RecordWindow> {
-    val normalized = windows.map { window ->
-        requireRecord(window.startMinute in 0..1439, "Start time is invalid.")
-        requireRecord(window.endMinute in 0..1439, "End time is invalid.")
-        requireRecord(window.startMinute != window.endMinute, "Start and end times must differ.")
-        window.copy(id = 0)
-    }
-    requireRecord(
-        normalized.distinctBy { it.startMinute to it.endMinute }.size == normalized.size,
-        "Suggested time windows must be unique.",
-    )
-    requireRecord(
-        windowCoverageMinutes(normalized) < MAX_WINDOW_COVERAGE_MINUTES,
-        "Suggested times must cover less than 12 hours.",
-    )
-    return normalized
-}
-
-/** Total minutes covered by [windows], counting overlaps once. Wraps midnight. */
-fun windowCoverageMinutes(windows: List<RecordWindow>): Int {
-    val segments = mutableListOf<Pair<Int, Int>>()
-    for (window in windows) {
-        if (window.startMinute < window.endMinute) {
-            segments += window.startMinute to window.endMinute
-        } else {
-            segments += window.startMinute to MINUTES_PER_DAY
-            segments += 0 to window.endMinute
-        }
-    }
-    segments.sortBy { it.first }
-    var covered = 0
-    var cursor = 0
-    for ((start, end) in segments) {
-        if (end <= cursor) continue
-        covered += end - maxOf(start, cursor)
-        cursor = end
-    }
-    return covered
 }
 
 fun measurementStepCount(minValue: Double, maxValue: Double, stepValue: Double): Int {
@@ -167,19 +118,6 @@ fun goalValues(
         item.id to entries.filter { it.itemId == item.id }.sumOf(RecordEntry::value)
     }.toMap()
 }
-
-fun isMinuteInWindow(minute: Int, startMinute: Int, endMinute: Int): Boolean {
-    val normalized = normalizeMinute(minute)
-    val start = normalizeMinute(startMinute)
-    val end = normalizeMinute(endMinute)
-    return if (start < end) {
-        normalized in start until end
-    } else {
-        normalized >= start || normalized < end
-    }
-}
-
-private fun normalizeMinute(minute: Int): Int = ((minute % (24 * 60)) + 24 * 60) % (24 * 60)
 
 private fun requirePositive(value: Double?, label: String) {
     if (value != null) {

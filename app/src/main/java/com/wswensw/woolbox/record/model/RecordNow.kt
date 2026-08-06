@@ -5,9 +5,6 @@ import java.time.LocalDateTime
 
 const val MINUTES_PER_DAY = 24 * 60
 
-/** Suggested windows must leave most of the day uncovered to stay meaningful. */
-const val MAX_WINDOW_COVERAGE_MINUTES = 12 * 60
-
 /** Local wall-clock snapshot driving every time-aware Records surface. */
 data class RecordsClock(
     val date: LocalDate,
@@ -29,8 +26,7 @@ data class RecordsClock(
 
 /**
  * What a suggestion acts on. Accumulate items write their default value;
- * subtasks are completed. Windows belong to the subtask, not the task, so a
- * task can be suggested at several different times of day.
+ * subtasks are completed.
  */
 sealed interface NowTarget {
     val name: String
@@ -57,14 +53,6 @@ fun isGoalSatisfied(item: RecordItem, cumulative: Double): Boolean {
     return cumulative >= target
 }
 
-/**
- * Whether today already has an entry inside [window]. Overnight windows only
- * match the part that falls on the current local date, because entries are
- * fixed to the local day they were recorded on.
- */
-fun isWindowRecorded(window: RecordWindow, minutes: List<Int>?): Boolean =
-    minutes?.any { isMinuteInWindow(it, window.startMinute, window.endMinute) } == true
-
 /** Minutes from [from] forward to [to] on a circular day. */
 fun forwardMinutes(from: Int, to: Int): Int {
     val span = (to - from) % MINUTES_PER_DAY
@@ -76,7 +64,3 @@ fun circularMinuteDistance(left: Int, right: Int): Int {
     val forward = forwardMinutes(left, right)
     return minOf(forward, MINUTES_PER_DAY - forward)
 }
-
-/** Length of a window in minutes; a full-day window is impossible by validation. */
-fun windowLengthMinutes(window: RecordWindow): Int =
-    forwardMinutes(window.startMinute, window.endMinute)

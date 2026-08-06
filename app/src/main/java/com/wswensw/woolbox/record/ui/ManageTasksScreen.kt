@@ -50,6 +50,22 @@ fun ManageTasksScreen(
     onEdit: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
+    val groups: List<Pair<Int, List<TodoTask>>> = listOf(
+        R.string.overdue to openTasks
+            .filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
+            .sortedBy(TodoTask::plannedDate),
+        R.string.today to openTasks
+            .filter { it.dateBucket(today) == TaskDateBucket.TODAY },
+        R.string.planned to openTasks
+            .filter { it.dateBucket(today) == TaskDateBucket.PLANNED }
+            .sortedBy(TodoTask::plannedDate),
+        R.string.unscheduled to openTasks
+            .filter { it.dateBucket(today) == TaskDateBucket.UNSCHEDULED },
+        R.string.completed to state.tasks
+            .filter(TodoTask::isCompleted)
+            .sortedByDescending(TodoTask::completedAt),
+    ).filter { (_, tasks) -> tasks.isNotEmpty() }
     AppLazyRouteScaffold(
         title = stringResource(R.string.manage_tasks),
         onBack = onBack,
@@ -87,15 +103,31 @@ fun ManageTasksScreen(
                     modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal),
                 )
             }
-            else -> items(state.tasks, key = TodoTask::id) { task ->
-                TaskManageCard(
-                    task = task,
-                    today = today,
-                    onClick = { onEdit(task.id) },
-                    modifier = Modifier
-                        .padding(horizontal = AppStyle.spacing.pageHorizontal)
-                        .padding(bottom = 8.dp),
-                )
+            else -> groups.forEach { (titleRes, tasks) ->
+                item(key = "group-$titleRes") {
+                    Text(
+                        text = "${stringResource(titleRes)} (${tasks.size})",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(
+                            start = AppStyle.spacing.pageHorizontal,
+                            end = AppStyle.spacing.pageHorizontal,
+                            top = 8.dp,
+                            bottom = 6.dp,
+                        ),
+                    )
+                }
+                items(tasks, key = TodoTask::id) { task ->
+                    TaskManageCard(
+                        task = task,
+                        today = today,
+                        onClick = { onEdit(task.id) },
+                        modifier = Modifier
+                            .padding(horizontal = AppStyle.spacing.pageHorizontal)
+                            .padding(bottom = 8.dp),
+                    )
+                }
             }
         }
     }
@@ -208,12 +240,13 @@ private fun TaskManageCard(
 
 @Composable
 private fun taskScheduleLabel(task: TodoTask, today: LocalDate): String {
-    val plannedDate = task.plannedDate ?: return stringResource(R.string.later)
+    val plannedDate = task.plannedDate ?: return stringResource(R.string.unscheduled)
     if (task.isCompleted) return taskDateLabel(plannedDate, today)
     return when (task.dateBucket(today)) {
         TaskDateBucket.OVERDUE -> "${stringResource(R.string.overdue)} · ${taskDateLabel(plannedDate, today)}"
         TaskDateBucket.TODAY,
-        TaskDateBucket.LATER,
+        TaskDateBucket.PLANNED,
+        TaskDateBucket.UNSCHEDULED,
         -> taskDateLabel(plannedDate, today)
     }
 }

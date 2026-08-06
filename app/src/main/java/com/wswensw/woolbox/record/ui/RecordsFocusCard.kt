@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -675,7 +676,7 @@ internal fun focusQueueSupportingLabel(candidate: FocusCandidate, cumulative: Do
 }
 
 internal fun focusReasonLabel(reason: FocusReason): String = when (reason) {
-    is FocusReason.DueNow -> "${formatMinuteSpan(reason.endsInMinutes)} left"
+    is FocusReason.Overdue -> if (reason.days == 1) "1 day overdue" else "${reason.days} days overdue"
     is FocusReason.Habit -> "usually ${formatMinute(reason.habitMinute)}"
     is FocusReason.StreakRisk -> "${reason.days}-day streak"
     is FocusReason.BehindPace -> "behind · ${reason.percent}%"
@@ -702,7 +703,7 @@ internal fun focusDayStatusLabel(clock: RecordsClock, ring: DayRing): String = b
 
 @Composable
 private fun localizedFocusReasonLabel(reason: FocusReason): String = when (reason) {
-    is FocusReason.DueNow -> stringResource(R.string.due_minutes_left, formatMinuteSpan(reason.endsInMinutes))
+    is FocusReason.Overdue -> pluralStringResource(R.plurals.days_overdue, reason.days, reason.days)
     is FocusReason.Habit -> stringResource(R.string.usually_at, formatMinute(reason.habitMinute))
     is FocusReason.StreakRisk -> stringResource(R.string.streak_risk, reason.days)
     is FocusReason.BehindPace -> stringResource(R.string.behind_percent, reason.percent)
@@ -753,17 +754,6 @@ private fun localizedFocusQueueSupportingLabel(candidate: FocusCandidate, cumula
     return when (val target = candidate.target) {
         is NowTarget.Accumulate -> reason.ifEmpty { localizedFocusCumulativeLabel(target.item, cumulative ?: 0.0) }
         is NowTarget.Task -> if (reason.isEmpty()) target.task.title else "${target.task.title} · $reason"
-    }
-}
-
-internal fun formatMinuteSpan(minutes: Int): String {
-    val safe = minutes.coerceAtLeast(0)
-    val hours = safe / 60
-    val rest = safe % 60
-    return if (hours == 0) {
-        "${rest}m"
-    } else {
-        String.format(Locale.ROOT, "%dh %02dm", hours, rest)
     }
 }
 

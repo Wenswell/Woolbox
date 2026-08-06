@@ -30,7 +30,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,11 +39,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.validatedTaskTitle
-import com.wswensw.woolbox.record.model.validatedWindows
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
@@ -57,8 +54,8 @@ fun TaskDetailScreen(
     today: LocalDate,
     onBack: () -> Unit,
     onSave: (String, LocalDate?, (String?) -> Unit) -> Unit,
-    onCreateStep: (String, List<RecordWindow>, (String?) -> Unit) -> Unit,
-    onUpdateStep: (TodoStep, String, List<RecordWindow>, (String?) -> Unit) -> Unit,
+    onCreateStep: (String, (String?) -> Unit) -> Unit,
+    onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
     onDeleteStep: (TodoStep, (String?) -> Unit) -> Unit,
     onReorderSteps: (List<Long>, (String?) -> Unit) -> Unit,
@@ -127,10 +124,6 @@ fun TaskDetailScreen(
     }
 
     val titleDirty = title.trim() != task.title || plannedDate != task.plannedDate
-    val hasSuggestedTimes = task.steps.any { it.windows.isNotEmpty() }
-    // Task date and subtask windows are separate writes. A new date must be
-    // saved before the server can accept a window for a previously Later task.
-    val canEditSuggestedTimes = task.plannedDate != null && plannedDate != null
     AppRouteScaffold(
         title = stringResource(R.string.edit_task),
         onBack = onBack,
@@ -170,21 +163,12 @@ fun TaskDetailScreen(
             TaskScheduleFields(
                 plannedDate = plannedDate,
                 today = today,
-                hasSuggestedTimes = hasSuggestedTimes,
                 enabled = !savingTitle,
                 onPlannedDateChange = { selectedDate -> plannedDateValue = selectedDate?.toString() },
             )
         }
 
         AppSection(title = stringResource(R.string.subtasks)) {
-            if (!canEditSuggestedTimes) {
-                Text(
-                    text = stringResource(R.string.save_task_date_first),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
-                )
-            }
             task.steps.forEachIndexed { index, step ->
                 TaskStepRow(
                     step = step,
@@ -230,11 +214,9 @@ fun TaskDetailScreen(
         TaskStepDialog(
             title = stringResource(R.string.new_subtask),
             initialTitle = "",
-            initialWindows = emptyList(),
-            showSuggestedTimes = canEditSuggestedTimes,
             onDismiss = { creatingStep = false },
-            onSave = { value, stepWindows, onResult ->
-                onCreateStep(value, stepWindows) { error ->
+            onSave = { value, onResult ->
+                onCreateStep(value) { error ->
                     onResult(error)
                     if (error == null) creatingStep = false
                 }
@@ -246,11 +228,9 @@ fun TaskDetailScreen(
         TaskStepDialog(
             title = stringResource(R.string.edit_subtask),
             initialTitle = editingStep.title,
-            initialWindows = editingStep.windows,
-            showSuggestedTimes = canEditSuggestedTimes,
             onDismiss = { editingStepId = null },
-            onSave = { value, stepWindows, onResult ->
-                onUpdateStep(editingStep, value, stepWindows) { error ->
+            onSave = { value, onResult ->
+                onUpdateStep(editingStep, value) { error ->
                     onResult(error)
                     if (error == null) editingStepId = null
                 }
@@ -331,29 +311,17 @@ private fun TaskStepRow(
     }
 }
 
-/**
- * Title plus suggested times for one subtask. Windows live on the subtask
- * because that is the thing scheduled and completed.
- */
 @Composable
 private fun TaskStepDialog(
     title: String,
     initialTitle: String,
-    initialWindows: List<RecordWindow>,
-    showSuggestedTimes: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, List<RecordWindow>, (String?) -> Unit) -> Unit,
+    onSave: (String, (String?) -> Unit) -> Unit,
 ) {
     var value by rememberSaveable(initialTitle) { mutableStateOf(initialTitle) }
-    var windows by rememberSaveable(initialTitle) {
-        mutableStateOf(initialWindows.map { "${it.startMinute},${it.endMinute}" })
-    }
-    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
-    val parsedWindows = windows.map(::decodeWindow)
     var valueError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
-    val invalidSuggestedTimesMessage = stringResource(R.string.invalid_suggested_times)
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(title) },
@@ -371,26 +339,6 @@ private fun TaskStepDialog(
                     supportingText = valueError?.let { message -> { Text(message) } },
                     singleLine = true,
                 )
-                if (showSuggestedTimes) {
-                    Text(
-                        text = stringResource(R.string.suggested_time),
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                    SuggestedTimeFields(
-                        windows = parsedWindows,
-                        enabled = !saving,
-                        onEditTime = { timeEditTarget = it },
-                        onRemove = { index ->
-                            windows = windows.toMutableList().also { it.removeAt(index) }
-                        },
-                        onAdd = { windows = windows + nextSuggestedWindow(parsedWindows).encode() },
-                        horizontalPadding = 0.dp,
-                        summary = taskSuggestedTimeSummary(parsedWindows),
-                    )
-                }
                 errorMessage?.let { message ->
                     Text(
                         text = message,
@@ -407,15 +355,9 @@ private fun TaskStepDialog(
                         valueError = error.message
                         return@TextButton
                     }
-                    val normalizedWindows = runCatching {
-                        validatedWindows(if (showSuggestedTimes) parsedWindows else emptyList())
-                    }.getOrElse { error ->
-                        errorMessage = error.message ?: invalidSuggestedTimesMessage
-                        return@TextButton
-                    }
                     saving = true
                     errorMessage = null
-                    onSave(normalized, normalizedWindows) { error ->
+                    onSave(normalized) { error ->
                         saving = false
                         errorMessage = error
                     }
@@ -430,17 +372,6 @@ private fun TaskStepDialog(
         },
     )
 
-    timeEditTarget?.let { target ->
-        val window = parsedWindows.getOrNull(target.index) ?: return@let
-        RecordTimePickerDialog(
-            initialMinute = if (target.start) window.startMinute else window.endMinute,
-            onDismiss = { timeEditTarget = null },
-            onConfirm = { minute ->
-                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
-                timeEditTarget = null
-            },
-        )
-    }
 }
 
 @Composable

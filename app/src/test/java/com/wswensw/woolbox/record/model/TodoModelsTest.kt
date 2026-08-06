@@ -49,7 +49,7 @@ class TodoModelsTest {
 
         assertEquals(TaskDateBucket.OVERDUE, task.copy(plannedDate = today.minusDays(1)).dateBucket(today))
         assertEquals(TaskDateBucket.TODAY, task.dateBucket(today))
-        assertEquals(TaskDateBucket.LATER, task.copy(plannedDate = today.plusDays(1)).dateBucket(today))
-        assertEquals(TaskDateBucket.LATER, task.copy(plannedDate = null).dateBucket(today))
+        assertEquals(TaskDateBucket.PLANNED, task.copy(plannedDate = today.plusDays(1)).dateBucket(today))
+        assertEquals(TaskDateBucket.UNSCHEDULED, task.copy(plannedDate = null).dateBucket(today))
     }
 }

@@ -552,11 +552,11 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     onSave = { title, plannedDate, onResult ->
                         recordsViewModel.updateTask(taskId, title, plannedDate, onResult)
                     },
-                    onCreateStep = { title, windows, onResult ->
-                        recordsViewModel.createStep(taskId, title, windows, onResult)
+                    onCreateStep = { title, onResult ->
+                        recordsViewModel.createStep(taskId, title, onResult)
                     },
-                    onUpdateStep = { step, title, windows, onResult ->
-                        recordsViewModel.updateStep(step.id, title, windows, onResult)
+                    onUpdateStep = { step, title, onResult ->
+                        recordsViewModel.updateStep(step.id, title, onResult)
                     },
                     onToggleStep = { step, completed ->
                         recordsViewModel.setStepCompleted(step.id, completed)

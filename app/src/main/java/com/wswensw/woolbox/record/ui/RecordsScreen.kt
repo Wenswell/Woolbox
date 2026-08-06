@@ -103,9 +103,14 @@ fun RecordsScreen(
     modifier: Modifier = Modifier,
 ) {
     val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
-    val overdueTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
+    val overdueTasks = openTasks
+        .filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
+        .sortedBy(TodoTask::plannedDate)
     val todayTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.TODAY }
-    val laterTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.LATER }
+    val plannedTasks = openTasks
+        .filter { it.dateBucket(today) == TaskDateBucket.PLANNED }
+        .sortedBy(TodoTask::plannedDate)
+    val unscheduledTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.UNSCHEDULED }
     val previewLimit = rootTaskPreviewLimit.count
     val accumulateItems = orderedRecordItems(state.activeItems)
         .filter { it.mode == RecordMode.ACCUMULATE }
@@ -263,10 +268,28 @@ fun RecordsScreen(
                             }
                         }
                     }
-                    if (laterTasks.isNotEmpty()) {
+                    if (plannedTasks.isNotEmpty()) {
                         item {
-                            LaterTasksSummary(
-                                count = laterTasks.size,
+                            TaskBucketSummary(
+                                title = stringResource(R.string.planned),
+                                subtitle = pluralStringResource(
+                                    R.plurals.tasks_planned,
+                                    plannedTasks.size,
+                                    plannedTasks.size,
+                                ),
+                                onClick = onManageTasks,
+                            )
+                        }
+                    }
+                    if (unscheduledTasks.isNotEmpty()) {
+                        item {
+                            TaskBucketSummary(
+                                title = stringResource(R.string.unscheduled),
+                                subtitle = pluralStringResource(
+                                    R.plurals.tasks_unscheduled,
+                                    unscheduledTasks.size,
+                                    unscheduledTasks.size,
+                                ),
                                 onClick = onManageTasks,
                             )
                         }
@@ -383,8 +406,9 @@ private fun RecordsSectionHeader(
 }
 
 @Composable
-private fun LaterTasksSummary(
-    count: Int,
+private fun TaskBucketSummary(
+    title: String,
+    subtitle: String,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -401,13 +425,13 @@ private fun LaterTasksSummary(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.later),
+                    text = title,
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = pluralStringResource(R.plurals.tasks_scheduled_later, count, count),
+                    text = subtitle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )

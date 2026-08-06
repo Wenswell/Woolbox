@@ -191,7 +191,6 @@ fun MeasurementItemFormScreen(
             goalValue = null,
             goalPeriod = null,
             priority = checkNotNull(priority.toIntOrNull()),
-            windows = emptyList(),
             minValue = parseRequiredFinite(minValue, "Minimum"),
             maxValue = parseRequiredFinite(maxValue, "Maximum"),
         )

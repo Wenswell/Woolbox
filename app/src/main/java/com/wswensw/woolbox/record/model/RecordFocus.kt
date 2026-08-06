@@ -3,6 +3,7 @@ package com.wswensw.woolbox.record.model
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -45,10 +46,10 @@ sealed interface FocusReason {
     val rank: Int
     val urgency: Int
 
-    /** Inside a suggested window that has not been acted on. Closes soonest first. */
-    data class DueNow(val endsInMinutes: Int) : FocusReason {
+    /** A task missed its planned day. Oldest missed commitment first. */
+    data class Overdue(val days: Int) : FocusReason {
         override val rank: Int get() = 4
-        override val urgency: Int get() = endsInMinutes
+        override val urgency: Int get() = -days
     }
 
     /** Near the time of day this item is normally recorded at. */
@@ -84,7 +85,6 @@ sealed interface FocusReason {
 data class FocusCandidate(
     val target: NowTarget,
     val reason: FocusReason,
-    val window: RecordWindow? = null,
     val isDeferred: Boolean = false,
 )
 
@@ -123,25 +123,19 @@ fun hasFocusCommitments(
         if (hasGoal && isGoalSatisfied(item, goalValues[item.id] ?: todayValues[item.id] ?: 0.0)) {
             return@any false
         }
-        hasGoal || item.windows.isNotEmpty() || habitMinutes.containsKey(item.id)
+        hasGoal || habitMinutes.containsKey(item.id)
     }
     if (hasItem) return true
     return tasks.any { task ->
-        task.steps.any { step ->
-            val carriesIntoToday = task.plannedDate == today.minusDays(1) &&
-                step.windows.any(RecordWindow::crossesMidnight)
-            !step.isCompleted && (task.plannedDate == today || carriesIntoToday)
-        }
+        task.nextStep != null && task.plannedDate?.let { !it.isAfter(today) } == true
     }
 }
 
 /**
  * Everything open, strongest reason first. Only commitments take part: an
- * accumulate item earns a place through an unmet goal, a suggested window it is
- * inside of, or a learned habit time; a subtask through being open today or
- * carrying a window. Items whose only claim is time bound drop out once that
- * time passes, so the queue never pads itself with things there is no reason to
- * do now.
+ * accumulate item earns a place through an unmet goal or a learned habit time.
+ * Each overdue or today task contributes its first unfinished subtask, so one
+ * task occupies one queue position and advances in its fixed step order.
  */
 fun focusQueue(
     items: List<RecordItem>,
@@ -161,10 +155,7 @@ fun focusQueue(
             addAll(accumulateCandidate(item, clock, goalValues, todayValues, todayMinutes, habitMinutes, itemStreaks))
         }
         for (task in tasks) {
-            for (step in task.steps) {
-                if (step.isCompleted) continue
-                addAll(stepCandidate(task, step, clock))
-            }
+            taskCandidate(task, clock)?.let(::add)
         }
     }
         .map { candidate ->
@@ -188,7 +179,7 @@ fun focusQueue(
 /** Stable identity for a target across snapshots, for deferral and animation. */
 fun focusTargetKey(target: NowTarget): String = when (target) {
     is NowTarget.Accumulate -> "item:${target.item.id}"
-    is NowTarget.Task -> "step:${target.step.id}"
+    is NowTarget.Task -> "task:${target.task.id}"
 }
 
 private fun accumulateCandidate(
@@ -204,24 +195,9 @@ private fun accumulateCandidate(
     val cumulative = goalValues[item.id] ?: todayValues[item.id] ?: 0.0
     if (hasGoal && isGoalSatisfied(item, cumulative)) return emptyList()
 
-    val minutes = todayMinutes[item.id]
     val target = NowTarget.Accumulate(item)
-    val openWindow = item.windows
-        .filter { isMinuteInWindow(clock.minuteOfDay, it.startMinute, it.endMinute) }
-        .filterNot { isWindowRecorded(it, minutes) }
-        .minByOrNull { forwardMinutes(clock.minuteOfDay, it.endMinute) }
-    if (openWindow != null) {
-        return listOf(
-            FocusCandidate(
-                target = target,
-                reason = FocusReason.DueNow(forwardMinutes(clock.minuteOfDay, openWindow.endMinute)),
-                window = openWindow,
-            ),
-        )
-    }
-
     val streak = itemStreaks[item.id] ?: 0
-    val recordedToday = minutes?.isNotEmpty() == true
+    val recordedToday = todayMinutes[item.id]?.isNotEmpty() == true
     val habitMinute = habitMinutes[item.id]
     if (habitMinute != null && !recordedToday) {
         val distance = circularMinuteDistance(clock.minuteOfDay, habitMinute)
@@ -233,8 +209,7 @@ private fun accumulateCandidate(
         return listOf(FocusCandidate(target, FocusReason.StreakRisk(streak)))
     }
     if (!hasGoal) {
-        // Windows and habits are the only claim a goalless item has on right
-        // now, and neither applies, so it stays out of the queue.
+        // A learned habit is the only claim a goalless item has on right now.
         return emptyList()
     }
     val goal = checkNotNull(item.goalValue)
@@ -248,37 +223,18 @@ private fun accumulateCandidate(
     return listOf(FocusCandidate(target, FocusReason.Queued))
 }
 
-private fun stepCandidate(task: TodoTask, step: TodoStep, clock: RecordsClock): List<FocusCandidate> {
-    val plannedDate = task.plannedDate ?: return emptyList()
+private fun taskCandidate(task: TodoTask, clock: RecordsClock): FocusCandidate? {
+    val plannedDate = task.plannedDate ?: return null
+    if (plannedDate.isAfter(clock.date)) return null
+    val step = task.nextStep ?: return null
     val target = NowTarget.Task(task, step)
-    val openWindow = step.windows
-        .filter { window -> window.isOpenFor(plannedDate, clock) }
-        .minByOrNull { forwardMinutes(clock.minuteOfDay, it.endMinute) }
-    if (openWindow != null) {
-        return listOf(
-            FocusCandidate(
-                target = target,
-                reason = FocusReason.DueNow(forwardMinutes(clock.minuteOfDay, openWindow.endMinute)),
-                window = openWindow,
-            ),
-        )
+    val reason = if (plannedDate.isBefore(clock.date)) {
+        FocusReason.Overdue(days = ChronoUnit.DAYS.between(plannedDate, clock.date).toInt())
+    } else {
+        FocusReason.Queued
     }
-    // A scheduled subtask belongs to its windows; an unscheduled one belongs to
-    // its planned date. A task never becomes today's work merely by crossing
-    // midnight.
-    if (step.windows.isNotEmpty() || plannedDate != clock.date) return emptyList()
-    return listOf(FocusCandidate(target, FocusReason.Queued))
+    return FocusCandidate(target, reason)
 }
-
-/** A task window is anchored to its task date and may only carry into tomorrow. */
-private fun RecordWindow.isOpenFor(plannedDate: LocalDate, clock: RecordsClock): Boolean = when {
-    !crossesMidnight() -> clock.date == plannedDate && clock.minuteOfDay in startMinute until endMinute
-    clock.date == plannedDate -> clock.minuteOfDay >= startMinute
-    clock.date == plannedDate.plusDays(1) -> clock.minuteOfDay < endMinute
-    else -> false
-}
-
-private fun RecordWindow.crossesMidnight(): Boolean = startMinute > endMinute
 
 /** Today's commitments and how many are closed, driving the day ring. */
 data class DayRing(

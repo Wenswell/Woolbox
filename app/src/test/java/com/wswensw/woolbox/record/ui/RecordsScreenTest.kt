@@ -290,9 +290,9 @@ class RecordsScreenTest {
             ),
         )
         assertEquals(
-            "Morning routine · 20m left",
+            "Morning routine · 2 days overdue",
             focusQueueSupportingLabel(
-                FocusCandidate(NowTarget.Task(task, task.steps.single()), FocusReason.DueNow(20)),
+                FocusCandidate(NowTarget.Task(task, task.steps.single()), FocusReason.Overdue(2)),
                 cumulative = null,
             ),
         )
@@ -318,7 +318,6 @@ class RecordsScreenTest {
         goalPeriod = period,
         priority = priority,
         archived = false,
-        windows = emptyList(),
         createdAt = 0,
         updatedAt = 0,
     )

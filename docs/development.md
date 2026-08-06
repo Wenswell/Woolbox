@@ -88,13 +88,13 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `OledShieldConfigRepositoryTest` | OLED profile upsert、时间、排序、保存和删除。 |
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
-| `RecordRulesTest` | 记录项规范化、累计/测量值规则、推荐排序、跨午夜时间段和十进制步进。 |
+| `RecordRulesTest` | 记录项规范化、累计/测量值规则、目标累计和十进制步进。 |
 | `TodoModelsTest` | 待办标题、完成进度和计划日期分组派生。 |
-| `RecordFocusTest` | Focus 理由排序、任务计划日期、跨午夜子事项时段和当日环统计。 |
+| `RecordFocusTest` | Focus 理由排序、逾期优先级、每任务下一子事项、计划日期边界和当日环统计。 |
 | `RecordsScreenTest` | Records 首字符与标题裁剪、待办排序、管理列表模式隔离、目标周期分组、进度边界、今日累计和下一个子事项。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
-| `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办日期与子事项时段约束、审计快照、含多个 Measurement 最新值的根页 overview、模式筛选和批量 API。 |
+| `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办计划日期、手动时间字段拒绝、审计快照、含多个 Measurement 最新值的根页 overview、模式筛选和批量 API。 |
 | `records-server/web/src/App.test.tsx` | 管理页即时筛选、删除确认、审计日志、记录项归档/恢复。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
@@ -167,7 +167,7 @@ node --check tools/publish-update.mjs
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Woolbox、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Records 根页 Tasks，创建标题和至少两个子事项并用箭头调整顺序；依次在进度 Sheet 勾选、重开子事项，确认完成时间、父项状态和已完成折叠区正确。进入 Manage tasks / Edit task，确认 Today、日期选择、Later、Overdue 分组和日期副文案；无日期任务不能编辑 Suggested time，移除所有时段后才能改 Later。创建今日跨午夜时段，次日结束分钟前仍出现在 Focus，结束后不再出现；刷新后服务端顺序一致。
+15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Records 根页 Tasks，新建任务应默认 Unscheduled，只显示一个日期入口且可独立清除；任务与累计表单均无时间段控件。创建标题和至少两个子事项并用箭头调整顺序；依次在进度 Sheet 勾选、重开子事项，确认 Focus 中同一任务只显示下一条未完成子事项，完成后按固定位序接替。进入 Manage tasks / Edit task，确认 Overdue、Today、Planned、Unscheduled、Completed 分组和日期副文案；逾期任务保留在 Focus，改为未来日期或清除日期后退出；刷新后服务端顺序一致。
 16. 在同一 Records 根页创建累计记录后确认液面、日目标饼或7 日目标分段条、快速记录、`Undo` 与断网错误行为；断网前启动刷新并立即记录一次，确认服务端写入成功不会被报告为写入失败，恢复网络后可刷新到新快照。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`。快速切换两个 Measurement，确认预览不被前一个请求覆盖；点卡确认预览 Sheet 显示 24 小时原始点位和流水，Slider 只能选择配置步进，录入后值和当前设备时间更新，短时 `Undo` 可删除该条流水；检查浅色与深色的可读性。
 17. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。

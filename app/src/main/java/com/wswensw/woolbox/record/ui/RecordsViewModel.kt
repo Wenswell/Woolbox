@@ -21,7 +21,6 @@ import com.wswensw.woolbox.record.model.NowTarget
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.StreakDays
 import com.wswensw.woolbox.record.model.focusTargetKey
-import com.wswensw.woolbox.record.model.RecordWindow
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -281,25 +280,23 @@ class RecordsViewModel(
     fun createStep(
         taskId: Long,
         title: String,
-        windows: List<RecordWindow>,
         onResult: (String?) -> Unit,
     ) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.subtask_add_failed,
     ) {
-        repository.createStep(taskId, title, windows)
+        repository.createStep(taskId, title)
     }
 
     fun updateStep(
         stepId: Long,
         title: String,
-        windows: List<RecordWindow>,
         onResult: (String?) -> Unit,
     ) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.subtask_update_failed,
     ) {
-        repository.updateStep(stepId, title, windows)
+        repository.updateStep(stepId, title)
     }
 
     fun setStepCompleted(stepId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(

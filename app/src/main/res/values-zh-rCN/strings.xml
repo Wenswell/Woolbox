@@ -161,7 +161,6 @@
     <string name="record_details">详情</string>
     <string name="record_measurement">测量</string>
     <string name="record_goal">目标</string>
-    <string name="record_recommendation">推荐</string>
     <string name="field_name">名称</string>
     <string name="field_description">描述</string>
     <string name="field_default">默认值</string>
@@ -170,22 +169,13 @@
     <string name="field_goal_value">目标值</string>
     <string name="field_priority">优先级</string>
     <string name="track_a_goal">跟踪目标</string>
-    <string name="suggested_time">推荐时段</string>
     <string name="today">今天</string>
-    <string name="later">以后</string>
     <string name="overdue">已逾期</string>
+    <string name="planned">已计划</string>
+    <string name="unscheduled">未计划</string>
+    <string name="completed">已完成</string>
     <string name="choose_date">选择日期</string>
-    <string name="remove_suggested_times">移除推荐时段后才能将任务移到以后。</string>
-    <string name="time_to">至</string>
-    <string name="remove_suggested_time">移除推荐时段</string>
-    <string name="add_suggested_time">添加推荐时段</string>
-    <string name="no_suggested_times">没有推荐时段，不会出现在当前队列。</string>
-    <string name="suggested_time_shown">每天有 %1$s 时间会出现在当前队列。</string>
-    <string name="no_task_suggested_times">没有推荐时段，在任务日期进入队列。</string>
-    <string name="task_suggested_time_shown">任务日期有 %1$s 时间会出现在当前队列。</string>
-    <string name="invalid_suggested_times">推荐时段无效。</string>
-    <string name="duration_minutes_short">%1$d 分钟</string>
-    <string name="duration_hours_minutes_short">%1$d 小时 %2$d 分钟</string>
+    <string name="remove_date">移除日期</string>
     <string name="edit_accumulate">编辑累计</string>
     <string name="edit_measurement">编辑测量</string>
     <string name="editing_accumulate">正在编辑累计</string>
@@ -212,8 +202,14 @@
     <plurals name="more_in_manage">
         <item quantity="other">在管理页查看另外 %d 项</item>
     </plurals>
-    <plurals name="tasks_scheduled_later">
-        <item quantity="other">%d 个任务安排在以后</item>
+    <plurals name="tasks_planned">
+        <item quantity="other">%d 个任务已安排未来日期</item>
+    </plurals>
+    <plurals name="tasks_unscheduled">
+        <item quantity="other">%d 个任务没有日期</item>
+    </plurals>
+    <plurals name="days_overdue">
+        <item quantity="other">已逾期 %d 天</item>
     </plurals>
     <plurals name="subtasks_count">
         <item quantity="other">%1$d / %2$d 个子任务</item>
@@ -236,15 +232,12 @@
     <string name="task_title">任务</string>
     <string name="field_title">标题</string>
     <string name="subtasks">子任务</string>
-    <string name="set_task_date_for_times">设置任务日期后才能添加推荐时段。</string>
-    <string name="suggested_times_for_subtask">子任务 %1$d 的推荐时段</string>
     <string name="move_subtask_up">上移子任务 %1$d</string>
     <string name="move_subtask_down">下移子任务 %1$d</string>
     <string name="remove_subtask">移除子任务 %1$d</string>
     <string name="add_subtask">添加子任务</string>
     <string name="subtask_number">子任务 %1$d</string>
     <string name="each_subtask_title">每个子任务都需要标题。</string>
-    <string name="save_task_date_first">保存任务日期后才能添加推荐时段。</string>
     <string name="new_subtask">新建子任务</string>
     <string name="edit_subtask">编辑子任务</string>
     <string name="delete_subtask_question">删除子任务？</string>
@@ -314,7 +307,6 @@
     <string name="streak_days">连续 %1$d 天</string>
     <string name="streak_days_limited">连续 %1$d+ 天</string>
     <string name="today_progress">今日 %1$d/%2$d</string>
-    <string name="due_minutes_left">剩余 %1$s</string>
     <string name="usually_at">通常 %1$s</string>
     <string name="streak_risk">连续 %1$d 天</string>
     <string name="behind_percent">落后 · %1$d%%</string>

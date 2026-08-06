@@ -6,7 +6,8 @@ import java.time.LocalDate
 enum class TaskDateBucket {
     OVERDUE,
     TODAY,
-    LATER,
+    PLANNED,
+    UNSCHEDULED,
 }
 
 data class TodoTask(
@@ -31,7 +32,8 @@ data class TodoTask(
 }
 
 fun TodoTask.dateBucket(today: LocalDate): TaskDateBucket = when {
-    plannedDate == null || plannedDate.isAfter(today) -> TaskDateBucket.LATER
+    plannedDate == null -> TaskDateBucket.UNSCHEDULED
+    plannedDate.isAfter(today) -> TaskDateBucket.PLANNED
     plannedDate.isBefore(today) -> TaskDateBucket.OVERDUE
     else -> TaskDateBucket.TODAY
 }
@@ -43,7 +45,6 @@ data class TodoStep(
     val completedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
-    val windows: List<RecordWindow> = emptyList(),
 ) {
     val isCompleted: Boolean
         get() = completedAt != null

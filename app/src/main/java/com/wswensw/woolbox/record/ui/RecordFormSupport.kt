@@ -1,26 +1,20 @@
 package com.wswensw.woolbox.record.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DateRange
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,15 +23,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.model.MINUTES_PER_DAY
-import com.wswensw.woolbox.record.model.RecordWindow
-import com.wswensw.woolbox.record.model.validatedWindows
-import com.wswensw.woolbox.record.model.windowCoverageMinutes
 import com.wswensw.woolbox.ui.AppStyle
 import java.time.Instant
 import java.time.LocalDate
@@ -46,49 +34,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-internal data class TimeEditTarget(
-    val index: Int,
-    val start: Boolean,
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun RecordTimePickerDialog(
-    initialMinute: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
-) {
-    val state = rememberTimePickerState(
-        initialHour = initialMinute / 60,
-        initialMinute = initialMinute % 60,
-        is24Hour = true,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.suggested_time)) },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) {
-                Text(stringResource(R.string.action_done))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
-
 internal fun Modifier.formField(): Modifier =
     fillMaxWidth().padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp)
 
-/** Shared schedule controls for task forms. A date answers which day; windows answer what time. */
+/** The only task scheduling control: one optional planned date. */
 @Composable
 internal fun TaskScheduleFields(
     plannedDate: LocalDate?,
     today: LocalDate,
-    hasSuggestedTimes: Boolean,
     enabled: Boolean,
     onPlannedDateChange: (LocalDate?) -> Unit,
 ) {
@@ -97,46 +50,32 @@ internal fun TaskScheduleFields(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip(
-            selected = plannedDate == today,
-            onClick = { onPlannedDateChange(today) },
+        OutlinedButton(
+            onClick = { pickingDate = true },
             enabled = enabled,
-            label = { Text(stringResource(R.string.today)) },
-        )
-        FilterChip(
-            selected = plannedDate == null,
-            onClick = { onPlannedDateChange(null) },
-            enabled = enabled && !hasSuggestedTimes,
-            label = { Text(stringResource(R.string.later)) },
-        )
-    }
-    OutlinedButton(
-        onClick = { pickingDate = true },
-        enabled = enabled,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 4.dp),
-    ) {
-        Icon(imageVector = Icons.Outlined.DateRange, contentDescription = null)
-        Text(
-            text = plannedDate?.let { taskDateLabel(it, today) } ?: stringResource(R.string.choose_date),
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
-    if (hasSuggestedTimes) {
-        Text(
-            text = stringResource(R.string.remove_suggested_times),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(
-                start = AppStyle.spacing.pageHorizontal,
-                end = AppStyle.spacing.pageHorizontal,
-                bottom = 4.dp,
-            ),
-        )
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(imageVector = Icons.Outlined.DateRange, contentDescription = null)
+            Text(
+                text = plannedDate?.let { taskDateLabel(it, today) }
+                    ?: stringResource(R.string.choose_date),
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+        if (plannedDate != null) {
+            IconButton(
+                onClick = { onPlannedDateChange(null) },
+                enabled = enabled,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(R.string.remove_date),
+                )
+            }
+        }
     }
     if (pickingDate) {
         TaskDatePickerDialog(
@@ -166,7 +105,9 @@ private fun TaskDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (LocalDate) -> Unit,
 ) {
-    val state = rememberDatePickerState(initialSelectedDateMillis = initialDate.utcStartMillis())
+    val state = androidx.compose.material3.rememberDatePickerState(
+        initialSelectedDateMillis = initialDate.utcStartMillis(),
+    )
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -197,205 +138,6 @@ private fun Long.toUtcLocalDate(): LocalDate =
 
 private val TaskDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-
-/**
- * Suggested time window rows plus their add action, shared by the accumulate
- * and task forms. Each row opens the time picker through [onEditTime]; the
- * caller owns the list and the picker dialog.
- */
-@Composable
-internal fun SuggestedTimeFields(
-    windows: List<RecordWindow>,
-    enabled: Boolean,
-    onEditTime: (TimeEditTarget) -> Unit,
-    onRemove: (Int) -> Unit,
-    onAdd: () -> Unit,
-    horizontalPadding: Dp = AppStyle.spacing.pageHorizontal,
-    summary: String = suggestedTimeSummary(windows),
-) {
-    val fieldModifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = horizontalPadding, vertical = 8.dp)
-    windows.forEachIndexed { index, window ->
-        Row(
-            modifier = fieldModifier,
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(
-                onClick = { onEditTime(TimeEditTarget(index, start = true)) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(formatMinute(window.startMinute))
-            }
-            Text(stringResource(R.string.time_to), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(
-                onClick = { onEditTime(TimeEditTarget(index, start = false)) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(formatMinute(window.endMinute))
-            }
-            IconButton(
-                enabled = enabled,
-                onClick = { onRemove(index) },
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_close_24),
-                    contentDescription = stringResource(R.string.remove_suggested_time),
-                )
-            }
-        }
-    }
-    OutlinedButton(
-        onClick = onAdd,
-        enabled = enabled,
-        modifier = fieldModifier,
-    ) {
-        Text(stringResource(R.string.add_suggested_time))
-    }
-    Text(
-        text = summary,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(start = horizontalPadding, end = horizontalPadding, bottom = 8.dp),
-    )
-}
-
-/**
- * Standalone editor for one subtask's suggested times, used by `New task`
- * where the subtask has no id yet. Validation runs on confirm so the caller
- * only ever receives a legal list.
- */
-@Composable
-internal fun SuggestedTimeDialog(
-    stepLabel: String,
-    initialWindows: List<RecordWindow>,
-    onDismiss: () -> Unit,
-    onConfirm: (List<RecordWindow>) -> Unit,
-) {
-    val invalidSuggestedTimes = stringResource(R.string.invalid_suggested_times)
-    var windows by remember { mutableStateOf(initialWindows.map { it.encode() }) }
-    var timeEditTarget by remember { mutableStateOf<TimeEditTarget?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val parsedWindows = windows.map(::decodeWindow)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stepLabel) },
-        text = {
-            Column {
-                SuggestedTimeFields(
-                    windows = parsedWindows,
-                    enabled = true,
-                    onEditTime = { timeEditTarget = it },
-                    onRemove = { index ->
-                        windows = windows.toMutableList().also { it.removeAt(index) }
-                        errorMessage = null
-                    },
-                    onAdd = {
-                        windows = windows + nextSuggestedWindow(parsedWindows).encode()
-                        errorMessage = null
-                    },
-                    horizontalPadding = 0.dp,
-                    summary = taskSuggestedTimeSummary(parsedWindows),
-                )
-                errorMessage?.let { message ->
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    runCatching { validatedWindows(parsedWindows) }.fold(
-                        onSuccess = onConfirm,
-                        onFailure = { error ->
-                            errorMessage = error.message ?: invalidSuggestedTimes
-                        },
-                    )
-                },
-            ) {
-                Text(stringResource(R.string.action_done))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
-
-    timeEditTarget?.let { target ->
-        val window = parsedWindows.getOrNull(target.index) ?: return@let
-        RecordTimePickerDialog(
-            initialMinute = if (target.start) window.startMinute else window.endMinute,
-            onDismiss = { timeEditTarget = null },
-            onConfirm = { minute ->
-                windows = parsedWindows.withEditedTime(target, minute).map { it.encode() }
-                errorMessage = null
-                timeEditTarget = null
-            },
-        )
-    }
-}
-
-/** Explains what the configured windows will do on the Records root page. */
-@Composable
-internal fun suggestedTimeSummary(windows: List<RecordWindow>): String {
-    if (windows.isEmpty()) return stringResource(R.string.no_suggested_times)
-    return stringResource(R.string.suggested_time_shown, suggestedTimeSpan(windows))
-}
-
-@Composable
-internal fun taskSuggestedTimeSummary(windows: List<RecordWindow>): String {
-    if (windows.isEmpty()) return stringResource(R.string.no_task_suggested_times)
-    return stringResource(R.string.task_suggested_time_shown, suggestedTimeSpan(windows))
-}
-
-@Composable
-private fun suggestedTimeSpan(windows: List<RecordWindow>): String {
-    val coverage = windowCoverageMinutes(windows)
-    val hours = coverage / 60
-    val minutes = coverage % 60
-    return if (hours == 0) {
-        stringResource(R.string.duration_minutes_short, minutes)
-    } else {
-        stringResource(R.string.duration_hours_minutes_short, hours, minutes)
-    }
-}
-
-/** Default window appended by the add action: one hour after the last end. */
-internal fun nextSuggestedWindow(windows: List<RecordWindow>): RecordWindow {
-    val start = windows.lastOrNull()?.endMinute ?: 9 * 60
-    return RecordWindow(startMinute = start, endMinute = (start + 60) % MINUTES_PER_DAY)
-}
-
-/** Applies a picked minute to the window the [target] points at. */
-internal fun List<RecordWindow>.withEditedTime(target: TimeEditTarget, minute: Int): List<RecordWindow> {
-    if (target.index !in indices) return this
-    return toMutableList().also { windows ->
-        val window = windows[target.index]
-        windows[target.index] = if (target.start) {
-            window.copy(startMinute = minute)
-        } else {
-            window.copy(endMinute = minute)
-        }
-    }
-}
-
-internal fun decodeWindow(value: String): RecordWindow {
-    val parts = value.split(',', limit = 2)
-    return RecordWindow(
-        startMinute = parts[0].toInt(),
-        endMinute = parts[1].toInt(),
-    )
-}
-
-/** Saveable form of a window, so form state survives configuration changes. */
-internal fun RecordWindow.encode(): String = "$startMinute,$endMinute"
 
 internal fun formatMinute(minute: Int): String = String.format(
     Locale.ROOT,
