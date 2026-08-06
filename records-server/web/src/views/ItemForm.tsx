@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { api } from "../api";
 import { Modal } from "../components/Modal";
-import { minute, message, numberOrNull, parseWindows } from "../lib/format";
+import { message, numberOrNull } from "../lib/format";
 import type { ItemInput, RecordItem, RecordMode, ValueType } from "../types";
 
 interface ItemFormValues {
@@ -18,7 +18,6 @@ interface ItemFormValues {
   goalValue: string | number;
   goalPeriod: "DAY" | "DAYS_7";
   priority: string | number;
-  windows: string;
 }
 
 export function ItemForm({
@@ -50,8 +49,6 @@ export function ItemForm({
       goalValue: item?.goalValue ?? "",
       goalPeriod: item?.goalPeriod ?? "DAY",
       priority: item?.priority ?? 0,
-      windows:
-        item?.windows.map((window) => `${minute(window.startMinute)}-${minute(window.endMinute)}`).join("\n") ?? "",
     },
   });
 
@@ -78,7 +75,6 @@ export function ItemForm({
             goalValue: measurement ? null : numberOrNull(values.goalValue),
             goalPeriod: measurement || !values.goalValue ? null : values.goalPeriod,
             priority: Number(values.priority),
-            windows: measurement ? [] : parseWindows(values.windows),
           };
 
           try {
@@ -183,16 +179,6 @@ export function ItemForm({
             )}
           </div>
         </section>
-
-        {!measurement && (
-          <section className="form-section">
-            <h3>Schedule</h3>
-            <label>
-              Suggested windows
-              <textarea placeholder="08:00-09:00, one per line" {...register("windows")} />
-            </label>
-          </section>
-        )}
 
         {formError && (
           <p className="form-error" role="alert">

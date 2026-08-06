@@ -141,7 +141,6 @@ export function auditChanges(log: RecordAuditLog): string {
     fieldChange("Unit", before.unit, after.unit),
     fieldChange("Goal", itemGoal(before), itemGoal(after)),
     fieldChange("Priority", before.priority, after.priority),
-    fieldChange("Suggested windows", itemWindows(before), itemWindows(after)),
   ].filter((value): value is string => value !== null);
 
   return changes.join("; ") || "No visible field changes.";
@@ -167,7 +166,7 @@ function taskDescription(task: TaskAuditSnapshot): string {
 
 function taskDateLabel(task: TaskAuditSnapshot): string | null {
   if (!("plannedDate" in task)) return null;
-  return task.plannedDate === null ? "Later" : task.plannedDate ?? null;
+  return task.plannedDate === null ? "Unscheduled" : task.plannedDate ?? null;
 }
 
 function stepDescription(step: StepAuditSnapshot): string {
@@ -196,14 +195,6 @@ function itemGoal(item: ItemAuditSnapshot): string {
   return item.goalValue === null
     ? "No target"
     : `Target ${item.goalValue} ${item.unit} / ${item.goalPeriod === "DAY" ? "day" : "7 days"}`;
-}
-
-function itemWindows(item: ItemAuditSnapshot): string {
-  return (
-    item.windows
-      .map((window) => `${minute(window.startMinute)}-${minute(window.endMinute)}`)
-      .join(", ") || "None"
-  );
 }
 
 function fieldChange(label: string, before: unknown, after: unknown): string | null {

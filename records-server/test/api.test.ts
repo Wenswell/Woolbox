@@ -32,29 +32,28 @@ describe("Records API", () => {
       unit: "ml",
       archived: false,
       createdAt: 1_700_000_000_000,
-      windows: [{ id: 1, itemId: 1, startMinute: 480, endMinute: 540 }],
     });
 
     const updated = await app.inject({
       method: "PUT",
       url: "/api/items/1",
-      payload: itemInput({ name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] }),
+      payload: itemInput({ name: "Hydration" }),
     });
     expect(updated.statusCode).toBe(200);
-    expect(updated.json().item).toMatchObject({ name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] });
+    expect(updated.json().item).toMatchObject({ name: "Hydration" });
 
     expect((await getAuditLogs()).map((log) => log.action)).toEqual(["ITEM_UPDATED", "ITEM_CREATED"]);
     expect((await getAuditLogs())[0]).toMatchObject({
       entityType: "ITEM",
       entityId: 1,
-      before: { name: "Water", windows: [{ startMinute: 480, endMinute: 540 }] },
-      after: { name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] },
+      before: { name: "Water" },
+      after: { name: "Hydration" },
     });
 
     const unchanged = await app.inject({
       method: "PUT",
       url: "/api/items/1",
-      payload: itemInput({ name: "Hydration", windows: [{ startMinute: 600, endMinute: 660 }] }),
+      payload: itemInput({ name: "Hydration" }),
     });
     expect(unchanged.statusCode).toBe(200);
     expect((await getAuditLogs()).map((log) => log.action)).toEqual(["ITEM_UPDATED", "ITEM_CREATED"]);
@@ -68,13 +67,10 @@ describe("Records API", () => {
     ["non-positive goal", { goalValue: 0, goalPeriod: "DAY" }],
     ["missing goal period", { goalValue: 2, goalPeriod: null }],
     ["invalid duration unit", { valueType: "DURATION", unit: "ml" }],
-    ["invalid start minute", { windows: [{ startMinute: -1, endMinute: 60 }] }],
-    ["invalid end minute", { windows: [{ startMinute: 60, endMinute: 1440 }] }],
-    ["equal window bounds", { windows: [{ startMinute: 60, endMinute: 60 }] }],
-    ["duplicate windows", { windows: [{ startMinute: 60, endMinute: 120 }, { startMinute: 60, endMinute: 120 }] }],
-    ["measurement duration", { mode: "MEASUREMENT", valueType: "DURATION", unit: "分", windows: [] }],
-    ["measurement goal", { mode: "MEASUREMENT", goalValue: 2, goalPeriod: "DAY", windows: [] }],
-    ["measurement windows", { mode: "MEASUREMENT" }],
+    ["manual time windows", { windows: [{ startMinute: 60, endMinute: 120 }] }],
+    ["measurement duration", { mode: "MEASUREMENT", valueType: "DURATION", unit: "分" }],
+    ["measurement goal", { mode: "MEASUREMENT", goalValue: 2, goalPeriod: "DAY" }],
+    ["incomplete measurement fields", { mode: "MEASUREMENT" }],
   ])("rejects %s without changing tables", async (_label, patch) => {
     const response = await createItem(itemInput(patch));
     expect(response.statusCode).toBe(400);
@@ -114,7 +110,6 @@ describe("Records API", () => {
         name: "Changed",
         valueType: "DURATION",
         unit: "分",
-        windows: [{ startMinute: 100, endMinute: 200 }],
       }),
     });
     expect(response.statusCode).toBe(400);
@@ -122,7 +117,6 @@ describe("Records API", () => {
       name: "Water",
       valueType: "NUMBER",
       unit: "ml",
-      windows: [{ startMinute: 480, endMinute: 540 }],
     });
   });
 
@@ -175,7 +169,6 @@ describe("Records API", () => {
       minValue: 0,
       maxValue: 10,
       unit: "°C",
-      windows: [],
     }));
     await createEntry(entryInput({ itemId: 1, localDate: "2026-07-19", localMinute: 600, value: 2 }));
     await createEntry(entryInput({ itemId: 2, localDate: "2026-07-20", localMinute: 700, value: 3 }));
@@ -230,7 +223,6 @@ describe("Records API", () => {
       maxValue: 10,
       stepValue: 0.5,
       unit: "°C",
-      windows: [],
     }));
     expect(created.statusCode).toBe(201);
     expect(created.json().item).toMatchObject({
@@ -240,7 +232,6 @@ describe("Records API", () => {
       minValue: -10,
       maxValue: 10,
       goalValue: null,
-      windows: [],
     });
 
     expect((await createEntry(entryInput({ itemId: 1, value: 0 }))).statusCode).toBe(201);
@@ -263,7 +254,6 @@ describe("Records API", () => {
       mode: "MEASUREMENT",
       valueType: "DURATION",
       unit: "分",
-      windows: [],
     }));
     expect(invalid.statusCode).toBe(400);
   });
@@ -277,7 +267,6 @@ describe("Records API", () => {
       minValue: 0,
       maxValue: 10,
       unit: "°C",
-      windows: [],
     }));
     await createItem(itemInput({
       name: "Weight",
@@ -286,7 +275,6 @@ describe("Records API", () => {
       minValue: 0,
       maxValue: 300,
       unit: "kg",
-      windows: [],
     }));
     await createItem(itemInput({ name: "Archived" }));
     await archiveItems([4], true);
@@ -497,93 +485,49 @@ describe("Records API", () => {
     expect(foreign.statusCode).toBe(400);
   });
 
-  it("stores subtask suggested windows and audits their changes", async () => {
-    const created = await createTask({
-      title: "Morning routine",
-      steps: [{ title: "Stretch", windows: [{ startMinute: 480, endMinute: 540 }] }, "Shower"],
-    });
-    expect(created.statusCode).toBe(201);
-    expect(created.json().task.steps).toMatchObject([
-      { title: "Stretch", windows: [{ id: 1, stepId: 1, startMinute: 480, endMinute: 540 }] },
-      { title: "Shower", windows: [] },
-    ]);
-    expect((await getTasks())[0]).toMatchObject({
-      steps: [{ title: "Stretch", windows: [{ startMinute: 480, endMinute: 540 }] }, { windows: [] }],
-    });
-
-    const updated = await app.inject({
-      method: "PUT",
-      url: "/api/steps/1",
-      payload: { title: "Stretch", windows: [{ startMinute: 420, endMinute: 480 }] },
-    });
-    expect(updated.statusCode).toBe(200);
-    expect(updated.json().step.windows).toMatchObject([{ startMinute: 420, endMinute: 480 }]);
-
-    const logs = (await app.inject({ method: "GET", url: "/api/audit-logs" })).json().logs as Array<{
-      action: string;
-      before: { windows?: unknown } | null;
-      after: { windows?: unknown } | null;
-    }>;
-    const stepUpdated = logs.find((log) => log.action === "STEP_UPDATED")!;
-    expect(stepUpdated.before?.windows).toEqual([{ startMinute: 480, endMinute: 540 }]);
-    expect(stepUpdated.after?.windows).toEqual([{ startMinute: 420, endMinute: 480 }]);
-    const stepCreated = logs.filter((log) => log.action === "STEP_CREATED");
-    expect(stepCreated.at(-1)?.after?.windows).toEqual([{ startMinute: 480, endMinute: 540 }]);
-  });
-
-  it("requires a task date for subtask suggested times", async () => {
-    const unplanned = await createTask({
-      title: "Later task",
-      plannedDate: null,
-      steps: [{ title: "Read", windows: [{ startMinute: 480, endMinute: 540 }] }],
-    });
-    expect(unplanned.statusCode).toBe(400);
-    expect(unplanned.json().error.message).toBe("Suggested times require a task date.");
-
-    const task = await createTask({ title: "Inbox", plannedDate: null, steps: ["Read"] });
-    expect(task.statusCode).toBe(201);
-    const addWindow = await createStep(1, {
-      title: "Timed",
+  it("rejects removed manual time-window fields", async () => {
+    const item = await createItem(itemInput({
       windows: [{ startMinute: 480, endMinute: 540 }],
-    });
-    expect(addWindow.statusCode).toBe(400);
-    expect(addWindow.json().error.message).toBe("Suggested times require a task date.");
+    }));
+    expect(item.statusCode).toBe(400);
+    expect(item.json().error.message).toBe("Manual time windows are not supported.");
 
-    const dated = await app.inject({
-      method: "PUT",
-      url: "/api/tasks/1",
-      payload: { title: "Inbox", plannedDate: "2026-07-21" },
+    const task = await createTask({
+      title: "Morning routine",
+      steps: [{ title: "Stretch", windows: [{ startMinute: 480, endMinute: 540 }] }],
     });
-    expect(dated.statusCode).toBe(200);
-    const savedWindow = await app.inject({
+    expect(task.statusCode).toBe(400);
+    expect(task.json().error.message).toBe("Manual time windows are not supported.");
+
+    const created = await createTask({ title: "Routine", steps: ["Stretch"] });
+    expect(created.statusCode).toBe(201);
+    const step = await app.inject({
       method: "PUT",
       url: "/api/steps/1",
-      payload: { title: "Read", windows: [{ startMinute: 480, endMinute: 540 }] },
+      payload: { title: "Stretch", windows: [] },
     });
-    expect(savedWindow.statusCode).toBe(200);
-
-    const moveLater = await app.inject({
-      method: "PUT",
-      url: "/api/tasks/1",
-      payload: { title: "Inbox", plannedDate: null },
-    });
-    expect(moveLater.statusCode).toBe(400);
-    expect(moveLater.json().error.message).toBe("Remove suggested times before moving a task to Later.");
+    expect(step.statusCode).toBe(400);
+    expect(step.json().error.message).toBe("Manual time windows are not supported.");
   });
 
-  it("adds subtask windows through the step endpoint and cascades deletes", async () => {
+  it("adds plain subtasks, clears task dates, and cascades deletes", async () => {
     const created = await createTask({ title: "Pack", steps: ["Bag"] });
     expect(created.statusCode).toBe(201);
-    expect(created.json().task.steps[0].windows).toEqual([]);
     const taskId = created.json().task.id as number;
 
     const added = await createStep(taskId, {
       title: "Evening check",
-      windows: [{ startMinute: 1200, endMinute: 1320 }],
     });
     expect(added.statusCode).toBe(201);
-    expect(added.json().step.windows).toMatchObject([{ startMinute: 1200, endMinute: 1320 }]);
     const stepId = added.json().step.id as number;
+
+    const unscheduled = await app.inject({
+      method: "PUT",
+      url: `/api/tasks/${taskId}`,
+      payload: { title: "Pack", plannedDate: null },
+    });
+    expect(unscheduled.statusCode).toBe(200);
+    expect(unscheduled.json().task.plannedDate).toBeNull();
 
     expect((await app.inject({ method: "DELETE", url: `/api/steps/${stepId}` })).statusCode).toBe(200);
     const remaining = (await getTasks())[0] as { steps: Array<{ id: number }> };
@@ -593,68 +537,15 @@ describe("Records API", () => {
     expect(await getTasks()).toEqual([]);
   });
 
-  it("rejects subtask windows that repeat, are invalid, or cover half the day", async () => {
-    const duplicate = await createTask({
-      title: "Dup",
-      steps: [
-        {
-          title: "A",
-          windows: [
-            { startMinute: 480, endMinute: 540 },
-            { startMinute: 480, endMinute: 540 },
-          ],
-        },
-      ],
-    });
-    expect(duplicate.statusCode).toBe(400);
-
-    const equal = await createTask({
-      title: "Equal",
-      steps: [{ title: "A", windows: [{ startMinute: 480, endMinute: 480 }] }],
-    });
-    expect(equal.statusCode).toBe(400);
-
-    const wide = await createTask({
-      title: "Wide",
-      steps: [{ title: "A", windows: [{ startMinute: 0, endMinute: 1439 }] }],
-    });
-    expect(wide.statusCode).toBe(400);
-    expect(wide.json().error.message).toBe("Suggested times must cover less than 12 hours.");
-
-    expect(await getTasks()).toEqual([]);
-  });
-
-  it("caps record item suggested time coverage", async () => {
-    const wide = await createItem(
-      itemInput({ name: "Wide", windows: [{ startMinute: 0, endMinute: 720 }] }),
-    );
-    expect(wide.statusCode).toBe(400);
-
-    const overlapping = await createItem(
-      itemInput({
-        name: "Overlapping",
-        windows: [
-          { startMinute: 480, endMinute: 900 },
-          { startMinute: 600, endMinute: 960 },
-        ],
-      }),
-    );
-    // Union is 480..960 = 8h, under the cap even though the sum is over it.
-    expect(overlapping.statusCode).toBe(201);
-
-    const overnight = await createItem(
-      itemInput({ name: "Overnight", windows: [{ startMinute: 1380, endMinute: 300 }] }),
-    );
-    // 23:00 -> 05:00 wraps midnight and counts as 6h.
-    expect(overnight.statusCode).toBe(201);
-  });
-
 
   async function createTask(payload: Record<string, unknown>) {
+    const steps = Array.isArray(payload.steps)
+      ? payload.steps.map((step) => typeof step === "string" ? { title: step } : step)
+      : payload.steps;
     return app.inject({
       method: "POST",
       url: "/api/tasks",
-      payload: { plannedDate: "2026-07-20", ...payload },
+      payload: { plannedDate: "2026-07-20", ...payload, steps },
     });
   }
 
@@ -693,7 +584,6 @@ function itemInput(patch: Record<string, unknown> = {}) {
     goalValue: null,
     goalPeriod: null,
     priority: 1,
-    windows: [{ startMinute: 480, endMinute: 540 }],
     ...patch,
   };
 }

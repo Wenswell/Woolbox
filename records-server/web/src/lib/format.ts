@@ -22,25 +22,6 @@ export function numberOrNull(value: string | number): number | null {
   return value === "" ? null : Number(value);
 }
 
-export function parseWindows(value: string): Array<{ startMinute: number; endMinute: number }> {
-  return value
-    .split(/\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((window) => {
-      const [start, end] = window.split("-");
-      return {
-        startMinute: timeMinute(start),
-        endMinute: timeMinute(end),
-      };
-    });
-}
-
-export function timeMinute(value: string): number {
-  const [hour, minuteValue] = value.split(":").map(Number);
-  return hour * 60 + minuteValue;
-}
-
 export function message(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Request failed.";
 }

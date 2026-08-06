@@ -7,19 +7,15 @@ import {
   recordAuditLogs,
   recordEntries,
   recordItems,
-  recordWindows,
   todoSteps,
-  todoStepWindows,
   todoTasks,
 } from "./schema.js";
 
 const AuditLogPageSize = 100;
 
 type RecordItemRow = typeof recordItems.$inferSelect;
-type RecordWindowRow = typeof recordWindows.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
 type TodoTaskRow = typeof todoTasks.$inferSelect;
-type TodoStepWindowRow = typeof todoStepWindows.$inferSelect;
 type TodoStepRow = typeof todoSteps.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
 
@@ -58,7 +54,6 @@ interface ItemAuditSnapshot {
   goalPeriod: string | null;
   priority: number;
   archived: boolean;
-  windows: Array<{ startMinute: number; endMinute: number }>;
   entryCount?: number;
 }
 
@@ -87,7 +82,6 @@ interface StepAuditSnapshot {
   taskTitle: string;
   title: string;
   completedAt: number | null;
-  windows: Array<{ startMinute: number; endMinute: number }>;
 }
 
 type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot;
@@ -114,7 +108,7 @@ export class RecordsService {
       .where(eq(recordItems.archived, archived))
       .orderBy(sql`${recordItems.name} COLLATE NOCASE`)
       .all();
-    return this.attachWindows(rows);
+    return rows;
   }
 
   overview(startDate: string, endDate: string) {
@@ -133,7 +127,7 @@ export class RecordsService {
   getItem(id: number) {
     const row = this.db.select().from(recordItems).where(eq(recordItems.id, id)).get();
     if (!row) throw new ApiError(404, "Record item not found.");
-    return this.attachWindows([row])[0]!;
+    return row;
   }
 
   createItem(input: RecordItemInput) {
@@ -142,14 +136,9 @@ export class RecordsService {
       const now = this.now();
       const created = tx
         .insert(recordItems)
-        .values({ ...withoutWindows(input), archived: false, createdAt: now, updatedAt: now })
+        .values({ ...input, archived: false, createdAt: now, updatedAt: now })
         .returning({ id: recordItems.id })
         .get();
-      if (input.windows.length > 0) {
-        tx.insert(recordWindows)
-          .values(input.windows.map((window) => ({ ...window, itemId: created.id })))
-          .run();
-      }
       this.writeAudit(tx, {
         action: "ITEM_CREATED",
         entityType: "ITEM",
@@ -167,11 +156,8 @@ export class RecordsService {
       const current = tx.select().from(recordItems).where(eq(recordItems.id, id)).get();
       if (!current) throw new ApiError(404, "Record item not found.");
       this.requireUniqueName(input.name, id);
-      const before = itemSnapshot(
-        current,
-        tx.select().from(recordWindows).where(eq(recordWindows.itemId, id)).all(),
-      );
-      const after = itemSnapshot({ ...current, ...withoutWindows(input) }, input.windows);
+      const before = itemSnapshot(current);
+      const after = itemSnapshot({ ...current, ...input });
       if (isDeepStrictEqual(before, after)) return;
 
       const entryTotal = tx
@@ -194,15 +180,9 @@ export class RecordsService {
 
       const now = this.now();
       tx.update(recordItems)
-        .set({ ...withoutWindows(input), updatedAt: now })
+        .set({ ...input, updatedAt: now })
         .where(eq(recordItems.id, id))
         .run();
-      tx.delete(recordWindows).where(eq(recordWindows.itemId, id)).run();
-      if (input.windows.length > 0) {
-        tx.insert(recordWindows)
-          .values(input.windows.map((window) => ({ ...window, itemId: id })))
-          .run();
-      }
       this.writeAudit(tx, {
         action: "ITEM_UPDATED",
         entityType: "ITEM",
@@ -222,12 +202,6 @@ export class RecordsService {
       const changed = existing.filter((item) => item.archived !== archived);
       if (changed.length === 0) return;
 
-      const windows = tx
-        .select()
-        .from(recordWindows)
-        .where(inArray(recordWindows.itemId, changed.map((item) => item.id)))
-        .all();
-      const windowsByItem = groupWindows(windows);
       const now = this.now();
       tx.update(recordItems)
         .set({ archived, updatedAt: now })
@@ -238,8 +212,8 @@ export class RecordsService {
           action: archived ? "ITEM_ARCHIVED" : "ITEM_RESTORED",
           entityType: "ITEM",
           entityId: item.id,
-          before: itemSnapshot(item, windowsByItem.get(item.id) ?? []),
-          after: itemSnapshot({ ...item, archived }, windowsByItem.get(item.id) ?? []),
+          before: itemSnapshot(item),
+          after: itemSnapshot({ ...item, archived }),
           createdAt: now,
         });
       }
@@ -252,7 +226,6 @@ export class RecordsService {
       const current = tx.select().from(recordItems).where(eq(recordItems.id, id)).get();
       if (!current) throw new ApiError(404, "Record item not found.");
       if (!current.archived) throw new ApiError(400, "Archive the record item before deleting it.");
-      const windows = tx.select().from(recordWindows).where(eq(recordWindows.itemId, id)).all();
       const entryCount = tx
         .select({ value: count() })
         .from(recordEntries)
@@ -262,11 +235,11 @@ export class RecordsService {
         action: "ITEM_DELETED",
         entityType: "ITEM",
         entityId: id,
-        before: { ...itemSnapshot(current, windows), entryCount },
+        before: { ...itemSnapshot(current), entryCount },
         createdAt: this.now(),
       });
       tx.delete(recordItems).where(eq(recordItems.id, id)).run();
-      return { ...current, windows };
+      return current;
     });
     return deleted;
   }
@@ -405,7 +378,7 @@ export class RecordsService {
   getStep(id: number) {
     const step = this.db.select().from(todoSteps).where(eq(todoSteps.id, id)).get();
     if (!step) throw new ApiError(404, "Step not found.");
-    return { ...step, windows: this.stepWindows([id]).get(id) ?? [] };
+    return step;
   }
 
   createTask(input: TaskCreateInput) {
@@ -427,12 +400,6 @@ export class RecordsService {
         })))
         .returning({ id: todoSteps.id, title: todoSteps.title })
         .all();
-      const stepWindows = input.steps.flatMap((step, position) =>
-        step.windows.map((window) => ({ ...window, stepId: steps[position]!.id })),
-      );
-      if (stepWindows.length > 0) {
-        tx.insert(todoStepWindows).values(stepWindows).run();
-      }
       this.writeAudit(tx, {
         action: "TASK_CREATED",
         entityType: "TASK",
@@ -443,7 +410,7 @@ export class RecordsService {
         },
         createdAt: now,
       });
-      steps.forEach((step, position) => {
+      steps.forEach((step) => {
         this.writeAudit(tx, {
           action: "STEP_CREATED",
           entityType: "STEP",
@@ -451,7 +418,6 @@ export class RecordsService {
           after: stepSnapshot(
             { id: step.id, taskId: task.id, title: step.title, completedAt: null },
             input.title,
-            input.steps[position]!.windows,
           ),
           createdAt: now,
         });
@@ -464,7 +430,6 @@ export class RecordsService {
   updateTask(id: number, input: TaskWriteInput) {
     this.db.transaction((tx) => {
       const current = this.requireTask(tx, id);
-      if (input.plannedDate === null) this.requireTaskWithoutSuggestedTimes(tx, id);
       const now = this.now();
       const updated = { ...current, title: input.title, plannedDate: input.plannedDate, updatedAt: now };
       tx.update(todoTasks).set({ title: input.title, plannedDate: input.plannedDate, updatedAt: now }).where(eq(todoTasks.id, id)).run();
@@ -503,7 +468,6 @@ export class RecordsService {
   createStep(taskId: number, input: StepInput) {
     const id = this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
-      this.requireTaskDateForSuggestedTimes(task, input.windows);
       const now = this.now();
       const existing = tx.select().from(todoSteps).where(eq(todoSteps.taskId, taskId)).all();
       const position = existing.reduce((max, step) => Math.max(max, step.position), -1) + 1;
@@ -512,11 +476,6 @@ export class RecordsService {
         .values({ taskId, title: input.title, position, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoSteps.id })
         .get();
-      if (input.windows.length > 0) {
-        tx.insert(todoStepWindows)
-          .values(input.windows.map((window) => ({ ...window, stepId: step.id })))
-          .run();
-      }
       this.writeAudit(tx, {
         action: "STEP_CREATED",
         entityType: "STEP",
@@ -524,7 +483,6 @@ export class RecordsService {
         after: stepSnapshot(
           { id: step.id, taskId, title: input.title, completedAt: null },
           task.title,
-          input.windows,
         ),
         createdAt: now,
       });
@@ -538,23 +496,15 @@ export class RecordsService {
     this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
-      this.requireTaskDateForSuggestedTimes(task, input.windows);
       const now = this.now();
-      const currentWindows = tx.select().from(todoStepWindows).where(eq(todoStepWindows.stepId, id)).all();
       const updated = { ...step, title: input.title, updatedAt: now };
       tx.update(todoSteps).set({ title: input.title, updatedAt: now }).where(eq(todoSteps.id, id)).run();
-      tx.delete(todoStepWindows).where(eq(todoStepWindows.stepId, id)).run();
-      if (input.windows.length > 0) {
-        tx.insert(todoStepWindows)
-          .values(input.windows.map((window) => ({ ...window, stepId: id })))
-          .run();
-      }
       this.writeAudit(tx, {
         action: "STEP_UPDATED",
         entityType: "STEP",
         entityId: id,
-        before: stepSnapshot(step, task.title, currentWindows),
-        after: stepSnapshot(updated, task.title, input.windows),
+        before: stepSnapshot(step, task.title),
+        after: stepSnapshot(updated, task.title),
         createdAt: now,
       });
     });
@@ -668,36 +618,6 @@ export class RecordsService {
     };
   }
 
-  private attachWindows(rows: RecordItemRow[]) {
-    if (rows.length === 0) return [];
-    const windows = this.db
-      .select()
-      .from(recordWindows)
-      .where(inArray(recordWindows.itemId, rows.map((row) => row.id)))
-      .orderBy(asc(recordWindows.startMinute), asc(recordWindows.endMinute), asc(recordWindows.id))
-      .all();
-    const grouped = groupWindows(windows);
-    return rows.map((row) => ({ ...row, windows: grouped.get(row.id) ?? [] }));
-  }
-
-  /** Suggested windows for the given steps, oldest start first. */
-  private stepWindows(stepIds: number[]) {
-    const grouped = new Map<number, TodoStepWindowRow[]>();
-    if (stepIds.length === 0) return grouped;
-    const windows = this.db
-      .select()
-      .from(todoStepWindows)
-      .where(inArray(todoStepWindows.stepId, stepIds))
-      .orderBy(asc(todoStepWindows.startMinute), asc(todoStepWindows.endMinute), asc(todoStepWindows.id))
-      .all();
-    for (const window of windows) {
-      const stepWindows = grouped.get(window.stepId) ?? [];
-      stepWindows.push(window);
-      grouped.set(window.stepId, stepWindows);
-    }
-    return grouped;
-  }
-
   private attachSteps(tasks: TodoTaskRow[]) {
     if (tasks.length === 0) return [];
     const taskIds = tasks.map((task) => task.id);
@@ -713,13 +633,9 @@ export class RecordsService {
       taskSteps.push(step);
       stepsByTask.set(step.taskId, taskSteps);
     }
-    const windowsByStep = this.stepWindows(steps.map((step) => step.id));
     return tasks.map((task) => ({
       ...task,
-      steps: (stepsByTask.get(task.id) ?? []).map((step) => ({
-        ...step,
-        windows: windowsByStep.get(step.id) ?? [],
-      })),
+      steps: stepsByTask.get(task.id) ?? [],
     }));
   }
 
@@ -733,28 +649,6 @@ export class RecordsService {
     const step = tx.select().from(todoSteps).where(eq(todoSteps.id, id)).get();
     if (!step) throw new ApiError(404, "Step not found.");
     return step;
-  }
-
-  private requireTaskDateForSuggestedTimes(task: TodoTaskRow, windows: StepInput["windows"]) {
-    if (task.plannedDate === null && windows.length > 0) {
-      throw new ApiError(400, "Suggested times require a task date.");
-    }
-  }
-
-  private requireTaskWithoutSuggestedTimes(tx: RecordsTransaction, taskId: number) {
-    const stepIds = tx
-      .select({ id: todoSteps.id })
-      .from(todoSteps)
-      .where(eq(todoSteps.taskId, taskId))
-      .all()
-      .map((step) => step.id);
-    if (stepIds.length === 0) return;
-    const hasSuggestedTimes = tx
-      .select({ id: todoStepWindows.id })
-      .from(todoStepWindows)
-      .where(inArray(todoStepWindows.stepId, stepIds))
-      .get() !== undefined;
-    if (hasSuggestedTimes) throw new ApiError(400, "Remove suggested times before moving a task to Later.");
   }
 
   private reconcileTaskCompletion(tx: RecordsTransaction, task: TodoTaskRow, now: number) {
@@ -841,31 +735,10 @@ export class RecordsService {
   }
 }
 
-function withoutWindows(input: RecordItemInput) {
-  const { windows: _windows, ...item } = input;
-  return item;
-}
-
-function groupWindows(windows: RecordWindowRow[]) {
-  const grouped = new Map<number, RecordWindowRow[]>();
-  for (const window of windows) {
-    const itemWindows = grouped.get(window.itemId) ?? [];
-    itemWindows.push(window);
-    grouped.set(window.itemId, itemWindows);
-  }
-  return grouped;
-}
-
 function itemSnapshot(
   item: Pick<RecordItemRow, "id" | "name" | "description" | "mode" | "valueType" | "defaultValue" | "minValue" | "maxValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
-  windows: Array<Pick<RecordWindowRow, "startMinute" | "endMinute">> = [],
 ): ItemAuditSnapshot {
-  return {
-    ...item,
-    windows: windows
-      .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }))
-      .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute),
-  };
+  return item;
 }
 
 function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnapshot {
@@ -889,16 +762,9 @@ function taskSnapshot(task: { id: number; title: string; plannedDate: string | n
   };
 }
 
-function sortedWindows(windows: Array<Pick<TodoStepWindowRow, "startMinute" | "endMinute">>) {
-  return windows
-    .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }))
-    .sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
-}
-
 function stepSnapshot(
   step: Pick<TodoStepRow, "id" | "taskId" | "title" | "completedAt">,
   taskTitle: string,
-  windows: Array<Pick<TodoStepWindowRow, "startMinute" | "endMinute">> = [],
 ): StepAuditSnapshot {
   return {
     id: step.id,
@@ -906,7 +772,6 @@ function stepSnapshot(
     taskTitle,
     title: step.title,
     completedAt: step.completedAt,
-    windows: sortedWindows(windows),
   };
 }
 

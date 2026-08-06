@@ -7,10 +7,6 @@ export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
 
-export interface RecordWindowInput {
-  startMinute: number;
-  endMinute: number;
-}
 export interface RecordItemInput {
   name: string;
   description: string;
@@ -24,7 +20,6 @@ export interface RecordItemInput {
   goalValue: number | null;
   goalPeriod: GoalPeriod | null;
   priority: number;
-  windows: RecordWindowInput[];
 }
 
 export interface RecordEntryInput {
@@ -39,10 +34,7 @@ export interface TaskTitleInput {
   title: string;
 }
 
-/** A subtask and the times of day it is suggested at. */
-export interface StepInput extends TaskTitleInput {
-  windows: RecordWindowInput[];
-}
+export type StepInput = TaskTitleInput;
 
 export interface TaskWriteInput extends TaskTitleInput {
   plannedDate: string | null;
@@ -63,6 +55,7 @@ export class ApiError extends Error {
 
 export function parseItemInput(value: unknown): RecordItemInput {
   const input = objectInput(value);
+  requireRule(input.windows === undefined, "Manual time windows are not supported.");
   const name = stringField(input, "name").trim();
   const description = stringField(input, "description").trim();
   const unit = stringField(input, "unit").trim();
@@ -75,12 +68,10 @@ export function parseItemInput(value: unknown): RecordItemInput {
   const goalValue = nullableNumberField(input, "goalValue");
   const goalPeriod = nullableEnumField(input, "goalPeriod", GOAL_PERIODS);
   const priority = integerField(input, "priority");
-  const windowsValue = input.windows;
 
   requireRule(name.length > 0, "Name is required.");
   requireRule(unit.length > 0, "Unit is required.");
   requirePositive(stepValue, "Step");
-  const windows = parseWindowsInput(windowsValue);
 
   if (mode === "ACCUMULATE") {
     requirePositive(defaultValue, "Default value");
@@ -93,7 +84,6 @@ export function parseItemInput(value: unknown): RecordItemInput {
     requireRule(defaultValue === null, "Measurements do not support default values.");
     requireMeasurementGrid(minValue, maxValue, stepValue);
     requireRule(goalValue === null && goalPeriod === null, "Measurements do not support goals.");
-    requireRule(windows.length === 0, "Measurements do not support suggested time windows.");
   }
 
   return {
@@ -109,7 +99,6 @@ export function parseItemInput(value: unknown): RecordItemInput {
     goalValue,
     goalPeriod: goalValue === null ? null : goalPeriod,
     priority,
-    windows,
   };
 }
 
@@ -133,20 +122,12 @@ export function parseTaskInput(value: unknown): TaskTitleInput {
   return { title };
 }
 
-/**
- * A subtask, given either as a bare title string or as an object with a title
- * and suggested windows. Subtasks predate windows, so an absent list is none.
- */
 export function parseStepInput(value: unknown): StepInput {
-  if (typeof value === "string") {
-    const title = value.trim();
-    requireRule(title.length > 0, "Subtask titles are required.");
-    return { title, windows: [] };
-  }
   const input = objectInput(value);
+  requireRule(input.windows === undefined, "Manual time windows are not supported.");
   const title = stringField(input, "title").trim();
   requireRule(title.length > 0, "Subtask titles are required.");
-  return { title, windows: parseWindowsInput(input.windows, true) };
+  return { title };
 }
 
 export function parseTaskWriteInput(value: unknown): TaskWriteInput {
@@ -163,10 +144,6 @@ export function parseTaskCreateInput(value: unknown): TaskCreateInput {
   const { title, plannedDate } = parseTaskWriteInput(input);
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
   const steps = input.steps.map(parseStepInput);
-  requireRule(
-    plannedDate !== null || steps.every((step) => step.windows.length === 0),
-    "Suggested times require a task date.",
-  );
   return { title, plannedDate, steps };
 }
 
@@ -209,57 +186,6 @@ export function parseArchived(value: unknown): boolean {
 export function parseIsoDate(value: unknown, label: string): string {
   requireRule(typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isRealDate(value), `${label} is invalid.`);
   return value;
-}
-
-export const MINUTES_PER_DAY = 24 * 60;
-export const MAX_WINDOW_COVERAGE_MINUTES = 12 * 60;
-
-/**
- * Suggested windows must stay a hint about *now*, so their union has to leave
- * most of the day uncovered. Overlapping windows are counted once.
- */
-export function windowCoverageMinutes(windows: RecordWindowInput[]): number {
-  const segments: Array<[number, number]> = [];
-  for (const { startMinute, endMinute } of windows) {
-    if (startMinute < endMinute) {
-      segments.push([startMinute, endMinute]);
-    } else {
-      segments.push([startMinute, MINUTES_PER_DAY]);
-      segments.push([0, endMinute]);
-    }
-  }
-  segments.sort((left, right) => left[0] - right[0]);
-  let covered = 0;
-  let cursor = 0;
-  for (const [start, end] of segments) {
-    if (end <= cursor) continue;
-    covered += end - Math.max(start, cursor);
-    cursor = end;
-  }
-  return covered;
-}
-
-function parseWindowsInput(value: unknown, optional = false): RecordWindowInput[] {
-  if (optional && value === undefined) return [];
-  requireRule(Array.isArray(value), "Windows must be an array.");
-  const windows = value.map((window) => parseWindowInput(window));
-  const unique = new Set(windows.map(({ startMinute, endMinute }) => `${startMinute}:${endMinute}`));
-  requireRule(unique.size === windows.length, "Suggested time windows must be unique.");
-  requireRule(
-    windowCoverageMinutes(windows) < MAX_WINDOW_COVERAGE_MINUTES,
-    "Suggested times must cover less than 12 hours.",
-  );
-  return windows;
-}
-
-function parseWindowInput(value: unknown): RecordWindowInput {
-  const input = objectInput(value);
-  const startMinute = integerField(input, "startMinute");
-  const endMinute = integerField(input, "endMinute");
-  requireRule(startMinute >= 0 && startMinute <= 1439, "Start time is invalid.");
-  requireRule(endMinute >= 0 && endMinute <= 1439, "End time is invalid.");
-  requireRule(startMinute !== endMinute, "Start and end times must differ.");
-  return { startMinute, endMinute };
 }
 
 function objectInput(value: unknown): Record<string, unknown> {

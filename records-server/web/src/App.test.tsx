@@ -20,7 +20,6 @@ const activeItem = {
   archived: false,
   createdAt: 1,
   updatedAt: 1,
-  windows: [],
 };
 const archivedItem = { ...activeItem, id: 2, name: "Read", unit: "pages", archived: true };
 const entry = {

@@ -14,7 +14,7 @@ describe("Records migrations", () => {
     if (directory) rmSync(directory, { recursive: true, force: true });
   });
 
-  it("upgrades a database with task horizons to date-planned tasks", async () => {
+  it("upgrades date-planned tasks and removes manual scheduling tables", async () => {
     directory = mkdtempSync(join(tmpdir(), "records-migration-test-"));
     const databaseFile = join(directory, "records.sqlite");
     const publishedMigrations = join(directory, "published-migrations");
@@ -42,6 +42,12 @@ describe("Records migrations", () => {
     sqlite.prepare(
       "INSERT INTO todo_step_windows (step_id, start_minute, end_minute) VALUES (?, ?, ?)",
     ).run(stepId, 480, 540);
+    const itemId = sqlite.prepare(
+      "INSERT INTO record_items (name, description, value_type, default_value, step_value, unit, priority, archived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run("Water", "", "NUMBER", 1, 1, "times", 0, 0, 1, 1).lastInsertRowid;
+    sqlite.prepare(
+      "INSERT INTO record_windows (item_id, start_minute, end_minute) VALUES (?, ?, ?)",
+    ).run(itemId, 480, 540);
     sqlite.close();
 
     const app = buildApp({ databaseFile });
@@ -53,12 +59,12 @@ describe("Records migrations", () => {
     await app.close();
 
     const migrated = new Database(databaseFile, { readonly: true });
-    expect(tableNames(migrated)).toContain("todo_step_windows");
+    expect(tableNames(migrated)).not.toContain("todo_step_windows");
+    expect(tableNames(migrated)).not.toContain("record_windows");
     expect(tableNames(migrated)).not.toContain("todo_task_windows");
     expect(columnNames(migrated, "todo_tasks")).toContain("planned_date");
     expect(columnNames(migrated, "todo_tasks")).not.toContain("horizon");
     expect(migrated.prepare("SELECT planned_date AS plannedDate FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({ plannedDate: null });
-    expect(migrated.prepare("SELECT COUNT(*) AS value FROM todo_step_windows").get()).toEqual({ value: 0 });
     migrated.close();
   });
 });

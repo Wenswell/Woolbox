@@ -27,12 +27,11 @@ const response = await fetch("http://127.0.0.1:4320/api/overview?startDate=2000-
 if (!response?.ok) process.exit(1);
 const overview = await response.json();
 if (!Array.isArray(overview.items) || !Array.isArray(overview.tasks)) process.exit(1);
-if (!overview.items.every((item) => Array.isArray(item.windows))) process.exit(1);
 if (!overview.tasks.every(
   (task) =>
     (typeof task.plannedDate === "string" || task.plannedDate === null)
     && Array.isArray(task.steps)
-    && task.steps.every((step) => Array.isArray(step.windows)),
+    && task.steps.every((step) => typeof step.title === "string"),
 )) process.exit(1);
 NODE
   then
@@ -53,8 +52,8 @@ const positionColumn = database.prepare("SELECT name FROM pragma_table_info('tod
 if (!positionColumn) throw new Error("Todo step position migration is missing.");
 const plannedDateColumn = database.prepare("SELECT name FROM pragma_table_info('todo_tasks') WHERE name = 'planned_date'").get();
 if (!plannedDateColumn) throw new Error("Todo task planned date migration is missing.");
-const stepWindowsTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'todo_step_windows'").get();
-if (!stepWindowsTable) throw new Error("Todo step windows migration is missing.");
+const removedWindowTables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('record_windows', 'todo_step_windows')").all();
+if (removedWindowTables.length !== 0) throw new Error("Removed scheduling tables still exist.");
 console.log("Database schema verified.");
 NODE
 echo "Records deployment verified."

@@ -24,19 +24,6 @@ export const recordItems = sqliteTable(
   (table) => [uniqueIndex("record_items_name_unique").on(sql`${table.name} COLLATE NOCASE`)],
 );
 
-export const recordWindows = sqliteTable(
-  "record_windows",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    itemId: integer("item_id")
-      .notNull()
-      .references(() => recordItems.id, { onDelete: "cascade" }),
-    startMinute: integer("start_minute").notNull(),
-    endMinute: integer("end_minute").notNull(),
-  },
-  (table) => [index("record_windows_item_id_index").on(table.itemId)],
-);
-
 export const recordEntries = sqliteTable(
   "record_entries",
   {
@@ -90,19 +77,6 @@ export const todoSteps = sqliteTable(
     index("todo_steps_task_created_at_index").on(table.taskId, table.createdAt),
     index("todo_steps_task_position_index").on(table.taskId, table.position),
   ],
-);
-
-export const todoStepWindows = sqliteTable(
-  "todo_step_windows",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    stepId: integer("step_id")
-      .notNull()
-      .references(() => todoSteps.id, { onDelete: "cascade" }),
-    startMinute: integer("start_minute").notNull(),
-    endMinute: integer("end_minute").notNull(),
-  },
-  (table) => [index("todo_step_windows_step_id_index").on(table.stepId)],
 );
 
 export const recordAuditLogs = sqliteTable(
