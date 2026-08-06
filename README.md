@@ -89,7 +89,7 @@ pnpm run publish:debug
 
 | 构建类型 | 当前发布版本 |
 | --- | --- |
-| debug | `0.1.31` (`versionCode 32`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.31-debug.apk`，远端 `content-length` `68,744,492`，SHA-256 `015bee3a1120307c5a037c68018cb96e145ea9d35d24f6bd357103159e3e9a84`。 |
+| debug | `0.1.32` (`versionCode 33`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.32-debug.apk`，远端 `content-length` `68,468,158`，SHA-256 `ef937a516ab9963028170b0bb7bbc185a1b87edecaf2ce4d6eb7df0abf05a364`。 |
 | release | 尚未发布。 |
 
 安装到已连接设备：
