@@ -12,7 +12,7 @@ Woolbox 是 Android 12 及以上的工具应用。当前提供两项跨应用无
 
 Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。
 
-当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、提醒、日历视图、重复任务、标签、协作、多级子事项或可配置图表；PC 管理页只管理记录项、流水和审计日志，不提供待办管理。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
+当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、提醒、日历视图、重复任务、标签、协作、多级子事项或可配置图表。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
 
 ## 入口语义
 
@@ -130,7 +130,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 5. **Measurement**：区标题旁仅 Manage；2 列 grid 显示最新值与时间。点卡打开 24 小时预览 Sheet；新建在 `Manage measurements` 顶栏加号 → `New measurement`，色卡进 `Edit measurement`。录入提交当前设备时刻，成功后保持预览并提供短时 `Undo`。
 6. 累计确认写入时提交当前设备时刻，成功关闭 Sheet 并短时 `Undo`；刚达标时附加 `Goal reached` 文案与强触觉；失败保持 Sheet 并显示错误。
 7. 新建/编辑均为独立全屏路由，顶栏 New/Edit + 纯 icon 保存；累计与测量表单分离，无 mode 切换。
-8. PC 管理页的 `Entries` 仅用于筛选和批量删除流水；`Record items` 可配置记录模式；`Logs` 显示每次成功写操作的对象、动作、时间和变更内容。
+8. PC 管理页使用 `Overview`、`Tasks`、`Accumulate`、`Measurement`、`Entries`、`Activity` 六个固定入口：Overview 汇总当前对象与近期操作；Tasks 管理任务及一级子事项的创建、编辑、完成、重开、排序和删除；两类记录项使用独立表单并支持归档、恢复与归档后永久删除；Entries 支持日期、模式和记录项筛选，可新增流水和批量删除；Activity 显示每次成功写操作的对象、动作、时间和变更内容。任务完成状态仍只由子事项派生，PC 不提供父项完成开关。
 
 ### 待办规则
 
@@ -192,7 +192,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - 日目标按进度进入队列，有习惯时刻的累计在该时刻附近进入队列；每个今日或逾期待办只显示第一条未完成子事项，未来和未安排任务不进入队列。
 - 任务只提供一个可选日期；未来日期和无日期分别显示为 Planned 与 Unscheduled，页面不提供手动时间段配置。
 - 全部日目标达标后当日环闭合并给出一次 `Day closed`；重新打开同一天不再提示。
-- Android 新建记录后 PC 刷新可见；PC Entries 可删除但不可编辑，Logs 可查看每次成功写操作的变更快照；Android `Tasks` 的子事项创建、完成时间、父项进度与 Manage tasks 的 Completed 内容，以及根页 Accumulate/Measurement 两列网格中的累计记录、Measurement 闭区间滑块、24 小时原始图表点位和短时撤销均符合上述规则。
+- Android 新建记录后 PC 刷新可见；PC 六个入口可管理任务、子事项、两类记录项和流水，Activity 可查看每次成功写操作的变更快照；Entries 可新增和删除但不提供编辑。Android `Tasks` 的子事项创建、完成时间、父项进度与 Manage tasks 的 Completed 内容，以及根页 Accumulate/Measurement 两列网格中的累计记录、Measurement 闭区间滑块、24 小时原始图表点位和短时撤销均符合上述规则。
 - Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
 - Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。

@@ -27,7 +27,7 @@ export function message(reason: unknown): string {
 }
 
 export function formatDateTime(epoch: number): string {
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "medium",
   }).format(epoch);

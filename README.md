@@ -61,7 +61,7 @@ app/src/main/java/com/wswensw/woolbox/
    └─ ui/              工具页面 ViewModel
 ```
 
-`records-server/` 提供 Fastify API、PC 管理页、SQLite 迁移和部署脚本。
+`records-server/` 提供 Fastify API、覆盖全部 Records 对象的 PC 管理页、SQLite 迁移和部署脚本。
 
 模块协作、窗口选择和覆盖层 Context 约束见 [系统架构](docs/architecture.md)。
 

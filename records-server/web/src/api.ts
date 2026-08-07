@@ -1,4 +1,14 @@
-import type { AuditLogPage, ItemInput, RecordEntry, RecordItem } from "./types";
+import type {
+  AuditLogPage,
+  ItemInput,
+  RecordEntry,
+  RecordItem,
+  RecordMode,
+  TaskCreateInput,
+  TaskWriteInput,
+  TodoTask,
+  TodoStep,
+} from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`api/${path}`, {
@@ -31,12 +41,77 @@ export const api = {
     });
   },
 
-  async entries(startDate: string, endDate: string, itemId?: string): Promise<RecordEntry[]> {
+  async deleteItem(id: number) {
+    return request<{ item: RecordItem }>(`items/${id}`, { method: "DELETE" });
+  },
+
+  async tasks(): Promise<TodoTask[]> {
+    return (await request<{ tasks: TodoTask[] }>("tasks")).tasks;
+  },
+
+  async createTask(input: TaskCreateInput) {
+    return request<{ task: TodoTask }>("tasks", { method: "POST", body: JSON.stringify(input) });
+  },
+
+  async updateTask(id: number, input: TaskWriteInput) {
+    return request<{ task: TodoTask }>(`tasks/${id}`, { method: "PUT", body: JSON.stringify(input) });
+  },
+
+  async deleteTask(id: number) {
+    return request<{ task: TodoTask }>(`tasks/${id}`, { method: "DELETE" });
+  },
+
+  async createStep(taskId: number, title: string) {
+    return request<{ step: TodoStep }>(`tasks/${taskId}/steps`, {
+      method: "POST",
+      body: JSON.stringify({ title }),
+    });
+  },
+
+  async updateStep(id: number, title: string) {
+    return request<{ step: TodoStep }>(`steps/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ title }),
+    });
+  },
+
+  async setStepCompleted(id: number, completed: boolean) {
+    return request<{ step: TodoStep }>(`steps/${id}/completion`, {
+      method: "PUT",
+      body: JSON.stringify({ completed }),
+    });
+  },
+
+  async deleteStep(id: number) {
+    return request<{ step: TodoStep }>(`steps/${id}`, { method: "DELETE" });
+  },
+
+  async reorderSteps(taskId: number, stepIds: number[]) {
+    return request<{ task: TodoTask }>(`tasks/${taskId}/steps/order`, {
+      method: "PUT",
+      body: JSON.stringify({ ids: stepIds }),
+    });
+  },
+
+  async entries(startDate: string, endDate: string, itemId?: string, mode?: RecordMode): Promise<RecordEntry[]> {
     const params = new URLSearchParams({ startDate, endDate });
     if (itemId) {
       params.set("itemId", itemId);
     }
+    if (mode) {
+      params.set("mode", mode);
+    }
     return (await request<{ entries: RecordEntry[] }>(`entries?${params}`)).entries;
+  },
+
+  async createEntry(input: {
+    itemId: number;
+    occurredAt: number;
+    localDate: string;
+    localMinute: number;
+    value: number;
+  }) {
+    return request<{ entry: RecordEntry }>("entries", { method: "POST", body: JSON.stringify(input) });
   },
 
   async auditLogs(beforeId?: number): Promise<AuditLogPage> {

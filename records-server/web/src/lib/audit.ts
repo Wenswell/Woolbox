@@ -37,6 +37,7 @@ export function actionLabel(action: RecordAuditLog["action"]): string {
     TASK_COMPLETED: "Completed task",
     TASK_REOPENED: "Reopened task",
     TASK_DELETED: "Deleted task",
+    TASK_STEPS_REORDERED: "Reordered subtasks",
     STEP_CREATED: "Created subtask",
     STEP_UPDATED: "Updated subtask",
     STEP_COMPLETED: "Completed subtask",
@@ -109,6 +110,9 @@ export function auditChanges(log: RecordAuditLog): string {
       fieldChange("Title", before.title, after.title),
       fieldChange("Planned date", taskDateLabel(before), taskDateLabel(after)),
     ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
+  }
+  if (log.action === "TASK_STEPS_REORDERED") {
+    return "Changed subtask order.";
   }
   if (
     log.action === "STEP_UPDATED" &&

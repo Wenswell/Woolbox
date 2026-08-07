@@ -1,59 +1,50 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, ClipboardList, LayoutDashboard, ListTodo, RefreshCw, Ruler, Sigma } from "lucide-react";
 import { api } from "./api";
 import { Toast } from "./components/Toast";
-import { localToday, message } from "./lib/format";
-import type { RecordAuditLog, RecordEntry, RecordItem } from "./types";
+import { localToday, message, shiftLocalDate } from "./lib/format";
+import type { RecordAuditLog, RecordEntry, RecordItem, TodoTask } from "./types";
 import { AuditLogView } from "./views/AuditLogView";
 import { EntriesView, type EntryFilters } from "./views/EntriesView";
-import { ItemsView, type ItemStatusFilter } from "./views/ItemsView";
+import { OverviewView } from "./views/OverviewView";
+import { RecordItemsView } from "./views/RecordItemsView";
+import { TasksView } from "./views/TasksView";
 
-type View = "entries" | "items" | "logs";
-
-const VIEWS: Array<{ id: View; label: string }> = [
-  { id: "entries", label: "Entries" },
-  { id: "items", label: "Record items" },
-  { id: "logs", label: "Logs" },
+type View = "overview" | "tasks" | "accumulate" | "measurement" | "entries" | "activity";
+const VIEWS: Record<View, { label: string; description: string }> = {
+  overview: { label: "Overview", description: "Records status and recent work" },
+  tasks: { label: "Tasks", description: "Tasks, plans and ordered subtasks" },
+  accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },
+  measurement: { label: "Measurement", description: "Bounded numerical measurements" },
+  entries: { label: "Entries", description: "Recorded values across every tracker" },
+  activity: { label: "Activity", description: "Immutable audit history for every change" },
+};
+const NAVIGATION = [
+  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "tasks" as const, icon: ListTodo }] },
+  { title: "Records", items: [{ id: "accumulate" as const, icon: Sigma }, { id: "measurement" as const, icon: Ruler }, { id: "entries" as const, icon: ClipboardList }] },
+  { title: "System", items: [{ id: "activity" as const, icon: Activity }] },
 ];
 
 export function App() {
-  const [view, setView] = useState<View>("entries");
-  const [items, setItems] = useState<RecordItem[]>([]);
-  const [entryItems, setEntryItems] = useState<RecordItem[]>([]);
+  const [view, setView] = useState<View>(() => viewFromHash());
+  const [activeItems, setActiveItems] = useState<RecordItem[]>([]);
+  const [archivedItems, setArchivedItems] = useState<RecordItem[]>([]);
+  const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [entries, setEntries] = useState<RecordEntry[]>([]);
   const [logs, setLogs] = useState<RecordAuditLog[]>([]);
   const [nextLogId, setNextLogId] = useState<number | null>(null);
-  const [filters, setFilters] = useState<EntryFilters>({
-    startDate: localToday(),
-    endDate: localToday(),
-    itemId: "",
+  const [filters, setFilters] = useState<EntryFilters>(() => {
+    const today = localToday();
+    return { startDate: shiftLocalDate(today, -29), endDate: today, itemId: "", mode: "" };
   });
-  const [itemStatus, setItemStatus] = useState<ItemStatusFilter>("active");
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const loadEntryItems = useCallback(async () => {
-    setEntryItems(await api.items(false));
-  }, []);
-
-  const loadItems = useCallback(async () => {
-    if (itemStatus === "all") {
-      const [active, archived] = await Promise.all([api.items(false), api.items(true)]);
-      setItems(
-        [...active, ...archived].sort((left, right) => left.priority - right.priority || left.name.localeCompare(right.name)),
-      );
-      return;
-    }
-    setItems(await api.items(itemStatus === "archived"));
-  }, [itemStatus]);
-
-  const loadEntries = useCallback(async () => {
-    setEntries(await api.entries(filters.startDate, filters.endDate, filters.itemId));
-  }, [filters]);
+  const allItems = useMemo(() => [...activeItems, ...archivedItems], [activeItems, archivedItems]);
 
   const loadLogs = useCallback(async (beforeId?: number) => {
     const page = await api.auditLogs(beforeId);
-    setLogs((current) => (beforeId === undefined ? page.logs : [...current, ...page.logs]));
+    setLogs((current) => beforeId === undefined ? page.logs : [...current, ...page.logs]);
     setNextLogId(page.nextBeforeId);
   }, []);
 
@@ -61,121 +52,85 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      await Promise.all([loadEntryItems(), loadItems(), loadEntries(), loadLogs()]);
+      const [active, archived, taskList, entryList, auditPage] = await Promise.all([
+        api.items(false),
+        api.items(true),
+        api.tasks(),
+        api.entries(filters.startDate, filters.endDate, filters.itemId, filters.mode || undefined),
+        api.auditLogs(),
+      ]);
+      setActiveItems(active);
+      setArchivedItems(archived);
+      setTasks(taskList);
+      setEntries(entryList);
+      setLogs(auditPage.logs);
+      setNextLogId(auditPage.nextBeforeId);
     } catch (reason) {
       setError(message(reason));
     } finally {
       setLoading(false);
     }
-  }, [loadEntries, loadEntryItems, loadItems, loadLogs]);
+  }, [filters]);
 
+  useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
+    document.title = `${VIEWS[view].label} · Records`;
+    window.history.replaceState(null, "", `#${view}`);
+  }, [view]);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  async function handleDeleteEntries(ids: number[]) {
-    try {
-      await api.deleteEntries(ids);
-      setToast(`Deleted ${ids.length} entries`);
-      await refresh();
-    } catch (reason) {
-      setError(message(reason));
-      throw reason;
-    }
-  }
-
-  async function handleArchiveItems(ids: number[], archived: boolean) {
-    try {
-      await api.archive(ids, archived);
-      setToast(archived ? `Archived ${ids.length} items` : `Restored ${ids.length} items`);
-      await refresh();
-    } catch (reason) {
-      setError(message(reason));
-      throw reason;
-    }
-  }
-
-  async function handleItemSaved() {
-    setToast("Record item saved");
+  async function changed(success: string) {
+    setToast(success);
     await refresh();
   }
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">Records administration</p>
-          <h1>Records</h1>
-        </div>
-        <button type="button" className="secondary" onClick={() => void refresh()}>
-          Refresh
-        </button>
-      </header>
-
-      <nav className="app-tabs" aria-label="Views">
-        <div className="segmented tabs">
-          {VIEWS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={view === item.id ? "active" : undefined}
-              onClick={() => setView(item.id)}
-            >
-              {item.label}
-            </button>
+    <div className="admin-shell">
+      <aside className="sidebar">
+        <div className="brand"><span className="brand-mark">R</span><div><strong>Records</strong><span>Administration</span></div></div>
+        <nav className="primary-nav" aria-label="Primary navigation">
+          {NAVIGATION.map((group) => (
+            <div className="nav-group" key={group.title}>
+              <p>{group.title}</p>
+              <div>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  return <button key={item.id} type="button" className={view === item.id ? "active" : undefined} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><Icon size={17} />{VIEWS[item.id].label}</button>;
+                })}
+              </div>
+            </div>
           ))}
-        </div>
-      </nav>
+        </nav>
+        <div className="sidebar-footer"><span className={error ? "status-dot error-dot" : "status-dot"} /><span>{error ? "Connection issue" : "Server connected"}</span></div>
+      </aside>
 
-      {error && (
-        <div className="error" role="alert">
-          <span>{error}</span>
-          <button type="button" className="secondary" onClick={() => void refresh()}>
-            Retry
-          </button>
-        </div>
-      )}
+      <div className="content-shell">
+        <header className="page-header">
+          <div><p className="eyebrow">Records administration</p><h1>{VIEWS[view].label}</h1><p className="page-description">{VIEWS[view].description}</p></div>
+          <button type="button" className="icon-button header-action" aria-label="Refresh current view" title="Refresh" onClick={() => void refresh()} disabled={loading}><RefreshCw size={18} className={loading ? "spin" : undefined} /></button>
+        </header>
 
-      <main className="app-main">
-        {view === "entries" && (
-          <EntriesView
-            entries={entries}
-            items={entryItems}
-            filters={filters}
-            loading={loading}
-            onFilters={setFilters}
-            onDelete={handleDeleteEntries}
-          />
-        )}
-        {view === "items" && (
-          <ItemsView
-            items={items}
-            loading={loading}
-            status={itemStatus}
-            onStatusChange={setItemStatus}
-            onArchive={handleArchiveItems}
-            onSaved={handleItemSaved}
-          />
-        )}
-        {view === "logs" && (
-          <AuditLogView
-            logs={logs}
-            loading={loading}
-            nextBeforeId={nextLogId}
-            onLoadMore={() => {
-              if (nextLogId !== null) void loadLogs(nextLogId);
-            }}
-          />
-        )}
-      </main>
+        {error && <div className="error-banner" role="alert"><span><strong>Could not refresh data.</strong>{error}</span><button type="button" className="secondary compact" onClick={() => void refresh()}>Retry</button></div>}
 
+        <main className="page-content">
+          {view === "overview" && <OverviewView tasks={tasks} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
+          {view === "tasks" && <TasksView tasks={tasks} loading={loading} onChanged={changed} onError={setError} />}
+          {view === "accumulate" && <RecordItemsView mode="ACCUMULATE" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
+          {view === "measurement" && <RecordItemsView mode="MEASUREMENT" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
+          {view === "entries" && <EntriesView entries={entries} items={allItems} filters={filters} loading={loading} onFilters={setFilters} onChanged={changed} onError={setError} />}
+          {view === "activity" && <AuditLogView logs={logs} loading={loading} nextBeforeId={nextLogId} onLoadMore={() => { if (nextLogId !== null) void loadLogs(nextLogId); }} />}
+        </main>
+      </div>
       <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
+}
+
+function viewFromHash(): View {
+  const value = window.location.hash.slice(1);
+  return value in VIEWS ? value as View : "overview";
 }

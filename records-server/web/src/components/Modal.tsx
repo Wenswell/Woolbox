@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { X } from "lucide-react";
 
 export function Modal({
   title,
@@ -11,9 +12,12 @@ export function Modal({
   children: ReactNode;
   size?: "md" | "lg";
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      const dialogs = document.querySelectorAll<HTMLElement>("[role='dialog']");
+      if (event.key === "Escape" && dialogs.item(dialogs.length - 1) === dialogRef.current) {
         onClose();
       }
     }
@@ -25,6 +29,7 @@ export function Modal({
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <div
+        ref={dialogRef}
         className={`modal modal-${size}`}
         role="dialog"
         aria-modal="true"
@@ -32,10 +37,8 @@ export function Modal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-title">
-          <h2>{title}</h2>
-          <button type="button" className="icon" aria-label="Close" onClick={onClose}>
-            ×
-          </button>
+          <div><p className="eyebrow">Records</p><h2>{title}</h2></div>
+          <button type="button" className="icon-button" aria-label="Close" title="Close" onClick={onClose}><X size={18} /></button>
         </div>
         {children}
       </div>

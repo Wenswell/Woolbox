@@ -153,7 +153,7 @@ Task progress Sheet 只显示子事项复选框和完成时间；标题、计划
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
-PC 管理页使用 App shell：粘性顶栏、分段页签（Entries / Record items / Logs）和主内容区。Entries 提供 Today/7 days/30 days 预设、起止日期与记录项即时筛选、结果计数、行选择与危险确认后的批量删除，不提供编辑入口。Record items 提供 All/Active/Archived 状态分段、模式/状态徽章、新建与编辑 Dialog（按 Mode 分区字段）、选择后的归档/恢复确认。Logs 以只读表格显示时间、对象、动作徽章和变更摘要，并可加载更早日志。成功操作显示 toast；失败在页面错误条或 Dialog 内显示并可重试。
+PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Tasks、Accumulate、Measurement、Entries、Activity。页面顶栏只显示当前页名称、上下文和刷新 icon；页面主操作跟随筛选栏。Overview 使用紧凑指标卡和任务、流水、审计预览，不承担写入。Tasks 使用状态分段、搜索与表格，编辑 Dialog 内按固定位序管理子事项；完成用 checkbox，重命名、上下移动和删除使用 icon。Accumulate 与 Measurement 分页管理，分别使用固定模式表单；状态分段、搜索、行选择、归档、恢复和永久删除保持同一布局。Entries 提供 Today/7 days/30 days、起止日期、模式与记录项筛选，可新增流水和危险确认后的批量删除，不提供编辑。Activity 以只读表格显示时间、对象、动作和变更摘要，支持对象筛选、搜索和游标加载。成功操作显示 toast；刷新失败保留已有数据并显示重试错误条；Dialog 写入失败保留表单和明确错误。
 
 
 ## 状态呈现

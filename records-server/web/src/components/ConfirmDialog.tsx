@@ -36,7 +36,7 @@ export function ConfirmDialog({
           onClick={onConfirm}
           disabled={busy}
         >
-          {confirmLabel}
+          {busy ? "Working…" : confirmLabel}
         </button>
       </div>
     </Modal>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Save } from "lucide-react";
 import { api } from "../api";
 import { Modal } from "../components/Modal";
 import { message, numberOrNull } from "../lib/format";
@@ -8,7 +9,6 @@ import type { ItemInput, RecordItem, RecordMode, ValueType } from "../types";
 interface ItemFormValues {
   name: string;
   description: string;
-  mode: RecordMode;
   valueType: ValueType;
   defaultValue: string | number;
   minValue: string | number;
@@ -22,42 +22,43 @@ interface ItemFormValues {
 
 export function ItemForm({
   item,
+  mode,
   onClose,
   onSaved,
 }: {
   item?: RecordItem;
+  mode: RecordMode;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
-  const {
-    register,
-    watch,
-    handleSubmit,
-    formState: { isSubmitting },
-  } = useForm<ItemFormValues>({
+  const measurement = mode === "MEASUREMENT";
+  const { register, watch, setValue, handleSubmit, formState: { isSubmitting } } = useForm<ItemFormValues>({
     defaultValues: {
       name: item?.name ?? "",
       description: item?.description ?? "",
-      mode: item?.mode ?? "ACCUMULATE",
       valueType: item?.valueType ?? "NUMBER",
       defaultValue: item?.defaultValue ?? "",
       minValue: item?.minValue ?? "",
       maxValue: item?.maxValue ?? "",
       stepValue: item?.stepValue ?? 1,
-      unit: item?.unit ?? "次",
+      unit: item?.unit ?? (measurement ? "" : "次"),
       goalValue: item?.goalValue ?? "",
       goalPeriod: item?.goalPeriod ?? "DAY",
       priority: item?.priority ?? 0,
     },
   });
-
-  const mode = watch("mode");
   const valueType = watch("valueType");
-  const measurement = mode === "MEASUREMENT";
+  const unit = watch("unit");
+
+  useEffect(() => {
+    if (!measurement && valueType === "DURATION" && !["秒", "分", "小时"].includes(unit)) {
+      setValue("unit", "秒");
+    }
+  }, [measurement, setValue, unit, valueType]);
 
   return (
-    <Modal title={item ? "Edit record item" : "New record item"} onClose={onClose} size="lg">
+    <Modal title={`${item ? "Edit" : "New"} ${measurement ? "measurement" : "accumulate"}`} onClose={onClose} size="lg">
       <form
         className="item-form"
         onSubmit={handleSubmit(async (values) => {
@@ -65,7 +66,7 @@ export function ItemForm({
           const input: ItemInput = {
             name: values.name,
             description: values.description,
-            mode: values.mode,
+            mode,
             valueType: measurement ? "NUMBER" : values.valueType,
             defaultValue: measurement ? null : numberOrNull(values.defaultValue),
             minValue: measurement ? Number(values.minValue) : null,
@@ -76,7 +77,6 @@ export function ItemForm({
             goalPeriod: measurement || !values.goalValue ? null : values.goalPeriod,
             priority: Number(values.priority),
           };
-
           try {
             await api.saveItem(input, item?.id);
             await onSaved();
@@ -86,11 +86,17 @@ export function ItemForm({
         })}
       >
         <section className="form-section">
-          <h3>Basics</h3>
-          <div className="grid">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Configuration</p>
+              <h3>{measurement ? "Measurement definition" : "Accumulation definition"}</h3>
+            </div>
+            <span className="type-mark">{measurement ? "MEASUREMENT" : "ACCUMULATE"}</span>
+          </div>
+          <div className="form-grid form-grid-2">
             <label>
               Name
-              <input {...register("name", { required: true })} />
+              <input autoFocus {...register("name", { required: "Name is required" })} />
             </label>
             <label>
               Priority
@@ -99,24 +105,17 @@ export function ItemForm({
           </div>
           <label>
             Description
-            <textarea {...register("description")} />
+            <textarea {...register("description")} placeholder="Optional context for this record item" />
           </label>
-          <div className="grid">
-            <label>
-              Mode
-              <select {...register("mode")}>
-                <option value="ACCUMULATE">Accumulate</option>
-                <option value="MEASUREMENT">Measurement</option>
-              </select>
-            </label>
+          <div className="form-grid form-grid-2">
             {measurement ? (
               <label>
-                Type
+                Value type
                 <input value="Number" readOnly />
               </label>
             ) : (
               <label>
-                Type
+                Value type
                 <select {...register("valueType")}>
                   <option value="NUMBER">Number</option>
                   <option value="DURATION">Duration</option>
@@ -125,11 +124,11 @@ export function ItemForm({
             )}
             <label>
               Unit
-              {valueType === "DURATION" && !measurement ? (
-                <select {...register("unit")}>
-                  <option>秒</option>
-                  <option>分</option>
-                  <option>小时</option>
+              {!measurement && valueType === "DURATION" ? (
+                <select {...register("unit", { required: true })}>
+                  <option value="秒">秒</option>
+                  <option value="分">分</option>
+                  <option value="小时">小时</option>
                 </select>
               ) : (
                 <input {...register("unit", { required: true })} />
@@ -139,8 +138,8 @@ export function ItemForm({
         </section>
 
         <section className="form-section">
-          <h3>Values</h3>
-          <div className="grid">
+          <p className="eyebrow">Rules</p>
+          <div className="form-grid form-grid-3">
             {measurement ? (
               <>
                 <label>
@@ -155,42 +154,35 @@ export function ItemForm({
             ) : (
               <label>
                 Default value
-                <input type="number" min="0" step="any" {...register("defaultValue")} />
+                <input type="number" min="0.000001" step="any" {...register("defaultValue")} />
               </label>
             )}
             <label>
               Step
               <input type="number" min="0.000001" step="any" {...register("stepValue", { required: true })} />
             </label>
-            {!measurement && (
-              <>
-                <label>
-                  Goal
-                  <input type="number" min="0" step="any" {...register("goalValue")} />
-                </label>
-                <label>
-                  Goal period
-                  <select {...register("goalPeriod")}>
-                    <option value="DAY">Day</option>
-                    <option value="DAYS_7">7 days</option>
-                  </select>
-                </label>
-              </>
-            )}
           </div>
+          {!measurement && (
+            <div className="form-grid form-grid-2">
+              <label>
+                Goal
+                <input type="number" min="0.000001" step="any" {...register("goalValue")} />
+              </label>
+              <label>
+                Goal period
+                <select {...register("goalPeriod")}>
+                  <option value="DAY">Per day</option>
+                  <option value="DAYS_7">Rolling 7 days</option>
+                </select>
+              </label>
+            </div>
+          )}
         </section>
 
-        {formError && (
-          <p className="form-error" role="alert">
-            {formError}
-          </p>
-        )}
-
-        <div className="form-actions">
-          <button type="button" className="secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Save"}</button>
+        {formError && <p className="form-error" role="alert">{formError}</p>}
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={onClose} disabled={isSubmitting}>Cancel</button>
+          <button disabled={isSubmitting}><Save size={16} />{isSubmitting ? "Saving…" : "Save changes"}</button>
         </div>
       </form>
     </Modal>
