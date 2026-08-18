@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, ClipboardList, LayoutDashboard, ListTodo, RefreshCw, Ruler, Sigma } from "lucide-react";
+import { Activity, CalendarCheck, ClipboardList, LayoutDashboard, ListTodo, RefreshCw, Ruler, Sigma } from "lucide-react";
 import { api } from "./api";
 import { Toast } from "./components/Toast";
 import { localToday, message, shiftLocalDate } from "./lib/format";
-import type { RecordAuditLog, RecordEntry, RecordItem, TodoTask } from "./types";
+import type { DailyPlan, RecordAuditLog, RecordEntry, RecordItem, TodoTask } from "./types";
 import { AuditLogView } from "./views/AuditLogView";
 import { EntriesView, type EntryFilters } from "./views/EntriesView";
 import { OverviewView } from "./views/OverviewView";
 import { RecordItemsView } from "./views/RecordItemsView";
 import { TasksView } from "./views/TasksView";
+import { TodayView } from "./views/TodayView";
 
-type View = "overview" | "tasks" | "accumulate" | "measurement" | "entries" | "activity";
+type View = "overview" | "today" | "tasks" | "accumulate" | "measurement" | "entries" | "activity";
 const VIEWS: Record<View, { label: string; description: string }> = {
   overview: { label: "Overview", description: "Records status and recent work" },
+  today: { label: "Today", description: "Daily commitments and hourly review" },
   tasks: { label: "Tasks", description: "Open outcomes and ordered subtasks" },
   accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },
   measurement: { label: "Measurement", description: "Bounded numerical measurements" },
@@ -20,7 +22,7 @@ const VIEWS: Record<View, { label: string; description: string }> = {
   activity: { label: "Activity", description: "Immutable audit history for every change" },
 };
 const NAVIGATION = [
-  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "tasks" as const, icon: ListTodo }] },
+  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "today" as const, icon: CalendarCheck }, { id: "tasks" as const, icon: ListTodo }] },
   { title: "Records", items: [{ id: "accumulate" as const, icon: Sigma }, { id: "measurement" as const, icon: Ruler }, { id: "entries" as const, icon: ClipboardList }] },
   { title: "System", items: [{ id: "activity" as const, icon: Activity }] },
 ];
@@ -30,6 +32,7 @@ export function App() {
   const [activeItems, setActiveItems] = useState<RecordItem[]>([]);
   const [archivedItems, setArchivedItems] = useState<RecordItem[]>([]);
   const [tasks, setTasks] = useState<TodoTask[]>([]);
+  const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
   const [entries, setEntries] = useState<RecordEntry[]>([]);
   const [logs, setLogs] = useState<RecordAuditLog[]>([]);
   const [nextLogId, setNextLogId] = useState<number | null>(null);
@@ -52,16 +55,19 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const [active, archived, taskList, entryList, auditPage] = await Promise.all([
+      const today = localToday();
+      const [active, archived, taskList, plan, entryList, auditPage] = await Promise.all([
         api.items(false),
         api.items(true),
-        api.tasks(),
+        api.tasks(today),
+        api.dailyPlan(today),
         api.entries(filters.startDate, filters.endDate, filters.itemId, filters.mode || undefined),
         api.auditLogs(),
       ]);
       setActiveItems(active);
       setArchivedItems(archived);
       setTasks(taskList);
+      setDailyPlan(plan);
       setEntries(entryList);
       setLogs(auditPage.logs);
       setNextLogId(auditPage.nextBeforeId);
@@ -118,7 +124,8 @@ export function App() {
 
         <main className="page-content">
           {view === "overview" && <OverviewView tasks={tasks} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
-          {view === "tasks" && <TasksView tasks={tasks} loading={loading} onChanged={changed} onError={setError} />}
+          {view === "today" && <TodayView localDate={localToday()} plan={dailyPlan} tasks={tasks} loading={loading} onChanged={changed} onRefresh={refresh} />}
+          {view === "tasks" && <TasksView localDate={localToday()} tasks={tasks} loading={loading} onChanged={changed} onError={setError} />}
           {view === "accumulate" && <RecordItemsView mode="ACCUMULATE" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "measurement" && <RecordItemsView mode="MEASUREMENT" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "entries" && <EntriesView entries={entries} items={allItems} filters={filters} loading={loading} onFilters={setFilters} onChanged={changed} onError={setError} />}

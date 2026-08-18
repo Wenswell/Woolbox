@@ -1,5 +1,6 @@
 import type {
   AuditLogPage,
+  DailyPlan,
   ItemInput,
   RecordEntry,
   RecordItem,
@@ -45,8 +46,8 @@ export const api = {
     return request<{ item: RecordItem }>(`items/${id}`, { method: "DELETE" });
   },
 
-  async tasks(): Promise<TodoTask[]> {
-    return (await request<{ tasks: TodoTask[] }>("tasks")).tasks;
+  async tasks(localDate: string): Promise<TodoTask[]> {
+    return (await request<{ tasks: TodoTask[] }>(`tasks?localDate=${localDate}`)).tasks;
   },
 
   async createTask(input: TaskCreateInput) {
@@ -57,40 +58,71 @@ export const api = {
     return request<{ task: TodoTask }>(`tasks/${id}`, { method: "PUT", body: JSON.stringify(input) });
   },
 
-  async deleteTask(id: number, planDate: string) {
-    return request<{ task: TodoTask }>(`tasks/${id}?planDate=${planDate}`, { method: "DELETE" });
+  async deleteTask(id: number, localDate: string) {
+    return request<{ task: TodoTask }>(`tasks/${id}?localDate=${localDate}`, { method: "DELETE" });
   },
 
-  async createStep(taskId: number, title: string) {
+  async createStep(taskId: number, title: string, localDate: string) {
     return request<{ step: TodoStep }>(`tasks/${taskId}/steps`, {
       method: "POST",
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, localDate }),
     });
   },
 
-  async updateStep(id: number, title: string) {
+  async updateStep(id: number, title: string, localDate: string) {
     return request<{ step: TodoStep }>(`steps/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, localDate }),
     });
   },
 
-  async setStepCompleted(id: number, completed: boolean) {
+  async setStepCompleted(id: number, completed: boolean, localDate: string) {
     return request<{ step: TodoStep }>(`steps/${id}/completion`, {
       method: "PUT",
-      body: JSON.stringify({ completed }),
+      body: JSON.stringify({ completed, localDate }),
     });
   },
 
-  async deleteStep(id: number) {
-    return request<{ step: TodoStep }>(`steps/${id}`, { method: "DELETE" });
+  async deleteStep(id: number, localDate: string) {
+    return request<{ step: TodoStep }>(`steps/${id}?localDate=${localDate}`, { method: "DELETE" });
   },
 
-  async reorderSteps(taskId: number, stepIds: number[]) {
+  async reorderSteps(taskId: number, stepIds: number[], localDate: string) {
     return request<{ task: TodoTask }>(`tasks/${taskId}/steps/order`, {
       method: "PUT",
-      body: JSON.stringify({ ids: stepIds }),
+      body: JSON.stringify({ ids: stepIds, localDate }),
     });
+  },
+
+  async dailyPlan(localDate: string): Promise<DailyPlan | null> {
+    return (await request<{ dailyPlan: DailyPlan | null }>(`daily-plans/${localDate}`)).dailyPlan;
+  },
+
+  async createDailyPlan(input: { localDate: string; firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {
+    return request<{ dailyPlan: DailyPlan }>("daily-plans", { method: "POST", body: JSON.stringify(input) });
+  },
+
+  async updateDailyPlan(plan: DailyPlan, input: { firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {
+    return request<{ dailyPlan: DailyPlan }>(`daily-plans/${plan.localDate}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...input, expectedRevision: plan.revision, occurredAt: Date.now() }),
+    });
+  },
+
+  async startDailyPlan(plan: DailyPlan) {
+    return dailyPlanTransition(plan, "start");
+  },
+
+  async reviewDailyPlan(plan: DailyPlan, currentTaskId: number) {
+    return dailyPlanTransition(plan, "review", currentTaskId);
+  },
+
+  async startExtraRound(plan: DailyPlan, currentTaskId: number) {
+    return dailyPlanTransition(plan, "extra-round", currentTaskId);
+  },
+
+  async endDailyPlan(plan: DailyPlan) {
+    return dailyPlanTransition(plan, "end");
   },
 
   async entries(startDate: string, endDate: string, itemId?: string, mode?: RecordMode): Promise<RecordEntry[]> {
@@ -125,3 +157,14 @@ export const api = {
     });
   },
 };
+
+function dailyPlanTransition(plan: DailyPlan, action: "start" | "review" | "extra-round" | "end", currentTaskId?: number) {
+  return request<{ dailyPlan: DailyPlan }>(`daily-plans/${plan.localDate}/${action}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      expectedRevision: plan.revision,
+      occurredAt: Date.now(),
+      ...(currentTaskId === undefined ? {} : { currentTaskId }),
+    }),
+  });
+}

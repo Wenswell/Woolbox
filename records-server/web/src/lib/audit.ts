@@ -134,6 +134,7 @@ export function auditChanges(log: RecordAuditLog): string {
   ) {
     return [
       fieldChange("Title", before.title, after.title),
+      fieldChange("Repeat", repeatMode(before.repeatMode), repeatMode(after.repeatMode)),
     ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
   }
   if (log.action === "TASK_STEPS_REORDERED") {
@@ -187,8 +188,12 @@ function entryDescription(entry: EntryAuditSnapshot): string {
 
 function taskDescription(task: TaskAuditSnapshot): string {
   return task.stepCount === undefined
-    ? task.title
-    : `${task.title}; ${task.stepCount} subtasks`;
+    ? `${task.title}; ${repeatMode(task.repeatMode)}`
+    : `${task.title}; ${repeatMode(task.repeatMode)}; ${task.stepCount} subtasks`;
+}
+
+function repeatMode(value: TaskAuditSnapshot["repeatMode"]): string {
+  return value === "DAILY" ? "Daily" : "Once";
 }
 
 function dailyPlanDescription(plan: DailyPlanAuditSnapshot): string {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { localToday } from "./lib/format";
 
 const activeItem = {
   id: 1, name: "Water", description: "Daily hydration", mode: "ACCUMULATE", valueType: "NUMBER",
@@ -14,11 +15,27 @@ const measurementItem = {
 };
 const archivedItem = { ...activeItem, id: 3, name: "Reading", unit: "pages", archived: true };
 const task = {
-  id: 10, title: "Prepare launch", completedAt: null, createdAt: 1, updatedAt: 1,
+  id: 10, title: "Prepare launch", repeatMode: "ONCE", completedAt: null, createdAt: 1, updatedAt: 1,
   steps: [
     { id: 11, taskId: 10, title: "Pack bag", position: 0, completedAt: null, createdAt: 1, updatedAt: 1 },
     { id: 12, taskId: 10, title: "Check route", position: 1, completedAt: null, createdAt: 1, updatedAt: 1 },
   ],
+};
+const activePlan = {
+  id: 40,
+  localDate: localToday(),
+  firstMove: "Open the project",
+  firstMoveCompletedAt: 1,
+  primaryTaskId: 10,
+  secondaryTaskId: null,
+  currentTaskId: 10,
+  state: "ACTIVE",
+  completedRounds: 1,
+  nextReviewAt: 1,
+  revision: 2,
+  endedAt: null,
+  createdAt: 1,
+  updatedAt: 1,
 };
 const entry = {
   id: 20, itemId: 1, occurredAt: 1_786_073_400_000, localDate: "2026-08-07", localMinute: 610,
@@ -31,7 +48,10 @@ const auditLog = {
 };
 
 describe("Records administration", () => {
+  let dailyPlan: typeof activePlan | null;
+
   beforeEach(() => {
+    dailyPlan = null;
     window.history.replaceState(null, "", window.location.pathname);
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -40,10 +60,12 @@ describe("Records administration", () => {
         if (url === "api/items") return response({ item: activeItem });
         if (url.includes("completion")) return response({ step: { ...task.steps[0], completedAt: Date.now() } });
         if (url.includes("steps/order")) return response({ task });
+        if (url.includes("daily-plans")) return response({ dailyPlan: activePlan });
         if (url === "api/entries") return response({ entry });
         return response({ ok: true, task, step: task.steps[0], item: activeItem });
       }
-      if (url === "api/tasks") return response({ tasks: [task] });
+      if (url.startsWith("api/tasks?localDate=")) return response({ tasks: [task] });
+      if (url.startsWith("api/daily-plans/")) return response({ dailyPlan });
       if (url.includes("audit-logs")) return response({ logs: [auditLog], nextBeforeId: null });
       if (url.includes("items?archived=true")) return response({ items: [archivedItem] });
       if (url.includes("items?archived=false")) return response({ items: [activeItem, measurementItem] });
@@ -52,10 +74,10 @@ describe("Records administration", () => {
     }));
   });
 
-  it("loads the six management areas and overview data", async () => {
+  it("loads the seven management areas and overview data", async () => {
     render(<App />);
     expect(await screen.findByText("Prepare launch")).toBeTruthy();
-    for (const label of ["Overview", "Tasks", "Accumulate", "Measurement", "Entries", "Activity"]) {
+    for (const label of ["Overview", "Today", "Tasks", "Accumulate", "Measurement", "Entries", "Activity"]) {
       expect(screen.getByRole("button", { name: label })).toBeTruthy();
     }
     expect(screen.getByText("Recent entries")).toBeTruthy();
@@ -71,10 +93,63 @@ describe("Records administration", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Edit task" });
     await user.click(within(dialog).getByLabelText("Complete Pack bag"));
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/steps/11/completion", expect.objectContaining({ method: "PUT", body: JSON.stringify({ completed: true }) })));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/steps/11/completion", expect.objectContaining({ method: "PUT", body: JSON.stringify({ completed: true, localDate: localToday() }) })));
 
     await user.click(within(dialog).getByRole("button", { name: "Move Pack bag down" }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/tasks/10/steps/order", expect.objectContaining({ method: "PUT", body: JSON.stringify({ ids: [12, 11] }) })));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/tasks/10/steps/order", expect.objectContaining({ method: "PUT", body: JSON.stringify({ ids: [12, 11], localDate: localToday() }) })));
+  });
+
+  it("creates Today with an explicit 1 + 1 selection", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    await user.type(screen.getByLabelText("First move"), "Open notes");
+    await user.selectOptions(screen.getByLabelText("Primary task"), "10");
+    await user.click(screen.getByRole("button", { name: "Save today" }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/daily-plans", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ localDate: localToday(), firstMove: "Open notes", primaryTaskId: 10, secondaryTaskId: null }),
+    })));
+  });
+
+  it("manages due Today work and hourly review", async () => {
+    dailyPlan = activePlan;
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    expect(await screen.findByText("Review due")).toBeTruthy();
+
+    await user.click(screen.getByRole("checkbox", { name: "Pack bag" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/steps/11/completion", expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({ completed: true, localDate: localToday() }),
+    })));
+    await user.click(screen.getByRole("button", { name: "Continue current" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(`api/daily-plans/${localToday()}/review`, expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining('"currentTaskId":10'),
+    })));
+  });
+
+  it("creates a reusable daily task", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Tasks" }));
+    await user.click(screen.getByRole("button", { name: "New task" }));
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    await user.type(within(dialog).getByLabelText("Title"), "Daily review");
+    await user.click(within(dialog).getByRole("button", { name: "Daily" }));
+    await user.type(within(dialog).getByLabelText("Subtask 1"), "Open notes");
+    await user.click(within(dialog).getByRole("button", { name: "Create task" }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/tasks", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ title: "Daily review", repeatMode: "DAILY", localDate: localToday(), steps: [{ title: "Open notes" }] }),
+    })));
   });
 
   it("uses a dedicated accumulate form without a mode switch", async () => {

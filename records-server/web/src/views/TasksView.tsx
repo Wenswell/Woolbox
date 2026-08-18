@@ -6,17 +6,19 @@ import { Badge } from "../components/Badge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DataTable } from "../components/DataTable";
 import { Modal } from "../components/Modal";
-import { localToday, message } from "../lib/format";
-import type { TodoStep, TodoTask } from "../types";
+import { message } from "../lib/format";
+import type { TaskRepeatMode, TodoStep, TodoTask } from "../types";
 
 type TaskFilter = "open" | "completed";
 
 export function TasksView({
+  localDate,
   tasks,
   loading,
   onChanged,
   onError,
 }: {
+  localDate: string;
   tasks: TodoTask[];
   loading: boolean;
   onChanged: (message: string) => Promise<void>;
@@ -27,7 +29,6 @@ export function TasksView({
   const [editing, setEditing] = useState<number | "new" | null>(null);
   const [deleting, setDeleting] = useState<TodoTask | null>(null);
   const [busy, setBusy] = useState(false);
-  const today = localToday();
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -47,6 +48,11 @@ export function TasksView({
           <span>{row.original.steps.find((step) => step.completedAt === null)?.title ?? "All subtasks completed"}</span>
         </button>
       ),
+    },
+    {
+      id: "repeat",
+      header: "Repeat",
+      cell: ({ row }) => <Badge tone="neutral">{repeatLabel(row.original.repeatMode)}</Badge>,
     },
     {
       id: "progress",
@@ -89,7 +95,7 @@ export function TasksView({
     if (!deleting) return;
     setBusy(true);
     try {
-      await api.deleteTask(deleting.id, today);
+      await api.deleteTask(deleting.id, localDate);
       setDeleting(null);
       if (editing === deleting.id) setEditing(null);
       await onChanged("Task deleted");
@@ -119,12 +125,14 @@ export function TasksView({
       {editing === "new" && (
         <NewTaskForm
           onClose={() => setEditing(null)}
+          localDate={localDate}
           onSaved={async () => { setEditing(null); await onChanged("Task created"); }}
         />
       )}
       {editingTask && (
         <TaskEditor
           task={editingTask}
+          localDate={localDate}
           onClose={() => setEditing(null)}
           onChanged={onChanged}
           onError={onError}
@@ -144,8 +152,9 @@ export function TasksView({
   );
 }
 
-function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
+function NewTaskForm({ localDate, onClose, onSaved }: { localDate: string; onClose: () => void; onSaved: () => Promise<void> }) {
   const [title, setTitle] = useState("");
+  const [repeatMode, setRepeatMode] = useState<TaskRepeatMode>("ONCE");
   const [steps, setSteps] = useState([""]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -155,7 +164,7 @@ function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     setBusy(true);
     setError(null);
     try {
-      await api.createTask({ title, steps: steps.map((step) => ({ title: step })) });
+      await api.createTask({ title, repeatMode, localDate, steps: steps.map((step) => ({ title: step })) });
       await onSaved();
     } catch (reason) {
       setError(message(reason));
@@ -169,6 +178,7 @@ function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       <form className="item-form" onSubmit={(event) => void submit(event)}>
         <div className="form-grid">
           <label>Title<input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+          <RepeatModeField value={repeatMode} onChange={setRepeatMode} />
         </div>
         <section className="form-section">
           <div className="section-heading"><div><p className="eyebrow">Subtasks</p><h3>Required work</h3></div><button type="button" className="secondary compact" onClick={() => setSteps((current) => [...current, ""])}><Plus size={15} />Add subtask</button></div>
@@ -191,23 +201,27 @@ function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
 function TaskEditor({
   task,
+  localDate,
   onClose,
   onChanged,
   onError,
 }: {
   task: TodoTask;
+  localDate: string;
   onClose: () => void;
   onChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
   const [title, setTitle] = useState(task.title);
+  const [repeatMode, setRepeatMode] = useState(task.repeatMode);
   const [newStep, setNewStep] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [deletingStep, setDeletingStep] = useState<TodoStep | null>(null);
 
   useEffect(() => {
     setTitle(task.title);
-  }, [task.id, task.title]);
+    setRepeatMode(task.repeatMode);
+  }, [task.id, task.repeatMode, task.title]);
 
   async function run(key: string, action: () => Promise<unknown>, success: string) {
     setBusy(key);
@@ -225,7 +239,7 @@ function TaskEditor({
 
   async function addStep(event: React.FormEvent) {
     event.preventDefault();
-    if (await run("add", () => api.createStep(task.id, newStep), "Subtask added")) {
+    if (await run("add", () => api.createStep(task.id, newStep, localDate), "Subtask added")) {
       setNewStep("");
     }
   }
@@ -235,14 +249,15 @@ function TaskEditor({
     const target = index + offset;
     if (target < 0 || target >= reordered.length) return;
     [reordered[index], reordered[target]] = [reordered[target]!, reordered[index]!];
-    void run("order", () => api.reorderSteps(task.id, reordered.map((step) => step.id)), "Subtasks reordered");
+    void run("order", () => api.reorderSteps(task.id, reordered.map((step) => step.id), localDate), "Subtasks reordered");
   }
 
   return (
     <Modal title="Edit task" onClose={onClose} size="lg">
       <div className="item-form">
-        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); void run("task", () => api.updateTask(task.id, { title }), "Task saved"); }}>
+        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); void run("task", () => api.updateTask(task.id, { title, repeatMode, localDate }), "Task saved"); }}>
           <label>Title<input required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+          <RepeatModeField value={repeatMode} onChange={setRepeatMode} disabled={busy !== null} />
           <div className="inline-form-action"><button disabled={busy !== null}><Save size={16} />{busy === "task" ? "Saving…" : "Save task"}</button></div>
         </form>
 
@@ -256,8 +271,8 @@ function TaskEditor({
                 index={index}
                 total={task.steps.length}
                 disabled={busy !== null}
-                onComplete={(completed) => run(`complete-${step.id}`, () => api.setStepCompleted(step.id, completed), completed ? "Subtask completed" : "Subtask reopened")}
-                onRename={(value) => run(`rename-${step.id}`, () => api.updateStep(step.id, value), "Subtask saved")}
+                onComplete={(completed) => run(`complete-${step.id}`, () => api.setStepCompleted(step.id, completed, localDate), completed ? "Subtask completed" : "Subtask reopened")}
+                onRename={(value) => run(`rename-${step.id}`, () => api.updateStep(step.id, value, localDate), "Subtask saved")}
                 onMove={(offset) => moveStep(index, offset)}
                 onDelete={() => setDeletingStep(step)}
               />
@@ -282,7 +297,7 @@ function TaskEditor({
           if (!deletingStep) return;
           const id = deletingStep.id;
           setDeletingStep(null);
-          void run(`delete-${id}`, () => api.deleteStep(id), "Subtask deleted");
+          void run(`delete-${id}`, () => api.deleteStep(id, localDate), "Subtask deleted");
         }}
       />
     </Modal>
@@ -328,6 +343,23 @@ function TaskStepRow({
 function taskStatus(task: TodoTask): { label: string; tone: "accent" | "muted" } {
   if (task.completedAt !== null) return { label: "Completed", tone: "muted" };
   return { label: "Open", tone: "accent" };
+}
+
+function RepeatModeField({ value, onChange, disabled = false }: { value: TaskRepeatMode; onChange: (value: TaskRepeatMode) => void; disabled?: boolean }) {
+  return (
+    <fieldset className="field-group">
+      <legend>Repeat</legend>
+      <div className="segmented" role="group" aria-label="Repeat">
+        {(["ONCE", "DAILY"] as const).map((mode) => (
+          <button key={mode} type="button" disabled={disabled} className={value === mode ? "active" : undefined} onClick={() => onChange(mode)}>{repeatLabel(mode)}</button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function repeatLabel(value: TaskRepeatMode) {
+  return value === "DAILY" ? "Daily" : "Once";
 }
 
 function capitalize(value: string): string {
