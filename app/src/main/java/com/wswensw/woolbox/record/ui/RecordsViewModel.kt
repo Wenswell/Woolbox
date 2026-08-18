@@ -17,6 +17,7 @@ import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.reminder.DailyReminderScheduler
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
@@ -55,6 +56,7 @@ data class MeasurementPreviewUiState(
 
 class RecordsViewModel(
     private val repository: RecordRepository,
+    private val reminderScheduler: DailyReminderScheduler,
     private val resources: Resources,
 ) : ViewModel() {
     private val error = MutableStateFlow<String?>(null)
@@ -112,7 +114,10 @@ class RecordsViewModel(
         loadedDate = date
         return runCatching { repository.refresh(date.toString()) }
             .onFailure { error.value = it.localizedFailure(R.string.records_load_failed) }
-            .onSuccess { error.value = null }
+            .onSuccess {
+                error.value = null
+                reminderScheduler.reconcile(repository.snapshot.value?.dailyPlan)
+            }
     }
 
     private fun RecordsSnapshot.toUiState() =
@@ -388,6 +393,7 @@ class RecordsViewModel(
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
             return RecordsViewModel(
                 repository = RecordRepository(applicationContext),
+                reminderScheduler = DailyReminderScheduler(applicationContext),
                 resources = applicationContext.resources,
             ) as T
         }

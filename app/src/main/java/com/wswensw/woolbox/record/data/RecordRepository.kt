@@ -205,6 +205,12 @@ class RecordRepository(context: Context) {
         Unit
     }
 
+    suspend fun getDailyPlan(localDate: LocalDate): DailyPlan? = withContext(Dispatchers.IO) {
+        request("GET", "daily-plans/$localDate")
+            .nullableObject("dailyPlan")
+            ?.let(::parseDailyPlan)
+    }
+
     suspend fun updateDailyPlan(
         plan: DailyPlan,
         firstMove: String,

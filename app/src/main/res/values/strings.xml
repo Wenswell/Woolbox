@@ -314,6 +314,12 @@
     <string name="daily_plan_start_failed">Unable to start today.</string>
     <string name="daily_plan_review_failed">Unable to update the review.</string>
     <string name="daily_plan_end_failed">Unable to end today.</string>
+    <string name="daily_review_channel">Daily reviews</string>
+    <string name="daily_review_notification">Review whether you are still moving today\'s commitment forward.</string>
+    <string name="notifications_required">Notifications required</string>
+    <string name="notifications_required_detail">Hourly reviews need Woolbox notifications.</string>
+    <string name="enable_notifications">Enable notifications</string>
+    <string name="notifications_not_enabled">Notifications are not enabled.</string>
     <string name="task_update_failed">Unable to update task.</string>
     <string name="task_delete_failed">Unable to delete task.</string>
     <string name="subtask_add_failed">Unable to add subtask.</string>

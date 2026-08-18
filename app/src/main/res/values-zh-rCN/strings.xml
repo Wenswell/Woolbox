@@ -310,6 +310,12 @@
     <string name="daily_plan_start_failed">无法开始今天。</string>
     <string name="daily_plan_review_failed">无法更新回顾。</string>
     <string name="daily_plan_end_failed">无法结束今天。</string>
+    <string name="daily_review_channel">每日回顾</string>
+    <string name="daily_review_notification">确认自己是否仍在推进今天的承诺。</string>
+    <string name="notifications_required">需要通知权限</string>
+    <string name="notifications_required_detail">小时回顾需要 Woolbox 通知。</string>
+    <string name="enable_notifications">启用通知</string>
+    <string name="notifications_not_enabled">通知尚未启用。</string>
     <string name="task_update_failed">无法更新任务。</string>
     <string name="task_delete_failed">无法删除任务。</string>
     <string name="subtask_add_failed">无法添加子任务。</string>

@@ -1,10 +1,13 @@
 package com.wswensw.woolbox.ui
 
 import android.app.Activity
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -12,6 +15,8 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,6 +48,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -76,6 +82,7 @@ import com.wswensw.woolbox.record.ui.TaskCreateScreen
 import com.wswensw.woolbox.record.ui.TaskDetailScreen
 import com.wswensw.woolbox.record.ui.DailyPlanScreen
 import com.wswensw.woolbox.record.ui.TaskProgressSheet
+import com.wswensw.woolbox.record.reminder.DailyReminderNotifications
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
 import com.wswensw.woolbox.tool.overlay.InAppOledShield
@@ -100,7 +107,10 @@ private enum class MainTab(
 }
 
 @Composable
-fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
+fun WoolboxApp(
+    dailyReviewRequest: Int,
+    onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult,
+) {
     val context = LocalContext.current
     val taskDoneTemplate = stringResource(R.string.task_done)
     val goalReachedTemplate = stringResource(R.string.goal_reached)
@@ -110,6 +120,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val copyHistorySavedMessage = stringResource(R.string.copy_history_saved)
     val copyHistoryDeletedMessage = stringResource(R.string.copy_history_deleted)
     val savedAppDeletedMessage = stringResource(R.string.saved_app_deleted)
+    val notificationsNotEnabledMessage = stringResource(R.string.notifications_not_enabled)
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
     val copyHistoryViewModel: CopyHistoryViewModel = viewModel()
@@ -132,12 +143,52 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     var taskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
+    var notificationsEnabled by remember {
+        mutableStateOf(DailyReminderNotifications.areEnabled(context))
+    }
+    var notificationPermissionDenied by rememberSaveable { mutableStateOf(false) }
+    var pendingNotificationAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingNotificationFailure by remember { mutableStateOf<(() -> Unit)?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val hapticFeedback = LocalHapticFeedback.current
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
     val recordsClock = recordsViewModel.clock.collectAsStateWithLifecycle()
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        notificationPermissionDenied = !granted
+        notificationsEnabled = DailyReminderNotifications.areEnabled(context)
+        val action = pendingNotificationAction
+        val failure = pendingNotificationFailure
+        pendingNotificationAction = null
+        pendingNotificationFailure = null
+        if (notificationsEnabled) action?.invoke() else failure?.invoke()
+    }
+    val requireNotifications: (onUnavailable: () -> Unit, action: () -> Unit) -> Unit =
+        { onUnavailable, action ->
+            notificationsEnabled = DailyReminderNotifications.areEnabled(context)
+            when {
+                notificationsEnabled -> action()
+                notificationPermissionDenied -> {
+                    onUnavailable()
+                    DailyReminderNotifications.openSettings(context)
+                }
+                Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) != PackageManager.PERMISSION_GRANTED -> {
+                    pendingNotificationAction = action
+                    pendingNotificationFailure = onUnavailable
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                else -> {
+                    onUnavailable()
+                    DailyReminderNotifications.openSettings(context)
+                }
+            }
+        }
 
     // Shared by the task progress Sheet and the focus card so completing a
     // subtask gives the same haptics and parent-done Snackbar either way.
@@ -209,9 +260,19 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         if (selectedTab == MainTab.SETTING) AppUpdateManager.checkForUpdate()
     }
 
+    LaunchedEffect(dailyReviewRequest) {
+        if (dailyReviewRequest == 0) return@LaunchedEffect
+        selectedTab = MainTab.RECORDS
+        navController.navigate(AppRoutes.ROOT) {
+            popUpTo(AppRoutes.ROOT)
+            launchSingleTop = true
+        }
+    }
+
     DisposableEffect(lifecycleOwner, toolViewModel, recordsViewModel, selectedTab) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                notificationsEnabled = DailyReminderNotifications.areEnabled(context)
                 toolViewModel.refreshAccessibilityState()
                 AppUpdateManager.syncInstallPermission()
                 if (selectedTab == MainTab.RECORDS) recordsViewModel.refresh()
@@ -301,9 +362,30 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
                                 },
-                                onStartPlan = recordsViewModel::startDailyPlan,
+                                notificationsEnabled = notificationsEnabled,
+                                onEnableNotifications = {
+                                    requireNotifications(
+                                        {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(notificationsNotEnabledMessage)
+                                            }
+                                        },
+                                        {},
+                                    )
+                                },
+                                onStartPlan = { plan, onResult ->
+                                    requireNotifications(
+                                        { onResult(notificationsNotEnabledMessage) },
+                                        { recordsViewModel.startDailyPlan(plan, onResult) },
+                                    )
+                                },
                                 onReviewPlan = recordsViewModel::reviewDailyPlan,
-                                onExtraRound = recordsViewModel::startExtraRound,
+                                onExtraRound = { plan, taskId, onResult ->
+                                    requireNotifications(
+                                        { onResult(notificationsNotEnabledMessage) },
+                                        { recordsViewModel.startExtraRound(plan, taskId, onResult) },
+                                    )
+                                },
                                 onEndPlan = recordsViewModel::endDailyPlan,
                                 modifier = Modifier.fillMaxSize(),
                             )

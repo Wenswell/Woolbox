@@ -75,6 +75,8 @@ fun RecordsScreen(
     onRecordItem: (RecordItem) -> Unit,
     onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
+    notificationsEnabled: Boolean,
+    onEnableNotifications: () -> Unit,
     onStartPlan: (DailyPlan, (String?) -> Unit) -> Unit,
     onReviewPlan: (DailyPlan, Long, (String?) -> Unit) -> Unit,
     onExtraRound: (DailyPlan, Long, (String?) -> Unit) -> Unit,
@@ -131,6 +133,8 @@ fun RecordsScreen(
                         now = System.currentTimeMillis(),
                         onPlan = onPlanToday,
                         onCompleteStep = onCompleteStep,
+                        notificationsEnabled = notificationsEnabled,
+                        onEnableNotifications = onEnableNotifications,
                         onStart = onStartPlan,
                         onReview = onReviewPlan,
                         onExtraRound = onExtraRound,
@@ -191,6 +195,8 @@ private fun TodayCard(
     now: Long,
     onPlan: () -> Unit,
     onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
+    notificationsEnabled: Boolean,
+    onEnableNotifications: () -> Unit,
     onStart: (DailyPlan, (String?) -> Unit) -> Unit,
     onReview: (DailyPlan, Long, (String?) -> Unit) -> Unit,
     onExtraRound: (DailyPlan, Long, (String?) -> Unit) -> Unit,
@@ -234,6 +240,30 @@ private fun TodayCard(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.first_move_done))
                     }
+                    if (!notificationsEnabled) {
+                        OutlinedButton(
+                            onClick = onEnableNotifications,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.enable_notifications)) }
+                    }
+                }
+                plan.state == DailyPlanState.ACTIVE && !notificationsEnabled -> {
+                    TodayHeader(stringResource(R.string.notifications_required), null)
+                    Text(
+                        stringResource(R.string.notifications_required_detail),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = onEnableNotifications, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.enable_notifications))
+                    }
+                    TextButton(
+                        onClick = {
+                            busy = true
+                            onEnd(plan) { result -> busy = false; error = result }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text(stringResource(R.string.end_today)) }
                 }
                 plan.state == DailyPlanState.ACTIVE && plan.isReviewDue(now) -> {
                     TodayHeader(stringResource(R.string.hourly_review), onPlan)
