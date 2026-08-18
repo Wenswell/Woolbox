@@ -26,10 +26,11 @@ try {
     for (const table of [
       "record_items",
       "record_entries",
-      "todo_tasks",
-      "todo_steps",
-      "todo_step_completions",
+      "task_templates",
+      "task_template_steps",
       "daily_plans",
+      "today_commitments",
+      "today_commitment_steps",
       "record_audit_logs",
     ]) {
       if (!tables.includes(table)) throw new Error(`Restored database is missing ${table}.`);
