@@ -2,7 +2,6 @@ package com.wswensw.woolbox.record.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,13 +24,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.model.TodoStep
-import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.TodayCommitment
+import com.wswensw.woolbox.record.model.TodayCommitmentStep
 import com.wswensw.woolbox.ui.AppStyle
 import java.time.Instant
 import java.time.ZoneId
@@ -40,20 +39,20 @@ import java.time.format.FormatStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskProgressSheet(
-    task: TodoTask,
+fun CommitmentProgressSheet(
+    commitment: TodayCommitment,
     onDismiss: () -> Unit,
-    onToggleStep: (TodoStep, Boolean, (String?) -> Unit) -> Unit,
+    onToggleStep: (TodayCommitmentStep, Boolean, (String?) -> Unit) -> Unit,
 ) {
-    var changingStepId by rememberSaveable(task.id) { mutableStateOf<Long?>(null) }
-    var errorMessage by rememberSaveable(task.id) { mutableStateOf<String?>(null) }
-    val completed = task.completedStepCount
-    val progress = if (task.steps.isEmpty()) 0f else completed.toFloat() / task.steps.size.toFloat()
+    var changingStepId by rememberSaveable(commitment.id) { mutableStateOf<Long?>(null) }
+    var errorMessage by rememberSaveable(commitment.id) { mutableStateOf<String?>(null) }
+    val completed = commitment.completedStepCount
+    val progress = completed.toFloat() / commitment.steps.size.toFloat()
     val reduceMotion = prefersReducedMotion()
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "TaskSheetProgress",
+        label = "CommitmentSheetProgress",
     )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -64,7 +63,7 @@ fun TaskProgressSheet(
                 .padding(bottom = 28.dp),
         ) {
             Text(
-                text = task.title,
+                text = commitment.title,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -72,40 +71,36 @@ fun TaskProgressSheet(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = pluralStringResource(
-                    R.plurals.subtasks_count,
-                    task.steps.size,
+                text = stringResource(
+                    R.string.commitment_steps_progress,
                     completed,
-                    task.steps.size,
+                    commitment.steps.size,
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
             )
             LinearProgressIndicator(
                 progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .height(6.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp),
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )
             Spacer(Modifier.height(16.dp))
             LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                items(task.steps, key = TodoStep::id) { step ->
-                    TaskProgressRow(
+                items(commitment.steps, key = TodayCommitmentStep::id) { step ->
+                    CommitmentProgressRow(
                         step = step,
                         enabled = changingStepId == null,
                         onToggle = { checked ->
                             changingStepId = step.id
                             errorMessage = null
-                            onToggleStep(step, checked) { error ->
+                            onToggleStep(step, checked) { result ->
                                 changingStepId = null
-                                errorMessage = error
+                                errorMessage = result
                             }
                         },
                     )
-                    if (step.id != task.steps.last().id) {
+                    if (step.id != commitment.steps.last().id) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
@@ -123,23 +118,16 @@ fun TaskProgressSheet(
 }
 
 @Composable
-private fun TaskProgressRow(
-    step: TodoStep,
+private fun CommitmentProgressRow(
+    step: TodayCommitmentStep,
     enabled: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
     androidx.compose.foundation.layout.Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(
-            checked = step.isCompleted,
-            onCheckedChange = onToggle,
-            enabled = enabled,
-        )
+        Checkbox(checked = step.isCompleted, onCheckedChange = onToggle, enabled = enabled)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = step.title,
@@ -155,7 +143,7 @@ private fun TaskProgressRow(
             )
             step.completedAt?.let { completedAt ->
                 Text(
-                    text = taskCompletedAtLabel(completedAt),
+                    text = commitmentCompletedAtLabel(completedAt),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp),
@@ -165,6 +153,6 @@ private fun TaskProgressRow(
     }
 }
 
-internal fun taskCompletedAtLabel(epochMillis: Long): String = DateTimeFormatter
+internal fun commitmentCompletedAtLabel(epochMillis: Long): String = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
     .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))

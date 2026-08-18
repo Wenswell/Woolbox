@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.record.model.emptyRecentDayValues
 import com.wswensw.woolbox.record.model.RecordItem
-import com.wswensw.woolbox.record.model.TodoTask
 import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.pow
@@ -128,11 +127,6 @@ internal fun colorProgressUnit(
     if (completed) return 1f
     if (progress.isNaN()) return 0f
     return progress.coerceIn(0f, 1f)
-}
-
-internal fun taskColorProgress(task: TodoTask): Float {
-    if (task.steps.isEmpty()) return if (task.isCompleted) 1f else 0f
-    return task.completedStepCount.toFloat() / task.steps.size.toFloat()
 }
 
 internal fun accumulateColorProgress(

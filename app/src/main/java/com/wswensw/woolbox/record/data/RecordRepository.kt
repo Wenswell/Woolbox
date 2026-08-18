@@ -5,25 +5,28 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.wswensw.woolbox.record.model.GoalPeriod
+import com.wswensw.woolbox.record.model.CommitmentRole
 import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.DailyPlanPauseReason
 import com.wswensw.woolbox.record.model.DailyPlanState
-import com.wswensw.woolbox.record.model.DailyPlanCompletionReason
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordValidationException
 import com.wswensw.woolbox.record.model.RecordValueType
-import com.wswensw.woolbox.record.model.TaskRepeatMode
-import com.wswensw.woolbox.record.model.TodoStep
-import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.TaskTemplate
+import com.wswensw.woolbox.record.model.TaskTemplateStep
+import com.wswensw.woolbox.record.model.TemplateCadence
+import com.wswensw.woolbox.record.model.TodayCommitment
+import com.wswensw.woolbox.record.model.TodayCommitmentStep
 import com.wswensw.woolbox.record.model.goalValues
 import com.wswensw.woolbox.record.model.itemRecentDayValues
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.record.model.validated
 import com.wswensw.woolbox.record.model.validatedFirstMove
-import com.wswensw.woolbox.record.model.validatedTaskTitle
+import com.wswensw.woolbox.record.model.validatedTemplateTitle
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.time.Instant
@@ -51,7 +54,7 @@ data class RecordsConnection(
     val username: String,
 )
 
-data class TodoStepDraft(
+data class TemplateStepDraft(
     val title: String,
 )
 
@@ -59,7 +62,7 @@ data class RecordsSnapshot(
     val activeItems: List<RecordItem>,
     val entries: List<RecordEntry>,
     val latestEntries: Map<Long, RecordEntry>,
-    val tasks: List<TodoTask>,
+    val templates: List<TaskTemplate>,
     val dailyPlan: DailyPlan?,
     val goalValues: Map<Long, Double>,
     val recentDayValues: Map<Long, List<Double>>,
@@ -94,7 +97,7 @@ class RecordRepository(context: Context) {
             latestEntries = overview.getJSONArray("latestMeasurementEntries")
             .mapObjects(::parseEntry)
             .associateBy(RecordEntry::itemId),
-            tasks = overview.getJSONArray("tasks").mapObjects(::parseTask),
+            templates = overview.getJSONArray("templates").mapObjects(::parseTemplate),
             dailyPlan = overview.nullableObject("dailyPlan")?.let(::parseDailyPlan),
             goalValues = goalValues(activeItems, date, todayEntries, rangeEntries),
             recentDayValues = itemRecentDayValues(
@@ -157,54 +160,44 @@ class RecordRepository(context: Context) {
         Unit
     }
 
-    suspend fun createTask(
+    suspend fun saveTemplate(
+        templateId: Long?,
         title: String,
-        repeatMode: TaskRepeatMode,
-        steps: List<TodoStepDraft>,
-        localDate: LocalDate,
+        cadence: TemplateCadence,
+        steps: List<TemplateStepDraft>,
     ): Long = withContext(Dispatchers.IO) {
         if (steps.isEmpty()) {
             throw RecordValidationException("At least one subtask is required.")
         }
         request(
-            "POST",
-            "tasks",
+            if (templateId == null) "POST" else "PUT",
+            if (templateId == null) "templates" else "templates/$templateId",
             body = JSONObject().apply {
-                put("title", validatedTaskTitle(title))
-                put("repeatMode", repeatMode.name)
-                put("localDate", localDate.toString())
-                put("steps", JSONArray(steps.map(::stepJson)))
+                put("title", validatedTemplateTitle(title))
+                put("cadence", cadence.name)
+                put("steps", JSONArray(steps.map(::templateStepJson)))
             },
-        ).getJSONObject("task").getLong("id")
+        ).getJSONObject("template").getLong("id")
     }
 
-    suspend fun updateTask(
-        taskId: Long,
-        title: String,
-        repeatMode: TaskRepeatMode,
-        localDate: LocalDate,
+    suspend fun archiveTemplate(
+        templateId: Long,
     ) = withContext(Dispatchers.IO) {
         request(
-            "PUT",
-            "tasks/$taskId",
+            "POST",
+            "templates/batch-archive",
             body = JSONObject()
-                .put("title", validatedTaskTitle(title))
-                .put("repeatMode", repeatMode.name)
-                .put("localDate", localDate.toString()),
+                .put("ids", JSONArray(listOf(templateId)))
+                .put("archived", true),
         )
-        Unit
-    }
-
-    suspend fun deleteTask(taskId: Long, localDate: LocalDate) = withContext(Dispatchers.IO) {
-        request("DELETE", "tasks/$taskId", query = mapOf("localDate" to localDate.toString()))
         Unit
     }
 
     suspend fun createDailyPlan(
         localDate: LocalDate,
         firstMove: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
+        primaryTemplateId: Long,
+        secondaryTemplateId: Long?,
     ) = withContext(Dispatchers.IO) {
         request(
             "POST",
@@ -212,8 +205,8 @@ class RecordRepository(context: Context) {
             body = JSONObject().apply {
                 put("localDate", localDate.toString())
                 put("firstMove", validatedFirstMove(firstMove))
-                put("primaryTaskId", primaryTaskId)
-                putNullable("secondaryTaskId", secondaryTaskId)
+                put("primaryTemplateId", primaryTemplateId)
+                putNullable("secondaryTemplateId", secondaryTemplateId)
             },
         )
         Unit
@@ -228,16 +221,16 @@ class RecordRepository(context: Context) {
     suspend fun updateDailyPlan(
         plan: DailyPlan,
         firstMove: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
+        primaryTemplateId: Long,
+        secondaryTemplateId: Long?,
         occurredAt: Long,
     ) = dailyPlanWrite(
         plan = plan,
         suffix = "",
         body = JSONObject().apply {
             put("firstMove", validatedFirstMove(firstMove))
-            put("primaryTaskId", primaryTaskId)
-            putNullable("secondaryTaskId", secondaryTaskId)
+            put("primaryTemplateId", primaryTemplateId)
+            putNullable("secondaryTemplateId", secondaryTemplateId)
             put("occurredAt", occurredAt)
         },
     )
@@ -245,11 +238,21 @@ class RecordRepository(context: Context) {
     suspend fun startDailyPlan(plan: DailyPlan, occurredAt: Long) =
         dailyPlanTransition(plan, "start", occurredAt)
 
-    suspend fun reviewDailyPlan(plan: DailyPlan, currentTaskId: Long, occurredAt: Long) =
-        dailyPlanTransition(plan, "review", occurredAt, currentTaskId)
+    suspend fun reviewDailyPlan(plan: DailyPlan, currentCommitmentId: Long, occurredAt: Long) =
+        dailyPlanTransition(plan, "review", occurredAt, currentCommitmentId)
 
-    suspend fun startExtraRound(plan: DailyPlan, currentTaskId: Long, occurredAt: Long) =
-        dailyPlanTransition(plan, "extra-round", occurredAt, currentTaskId)
+    suspend fun continueDailyPlan(plan: DailyPlan, currentCommitmentId: Long, occurredAt: Long) =
+        dailyPlanTransition(plan, "continue", occurredAt, currentCommitmentId)
+
+    suspend fun addDailyPlanCommitment(plan: DailyPlan, templateId: Long, occurredAt: Long) =
+        dailyPlanWrite(
+            plan = plan,
+            method = "POST",
+            suffix = "/commitments",
+            body = JSONObject()
+                .put("templateId", templateId)
+                .put("occurredAt", occurredAt),
+        )
 
     suspend fun endDailyPlan(plan: DailyPlan, occurredAt: Long) =
         dailyPlanTransition(plan, "end", occurredAt)
@@ -258,68 +261,40 @@ class RecordRepository(context: Context) {
         plan: DailyPlan,
         suffix: String,
         occurredAt: Long,
-        currentTaskId: Long? = null,
+        currentCommitmentId: Long? = null,
     ) = dailyPlanWrite(
         plan = plan,
         suffix = "/$suffix",
         body = JSONObject()
             .put("occurredAt", occurredAt)
-            .apply { currentTaskId?.let { put("currentTaskId", it) } },
+            .apply { currentCommitmentId?.let { put("currentCommitmentId", it) } },
     )
 
-    private suspend fun dailyPlanWrite(plan: DailyPlan, suffix: String, body: JSONObject) =
+    private suspend fun dailyPlanWrite(
+        plan: DailyPlan,
+        suffix: String,
+        body: JSONObject,
+        method: String = "PUT",
+    ) =
         withContext(Dispatchers.IO) {
             body.put("expectedRevision", plan.revision)
-            request("PUT", "daily-plans/${plan.localDate}$suffix", body = body)
+            request(method, "daily-plans/${plan.localDate}$suffix", body = body)
             Unit
         }
 
-    suspend fun createStep(
-        taskId: Long,
-        title: String,
-        localDate: LocalDate,
-    ): Long = withContext(Dispatchers.IO) {
-        request(
-            "POST",
-            "tasks/$taskId/steps",
-            body = stepJson(TodoStepDraft(title = title)).put("localDate", localDate.toString()),
-        ).getJSONObject("step").getLong("id")
-    }
-
-    suspend fun updateStep(
+    suspend fun setCommitmentStepCompleted(
+        plan: DailyPlan,
         stepId: Long,
-        title: String,
-        localDate: LocalDate,
+        completed: Boolean,
+        occurredAt: Long,
     ) = withContext(Dispatchers.IO) {
         request(
             "PUT",
-            "steps/$stepId",
-            body = stepJson(TodoStepDraft(title = title)).put("localDate", localDate.toString()),
-        )
-        Unit
-    }
-
-    suspend fun setStepCompleted(stepId: Long, completed: Boolean, localDate: LocalDate) = withContext(Dispatchers.IO) {
-        request(
-            "PUT",
-            "steps/$stepId/completion",
-            body = JSONObject().put("completed", completed).put("localDate", localDate.toString()),
-        )
-        Unit
-    }
-
-    suspend fun deleteStep(stepId: Long, localDate: LocalDate) = withContext(Dispatchers.IO) {
-        request("DELETE", "steps/$stepId", query = mapOf("localDate" to localDate.toString()))
-        Unit
-    }
-
-    suspend fun reorderSteps(taskId: Long, stepIds: List<Long>, localDate: LocalDate) = withContext(Dispatchers.IO) {
-        request(
-            "PUT",
-            "tasks/$taskId/steps/order",
+            "commitment-steps/$stepId/completion",
             body = JSONObject()
-                .put("ids", JSONArray(stepIds))
-                .put("localDate", localDate.toString()),
+                .put("completed", completed)
+                .put("expectedRevision", plan.revision)
+                .put("occurredAt", occurredAt),
         )
         Unit
     }
@@ -422,17 +397,17 @@ private fun parseEntry(value: JSONObject) = RecordEntry(
     itemValueType = RecordValueType.valueOf(value.getString("itemValueType")),
 )
 
-private fun stepJson(step: TodoStepDraft) = JSONObject()
-    .put("title", validatedTaskTitle(step.title))
+private fun templateStepJson(step: TemplateStepDraft) = JSONObject()
+    .put("title", validatedTemplateTitle(step.title))
 
-private fun parseTask(value: JSONObject) = TodoTask(
+private fun parseTemplate(value: JSONObject) = TaskTemplate(
     id = value.getLong("id"),
     title = value.getString("title"),
-    repeatMode = TaskRepeatMode.valueOf(value.getString("repeatMode")),
-    completedAt = value.nullableLong("completedAt"),
+    cadence = TemplateCadence.valueOf(value.getString("cadence")),
+    archived = value.getBoolean("archived"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
-    steps = value.getJSONArray("steps").mapObjects(::parseStep),
+    steps = value.getJSONArray("steps").mapObjects(::parseTemplateStep),
 )
 
 internal fun parseDailyPlan(value: JSONObject) = DailyPlan(
@@ -440,23 +415,46 @@ internal fun parseDailyPlan(value: JSONObject) = DailyPlan(
     localDate = LocalDate.parse(value.getString("localDate")),
     firstMove = value.getString("firstMove"),
     firstMoveCompletedAt = value.nullableLong("firstMoveCompletedAt"),
-    primaryTaskId = value.nullableLong("primaryTaskId"),
-    secondaryTaskId = value.nullableLong("secondaryTaskId"),
-    currentTaskId = value.nullableLong("currentTaskId"),
+    currentCommitmentId = value.nullableLong("currentCommitmentId"),
     state = DailyPlanState.valueOf(value.getString("state")),
-    completionReason = value.nullableString("completionReason")?.let(DailyPlanCompletionReason::valueOf),
+    pauseReason = value.nullableString("pauseReason")?.let(DailyPlanPauseReason::valueOf),
     completedRounds = value.getInt("completedRounds"),
     nextReviewAt = value.nullableLong("nextReviewAt"),
     revision = value.getInt("revision"),
     endedAt = value.nullableLong("endedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
+    commitments = value.getJSONArray("commitments").mapObjects(::parseCommitment),
 )
 
-private fun parseStep(value: JSONObject) = TodoStep(
+private fun parseTemplateStep(value: JSONObject) = TaskTemplateStep(
     id = value.getLong("id"),
-    taskId = value.getLong("taskId"),
+    templateId = value.getLong("templateId"),
     title = value.getString("title"),
+    position = value.getInt("position"),
+    createdAt = value.getLong("createdAt"),
+    updatedAt = value.getLong("updatedAt"),
+)
+
+private fun parseCommitment(value: JSONObject) = TodayCommitment(
+    id = value.getLong("id"),
+    planId = value.getLong("planId"),
+    templateId = value.nullableLong("templateId"),
+    role = CommitmentRole.valueOf(value.getString("role")),
+    position = value.getInt("position"),
+    title = value.getString("title"),
+    cadence = TemplateCadence.valueOf(value.getString("cadence")),
+    completedAt = value.nullableLong("completedAt"),
+    createdAt = value.getLong("createdAt"),
+    updatedAt = value.getLong("updatedAt"),
+    steps = value.getJSONArray("steps").mapObjects(::parseCommitmentStep),
+)
+
+private fun parseCommitmentStep(value: JSONObject) = TodayCommitmentStep(
+    id = value.getLong("id"),
+    commitmentId = value.getLong("commitmentId"),
+    title = value.getString("title"),
+    position = value.getInt("position"),
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),

@@ -61,13 +61,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.ui.ManageTasksScreen
+import com.wswensw.woolbox.record.ui.ManageTemplatesScreen
 import com.wswensw.woolbox.record.ui.ManageRecordsScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
-import com.wswensw.woolbox.record.model.TodoStep
-import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.TodayCommitment
+import com.wswensw.woolbox.record.model.TodayCommitmentStep
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
@@ -78,10 +79,9 @@ import com.wswensw.woolbox.record.ui.displayRecordName
 import com.wswensw.woolbox.record.ui.RecordsConnectionScreen
 import com.wswensw.woolbox.record.ui.RecordsScreen
 import com.wswensw.woolbox.record.ui.RecordsViewModel
-import com.wswensw.woolbox.record.ui.TaskCreateScreen
-import com.wswensw.woolbox.record.ui.TaskDetailScreen
+import com.wswensw.woolbox.record.ui.TemplateEditorScreen
 import com.wswensw.woolbox.record.ui.DailyPlanScreen
-import com.wswensw.woolbox.record.ui.TaskProgressSheet
+import com.wswensw.woolbox.record.ui.CommitmentProgressSheet
 import com.wswensw.woolbox.record.reminder.DailyReminderNotifications
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
@@ -112,7 +112,7 @@ fun WoolboxApp(
     onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult,
 ) {
     val context = LocalContext.current
-    val taskDoneTemplate = stringResource(R.string.task_done)
+    val commitmentDoneTemplate = stringResource(R.string.commitment_done)
     val goalReachedTemplate = stringResource(R.string.goal_reached)
     val recordedItemTemplate = stringResource(R.string.recorded_item)
     val undoLabel = stringResource(R.string.action_undo)
@@ -140,7 +140,7 @@ fun WoolboxApp(
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
     var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var taskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var commitmentSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
     var notificationsEnabled by remember {
@@ -190,24 +190,27 @@ fun WoolboxApp(
             }
         }
 
-    // Shared by the task progress Sheet and the focus card so completing a
-    // subtask gives the same haptics and parent-done Snackbar either way.
-    val completeStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit = { task, step, onResult ->
-        val parentCompleting = task.steps.all { it.id == step.id || it.isCompleted }
-        recordsViewModel.setStepCompleted(step.id, true) { error ->
+    val completeStep: (
+        DailyPlan,
+        TodayCommitment,
+        TodayCommitmentStep,
+        (String?) -> Unit,
+    ) -> Unit = { plan, commitment, step, onResult ->
+        val commitmentCompleting = commitment.steps.all { it.id == step.id || it.isCompleted }
+        recordsViewModel.setCommitmentStepCompleted(plan, step.id, true) { error ->
             onResult(error)
             if (error == null) {
                 hapticFeedback.performHapticFeedback(
-                    if (parentCompleting) {
+                    if (commitmentCompleting) {
                         HapticFeedbackType.LongPress
                     } else {
                         HapticFeedbackType.ContextClick
                     },
                 )
-                if (parentCompleting) {
+                if (commitmentCompleting) {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(
-                            message = taskDoneTemplate.formatLocalized(task.title),
+                            message = commitmentDoneTemplate.formatLocalized(commitment.title),
                             duration = SnackbarDuration.Short,
                         )
                     }
@@ -308,7 +311,7 @@ fun WoolboxApp(
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
                                     recordSheetItemId = null
-                                    taskSheetId = null
+                                    commitmentSheetId = null
                                     measurementSheetItemId = null
                                 }
                             },
@@ -340,9 +343,9 @@ fun WoolboxApp(
                                 state = recordsState,
                                 clock = recordsClock,
                                 onPlanToday = { navController.navigate(AppRoutes.DAILY_PLAN) },
-                                onManageTasks = {
-                                    taskSheetId = null
-                                    navController.navigate(AppRoutes.MANAGE_TASKS)
+                                onManageTemplates = {
+                                    commitmentSheetId = null
+                                    navController.navigate(AppRoutes.MANAGE_TEMPLATES)
                                 },
                                 onManageAccumulates = {
                                     recordSheetItemId = null
@@ -358,6 +361,7 @@ fun WoolboxApp(
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
                                 onCompleteStep = completeStep,
+                                onOpenCommitment = { commitmentSheetId = it.id },
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
@@ -380,10 +384,16 @@ fun WoolboxApp(
                                     )
                                 },
                                 onReviewPlan = recordsViewModel::reviewDailyPlan,
-                                onExtraRound = { plan, taskId, onResult ->
+                                onContinuePlan = { plan, commitmentId, onResult ->
                                     requireNotifications(
                                         { onResult(notificationsNotEnabledMessage) },
-                                        { recordsViewModel.startExtraRound(plan, taskId, onResult) },
+                                        { recordsViewModel.continueDailyPlan(plan, commitmentId, onResult) },
+                                    )
+                                },
+                                onAddCommitment = { plan, templateId, onResult ->
+                                    requireNotifications(
+                                        { onResult(notificationsNotEnabledMessage) },
+                                        { recordsViewModel.addDailyPlanCommitment(plan, templateId, onResult) },
                                     )
                                 },
                                 onEndPlan = recordsViewModel::endDailyPlan,
@@ -533,12 +543,12 @@ fun WoolboxApp(
                     },
                 )
             }
-            composable(AppRoutes.MANAGE_TASKS) {
-                ManageTasksScreen(
+            composable(AppRoutes.MANAGE_TEMPLATES) {
+                ManageTemplatesScreen(
                     state = recordsState,
                     onBack = { navController.popBackStack() },
-                    onCreate = { navController.navigate(AppRoutes.TASK_NEW) },
-                    onEdit = { taskId -> navController.navigate(AppRoutes.taskDetail(taskId)) },
+                    onCreate = { navController.navigate(AppRoutes.TEMPLATE_NEW) },
+                    onEdit = { templateId -> navController.navigate(AppRoutes.templateEdit(templateId)) },
                 )
             }
             composable(AppRoutes.MANAGE_ACCUMULATES) {
@@ -574,60 +584,51 @@ fun WoolboxApp(
                     onSave = recordsViewModel::configureCredentials,
                 )
             }
-            composable(AppRoutes.TASK_NEW) {
-                TaskCreateScreen(
+            composable(AppRoutes.TEMPLATE_NEW) {
+                TemplateEditorScreen(
+                    template = null,
+                    editing = false,
+                    loading = false,
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, repeatMode, steps, onResult ->
-                        recordsViewModel.createTask(title, repeatMode, steps) { taskId, error ->
+                    onSave = { title, cadence, steps, onResult ->
+                        recordsViewModel.saveTemplate(null, title, cadence, steps) { templateId, error ->
                             onResult(error)
-                            if (taskId != null) navController.popBackStack()
+                            if (templateId != null) navController.popBackStack()
                         }
                     },
+                    onArchive = null,
                 )
             }
             composable(
-                route = AppRoutes.TASK_DETAIL,
-                arguments = listOf(navArgument(AppRoutes.TASK_ID) { type = NavType.LongType }),
+                route = AppRoutes.TEMPLATE_EDIT,
+                arguments = listOf(navArgument(AppRoutes.TEMPLATE_ID) { type = NavType.LongType }),
             ) { entry ->
-                val taskId = entry.arguments?.getLong(AppRoutes.TASK_ID) ?: return@composable
-                TaskDetailScreen(
-                    task = recordsState.findTask(taskId),
+                val templateId = entry.arguments?.getLong(AppRoutes.TEMPLATE_ID) ?: return@composable
+                TemplateEditorScreen(
+                    template = recordsState.findTemplate(templateId),
+                    editing = true,
                     loading = recordsState.isLoading,
                     onBack = { navController.popBackStack() },
-                    onSave = { title, repeatMode, onResult ->
-                        recordsViewModel.updateTask(taskId, title, repeatMode, onResult)
+                    onSave = { title, cadence, steps, onResult ->
+                        recordsViewModel.saveTemplate(templateId, title, cadence, steps) { savedId, error ->
+                            onResult(error)
+                            if (savedId != null) navController.popBackStack()
+                        }
                     },
-                    onCreateStep = { title, onResult ->
-                        recordsViewModel.createStep(taskId, title, onResult)
-                    },
-                    onUpdateStep = { step, title, onResult ->
-                        recordsViewModel.updateStep(step.id, title, onResult)
-                    },
-                    onToggleStep = { step, completed ->
-                        recordsViewModel.setStepCompleted(step.id, completed)
-                    },
-                    onDeleteStep = { step, onResult ->
-                        recordsViewModel.deleteStep(step.id, onResult)
-                    },
-                    onReorderSteps = { stepIds, onResult ->
-                        recordsViewModel.reorderSteps(taskId, stepIds, onResult)
-                    },
-                    onDeleteTask = { onResult ->
-                        recordsViewModel.deleteTask(taskId, onResult)
-                    },
+                    onArchive = { onResult -> recordsViewModel.archiveTemplate(templateId, onResult) },
                 )
             }
             composable(AppRoutes.DAILY_PLAN) {
                 DailyPlanScreen(
                     plan = recordsState.dailyPlan,
-                    tasks = recordsState.tasks,
+                    templates = recordsState.templates,
                     onBack = { navController.popBackStack() },
-                    onSave = { firstMove, primaryTaskId, secondaryTaskId, onResult ->
+                    onSave = { firstMove, primaryTemplateId, secondaryTemplateId, onResult ->
                         recordsViewModel.saveDailyPlan(
                             recordsState.dailyPlan,
                             firstMove,
-                            primaryTaskId,
-                            secondaryTaskId,
+                            primaryTemplateId,
+                            secondaryTemplateId,
                         ) { error ->
                             onResult(error)
                             if (error == null) navController.popBackStack()
@@ -727,29 +728,30 @@ fun WoolboxApp(
                 }
             }
 
-            taskSheetId?.let { taskId ->
-                recordsState.findTask(taskId)?.let { task ->
-                    TaskProgressSheet(
-                        task = task,
-                        onDismiss = { taskSheetId = null },
+            commitmentSheetId?.let { commitmentId ->
+                val plan = recordsState.dailyPlan
+                plan?.commitments?.firstOrNull { it.id == commitmentId }?.let { commitment ->
+                    CommitmentProgressSheet(
+                        commitment = commitment,
+                        onDismiss = { commitmentSheetId = null },
                         onToggleStep = { step, completed, onResult ->
                             val completing = completed && !step.isCompleted
-                            val parentCompleting = completing &&
-                                task.steps.all { it.id == step.id || it.isCompleted }
-                            recordsViewModel.setStepCompleted(step.id, completed) { error ->
+                            val commitmentCompleting = completing &&
+                                commitment.steps.all { it.id == step.id || it.isCompleted }
+                            recordsViewModel.setCommitmentStepCompleted(plan, step.id, completed) { error ->
                                 onResult(error)
                                 if (error == null && completing) {
                                     hapticFeedback.performHapticFeedback(
-                                        if (parentCompleting) {
+                                        if (commitmentCompleting) {
                                             HapticFeedbackType.LongPress
                                         } else {
                                             HapticFeedbackType.ContextClick
                                         },
                                     )
-                                    if (parentCompleting) {
+                                    if (commitmentCompleting) {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = taskDoneTemplate.formatLocalized(task.title),
+                                                message = commitmentDoneTemplate.formatLocalized(commitment.title),
                                                 duration = SnackbarDuration.Short,
                                             )
                                         }
@@ -892,14 +894,14 @@ private object AppRoutes {
     const val OLED_SHIELD = "oled-shield"
 
     fun copyHistoryEdit(historyId: Long) = "global-copy/history/$historyId"
-    const val MANAGE_TASKS = "manage-tasks"
+    const val MANAGE_TEMPLATES = "manage-templates"
     const val MANAGE_ACCUMULATES = "manage-accumulates"
     const val MANAGE_MEASUREMENTS = "manage-measurements"
     const val RECORDS_CONNECTION = "records-connection"
-    const val TASK_NEW = "task/new"
+    const val TEMPLATE_NEW = "template/new"
     const val DAILY_PLAN = "records/today"
-    const val TASK_ID = "taskId"
-    const val TASK_DETAIL = "task/{$TASK_ID}"
+    const val TEMPLATE_ID = "templateId"
+    const val TEMPLATE_EDIT = "template/{$TEMPLATE_ID}"
     const val RECORD_ITEM_ID = "recordItemId"
     const val RECORD_ITEM_ACCUMULATE_NEW = "record-item/accumulate/new"
     const val RECORD_ITEM_ACCUMULATE_EDIT = "record-item/accumulate/{$RECORD_ITEM_ID}"
@@ -910,7 +912,7 @@ private object AppRoutes {
     fun accumulateItemEdit(itemId: Long) = "record-item/accumulate/$itemId"
     fun measurementItemNew() = RECORD_ITEM_MEASUREMENT_NEW
     fun measurementItemEdit(itemId: Long) = "record-item/measurement/$itemId"
-    fun taskDetail(taskId: Long) = "task/$taskId"
+    fun templateEdit(templateId: Long) = "template/$templateId"
 }
 
 private const val PageTransitionMillis = 220

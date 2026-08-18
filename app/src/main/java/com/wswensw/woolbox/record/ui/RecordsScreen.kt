@@ -51,15 +51,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.DailyPlan
-import com.wswensw.woolbox.record.model.DailyPlanCompletionReason
+import com.wswensw.woolbox.record.model.DailyPlanPauseReason
 import com.wswensw.woolbox.record.model.DailyPlanState
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordsClock
-import com.wswensw.woolbox.record.model.TodoStep
-import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.TaskTemplate
+import com.wswensw.woolbox.record.model.TodayCommitment
+import com.wswensw.woolbox.record.model.TodayCommitmentStep
 import com.wswensw.woolbox.ui.AppStyle
 import java.util.Locale
 
@@ -68,19 +69,21 @@ fun RecordsScreen(
     state: RecordsUiState,
     clock: State<RecordsClock>,
     onPlanToday: () -> Unit,
-    onManageTasks: () -> Unit,
+    onManageTemplates: () -> Unit,
     onManageAccumulates: () -> Unit,
     onManageMeasurements: () -> Unit,
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
-    onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
+    onCompleteStep: (DailyPlan, TodayCommitment, TodayCommitmentStep, (String?) -> Unit) -> Unit,
+    onOpenCommitment: (TodayCommitment) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
     notificationsEnabled: Boolean,
     onEnableNotifications: () -> Unit,
     onStartPlan: (DailyPlan, (String?) -> Unit) -> Unit,
     onReviewPlan: (DailyPlan, Long, (String?) -> Unit) -> Unit,
-    onExtraRound: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onContinuePlan: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onAddCommitment: (DailyPlan, Long, (String?) -> Unit) -> Unit,
     onEndPlan: (DailyPlan, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -130,27 +133,29 @@ fun RecordsScreen(
                     SectionTitle(stringResource(R.string.today))
                     TodayCard(
                         plan = state.dailyPlan,
-                        tasks = state.tasks,
+                        templates = state.templates,
                         now = System.currentTimeMillis(),
                         onPlan = onPlanToday,
                         onCompleteStep = onCompleteStep,
+                        onOpenCommitment = onOpenCommitment,
                         notificationsEnabled = notificationsEnabled,
                         onEnableNotifications = onEnableNotifications,
                         onStart = onStartPlan,
                         onReview = onReviewPlan,
-                        onExtraRound = onExtraRound,
+                        onContinue = onContinuePlan,
+                        onAddCommitment = onAddCommitment,
                         onEnd = onEndPlan,
                     )
                 }
                 item {
                     Spacer(Modifier.height(8.dp))
                     SectionLink(
-                        title = stringResource(R.string.records_tasks),
+                        title = stringResource(R.string.records_templates),
                         subtitle = stringResource(
-                            R.string.open_tasks_count,
-                            state.tasks.count { !it.isCompleted },
+                            R.string.templates_count,
+                            state.templates.size,
                         ),
-                        onClick = onManageTasks,
+                        onClick = onManageTemplates,
                     )
                 }
                 item {
@@ -192,22 +197,24 @@ fun RecordsScreen(
 @Composable
 private fun TodayCard(
     plan: DailyPlan?,
-    tasks: List<TodoTask>,
+    templates: List<TaskTemplate>,
     now: Long,
     onPlan: () -> Unit,
-    onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
+    onCompleteStep: (DailyPlan, TodayCommitment, TodayCommitmentStep, (String?) -> Unit) -> Unit,
+    onOpenCommitment: (TodayCommitment) -> Unit,
     notificationsEnabled: Boolean,
     onEnableNotifications: () -> Unit,
     onStart: (DailyPlan, (String?) -> Unit) -> Unit,
     onReview: (DailyPlan, Long, (String?) -> Unit) -> Unit,
-    onExtraRound: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onContinue: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onAddCommitment: (DailyPlan, Long, (String?) -> Unit) -> Unit,
     onEnd: (DailyPlan, (String?) -> Unit) -> Unit,
 ) {
     var busy by remember(plan?.revision) { mutableStateOf(false) }
     var error by remember(plan?.revision) { mutableStateOf<String?>(null) }
-    var choosingReviewTask by remember { mutableStateOf(false) }
-    val currentTask = tasks.firstOrNull { it.id == plan?.currentTaskId }
-    val openCommitments = plan?.committedTasks(tasks)?.filterNot(TodoTask::isCompleted).orEmpty()
+    var choiceMode by remember(plan?.revision) { mutableStateOf<TodayChoiceMode?>(null) }
+    val currentCommitment = plan?.currentCommitment
+    val openCommitments = plan?.openCommitments.orEmpty()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -267,21 +274,21 @@ private fun TodayCard(
                     ) { Text(stringResource(R.string.end_today)) }
                 }
                 plan.state == DailyPlanState.ACTIVE && plan.isReviewDue(now) -> {
-                    TodayHeader(stringResource(R.string.hourly_review), onPlan)
+                    TodayHeader(stringResource(R.string.hourly_review), null)
                     Text(stringResource(R.string.still_on_commitment), style = MaterialTheme.typography.titleLarge)
-                    currentTask?.let { Text(it.title, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    currentCommitment?.let { Text(it.title, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     Button(
                         onClick = {
-                            val taskId = currentTask?.id ?: return@Button
+                            val commitmentId = currentCommitment?.id ?: return@Button
                             busy = true
-                            onReview(plan, taskId) { result -> busy = false; error = result }
+                            onReview(plan, commitmentId) { result -> busy = false; error = result }
                         },
-                        enabled = !busy && currentTask != null,
+                        enabled = !busy && currentCommitment != null,
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.continue_current)) }
-                    if (openCommitments.any { it.id != currentTask?.id }) {
+                    if (openCommitments.any { it.id != currentCommitment?.id }) {
                         OutlinedButton(
-                            onClick = { choosingReviewTask = true },
+                            onClick = { choiceMode = TodayChoiceMode.REVIEW },
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.correct_course)) }
@@ -296,10 +303,10 @@ private fun TodayCard(
                     ) { Text(stringResource(R.string.end_today)) }
                 }
                 plan.state == DailyPlanState.ACTIVE -> {
-                    TodayHeader(stringResource(R.string.round_progress, plan.completedRounds + 1), onPlan)
-                    currentTask?.let { task ->
-                        Text(task.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        task.nextStep?.let { step ->
+                    TodayHeader(stringResource(R.string.round_progress, plan.completedRounds + 1), null)
+                    currentCommitment?.let { commitment ->
+                        Text(commitment.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        commitment.nextStep?.let { step ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 shape = RecordsCardShape,
@@ -312,7 +319,10 @@ private fun TodayCard(
                                         checked = false,
                                         onCheckedChange = {
                                             busy = true
-                                            onCompleteStep(task, step) { result -> busy = false; error = result }
+                                            onCompleteStep(plan, commitment, step) { result ->
+                                                busy = false
+                                                error = result
+                                            }
                                         },
                                         enabled = !busy,
                                     )
@@ -327,10 +337,10 @@ private fun TodayCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                plan.state == DailyPlanState.ENOUGH -> {
+                plan.state == DailyPlanState.PAUSED -> {
                     TodayHeader(
                         stringResource(
-                            if (plan.completionReason == DailyPlanCompletionReason.COMMITMENTS) {
+                            if (plan.pauseReason == DailyPlanPauseReason.COMMITMENTS_COMPLETED) {
                                 R.string.commitments_completed
                             } else {
                                 R.string.enough_for_today
@@ -346,25 +356,28 @@ private fun TodayCard(
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (
-                        plan.completionReason == DailyPlanCompletionReason.ROUNDS &&
-                        openCommitments.isNotEmpty()
-                    ) {
+                    if (plan.pauseReason == DailyPlanPauseReason.TARGET_REACHED && openCommitments.isNotEmpty()) {
                         Button(
                             onClick = {
                                 if (openCommitments.size == 1) {
                                     busy = true
-                                    onExtraRound(plan, openCommitments.single().id) { result ->
+                                    onContinue(plan, openCommitments.single().id) { result ->
                                         busy = false
                                         error = result
                                     }
                                 } else {
-                                    choosingReviewTask = true
+                                    choiceMode = TodayChoiceMode.CONTINUE
                                 }
                             },
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.extra_round)) }
+                        ) { Text(stringResource(R.string.continue_one_more_round)) }
+                    } else {
+                        Button(
+                            onClick = { choiceMode = TodayChoiceMode.ADD },
+                            enabled = !busy && templates.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.add_commitment)) }
                     }
                     TextButton(
                         onClick = {
@@ -383,36 +396,103 @@ private fun TodayCard(
                     )
                 }
             }
+            plan?.commitments?.takeIf { it.isNotEmpty() }?.let { commitments ->
+                Text(
+                    stringResource(R.string.today_commitments),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                commitments.forEach { commitment ->
+                    CommitmentRow(
+                        commitment = commitment,
+                        current = commitment.id == plan.currentCommitmentId,
+                        onClick = { onOpenCommitment(commitment) },
+                    )
+                }
+            }
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
 
-    if (choosingReviewTask && plan != null) {
-        TaskChoiceDialog(
-            title = stringResource(
-                if (plan.completionReason == DailyPlanCompletionReason.ROUNDS) {
-                    R.string.extra_round
-                } else {
-                    R.string.correct_course
-                },
-            ),
-            tasks = openCommitments.filter {
-                plan.completionReason == DailyPlanCompletionReason.ROUNDS || it.id != currentTask?.id
-            },
-            onDismiss = { choosingReviewTask = false },
-            onSelect = { task ->
-                choosingReviewTask = false
+    if (choiceMode == TodayChoiceMode.REVIEW && plan != null) {
+        CommitmentChoiceDialog(
+            title = stringResource(R.string.correct_course),
+            commitments = openCommitments.filter { it.id != currentCommitment?.id },
+            onDismiss = { choiceMode = null },
+            onSelect = { commitment ->
+                choiceMode = null
                 busy = true
-                val complete: (String?) -> Unit = { result -> busy = false; error = result }
-                if (plan.completionReason == DailyPlanCompletionReason.ROUNDS) {
-                    onExtraRound(plan, task.id, complete)
-                } else {
-                    onReview(plan, task.id, complete)
-                }
+                onReview(plan, commitment.id) { result -> busy = false; error = result }
             },
         )
+    }
+    if (choiceMode == TodayChoiceMode.CONTINUE && plan != null) {
+        CommitmentChoiceDialog(
+            title = stringResource(R.string.continue_one_more_round),
+            commitments = openCommitments,
+            onDismiss = { choiceMode = null },
+            onSelect = { commitment ->
+                choiceMode = null
+                busy = true
+                onContinue(plan, commitment.id) { result -> busy = false; error = result }
+            },
+        )
+    }
+    if (choiceMode == TodayChoiceMode.ADD && plan != null) {
+        TemplateChoiceDialog(
+            title = stringResource(R.string.add_commitment),
+            templates = templates,
+            onDismiss = { choiceMode = null },
+            onSelect = { template ->
+                choiceMode = null
+                busy = true
+                onAddCommitment(plan, template.id) { result -> busy = false; error = result }
+            },
+        )
+    }
+}
+
+private enum class TodayChoiceMode { REVIEW, CONTINUE, ADD }
+
+@Composable
+private fun CommitmentRow(
+    commitment: TodayCommitment,
+    current: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        color = if (current) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        },
+        shape = RecordsCardShape,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(commitment.title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(
+                        R.string.commitment_steps_progress,
+                        commitment.completedStepCount,
+                        commitment.steps.size,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (commitment.isCompleted) {
+                Icon(Icons.Rounded.CheckCircle, contentDescription = null)
+            } else {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+            }
+        }
     }
 }
 
@@ -434,11 +514,11 @@ private fun TodayHeader(title: String, onEdit: (() -> Unit)?) {
 }
 
 @Composable
-internal fun TaskChoiceDialog(
+internal fun TemplateChoiceDialog(
     title: String,
-    tasks: List<TodoTask>,
+    templates: List<TaskTemplate>,
     onDismiss: () -> Unit,
-    onSelect: (TodoTask) -> Unit,
+    onSelect: (TaskTemplate) -> Unit,
     onClear: (() -> Unit)? = null,
 ) {
     AlertDialog(
@@ -446,18 +526,42 @@ internal fun TaskChoiceDialog(
         title = { Text(title) },
         text = {
             LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
-                items(tasks, key = TodoTask::id) { task ->
-                    TextButton(onClick = { onSelect(task) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(task.title, modifier = Modifier.fillMaxWidth())
+                items(templates, key = TaskTemplate::id) { template ->
+                    TextButton(onClick = { onSelect(template) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(template.title, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
         },
         confirmButton = {
             onClear?.let { clear ->
-                TextButton(onClick = clear) { Text(stringResource(R.string.no_secondary_task)) }
+                TextButton(onClick = clear) { Text(stringResource(R.string.no_secondary_commitment)) }
             }
         },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun CommitmentChoiceDialog(
+    title: String,
+    commitments: List<TodayCommitment>,
+    onDismiss: () -> Unit,
+    onSelect: (TodayCommitment) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                items(commitments, key = TodayCommitment::id) { commitment ->
+                    TextButton(onClick = { onSelect(commitment) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(commitment.title, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
@@ -531,7 +635,7 @@ internal fun RecordsStatusCard(
 internal fun crossedGoalThreshold(previous: Double, current: Double, target: Double?): Boolean =
     target != null && target > 0.0 && previous < target && current >= target
 
-internal fun nextTaskStepTitle(task: TodoTask): String? = task.nextStep?.title
+internal fun nextCommitmentStepTitle(commitment: TodayCommitment): String? = commitment.nextStep?.title
 
 internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
     items.sortedWith(

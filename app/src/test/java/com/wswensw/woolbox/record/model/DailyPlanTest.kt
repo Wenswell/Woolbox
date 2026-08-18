@@ -13,35 +13,51 @@ class DailyPlanTest {
 
         assertFalse(plan.isReviewDue(9_999))
         assertTrue(plan.isReviewDue(10_000))
-        assertFalse(plan.copy(state = DailyPlanState.ENOUGH).isReviewDue(10_000))
+        assertFalse(plan.copy(state = DailyPlanState.PAUSED).isReviewDue(10_000))
     }
 
     @Test
-    fun commitmentsFollowPrimaryThenSecondaryAndIgnoreMissingTasks() {
-        val primary = task(1)
-        val secondary = task(2)
+    fun currentAndOpenCommitmentsComeFromPlanSnapshots() {
+        val completed = commitment(1, completedAt = 10)
+        val current = commitment(2)
+        val plan = plan(currentCommitmentId = 2, commitments = listOf(completed, current))
 
-        assertEquals(listOf(1L, 2L), plan().committedTasks(listOf(secondary, primary)).map(TodoTask::id))
-        assertEquals(listOf(1L), plan().committedTasks(listOf(primary)).map(TodoTask::id))
+        assertEquals(current, plan.currentCommitment)
+        assertEquals(listOf(2L), plan.openCommitments.map(TodayCommitment::id))
     }
 
-    private fun plan(nextReviewAt: Long? = null) = DailyPlan(
+    private fun plan(
+        nextReviewAt: Long? = null,
+        currentCommitmentId: Long? = 1,
+        commitments: List<TodayCommitment> = listOf(commitment(1)),
+    ) = DailyPlan(
         id = 1,
         localDate = LocalDate.of(2026, 8, 18),
         firstMove = "Go to the library",
         firstMoveCompletedAt = 1,
-        primaryTaskId = 1,
-        secondaryTaskId = 2,
-        currentTaskId = 1,
+        currentCommitmentId = currentCommitmentId,
         state = DailyPlanState.ACTIVE,
-        completionReason = null,
+        pauseReason = null,
         completedRounds = 0,
         nextReviewAt = nextReviewAt,
         revision = 0,
         endedAt = null,
         createdAt = 0,
         updatedAt = 0,
+        commitments = commitments,
     )
 
-    private fun task(id: Long) = TodoTask(id, "Task $id", TaskRepeatMode.ONCE, null, 0, 0, emptyList())
+    private fun commitment(id: Long, completedAt: Long? = null) = TodayCommitment(
+        id = id,
+        planId = 1,
+        templateId = id,
+        role = CommitmentRole.PRIMARY,
+        position = id.toInt(),
+        title = "Commitment $id",
+        cadence = TemplateCadence.MANUAL,
+        completedAt = completedAt,
+        createdAt = 0,
+        updatedAt = 0,
+        steps = listOf(TodayCommitmentStep(id, id, "Step", 0, completedAt, 0, 0)),
+    )
 }

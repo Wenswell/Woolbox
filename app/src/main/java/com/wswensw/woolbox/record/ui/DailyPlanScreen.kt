@@ -20,9 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
+import com.wswensw.woolbox.record.model.CommitmentRole
 import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.DailyPlanState
-import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.TaskTemplate
 import com.wswensw.woolbox.record.model.validatedFirstMove
 import com.wswensw.woolbox.ui.AppListItem
 import com.wswensw.woolbox.ui.AppRouteScaffold
@@ -34,46 +35,47 @@ private enum class PlanSlot { PRIMARY, SECONDARY }
 @Composable
 fun DailyPlanScreen(
     plan: DailyPlan?,
-    tasks: List<TodoTask>,
+    templates: List<TaskTemplate>,
     onBack: () -> Unit,
     onSave: (String, Long, Long?, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val openTasks = tasks.filterNot(TodoTask::isCompleted)
-    val existingPrimary = tasks.firstOrNull { it.id == plan?.primaryTaskId }
-    val existingSecondary = tasks.firstOrNull { it.id == plan?.secondaryTaskId }
-    val primaryLocked = existingPrimary?.isCompleted == true
-    val secondaryLocked = existingSecondary?.isCompleted == true
-    val firstMoveLocked = plan?.state == DailyPlanState.ACTIVE
+    val existingPrimaryId = plan?.commitments
+        ?.firstOrNull { it.role == CommitmentRole.PRIMARY }
+        ?.templateId
+    val existingSecondaryId = plan?.commitments
+        ?.firstOrNull { it.role == CommitmentRole.SECONDARY }
+        ?.templateId
+    val locked = plan != null && plan.state != DailyPlanState.READY
 
     var firstMove by rememberSaveable(plan?.id) { mutableStateOf(plan?.firstMove.orEmpty()) }
-    var primaryTaskId by rememberSaveable(plan?.id) { mutableStateOf(plan?.primaryTaskId) }
-    var secondaryTaskId by rememberSaveable(plan?.id) { mutableStateOf(plan?.secondaryTaskId) }
+    var primaryTemplateId by rememberSaveable(plan?.id) { mutableStateOf(existingPrimaryId) }
+    var secondaryTemplateId by rememberSaveable(plan?.id) { mutableStateOf(existingSecondaryId) }
     var choosingSlot by rememberSaveable { mutableStateOf<PlanSlot?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val primary = tasks.firstOrNull { it.id == primaryTaskId }
-    val secondary = tasks.firstOrNull { it.id == secondaryTaskId }
-    val primaryRequired = stringResource(R.string.primary_task_required)
-    val commitmentsMustDiffer = stringResource(R.string.commitments_must_differ)
+    val primary = templates.firstOrNull { it.id == primaryTemplateId }
+    val secondary = templates.firstOrNull { it.id == secondaryTemplateId }
+    val primaryRequired = stringResource(R.string.primary_template_required)
+    val commitmentsMustDiffer = stringResource(R.string.templates_must_differ)
 
     fun submit() {
         val normalizedMove = runCatching { validatedFirstMove(firstMove) }.getOrElse {
             error = it.message
             return
         }
-        val primaryId = primaryTaskId ?: run {
+        val primaryId = primaryTemplateId ?: run {
             error = primaryRequired
             return
         }
-        if (primaryId == secondaryTaskId) {
+        if (primaryId == secondaryTemplateId) {
             error = commitmentsMustDiffer
             return
         }
         saving = true
         error = null
-        onSave(normalizedMove, primaryId, secondaryTaskId) { result ->
+        onSave(normalizedMove, primaryId, secondaryTemplateId) { result ->
             saving = false
             error = result
         }
@@ -86,7 +88,7 @@ fun DailyPlanScreen(
         actions = {
             FilledTonalIconButton(
                 onClick = ::submit,
-                enabled = !saving && firstMove.isNotBlank() && primaryTaskId != null,
+                enabled = !locked && !saving && firstMove.isNotBlank() && primaryTemplateId != null,
             ) {
                 Icon(
                     Icons.Rounded.Check,
@@ -99,7 +101,7 @@ fun DailyPlanScreen(
             OutlinedTextField(
                 value = firstMove,
                 onValueChange = { firstMove = it; error = null },
-                enabled = !saving && !firstMoveLocked,
+                enabled = !saving && !locked,
                 label = { Text(stringResource(R.string.first_move_label)) },
                 singleLine = false,
                 maxLines = 3,
@@ -111,18 +113,18 @@ fun DailyPlanScreen(
         }
         AppSection(title = stringResource(R.string.today_commitments)) {
             AppListItem(
-                title = stringResource(R.string.primary_task),
-                subtitle = primary?.title ?: stringResource(R.string.choose_task),
-                enabled = !saving && !primaryLocked,
-                navigate = !primaryLocked,
-                onClick = if (primaryLocked) null else { { choosingSlot = PlanSlot.PRIMARY } },
+                title = stringResource(R.string.primary_commitment),
+                subtitle = primary?.title ?: stringResource(R.string.choose_template),
+                enabled = !saving && !locked,
+                navigate = !locked,
+                onClick = if (locked) null else { { choosingSlot = PlanSlot.PRIMARY } },
             )
             AppListItem(
-                title = stringResource(R.string.secondary_task),
-                subtitle = secondary?.title ?: stringResource(R.string.no_secondary_task),
-                enabled = !saving && !secondaryLocked,
-                navigate = !secondaryLocked,
-                onClick = if (secondaryLocked) null else { { choosingSlot = PlanSlot.SECONDARY } },
+                title = stringResource(R.string.secondary_commitment),
+                subtitle = secondary?.title ?: stringResource(R.string.no_secondary_commitment),
+                enabled = !saving && !locked,
+                navigate = !locked,
+                onClick = if (locked) null else { { choosingSlot = PlanSlot.SECONDARY } },
             )
         }
         error?.let {
@@ -136,19 +138,25 @@ fun DailyPlanScreen(
     }
 
     choosingSlot?.let { slot ->
-        val unavailableId = if (slot == PlanSlot.PRIMARY) secondaryTaskId else primaryTaskId
-        TaskChoiceDialog(
-            title = stringResource(if (slot == PlanSlot.PRIMARY) R.string.primary_task else R.string.secondary_task),
-            tasks = openTasks.filter { it.id != unavailableId },
+        val unavailableId = if (slot == PlanSlot.PRIMARY) secondaryTemplateId else primaryTemplateId
+        TemplateChoiceDialog(
+            title = stringResource(
+                if (slot == PlanSlot.PRIMARY) R.string.primary_commitment else R.string.secondary_commitment,
+            ),
+            templates = templates.filter { it.id != unavailableId },
             onDismiss = { choosingSlot = null },
-            onSelect = { task ->
-                if (slot == PlanSlot.PRIMARY) primaryTaskId = task.id else secondaryTaskId = task.id
+            onSelect = { template ->
+                if (slot == PlanSlot.PRIMARY) {
+                    primaryTemplateId = template.id
+                } else {
+                    secondaryTemplateId = template.id
+                }
                 choosingSlot = null
                 error = null
             },
             onClear = if (slot == PlanSlot.SECONDARY) {
                 {
-                    secondaryTaskId = null
+                    secondaryTemplateId = null
                     choosingSlot = null
                     error = null
                 }

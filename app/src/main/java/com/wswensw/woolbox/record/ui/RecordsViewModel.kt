@@ -9,15 +9,15 @@ import androidx.lifecycle.viewModelScope
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.RecordRepository
 import com.wswensw.woolbox.record.data.RecordsSnapshot
-import com.wswensw.woolbox.record.data.TodoStepDraft
 import com.wswensw.woolbox.record.data.RecordsConnection
+import com.wswensw.woolbox.record.data.TemplateStepDraft
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.RecordsClock
-import com.wswensw.woolbox.record.model.TaskRepeatMode
-import com.wswensw.woolbox.record.model.TodoTask
+import com.wswensw.woolbox.record.model.TaskTemplate
+import com.wswensw.woolbox.record.model.TemplateCadence
 import com.wswensw.woolbox.record.reminder.DailyReminderScheduler
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -36,7 +36,7 @@ data class RecordsUiState(
     val activeItems: List<RecordItem> = emptyList(),
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
-    val tasks: List<TodoTask> = emptyList(),
+    val templates: List<TaskTemplate> = emptyList(),
     val dailyPlan: DailyPlan? = null,
     val goalValues: Map<Long, Double> = emptyMap(),
     val recentDayValues: Map<Long, List<Double>> = emptyMap(),
@@ -45,7 +45,7 @@ data class RecordsUiState(
 ) {
     fun findItem(id: Long): RecordItem? = activeItems.firstOrNull { it.id == id }
 
-    fun findTask(id: Long): TodoTask? = tasks.firstOrNull { it.id == id }
+    fun findTemplate(id: Long): TaskTemplate? = templates.firstOrNull { it.id == id }
 }
 
 data class MeasurementPreviewUiState(
@@ -130,7 +130,7 @@ class RecordsViewModel(
             activeItems = activeItems,
             entries = entries,
             latestEntries = latestEntries,
-            tasks = tasks,
+            templates = templates,
             dailyPlan = dailyPlan,
             goalValues = goalValues,
             recentDayValues = recentDayValues,
@@ -212,122 +212,90 @@ class RecordsViewModel(
         }
     }
 
-    fun createTask(
+    fun saveTemplate(
+        templateId: Long?,
         title: String,
-        repeatMode: TaskRepeatMode,
-        steps: List<TodoStepDraft>,
-        onResult: (taskId: Long?, error: String?) -> Unit,
+        cadence: TemplateCadence,
+        steps: List<TemplateStepDraft>,
+        onResult: (templateId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
             writeAndRefresh(
-                action = { repository.createTask(title, repeatMode, steps, LocalDate.now()) },
-                onWritten = { taskId -> onResult(taskId, null) },
+                action = { repository.saveTemplate(templateId, title, cadence, steps) },
+                onWritten = { savedId -> onResult(savedId, null) },
             ).onFailure { failure ->
-                onResult(null, failure.localizedFailure(R.string.task_create_failed))
+                onResult(null, failure.localizedFailure(R.string.template_save_failed))
             }
         }
     }
 
-    fun updateTask(
-        taskId: Long,
-        title: String,
-        repeatMode: TaskRepeatMode,
-        onResult: (String?) -> Unit,
-    ) = runTaskAction(
+    fun archiveTemplate(templateId: Long, onResult: (String?) -> Unit) = runRecordsAction(
         onResult = onResult,
-        failureMessageRes = R.string.task_update_failed,
+        failureMessageRes = R.string.template_archive_failed,
     ) {
-        repository.updateTask(taskId, title, repeatMode, LocalDate.now())
-    }
-
-    fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
-        onResult = onResult,
-        failureMessageRes = R.string.task_delete_failed,
-    ) {
-        repository.deleteTask(taskId, LocalDate.now())
+        repository.archiveTemplate(templateId)
     }
 
     fun saveDailyPlan(
         existing: DailyPlan?,
         firstMove: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
+        primaryTemplateId: Long,
+        secondaryTemplateId: Long?,
         onResult: (String?) -> Unit,
-    ) = runTaskAction(onResult, R.string.daily_plan_save_failed) {
+    ) = runRecordsAction(onResult, R.string.daily_plan_save_failed) {
         if (existing == null) {
-            repository.createDailyPlan(LocalDate.now(), firstMove, primaryTaskId, secondaryTaskId)
+            repository.createDailyPlan(LocalDate.now(), firstMove, primaryTemplateId, secondaryTemplateId)
         } else {
             repository.updateDailyPlan(
                 existing,
                 firstMove,
-                primaryTaskId,
-                secondaryTaskId,
+                primaryTemplateId,
+                secondaryTemplateId,
                 System.currentTimeMillis(),
             )
         }
     }
 
     fun startDailyPlan(plan: DailyPlan, onResult: (String?) -> Unit) =
-        runTaskAction(onResult, R.string.daily_plan_start_failed) {
+        runRecordsAction(onResult, R.string.daily_plan_start_failed) {
             repository.startDailyPlan(plan, System.currentTimeMillis())
         }
 
-    fun reviewDailyPlan(plan: DailyPlan, taskId: Long, onResult: (String?) -> Unit) =
-        runTaskAction(onResult, R.string.daily_plan_review_failed) {
-            repository.reviewDailyPlan(plan, taskId, System.currentTimeMillis())
+    fun reviewDailyPlan(plan: DailyPlan, commitmentId: Long, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.daily_plan_review_failed) {
+            repository.reviewDailyPlan(plan, commitmentId, System.currentTimeMillis())
         }
 
-    fun startExtraRound(plan: DailyPlan, taskId: Long, onResult: (String?) -> Unit) =
-        runTaskAction(onResult, R.string.daily_plan_review_failed) {
-            repository.startExtraRound(plan, taskId, System.currentTimeMillis())
+    fun continueDailyPlan(plan: DailyPlan, commitmentId: Long, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.daily_plan_review_failed) {
+            repository.continueDailyPlan(plan, commitmentId, System.currentTimeMillis())
+        }
+
+    fun addDailyPlanCommitment(plan: DailyPlan, templateId: Long, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.daily_plan_add_commitment_failed) {
+            repository.addDailyPlanCommitment(plan, templateId, System.currentTimeMillis())
         }
 
     fun endDailyPlan(plan: DailyPlan, onResult: (String?) -> Unit) =
-        runTaskAction(onResult, R.string.daily_plan_end_failed) {
+        runRecordsAction(onResult, R.string.daily_plan_end_failed) {
             repository.endDailyPlan(plan, System.currentTimeMillis())
         }
 
-    fun createStep(
-        taskId: Long,
-        title: String,
-        onResult: (String?) -> Unit,
-    ) = runTaskAction(
-        onResult = onResult,
-        failureMessageRes = R.string.subtask_add_failed,
-    ) {
-        repository.createStep(taskId, title, LocalDate.now())
-    }
-
-    fun updateStep(
+    fun setCommitmentStepCompleted(
+        plan: DailyPlan,
         stepId: Long,
-        title: String,
+        completed: Boolean,
         onResult: (String?) -> Unit,
-    ) = runTaskAction(
+    ) = runRecordsAction(
         onResult = onResult,
-        failureMessageRes = R.string.subtask_update_failed,
+        failureMessageRes = R.string.commitment_step_update_failed,
     ) {
-        repository.updateStep(stepId, title, LocalDate.now())
-    }
-
-    fun setStepCompleted(stepId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(
-        onResult = onResult,
-        failureMessageRes = R.string.subtask_update_failed,
-    ) {
-        repository.setStepCompleted(stepId, completed, LocalDate.now())
-    }
-
-    fun deleteStep(stepId: Long, onResult: (String?) -> Unit) = runTaskAction(
-        onResult = onResult,
-        failureMessageRes = R.string.subtask_delete_failed,
-    ) {
-        repository.deleteStep(stepId, LocalDate.now())
-    }
-
-    fun reorderSteps(taskId: Long, stepIds: List<Long>, onResult: (String?) -> Unit) = runTaskAction(
-        onResult = onResult,
-        failureMessageRes = R.string.subtask_reorder_failed,
-    ) {
-        repository.reorderSteps(taskId, stepIds, LocalDate.now())
+        repository.setCommitmentStepCompleted(
+            plan = plan,
+            stepId = stepId,
+            completed = completed,
+            occurredAt = System.currentTimeMillis(),
+        )
     }
 
     fun loadMeasurementPreview(itemId: Long) {
@@ -371,7 +339,7 @@ class RecordsViewModel(
         }
     }
 
-    private fun runTaskAction(
+    private fun runRecordsAction(
         onResult: (String?) -> Unit,
         @StringRes failureMessageRes: Int,
         action: suspend () -> Unit,

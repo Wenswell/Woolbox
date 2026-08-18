@@ -21,7 +21,7 @@ class DailyReminderSchedulerTest {
 
     @Test
     fun inactiveOrDifferentDayHasNoReminder() {
-        assertNull(dailyReminderSpec(plan().copy(state = DailyPlanState.ENOUGH, nextReviewAt = null), today))
+        assertNull(dailyReminderSpec(plan().copy(state = DailyPlanState.PAUSED, nextReviewAt = null), today))
         assertNull(dailyReminderSpec(plan().copy(localDate = today.minusDays(1)), today))
     }
 
@@ -39,16 +39,15 @@ class DailyReminderSchedulerTest {
         localDate = today,
         firstMove = "Go to the library",
         firstMoveCompletedAt = 0,
-        primaryTaskId = 1,
-        secondaryTaskId = null,
-        currentTaskId = 1,
+        currentCommitmentId = 1,
         state = DailyPlanState.ACTIVE,
-        completionReason = null,
+        pauseReason = null,
         completedRounds = 0,
         nextReviewAt = 3_600_000,
         revision = 7,
         endedAt = null,
         createdAt = 0,
         updatedAt = 0,
+        commitments = emptyList(),
     )
 }
