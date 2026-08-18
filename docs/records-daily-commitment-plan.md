@@ -66,9 +66,9 @@ READY/ACTIVE/ENOUGH --结束今天--> ENDED
 
 | 字段 | 规则 |
 | --- | --- |
-| `local_date` | ISO 本地日期，主键；日期由 Android 提交，服务端不推断时区。 |
+| `id` / `local_date` | 自增审计 ID 与唯一 ISO 本地日期；日期由 Android 提交，服务端不推断时区。 |
 | `first_move` / `first_move_completed_at` | 非空启动动作及可空完成时间。 |
-| `primary_task_id` / `secondary_task_id` | 主任务必填、次任务可空且不得相同；创建或替换槽位时目标任务必须未完成。 |
+| `primary_task_id` / `secondary_task_id` | 活动计划的主任务必填、次任务可空且不得相同；选入时必须未完成，计划结束后删除任务可将引用置空。 |
 | `current_task_id` | `READY` 时为空；活动时只能是尚未完成的主任务或次任务。 |
 | `state` | `READY`、`ACTIVE`、`ENOUGH`、`ENDED`。 |
 | `completed_rounds` / `next_review_at` | 非负轮次；只有 `ACTIVE` 保存下一次回顾时刻。 |

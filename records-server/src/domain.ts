@@ -2,10 +2,12 @@ export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
+export const DAILY_PLAN_STATES = ["READY", "ACTIVE", "ENOUGH", "ENDED"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
+export type DailyPlanState = (typeof DAILY_PLAN_STATES)[number];
 
 export interface RecordItemInput {
   name: string;
@@ -36,12 +38,34 @@ export interface TaskTitleInput {
 
 export type StepInput = TaskTitleInput;
 
-export interface TaskWriteInput extends TaskTitleInput {
-  plannedDate: string | null;
-}
+export type TaskWriteInput = TaskTitleInput;
 
 export interface TaskCreateInput extends TaskWriteInput {
   steps: StepInput[];
+}
+
+export interface DailyPlanCreateInput {
+  localDate: string;
+  firstMove: string;
+  primaryTaskId: number;
+  secondaryTaskId: number | null;
+}
+
+export interface DailyPlanUpdateInput {
+  firstMove: string;
+  primaryTaskId: number;
+  secondaryTaskId: number | null;
+  expectedRevision: number;
+  occurredAt: number;
+}
+
+export interface DailyPlanTransitionInput {
+  expectedRevision: number;
+  occurredAt: number;
+}
+
+export interface DailyPlanReviewInput extends DailyPlanTransitionInput {
+  currentTaskId: number;
 }
 
 export class ApiError extends Error {
@@ -106,7 +130,7 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
   const input = objectInput(value);
   const entry = {
     itemId: positiveIntegerField(input, "itemId"),
-    occurredAt: integerField(input, "occurredAt"),
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
     localDate: stringField(input, "localDate"),
     localMinute: integerField(input, "localMinute"),
     value: numberField(input, "value"),
@@ -117,7 +141,9 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
 }
 
 export function parseTaskInput(value: unknown): TaskTitleInput {
-  const title = stringField(objectInput(value), "title").trim();
+  const input = objectInput(value);
+  requireRule(input.plannedDate === undefined, "Task dates are not supported.");
+  const title = stringField(input, "title").trim();
   requireRule(title.length > 0, "Title is required.");
   return { title };
 }
@@ -131,20 +157,56 @@ export function parseStepInput(value: unknown): StepInput {
 }
 
 export function parseTaskWriteInput(value: unknown): TaskWriteInput {
-  const input = objectInput(value);
-  const { title } = parseTaskInput(input);
-  return {
-    title,
-    plannedDate: input.plannedDate === null ? null : parseIsoDate(input.plannedDate, "Planned date"),
-  };
+  return parseTaskInput(value);
 }
 
 export function parseTaskCreateInput(value: unknown): TaskCreateInput {
   const input = objectInput(value);
-  const { title, plannedDate } = parseTaskWriteInput(input);
+  const { title } = parseTaskWriteInput(input);
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
   const steps = input.steps.map(parseStepInput);
-  return { title, plannedDate, steps };
+  return { title, steps };
+}
+
+export function parseDailyPlanCreateInput(value: unknown): DailyPlanCreateInput {
+  const input = objectInput(value);
+  const result = {
+    localDate: parseIsoDate(input.localDate, "Local date"),
+    firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
+    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
+    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
+  };
+  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary tasks must be different.");
+  return result;
+}
+
+export function parseDailyPlanUpdateInput(value: unknown): DailyPlanUpdateInput {
+  const input = objectInput(value);
+  const result = {
+    firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
+    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
+    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
+    expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
+  };
+  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary tasks must be different.");
+  return result;
+}
+
+export function parseDailyPlanTransitionInput(value: unknown): DailyPlanTransitionInput {
+  const input = objectInput(value);
+  return {
+    expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
+  };
+}
+
+export function parseDailyPlanReviewInput(value: unknown): DailyPlanReviewInput {
+  const input = objectInput(value);
+  return {
+    ...parseDailyPlanTransitionInput(input),
+    currentTaskId: positiveIntegerField(input, "currentTaskId"),
+  };
 }
 
 export function parseCompleted(value: unknown): boolean {
@@ -214,6 +276,22 @@ function integerField(input: Record<string, unknown>, field: string): number {
 function positiveIntegerField(input: Record<string, unknown>, field: string): number {
   const value = integerField(input, field);
   requireRule(value > 0, `${field} must be positive.`);
+  return value;
+}
+
+function nonNegativeIntegerField(input: Record<string, unknown>, field: string): number {
+  const value = integerField(input, field);
+  requireRule(value >= 0, `${field} must not be negative.`);
+  return value;
+}
+
+function nullablePositiveIntegerField(input: Record<string, unknown>, field: string): number | null {
+  return input[field] === null ? null : positiveIntegerField(input, field);
+}
+
+function requiredTrimmedString(input: Record<string, unknown>, field: string, message: string): string {
+  const value = stringField(input, field).trim();
+  requireRule(value.length > 0, message);
   return value;
 }
 

@@ -49,15 +49,11 @@ export const todoTasks = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     title: text("title").notNull(),
-    plannedDate: text("planned_date"),
     completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [
-    index("todo_tasks_created_at_index").on(table.createdAt),
-    index("todo_tasks_planned_date_index").on(table.plannedDate),
-  ],
+  (table) => [index("todo_tasks_created_at_index").on(table.createdAt)],
 );
 
 export const todoSteps = sqliteTable(
@@ -79,12 +75,36 @@ export const todoSteps = sqliteTable(
   ],
 );
 
+export const dailyPlans = sqliteTable(
+  "daily_plans",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    localDate: text("local_date").notNull(),
+    firstMove: text("first_move").notNull(),
+    firstMoveCompletedAt: integer("first_move_completed_at"),
+    primaryTaskId: integer("primary_task_id")
+      .references(() => todoTasks.id, { onDelete: "set null" }),
+    secondaryTaskId: integer("secondary_task_id")
+      .references(() => todoTasks.id, { onDelete: "set null" }),
+    currentTaskId: integer("current_task_id")
+      .references(() => todoTasks.id, { onDelete: "set null" }),
+    state: text("state", { enum: ["READY", "ACTIVE", "ENOUGH", "ENDED"] }).notNull(),
+    completedRounds: integer("completed_rounds").notNull(),
+    nextReviewAt: integer("next_review_at"),
+    revision: integer("revision").notNull(),
+    endedAt: integer("ended_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [uniqueIndex("daily_plans_local_date_unique").on(table.localDate)],
+);
+
 export const recordAuditLogs = sqliteTable(
   "record_audit_logs",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     action: text("action").notNull(),
-    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "TASK", "STEP"] }).notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "TASK", "STEP", "DAILY_PLAN"] }).notNull(),
     entityId: integer("entity_id").notNull(),
     beforeJson: text("before_json"),
     afterJson: text("after_json"),

@@ -14,7 +14,7 @@ const measurementItem = {
 };
 const archivedItem = { ...activeItem, id: 3, name: "Reading", unit: "pages", archived: true };
 const task = {
-  id: 10, title: "Prepare launch", plannedDate: "2026-08-07", completedAt: null, createdAt: 1, updatedAt: 1,
+  id: 10, title: "Prepare launch", completedAt: null, createdAt: 1, updatedAt: 1,
   steps: [
     { id: 11, taskId: 10, title: "Pack bag", position: 0, completedAt: null, createdAt: 1, updatedAt: 1 },
     { id: 12, taskId: 10, title: "Check route", position: 1, completedAt: null, createdAt: 1, updatedAt: 1 },

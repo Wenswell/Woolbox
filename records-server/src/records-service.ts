@@ -1,9 +1,22 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
-import type { RecordEntryInput, RecordItemInput, RecordMode, StepInput, TaskCreateInput, TaskTitleInput, TaskWriteInput } from "./domain.js";
+import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
+import type {
+  DailyPlanCreateInput,
+  DailyPlanReviewInput,
+  DailyPlanTransitionInput,
+  DailyPlanUpdateInput,
+  RecordEntryInput,
+  RecordItemInput,
+  RecordMode,
+  StepInput,
+  TaskCreateInput,
+  TaskTitleInput,
+  TaskWriteInput,
+} from "./domain.js";
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
+  dailyPlans,
   recordAuditLogs,
   recordEntries,
   recordItems,
@@ -12,11 +25,13 @@ import {
 } from "./schema.js";
 
 const AuditLogPageSize = 100;
+const ReviewIntervalMs = 60 * 60 * 1_000;
 
 type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
 type TodoTaskRow = typeof todoTasks.$inferSelect;
 type TodoStepRow = typeof todoSteps.$inferSelect;
+type DailyPlanRow = typeof dailyPlans.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
 
 type AuditAction =
@@ -37,7 +52,10 @@ type AuditAction =
   | "STEP_UPDATED"
   | "STEP_COMPLETED"
   | "STEP_REOPENED"
-  | "STEP_DELETED";
+  | "STEP_DELETED"
+  | "DAILY_PLAN_CREATED"
+  | "DAILY_PLAN_UPDATED"
+  | "DAILY_PLAN_ENDED";
 
 interface ItemAuditSnapshot {
   id: number;
@@ -70,7 +88,6 @@ interface EntryAuditSnapshot {
 interface TaskAuditSnapshot {
   id: number;
   title: string;
-  plannedDate: string | null;
   completedAt: number | null;
   stepCount?: number;
   stepIds?: number[];
@@ -84,11 +101,20 @@ interface StepAuditSnapshot {
   completedAt: number | null;
 }
 
-type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot;
+interface DailyPlanAuditSnapshot {
+  id: number;
+  localDate: string;
+  firstMove: string;
+  primaryTaskId: number | null;
+  secondaryTaskId: number | null;
+  state: string;
+}
+
+type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot | DailyPlanAuditSnapshot;
 
 interface AuditWrite {
   action: AuditAction;
-  entityType: "ITEM" | "ENTRY" | "TASK" | "STEP";
+  entityType: "ITEM" | "ENTRY" | "TASK" | "STEP" | "DAILY_PLAN";
   entityId: number;
   before?: AuditSnapshot;
   after?: AuditSnapshot;
@@ -111,7 +137,7 @@ export class RecordsService {
     return rows;
   }
 
-  overview(startDate: string, endDate: string) {
+  overview(startDate: string, endDate: string, planDate: string) {
     if (startDate > endDate) throw new ApiError(400, "Start date must not be after end date.");
     const items = this.listItems(false);
     const tasks = this.listTasks();
@@ -119,6 +145,7 @@ export class RecordsService {
     return {
       items,
       tasks,
+      dailyPlan: this.getDailyPlan(planDate),
       accumulateEntries,
       latestMeasurementEntries: this.listLatestEntries(),
     };
@@ -381,12 +408,191 @@ export class RecordsService {
     return step;
   }
 
+  getDailyPlan(localDate: string) {
+    return this.db.select().from(dailyPlans).where(eq(dailyPlans.localDate, localDate)).get() ?? null;
+  }
+
+  createDailyPlan(input: DailyPlanCreateInput) {
+    const id = this.db.transaction((tx) => {
+      if (tx.select({ id: dailyPlans.id }).from(dailyPlans).where(eq(dailyPlans.localDate, input.localDate)).get()) {
+        throw new ApiError(409, "A plan already exists for this date.");
+      }
+      this.requireOpenTask(tx, input.primaryTaskId, "Primary task");
+      if (input.secondaryTaskId !== null) this.requireOpenTask(tx, input.secondaryTaskId, "Secondary task");
+      const now = this.now();
+      const created = tx.insert(dailyPlans).values({
+        localDate: input.localDate,
+        firstMove: input.firstMove,
+        firstMoveCompletedAt: null,
+        primaryTaskId: input.primaryTaskId,
+        secondaryTaskId: input.secondaryTaskId,
+        currentTaskId: null,
+        state: "READY",
+        completedRounds: 0,
+        nextReviewAt: null,
+        revision: 0,
+        endedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      }).returning({ id: dailyPlans.id }).get();
+      const plan = { id: created.id, ...input, state: "READY" as const };
+      this.writeAudit(tx, {
+        action: "DAILY_PLAN_CREATED",
+        entityType: "DAILY_PLAN",
+        entityId: created.id,
+        after: dailyPlanSnapshot(plan),
+        createdAt: now,
+      });
+      return created.id;
+    });
+    return this.requireDailyPlanById(id);
+  }
+
+  updateDailyPlan(localDate: string, input: DailyPlanUpdateInput) {
+    this.db.transaction((tx) => {
+      const plan = this.requireDailyPlan(tx, localDate);
+      this.requireRevision(plan, input.expectedRevision);
+      if (plan.state !== "READY" && plan.state !== "ACTIVE") {
+        throw new ApiError(409, "Only ready or active plans can change commitments.");
+      }
+      if (plan.state !== "READY" && input.firstMove !== plan.firstMove) {
+        throw new ApiError(409, "The first move cannot change after the plan starts.");
+      }
+      this.requireReplaceableSlot(tx, plan.primaryTaskId, input.primaryTaskId, "Primary task");
+      this.requireReplaceableSlot(tx, plan.secondaryTaskId, input.secondaryTaskId, "Secondary task");
+
+      if (
+        input.firstMove === plan.firstMove
+        && input.primaryTaskId === plan.primaryTaskId
+        && input.secondaryTaskId === plan.secondaryTaskId
+      ) return;
+
+      let currentTaskId = plan.currentTaskId;
+      let nextReviewAt = plan.nextReviewAt;
+      if (plan.state === "ACTIVE" && !this.isOpenCommitment(tx, plan.currentTaskId, input.primaryTaskId, input.secondaryTaskId)) {
+        currentTaskId = this.firstOpenCommitment(tx, input.primaryTaskId, input.secondaryTaskId);
+        nextReviewAt = input.occurredAt + ReviewIntervalMs;
+      }
+      const now = this.now();
+      const updated: DailyPlanRow = {
+        ...plan,
+        firstMove: input.firstMove,
+        primaryTaskId: input.primaryTaskId,
+        secondaryTaskId: input.secondaryTaskId,
+        currentTaskId,
+        nextReviewAt,
+        revision: plan.revision + 1,
+        updatedAt: now,
+      };
+      tx.update(dailyPlans).set({
+        firstMove: updated.firstMove,
+        primaryTaskId: updated.primaryTaskId,
+        secondaryTaskId: updated.secondaryTaskId,
+        currentTaskId: updated.currentTaskId,
+        nextReviewAt: updated.nextReviewAt,
+        revision: updated.revision,
+        updatedAt: now,
+      }).where(eq(dailyPlans.id, plan.id)).run();
+      this.writeAudit(tx, {
+        action: "DAILY_PLAN_UPDATED",
+        entityType: "DAILY_PLAN",
+        entityId: plan.id,
+        before: dailyPlanSnapshot(plan),
+        after: dailyPlanSnapshot(updated),
+        createdAt: now,
+      });
+    });
+    return this.getDailyPlan(localDate)!;
+  }
+
+  startDailyPlan(localDate: string, input: DailyPlanTransitionInput) {
+    return this.transitionDailyPlan(localDate, input, (tx, plan) => {
+      if (plan.state !== "READY") throw new ApiError(409, "Only ready plans can start.");
+      const currentTaskId = this.firstOpenCommitment(tx, plan.primaryTaskId, plan.secondaryTaskId);
+      return {
+        firstMoveCompletedAt: input.occurredAt,
+        currentTaskId,
+        state: currentTaskId === null ? "ENOUGH" as const : "ACTIVE" as const,
+        nextReviewAt: currentTaskId === null ? null : input.occurredAt + ReviewIntervalMs,
+      };
+    });
+  }
+
+  reviewDailyPlan(localDate: string, input: DailyPlanReviewInput) {
+    return this.transitionDailyPlan(localDate, input, (tx, plan) => {
+      if (plan.state !== "ACTIVE" || plan.nextReviewAt === null) {
+        throw new ApiError(409, "Only active plans can be reviewed.");
+      }
+      if (input.occurredAt < plan.nextReviewAt) throw new ApiError(409, "The next review is not due yet.");
+      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId)) {
+        throw new ApiError(409, "Current task must be an unfinished commitment.");
+      }
+      const completedRounds = plan.completedRounds + 1;
+      const enough = completedRounds >= 4;
+      return {
+        completedRounds,
+        currentTaskId: enough ? null : input.currentTaskId,
+        state: enough ? "ENOUGH" as const : "ACTIVE" as const,
+        nextReviewAt: enough ? null : input.occurredAt + ReviewIntervalMs,
+      };
+    });
+  }
+
+  startExtraRound(localDate: string, input: DailyPlanReviewInput) {
+    return this.transitionDailyPlan(localDate, input, (tx, plan) => {
+      if (plan.state !== "ENOUGH") throw new ApiError(409, "Only enough plans can start an extra round.");
+      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId)) {
+        throw new ApiError(409, "An extra round requires an unfinished commitment.");
+      }
+      return {
+        currentTaskId: input.currentTaskId,
+        state: "ACTIVE" as const,
+        nextReviewAt: input.occurredAt + ReviewIntervalMs,
+      };
+    });
+  }
+
+  endDailyPlan(localDate: string, input: DailyPlanTransitionInput) {
+    this.db.transaction((tx) => {
+      const plan = this.requireDailyPlan(tx, localDate);
+      this.requireRevision(plan, input.expectedRevision);
+      if (plan.state === "ENDED") throw new ApiError(409, "The plan has already ended.");
+      const now = this.now();
+      const updated: DailyPlanRow = {
+        ...plan,
+        currentTaskId: null,
+        state: "ENDED",
+        nextReviewAt: null,
+        revision: plan.revision + 1,
+        endedAt: input.occurredAt,
+        updatedAt: now,
+      };
+      tx.update(dailyPlans).set({
+        currentTaskId: null,
+        state: updated.state,
+        nextReviewAt: null,
+        revision: updated.revision,
+        endedAt: updated.endedAt,
+        updatedAt: now,
+      }).where(eq(dailyPlans.id, plan.id)).run();
+      this.writeAudit(tx, {
+        action: "DAILY_PLAN_ENDED",
+        entityType: "DAILY_PLAN",
+        entityId: updated.id,
+        before: dailyPlanSnapshot(plan),
+        after: dailyPlanSnapshot(updated),
+        createdAt: now,
+      });
+    });
+    return this.getDailyPlan(localDate)!;
+  }
+
   createTask(input: TaskCreateInput) {
     const id = this.db.transaction((tx) => {
       const now = this.now();
       const task = tx
         .insert(todoTasks)
-        .values({ title: input.title, plannedDate: input.plannedDate, completedAt: null, createdAt: now, updatedAt: now })
+        .values({ title: input.title, completedAt: null, createdAt: now, updatedAt: now })
         .returning({ id: todoTasks.id })
         .get();
       const steps = tx.insert(todoSteps)
@@ -405,7 +611,7 @@ export class RecordsService {
         entityType: "TASK",
         entityId: task.id,
         after: {
-          ...taskSnapshot({ id: task.id, title: input.title, plannedDate: input.plannedDate, completedAt: null }),
+          ...taskSnapshot({ id: task.id, title: input.title, completedAt: null }),
           stepCount: steps.length,
         },
         createdAt: now,
@@ -431,8 +637,8 @@ export class RecordsService {
     this.db.transaction((tx) => {
       const current = this.requireTask(tx, id);
       const now = this.now();
-      const updated = { ...current, title: input.title, plannedDate: input.plannedDate, updatedAt: now };
-      tx.update(todoTasks).set({ title: input.title, plannedDate: input.plannedDate, updatedAt: now }).where(eq(todoTasks.id, id)).run();
+      const updated = { ...current, title: input.title, updatedAt: now };
+      tx.update(todoTasks).set({ title: input.title, updatedAt: now }).where(eq(todoTasks.id, id)).run();
       this.writeAudit(tx, {
         action: "TASK_UPDATED",
         entityType: "TASK",
@@ -445,9 +651,13 @@ export class RecordsService {
     return this.getTask(id);
   }
 
-  deleteTask(id: number) {
+  deleteTask(id: number, planDate: string) {
     return this.db.transaction((tx) => {
       const task = this.requireTask(tx, id);
+      const plan = tx.select().from(dailyPlans).where(eq(dailyPlans.localDate, planDate)).get();
+      if (plan && plan.state !== "ENDED" && (plan.primaryTaskId === id || plan.secondaryTaskId === id)) {
+        throw new ApiError(409, "Replace this task in Today or end the plan before deleting it.");
+      }
       const stepCount = tx
         .select({ value: count() })
         .from(todoSteps)
@@ -677,7 +887,107 @@ export class RecordsService {
       after: taskSnapshot(updated),
       createdAt: now,
     });
+    if (completed) this.reconcileDailyPlanCompletion(tx, task.id, now);
     return updated;
+  }
+
+  private transitionDailyPlan(
+    localDate: string,
+    input: DailyPlanTransitionInput,
+    transition: (tx: RecordsTransaction, plan: DailyPlanRow) => Partial<DailyPlanRow>,
+  ) {
+    this.db.transaction((tx) => {
+      const plan = this.requireDailyPlan(tx, localDate);
+      this.requireRevision(plan, input.expectedRevision);
+      const patch = transition(tx, plan);
+      tx.update(dailyPlans).set({ ...patch, revision: plan.revision + 1, updatedAt: this.now() })
+        .where(eq(dailyPlans.id, plan.id)).run();
+    });
+    return this.getDailyPlan(localDate)!;
+  }
+
+  private requireDailyPlan(tx: RecordsTransaction, localDate: string) {
+    const plan = tx.select().from(dailyPlans).where(eq(dailyPlans.localDate, localDate)).get();
+    if (!plan) throw new ApiError(404, "Daily plan not found.");
+    return plan;
+  }
+
+  private requireDailyPlanById(id: number) {
+    const plan = this.db.select().from(dailyPlans).where(eq(dailyPlans.id, id)).get();
+    if (!plan) throw new ApiError(404, "Daily plan not found.");
+    return plan;
+  }
+
+  private requireRevision(plan: DailyPlanRow, expectedRevision: number) {
+    if (plan.revision !== expectedRevision) throw new ApiError(409, "Daily plan has changed. Refresh and try again.");
+  }
+
+  private requireOpenTask(tx: RecordsTransaction, id: number, label: string) {
+    const task = this.requireTask(tx, id);
+    if (task.completedAt !== null) throw new ApiError(409, `${label} must be open.`);
+    return task;
+  }
+
+  private requireReplaceableSlot(
+    tx: RecordsTransaction,
+    currentId: number | null,
+    replacementId: number | null,
+    label: string,
+  ) {
+    if (currentId === replacementId) return;
+    if (currentId !== null) {
+      const current = this.requireTask(tx, currentId);
+      if (current.completedAt !== null) throw new ApiError(409, `A completed ${label.toLowerCase()} cannot be replaced.`);
+    }
+    if (replacementId !== null) this.requireOpenTask(tx, replacementId, label);
+  }
+
+  private isOpenCommitment(
+    tx: RecordsTransaction,
+    taskId: number | null,
+    primaryTaskId: number | null,
+    secondaryTaskId: number | null,
+  ) {
+    if (taskId === null || (taskId !== primaryTaskId && taskId !== secondaryTaskId)) return false;
+    return tx.select({ completedAt: todoTasks.completedAt }).from(todoTasks).where(eq(todoTasks.id, taskId)).get()?.completedAt === null;
+  }
+
+  private firstOpenCommitment(
+    tx: RecordsTransaction,
+    primaryTaskId: number | null,
+    secondaryTaskId: number | null,
+  ) {
+    if (this.isOpenCommitment(tx, primaryTaskId, primaryTaskId, secondaryTaskId)) return primaryTaskId;
+    if (this.isOpenCommitment(tx, secondaryTaskId, primaryTaskId, secondaryTaskId)) return secondaryTaskId;
+    return null;
+  }
+
+  private reconcileDailyPlanCompletion(tx: RecordsTransaction, taskId: number, occurredAt: number) {
+    const plan = tx.select().from(dailyPlans)
+      .where(and(
+        inArray(dailyPlans.state, ["READY", "ACTIVE"]),
+        or(eq(dailyPlans.primaryTaskId, taskId), eq(dailyPlans.secondaryTaskId, taskId)),
+      ))
+      .orderBy(desc(dailyPlans.localDate), desc(dailyPlans.id))
+      .get();
+    if (!plan) return;
+    const nextTaskId = this.firstOpenCommitment(tx, plan.primaryTaskId, plan.secondaryTaskId);
+    if (nextTaskId === null) {
+      tx.update(dailyPlans).set({
+        state: "ENOUGH",
+        currentTaskId: null,
+        nextReviewAt: null,
+        revision: plan.revision + 1,
+        updatedAt: occurredAt,
+      }).where(eq(dailyPlans.id, plan.id)).run();
+    } else if (plan.state === "ACTIVE" && plan.currentTaskId === taskId) {
+      tx.update(dailyPlans).set({
+        currentTaskId: nextTaskId,
+        nextReviewAt: occurredAt + ReviewIntervalMs,
+        revision: plan.revision + 1,
+        updatedAt: occurredAt,
+      }).where(eq(dailyPlans.id, plan.id)).run();
+    }
   }
 
   private entryQuery() {
@@ -753,12 +1063,24 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
   };
 }
 
-function taskSnapshot(task: { id: number; title: string; plannedDate: string | null; completedAt: number | null }): TaskAuditSnapshot {
+function taskSnapshot(task: { id: number; title: string; completedAt: number | null }): TaskAuditSnapshot {
   return {
     id: task.id,
     title: task.title,
-    plannedDate: task.plannedDate,
     completedAt: task.completedAt,
+  };
+}
+
+function dailyPlanSnapshot(
+  plan: Pick<DailyPlanRow, "id" | "localDate" | "firstMove" | "primaryTaskId" | "secondaryTaskId" | "state">,
+): DailyPlanAuditSnapshot {
+  return {
+    id: plan.id,
+    localDate: plan.localDate,
+    firstMove: plan.firstMove,
+    primaryTaskId: plan.primaryTaskId,
+    secondaryTaskId: plan.secondaryTaskId,
+    state: plan.state,
   };
 }
 

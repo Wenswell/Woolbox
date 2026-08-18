@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 import { openRecordsDatabase } from "./database.js";
 import {
   ApiError,
+  parseDailyPlanCreateInput,
+  parseDailyPlanReviewInput,
+  parseDailyPlanTransitionInput,
+  parseDailyPlanUpdateInput,
   parseArchived,
   parseCompleted,
   parseEntryInput,
@@ -96,8 +100,55 @@ export function buildApp(options: BuildAppOptions) {
     return records.overview(
       parseIsoDate(query.startDate, "Start date"),
       parseIsoDate(query.endDate, "End date"),
+      parseIsoDate(query.planDate, "Plan date"),
     );
   });
+
+  app.get("/api/daily-plans/:localDate", (request) => ({
+    dailyPlan: records.getDailyPlan(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+    ),
+  }));
+
+  app.post("/api/daily-plans", (request, reply) => {
+    const dailyPlan = records.createDailyPlan(parseDailyPlanCreateInput(request.body));
+    return reply.status(201).send({ dailyPlan });
+  });
+
+  app.put("/api/daily-plans/:localDate", (request) => ({
+    dailyPlan: records.updateDailyPlan(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanUpdateInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-plans/:localDate/start", (request) => ({
+    dailyPlan: records.startDailyPlan(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanTransitionInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-plans/:localDate/review", (request) => ({
+    dailyPlan: records.reviewDailyPlan(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanReviewInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-plans/:localDate/extra-round", (request) => ({
+    dailyPlan: records.startExtraRound(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanReviewInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-plans/:localDate/end", (request) => ({
+    dailyPlan: records.endDailyPlan(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanTransitionInput(request.body),
+    ),
+  }));
 
   app.post("/api/tasks", (request, reply) => {
     const task = records.createTask(parseTaskCreateInput(request.body));
@@ -111,9 +162,15 @@ export function buildApp(options: BuildAppOptions) {
     ),
   }));
 
-  app.delete("/api/tasks/:id", (request) => ({
-    task: records.deleteTask(parseId((request.params as { id?: unknown }).id, "Task ID")),
-  }));
+  app.delete("/api/tasks/:id", (request) => {
+    const query = request.query as Record<string, unknown>;
+    return {
+      task: records.deleteTask(
+        parseId((request.params as { id?: unknown }).id, "Task ID"),
+        parseIsoDate(query.planDate, "Plan date"),
+      ),
+    };
+  });
 
   app.post("/api/tasks/:id/steps", (request, reply) => {
     const step = records.createStep(

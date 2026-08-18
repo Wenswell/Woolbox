@@ -1,4 +1,5 @@
 import type {
+  DailyPlanAuditSnapshot,
   EntryAuditSnapshot,
   ItemAuditSnapshot,
   RecordAuditLog,
@@ -17,6 +18,9 @@ export function auditSubject(log: RecordAuditLog): string {
   }
   if ("itemName" in snapshot) {
     return `Entry: ${snapshot.itemName}`;
+  }
+  if ("localDate" in snapshot && "firstMove" in snapshot) {
+    return `Daily plan: ${snapshot.localDate}`;
   }
   return "taskTitle" in snapshot
     ? `Subtask: ${snapshot.taskTitle}`
@@ -43,6 +47,9 @@ export function actionLabel(action: RecordAuditLog["action"]): string {
     STEP_COMPLETED: "Completed subtask",
     STEP_REOPENED: "Reopened subtask",
     STEP_DELETED: "Deleted subtask",
+    DAILY_PLAN_CREATED: "Created daily plan",
+    DAILY_PLAN_UPDATED: "Updated daily plan",
+    DAILY_PLAN_ENDED: "Ended daily plan",
   }[action];
 }
 
@@ -76,6 +83,25 @@ export function auditChanges(log: RecordAuditLog): string {
   if (log.action === "TASK_CREATED" && after && isTaskSnapshot(after)) {
     return taskDescription(after);
   }
+  if (log.action === "DAILY_PLAN_CREATED" && after && isDailyPlanSnapshot(after)) {
+    return dailyPlanDescription(after);
+  }
+  if (log.action === "DAILY_PLAN_ENDED" && after && isDailyPlanSnapshot(after)) {
+    return `Status: ${after.state}`;
+  }
+  if (
+    log.action === "DAILY_PLAN_UPDATED"
+    && before
+    && after
+    && isDailyPlanSnapshot(before)
+    && isDailyPlanSnapshot(after)
+  ) {
+    return [
+      fieldChange("First move", before.firstMove, after.firstMove),
+      fieldChange("Primary task", before.primaryTaskId, after.primaryTaskId),
+      fieldChange("Secondary task", before.secondaryTaskId, after.secondaryTaskId),
+    ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
+  }
   if (log.action === "TASK_DELETED" && before && isTaskSnapshot(before)) {
     return taskDescription(before);
   }
@@ -108,7 +134,6 @@ export function auditChanges(log: RecordAuditLog): string {
   ) {
     return [
       fieldChange("Title", before.title, after.title),
-      fieldChange("Planned date", taskDateLabel(before), taskDateLabel(after)),
     ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
   }
   if (log.action === "TASK_STEPS_REORDERED") {
@@ -161,16 +186,14 @@ function entryDescription(entry: EntryAuditSnapshot): string {
 }
 
 function taskDescription(task: TaskAuditSnapshot): string {
-  const schedule = taskDateLabel(task);
-  const description = task.stepCount === undefined
+  return task.stepCount === undefined
     ? task.title
     : `${task.title}; ${task.stepCount} subtasks`;
-  return schedule === null ? description : `${description}; ${schedule}`;
 }
 
-function taskDateLabel(task: TaskAuditSnapshot): string | null {
-  if (!("plannedDate" in task)) return null;
-  return task.plannedDate === null ? "Unscheduled" : task.plannedDate ?? null;
+function dailyPlanDescription(plan: DailyPlanAuditSnapshot): string {
+  const secondary = plan.secondaryTaskId === null ? "none" : plan.secondaryTaskId;
+  return `${plan.localDate}; first move: ${plan.firstMove}; tasks ${plan.primaryTaskId} + ${secondary}`;
 }
 
 function stepDescription(step: StepAuditSnapshot): string {
@@ -193,6 +216,12 @@ function isStepSnapshot(
   snapshot: NonNullable<RecordAuditLog["before"]>,
 ): snapshot is StepAuditSnapshot {
   return "taskTitle" in snapshot;
+}
+
+function isDailyPlanSnapshot(
+  snapshot: NonNullable<RecordAuditLog["before"]>,
+): snapshot is DailyPlanAuditSnapshot {
+  return "localDate" in snapshot && "firstMove" in snapshot;
 }
 
 function itemGoal(item: ItemAuditSnapshot): string {

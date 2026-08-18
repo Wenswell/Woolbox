@@ -13,7 +13,7 @@ import { TasksView } from "./views/TasksView";
 type View = "overview" | "tasks" | "accumulate" | "measurement" | "entries" | "activity";
 const VIEWS: Record<View, { label: string; description: string }> = {
   overview: { label: "Overview", description: "Records status and recent work" },
-  tasks: { label: "Tasks", description: "Tasks, plans and ordered subtasks" },
+  tasks: { label: "Tasks", description: "Open outcomes and ordered subtasks" },
   accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },
   measurement: { label: "Measurement", description: "Bounded numerical measurements" },
   entries: { label: "Entries", description: "Recorded values across every tracker" },

@@ -23,13 +23,13 @@ systemctl --user restart records.service
 systemctl --user is-active records.service
 for attempt in {1..20}; do
   if /home/ravvss/.local/node/bin/node - <<'NODE'
-const response = await fetch("http://127.0.0.1:4320/api/overview?startDate=2000-01-01&endDate=2000-01-01").catch(() => null);
+const response = await fetch("http://127.0.0.1:4320/api/overview?startDate=2000-01-01&endDate=2000-01-01&planDate=2000-01-01").catch(() => null);
 if (!response?.ok) process.exit(1);
 const overview = await response.json();
-if (!Array.isArray(overview.items) || !Array.isArray(overview.tasks)) process.exit(1);
+if (!Array.isArray(overview.items) || !Array.isArray(overview.tasks) || overview.dailyPlan !== null) process.exit(1);
 if (!overview.tasks.every(
   (task) =>
-    (typeof task.plannedDate === "string" || task.plannedDate === null)
+    task.plannedDate === undefined
     && Array.isArray(task.steps)
     && task.steps.every((step) => typeof step.title === "string"),
 )) process.exit(1);
@@ -51,7 +51,9 @@ if (boundColumns.length !== 2) throw new Error("Measurement bounds migration is 
 const positionColumn = database.prepare("SELECT name FROM pragma_table_info('todo_steps') WHERE name = 'position'").get();
 if (!positionColumn) throw new Error("Todo step position migration is missing.");
 const plannedDateColumn = database.prepare("SELECT name FROM pragma_table_info('todo_tasks') WHERE name = 'planned_date'").get();
-if (!plannedDateColumn) throw new Error("Todo task planned date migration is missing.");
+if (plannedDateColumn) throw new Error("Removed todo task planned date still exists.");
+const dailyPlansTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'daily_plans'").get();
+if (!dailyPlansTable) throw new Error("Daily plan migration is missing.");
 const removedWindowTables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('record_windows', 'todo_step_windows')").all();
 if (removedWindowTables.length !== 0) throw new Error("Removed scheduling tables still exist.");
 console.log("Database schema verified.");

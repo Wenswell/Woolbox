@@ -57,8 +57,8 @@ export const api = {
     return request<{ task: TodoTask }>(`tasks/${id}`, { method: "PUT", body: JSON.stringify(input) });
   },
 
-  async deleteTask(id: number) {
-    return request<{ task: TodoTask }>(`tasks/${id}`, { method: "DELETE" });
+  async deleteTask(id: number, planDate: string) {
+    return request<{ task: TodoTask }>(`tasks/${id}?planDate=${planDate}`, { method: "DELETE" });
   },
 
   async createStep(taskId: number, title: string) {

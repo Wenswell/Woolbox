@@ -14,7 +14,7 @@ describe("Records migrations", () => {
     if (directory) rmSync(directory, { recursive: true, force: true });
   });
 
-  it("upgrades date-planned tasks and removes manual scheduling tables", async () => {
+  it("upgrades legacy tasks into the daily commitment schema", async () => {
     directory = mkdtempSync(join(tmpdir(), "records-migration-test-"));
     const databaseFile = join(directory, "records.sqlite");
     const publishedMigrations = join(directory, "published-migrations");
@@ -53,7 +53,7 @@ describe("Records migrations", () => {
     const app = buildApp({ databaseFile });
     const response = await app.inject({
       method: "GET",
-      url: "/api/overview?startDate=2000-01-01&endDate=2000-01-01",
+      url: "/api/overview?startDate=2000-01-01&endDate=2000-01-01&planDate=2000-01-01",
     });
     expect(response.statusCode).toBe(200);
     await app.close();
@@ -62,9 +62,11 @@ describe("Records migrations", () => {
     expect(tableNames(migrated)).not.toContain("todo_step_windows");
     expect(tableNames(migrated)).not.toContain("record_windows");
     expect(tableNames(migrated)).not.toContain("todo_task_windows");
-    expect(columnNames(migrated, "todo_tasks")).toContain("planned_date");
+    expect(tableNames(migrated)).toContain("daily_plans");
+    expect(columnNames(migrated, "todo_tasks")).not.toContain("planned_date");
     expect(columnNames(migrated, "todo_tasks")).not.toContain("horizon");
-    expect(migrated.prepare("SELECT planned_date AS plannedDate FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({ plannedDate: null });
+    expect(migrated.prepare("SELECT title FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({ title: "Legacy task" });
+    expect(migrated.prepare("SELECT title, position FROM todo_steps WHERE id = ?").get(stepId)).toEqual({ title: "Legacy step", position: 0 });
     migrated.close();
   });
 });

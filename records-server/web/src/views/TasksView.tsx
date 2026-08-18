@@ -9,7 +9,7 @@ import { Modal } from "../components/Modal";
 import { localToday, message } from "../lib/format";
 import type { TodoStep, TodoTask } from "../types";
 
-type TaskFilter = "open" | "completed" | "all";
+type TaskFilter = "open" | "completed";
 
 export function TasksView({
   tasks,
@@ -32,10 +32,10 @@ export function TasksView({
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     return tasks
-      .filter((task) => filter === "all" || (filter === "completed") === (task.completedAt !== null))
+      .filter((task) => (filter === "completed") === (task.completedAt !== null))
       .filter((task) => !normalized || `${task.title} ${task.steps.map((step) => step.title).join(" ")}`.toLocaleLowerCase().includes(normalized))
-      .sort((left, right) => taskOrder(left, right, today));
-  }, [filter, query, tasks, today]);
+      .sort((left, right) => left.title.localeCompare(right.title));
+  }, [filter, query, tasks]);
 
   const columns = useMemo<ColumnDef<TodoTask>[]>(() => [
     {
@@ -47,11 +47,6 @@ export function TasksView({
           <span>{row.original.steps.find((step) => step.completedAt === null)?.title ?? "All subtasks completed"}</span>
         </button>
       ),
-    },
-    {
-      id: "plan",
-      header: "Plan",
-      cell: ({ row }) => row.original.plannedDate ?? "Unscheduled",
     },
     {
       id: "progress",
@@ -71,7 +66,7 @@ export function TasksView({
       id: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status = taskStatus(row.original, today);
+        const status = taskStatus(row.original);
         return <Badge tone={status.tone}>{status.label}</Badge>;
       },
     },
@@ -85,7 +80,7 @@ export function TasksView({
         </div>
       ),
     },
-  ], [today]);
+  ], []);
 
   const table = useReactTable({ data: filtered, columns, getRowId: (row) => String(row.id), getCoreRowModel: getCoreRowModel() });
   const editingTask = typeof editing === "number" ? tasks.find((task) => task.id === editing) : undefined;
@@ -94,7 +89,7 @@ export function TasksView({
     if (!deleting) return;
     setBusy(true);
     try {
-      await api.deleteTask(deleting.id);
+      await api.deleteTask(deleting.id, today);
       setDeleting(null);
       if (editing === deleting.id) setEditing(null);
       await onChanged("Task deleted");
@@ -109,7 +104,7 @@ export function TasksView({
     <section className="view-stack">
       <div className="filter-bar">
         <div className="segmented" role="group" aria-label="Task status">
-          {(["open", "completed", "all"] as const).map((value) => (
+          {(["open", "completed"] as const).map((value) => (
             <button key={value} type="button" className={filter === value ? "active" : undefined} onClick={() => setFilter(value)}>{capitalize(value)}</button>
           ))}
         </div>
@@ -151,7 +146,6 @@ export function TasksView({
 
 function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
   const [title, setTitle] = useState("");
-  const [plannedDate, setPlannedDate] = useState("");
   const [steps, setSteps] = useState([""]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -161,7 +155,7 @@ function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     setBusy(true);
     setError(null);
     try {
-      await api.createTask({ title, plannedDate: plannedDate || null, steps: steps.map((step) => ({ title: step })) });
+      await api.createTask({ title, steps: steps.map((step) => ({ title: step })) });
       await onSaved();
     } catch (reason) {
       setError(message(reason));
@@ -173,9 +167,8 @@ function NewTaskForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   return (
     <Modal title="New task" onClose={onClose} size="lg">
       <form className="item-form" onSubmit={(event) => void submit(event)}>
-        <div className="form-grid form-grid-2">
+        <div className="form-grid">
           <label>Title<input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-          <label>Planned date<input type="date" value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} /></label>
         </div>
         <section className="form-section">
           <div className="section-heading"><div><p className="eyebrow">Subtasks</p><h3>Required work</h3></div><button type="button" className="secondary compact" onClick={() => setSteps((current) => [...current, ""])}><Plus size={15} />Add subtask</button></div>
@@ -208,15 +201,13 @@ function TaskEditor({
   onError: (message: string) => void;
 }) {
   const [title, setTitle] = useState(task.title);
-  const [plannedDate, setPlannedDate] = useState(task.plannedDate ?? "");
   const [newStep, setNewStep] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [deletingStep, setDeletingStep] = useState<TodoStep | null>(null);
 
   useEffect(() => {
     setTitle(task.title);
-    setPlannedDate(task.plannedDate ?? "");
-  }, [task.id, task.plannedDate, task.title]);
+  }, [task.id, task.title]);
 
   async function run(key: string, action: () => Promise<unknown>, success: string) {
     setBusy(key);
@@ -250,9 +241,8 @@ function TaskEditor({
   return (
     <Modal title="Edit task" onClose={onClose} size="lg">
       <div className="item-form">
-        <form className="form-grid form-grid-2" onSubmit={(event) => { event.preventDefault(); void run("task", () => api.updateTask(task.id, { title, plannedDate: plannedDate || null }), "Task saved"); }}>
+        <form className="form-grid" onSubmit={(event) => { event.preventDefault(); void run("task", () => api.updateTask(task.id, { title }), "Task saved"); }}>
           <label>Title<input required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-          <label>Planned date<input type="date" value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} /></label>
           <div className="inline-form-action"><button disabled={busy !== null}><Save size={16} />{busy === "task" ? "Saving…" : "Save task"}</button></div>
         </form>
 
@@ -335,23 +325,9 @@ function TaskStepRow({
   );
 }
 
-function taskStatus(task: TodoTask, today: string): { label: string; tone: "accent" | "warning" | "danger" | "muted" } {
+function taskStatus(task: TodoTask): { label: string; tone: "accent" | "muted" } {
   if (task.completedAt !== null) return { label: "Completed", tone: "muted" };
-  if (task.plannedDate === null) return { label: "Unscheduled", tone: "muted" };
-  if (task.plannedDate < today) return { label: "Overdue", tone: "danger" };
-  if (task.plannedDate === today) return { label: "Today", tone: "warning" };
-  return { label: "Planned", tone: "accent" };
-}
-
-function taskOrder(left: TodoTask, right: TodoTask, today: string): number {
-  const score = (task: TodoTask) => {
-    if (task.completedAt !== null) return 4;
-    if (task.plannedDate !== null && task.plannedDate < today) return 0;
-    if (task.plannedDate === today) return 1;
-    if (task.plannedDate !== null) return 2;
-    return 3;
-  };
-  return score(left) - score(right) || (left.plannedDate ?? "9999").localeCompare(right.plannedDate ?? "9999") || left.title.localeCompare(right.title);
+  return { label: "Open", tone: "accent" };
 }
 
 function capitalize(value: string): string {

@@ -286,7 +286,7 @@ describe("Records API", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/overview?startDate=2026-07-19&endDate=2026-07-20",
+      url: "/api/overview?startDate=2026-07-19&endDate=2026-07-20&planDate=2026-07-20",
     });
 
     expect(response.statusCode).toBe(200);
@@ -296,7 +296,8 @@ describe("Records API", () => {
         { id: 1, name: "Water", archived: false },
         { id: 3, name: "Weight", archived: false },
       ],
-      tasks: [{ id: 1, title: "Pack", plannedDate: "2026-07-20", steps: [{ title: "Bag" }] }],
+      tasks: [{ id: 1, title: "Pack", steps: [{ title: "Bag" }] }],
+      dailyPlan: null,
       accumulateEntries: [{ itemId: 1, value: 2, itemMode: "ACCUMULATE" }],
       latestMeasurementEntries: [
         { itemId: 2, value: 4, itemMode: "MEASUREMENT" },
@@ -316,7 +317,7 @@ describe("Records API", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/overview?startDate=2026-06-21&endDate=2026-07-20",
+      url: "/api/overview?startDate=2026-06-21&endDate=2026-07-20&planDate=2026-07-20",
     });
 
     expect(response.statusCode).toBe(200);
@@ -328,7 +329,7 @@ describe("Records API", () => {
 
     const narrower = await app.inject({
       method: "GET",
-      url: "/api/overview?startDate=2026-07-01&endDate=2026-07-20",
+      url: "/api/overview?startDate=2026-07-01&endDate=2026-07-20&planDate=2026-07-20",
     });
     expect(narrower.json().accumulateEntries).toHaveLength(2);
   });
@@ -339,7 +340,6 @@ describe("Records API", () => {
     expect(created.json().task).toMatchObject({
       id: 1,
       title: "Prepare trip",
-      plannedDate: "2026-07-20",
       completedAt: null,
       steps: [
         { id: 1, title: "Book train", completedAt: null },
@@ -382,10 +382,9 @@ describe("Records API", () => {
     expect((await app.inject({ method: "DELETE", url: "/api/steps/2" })).statusCode).toBe(200);
     expect((await app.inject({ method: "DELETE", url: "/api/steps/3" })).statusCode).toBe(400);
 
-    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey", plannedDate: null } });
+    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey" } });
     expect(renamed.statusCode).toBe(200);
     expect(renamed.json().task.title).toBe("Prepare journey");
-    expect(renamed.json().task.plannedDate).toBeNull();
     expect((await getAuditLogs()).map((log) => log.action)).toContain("TASK_COMPLETED");
     expect((await getAuditLogs()).map((log) => log.action)).toContain("STEP_REOPENED");
   });
@@ -510,7 +509,7 @@ describe("Records API", () => {
     expect(step.json().error.message).toBe("Manual time windows are not supported.");
   });
 
-  it("adds plain subtasks, clears task dates, and cascades deletes", async () => {
+  it("adds plain subtasks, rejects task dates, and cascades deletes", async () => {
     const created = await createTask({ title: "Pack", steps: ["Bag"] });
     expect(created.statusCode).toBe(201);
     const taskId = created.json().task.id as number;
@@ -521,20 +520,154 @@ describe("Records API", () => {
     expect(added.statusCode).toBe(201);
     const stepId = added.json().step.id as number;
 
-    const unscheduled = await app.inject({
+    const removedDate = await app.inject({
       method: "PUT",
       url: `/api/tasks/${taskId}`,
       payload: { title: "Pack", plannedDate: null },
     });
-    expect(unscheduled.statusCode).toBe(200);
-    expect(unscheduled.json().task.plannedDate).toBeNull();
+    expect(removedDate.statusCode).toBe(400);
+    expect(removedDate.json().error.message).toBe("Task dates are not supported.");
 
     expect((await app.inject({ method: "DELETE", url: `/api/steps/${stepId}` })).statusCode).toBe(200);
     const remaining = (await getTasks())[0] as { steps: Array<{ id: number }> };
     expect(remaining.steps.map((step) => step.id)).toEqual([1]);
 
-    expect((await app.inject({ method: "DELETE", url: `/api/tasks/${taskId}` })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: `/api/tasks/${taskId}?planDate=2026-07-20` })).statusCode).toBe(200);
     expect(await getTasks()).toEqual([]);
+  });
+
+  it("runs one daily plan through four reviews, an extra round, and explicit end", async () => {
+    await createTask({ title: "Build feature", steps: ["Implement"] });
+    await createTask({ title: "Write notes", steps: ["Draft"] });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: {
+        localDate: "2026-07-20",
+        firstMove: "  Go to the library  ",
+        primaryTaskId: 1,
+        secondaryTaskId: 2,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().dailyPlan).toMatchObject({
+      firstMove: "Go to the library",
+      state: "READY",
+      completedRounds: 0,
+      revision: 0,
+    });
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: { localDate: "2026-07-20", firstMove: "Start", primaryTaskId: 1, secondaryTaskId: null },
+    })).statusCode).toBe(409);
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: { localDate: "2026-07-21", firstMove: "Start", primaryTaskId: 1, secondaryTaskId: 1 },
+    })).statusCode).toBe(400);
+
+    let plan = (await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/start",
+      payload: { expectedRevision: 0, occurredAt: 1_000 },
+    })).json().dailyPlan;
+    expect(plan).toMatchObject({ state: "ACTIVE", currentTaskId: 1, nextReviewAt: 3_601_000, revision: 1 });
+    expect((await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/end",
+      payload: { expectedRevision: 0, occurredAt: 2_000 },
+    })).statusCode).toBe(409);
+
+    const overview = await app.inject({
+      method: "GET",
+      url: "/api/overview?startDate=2026-07-20&endDate=2026-07-20&planDate=2026-07-20",
+    });
+    expect(overview.json().dailyPlan).toMatchObject({ state: "ACTIVE", revision: 1 });
+
+    const early = await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/review",
+      payload: { expectedRevision: 1, occurredAt: 3_600_999, currentTaskId: 1 },
+    });
+    expect(early.statusCode).toBe(409);
+
+    for (let round = 1; round <= 4; round += 1) {
+      const response = await app.inject({
+        method: "PUT",
+        url: "/api/daily-plans/2026-07-20/review",
+        payload: { expectedRevision: plan.revision, occurredAt: plan.nextReviewAt, currentTaskId: 1 },
+      });
+      expect(response.statusCode).toBe(200);
+      plan = response.json().dailyPlan;
+      expect(plan.completedRounds).toBe(round);
+    }
+    expect(plan).toMatchObject({ state: "ENOUGH", currentTaskId: null, nextReviewAt: null, revision: 5 });
+
+    plan = (await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/extra-round",
+      payload: { expectedRevision: 5, occurredAt: 20_000_000, currentTaskId: 1 },
+    })).json().dailyPlan;
+    expect(plan).toMatchObject({ state: "ACTIVE", completedRounds: 4, currentTaskId: 1, revision: 6 });
+
+    const ended = await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/end",
+      payload: { expectedRevision: 6, occurredAt: 20_000_100 },
+    });
+    expect(ended.json().dailyPlan).toMatchObject({ state: "ENDED", endedAt: 20_000_100, revision: 7 });
+    const actions = (await getAuditLogs()).map((log) => String(log.action));
+    expect(actions.filter((action) => action.startsWith("DAILY_PLAN"))).toEqual([
+      "DAILY_PLAN_ENDED",
+      "DAILY_PLAN_CREATED",
+    ]);
+  });
+
+  it("replaces an active commitment and advances when committed tasks complete", async () => {
+    await createTask({ title: "Old primary", steps: ["Old step"] });
+    await createTask({ title: "Secondary", steps: ["Secondary step"] });
+    await createTask({ title: "New primary", steps: ["New step"] });
+    await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: { localDate: "2026-07-20", firstMove: "Start", primaryTaskId: 1, secondaryTaskId: 2 },
+    });
+    await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/start",
+      payload: { expectedRevision: 0, occurredAt: 1_000 },
+    });
+
+    const replaced = await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20",
+      payload: {
+        firstMove: "Start",
+        primaryTaskId: 3,
+        secondaryTaskId: 2,
+        expectedRevision: 1,
+        occurredAt: 2_000,
+      },
+    });
+    expect(replaced.json().dailyPlan).toMatchObject({ currentTaskId: 3, nextReviewAt: 3_602_000, revision: 2 });
+
+    await setStepCompleted(3, true);
+    let plan = (await getDailyPlan("2026-07-20"))!;
+    expect(plan).toMatchObject({ state: "ACTIVE", currentTaskId: 2, revision: 3 });
+
+    await setStepCompleted(2, true);
+    plan = (await getDailyPlan("2026-07-20"))!;
+    expect(plan).toMatchObject({ state: "ENOUGH", currentTaskId: null, nextReviewAt: null, revision: 4 });
+    expect((await app.inject({ method: "DELETE", url: "/api/tasks/2?planDate=2026-07-20" })).statusCode).toBe(409);
+
+    await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/end",
+      payload: { expectedRevision: 4, occurredAt: 5_000 },
+    });
+    expect((await app.inject({ method: "DELETE", url: "/api/tasks/2?planDate=2026-07-20" })).statusCode).toBe(200);
   });
 
 
@@ -545,7 +678,7 @@ describe("Records API", () => {
     return app.inject({
       method: "POST",
       url: "/api/tasks",
-      payload: { plannedDate: "2026-07-20", ...payload, steps },
+      payload: { ...payload, steps },
     });
   }
 
@@ -561,6 +694,12 @@ describe("Records API", () => {
 
   async function setStepCompleted(stepId: number, completed: boolean) {
     return app.inject({ method: "PUT", url: `/api/steps/${stepId}/completion`, payload: { completed } });
+  }
+
+  async function getDailyPlan(localDate: string): Promise<Record<string, unknown> | null> {
+    const response = await app.inject({ method: "GET", url: `/api/daily-plans/${localDate}` });
+    expect(response.statusCode).toBe(200);
+    return response.json().dailyPlan;
   }
 
   async function getAuditLogs(): Promise<Array<Record<string, unknown>>> {
