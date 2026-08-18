@@ -1,6 +1,6 @@
 # Records Today 完整管理
 
-Status: in progress (server complete)
+Status: in progress (server and PC complete)
 
 ## 目标
 

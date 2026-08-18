@@ -766,12 +766,21 @@ describe("Records API", () => {
       payload: { expectedRevision: 5, occurredAt: 6_000 },
     })).statusCode).toBe(409);
 
-    expect((await getAuditLogs()).map((log) => log.action).filter((action) => String(action).startsWith("DAILY_PLAN"))).toEqual([
+    const planAudits = (await getAuditLogs()).filter((log) => String(log.action).startsWith("DAILY_PLAN"));
+    expect(planAudits.map((log) => log.action)).toEqual([
       "DAILY_PLAN_UPDATED",
       "DAILY_PLAN_ENDED",
       "DAILY_PLAN_UPDATED",
       "DAILY_PLAN_CREATED",
     ]);
+    expect(planAudits[2]).toMatchObject({
+      before: { currentTaskId: 1, completedRounds: 1, nextReviewAt: 3_602_000 },
+      after: { currentTaskId: 2, completedRounds: 1, nextReviewAt: 3_603_000 },
+    });
+    expect(planAudits[0]).toMatchObject({
+      before: { state: "ENDED", completedRounds: 1 },
+      after: { state: "READY", completedRounds: 0, currentTaskId: null, nextReviewAt: null },
+    });
   });
 
   it("replaces an active commitment and advances when committed tasks complete", async () => {

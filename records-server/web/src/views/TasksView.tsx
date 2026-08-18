@@ -152,7 +152,7 @@ export function TasksView({
   );
 }
 
-function NewTaskForm({ localDate, onClose, onSaved }: { localDate: string; onClose: () => void; onSaved: () => Promise<void> }) {
+export function NewTaskForm({ localDate, onClose, onSaved }: { localDate: string; onClose: () => void; onSaved: (task: TodoTask) => Promise<void> }) {
   const [title, setTitle] = useState("");
   const [repeatMode, setRepeatMode] = useState<TaskRepeatMode>("ONCE");
   const [steps, setSteps] = useState([""]);
@@ -164,8 +164,8 @@ function NewTaskForm({ localDate, onClose, onSaved }: { localDate: string; onClo
     setBusy(true);
     setError(null);
     try {
-      await api.createTask({ title, repeatMode, localDate, steps: steps.map((step) => ({ title: step })) });
-      await onSaved();
+      const result = await api.createTask({ title, repeatMode, localDate, steps: steps.map((step) => ({ title: step })) });
+      await onSaved(result.task);
     } catch (reason) {
       setError(message(reason));
     } finally {
@@ -199,7 +199,7 @@ function NewTaskForm({ localDate, onClose, onSaved }: { localDate: string; onClo
   );
 }
 
-function TaskEditor({
+export function TaskEditor({
   task,
   localDate,
   onClose,

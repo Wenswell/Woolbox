@@ -16,6 +16,6 @@ export interface ItemAuditSnapshot { id: number; name: string; description: stri
 export interface EntryAuditSnapshot { id: number; itemId: number; itemName: string; occurredAt: number; localDate: string; localMinute: number; value: number }
 export interface TaskAuditSnapshot { id: number; title: string; repeatMode: TaskRepeatMode; localDate: string; completedAt: number | null; stepCount?: number; stepIds?: number[] }
 export interface StepAuditSnapshot { id: number; taskId: number; taskTitle: string; repeatMode: TaskRepeatMode; localDate: string; title: string; completedAt: number | null }
-export interface DailyPlanAuditSnapshot { id: number; localDate: string; firstMove: string; primaryTaskId: number | null; secondaryTaskId: number | null; state: string }
+export interface DailyPlanAuditSnapshot { id: number; localDate: string; firstMove: string; primaryTaskId: number | null; secondaryTaskId: number | null; currentTaskId: number | null; state: string; completedRounds: number; nextReviewAt: number | null }
 export interface RecordAuditLog { id: number; action: AuditAction; entityType: "ITEM" | "ENTRY" | "TASK" | "STEP" | "DAILY_PLAN"; entityId: number; before: ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot | DailyPlanAuditSnapshot | null; after: ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot | DailyPlanAuditSnapshot | null; createdAt: number }
 export interface AuditLogPage { logs: RecordAuditLog[]; nextBeforeId: number | null }

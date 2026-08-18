@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Edit3, Flag, Play, Save, Square } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Edit3, Flag, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { api } from "../api";
 import { Badge } from "../components/Badge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { message } from "../lib/format";
+import { localToday, message, shiftLocalDate } from "../lib/format";
 import type { DailyPlan, TodoTask } from "../types";
+import { NewTaskForm, TaskEditor } from "./TasksView";
 
 export function TodayView({
   localDate,
   plan,
   tasks,
   loading,
+  onDateChange,
   onChanged,
   onRefresh,
 }: {
@@ -18,11 +20,14 @@ export function TodayView({
   plan: DailyPlan | null;
   tasks: TodoTask[];
   loading: boolean;
+  onDateChange: (localDate: string) => void;
   onChanged: (message: string) => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [ending, setEnding] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -35,8 +40,9 @@ export function TodayView({
 
   useEffect(() => {
     setEditing(false);
+    setEditingTaskId(null);
     setError(null);
-  }, [plan?.revision, plan?.id]);
+  }, [localDate, plan?.revision, plan?.id]);
 
   const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
   const commitments = plan
@@ -66,18 +72,21 @@ export function TodayView({
   }
 
   if (loading && plan === null && tasks.length === 0) {
-    return <p className="empty-state">Loading today...</p>;
+    return <section className="view-stack"><DateNavigator localDate={localDate} onChange={onDateChange} /><p className="empty-state">Loading selected date...</p></section>;
   }
 
   if (plan === null || editing) {
     return (
       <section className="view-stack">
+        <DateNavigator localDate={localDate} onChange={onDateChange} />
         <PlanEditor
           localDate={localDate}
           plan={plan}
           tasks={tasks}
           busy={busy !== null}
           onCancel={plan === null ? undefined : () => setEditing(false)}
+          onChanged={onChanged}
+          onError={setError}
           onSave={(input) => run(
             "plan",
             () => plan === null ? api.createDailyPlan({ localDate, ...input }) : api.updateDailyPlan(plan, input),
@@ -91,6 +100,7 @@ export function TodayView({
 
   return (
     <section className="view-stack">
+      <DateNavigator localDate={localDate} onChange={onDateChange} />
       <div className="today-status-bar">
         <div>
           <p className="eyebrow">{formatLocalDate(localDate)}</p>
@@ -99,6 +109,9 @@ export function TodayView({
         <div className="row-actions">
           {(plan.state === "READY" || plan.state === "ACTIVE") && (
             <button type="button" className="secondary" onClick={() => setEditing(true)} disabled={busy !== null}><Edit3 size={16} />Edit</button>
+          )}
+          {plan.state !== "READY" && (
+            <button type="button" className="secondary" onClick={() => setResetting(true)} disabled={busy !== null}><RotateCcw size={16} />Reset</button>
           )}
           {plan.state !== "ENDED" && (
             <button type="button" className="danger-secondary" onClick={() => setEnding(true)} disabled={busy !== null}><Square size={15} />End today</button>
@@ -122,16 +135,19 @@ export function TodayView({
             <div><p className="eyebrow">Round {plan.completedRounds + 1}</p><h3>{currentTask?.title ?? "Current commitment"}</h3></div>
             {plan.nextReviewAt !== null && <span className={reviewDue ? "review-time due" : "review-time"}>{reviewDue ? "Review due" : `Review ${formatTime(plan.nextReviewAt)}`}</span>}
           </div>
-          {currentTask && <CurrentSteps task={currentTask} busy={busy !== null} onToggle={(stepId, completed) => run(`step-${stepId}`, () => api.setStepCompleted(stepId, completed, localDate), completed ? "Subtask completed" : "Subtask reopened")} />}
-          {reviewDue && (
-            <div className="today-actions">
-              {openCommitments.map((task) => (
-                <button key={task.id} type="button" className={task.id === currentTask?.id ? undefined : "secondary"} disabled={busy !== null} onClick={() => void run(`review-${task.id}`, () => api.reviewDailyPlan(plan, task.id), task.id === currentTask?.id ? "Current commitment continued" : "Commitment switched")}>
-                  <Play size={15} />{task.id === currentTask?.id ? "Continue current" : `Switch to ${task.title}`}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="today-actions">
+            {currentTask && (
+              <button type="button" disabled={busy !== null} onClick={() => void run(`review-${currentTask.id}`, () => api.reviewDailyPlanNow(plan, currentTask.id), "Round completed")}>
+                <Check size={15} />{reviewDue ? "Complete review" : "Review now"}
+              </button>
+            )}
+            {openCommitments.filter((task) => task.id !== currentTask?.id).map((task) => (
+              <span className="today-action-pair" key={task.id}>
+                <button type="button" className="secondary" disabled={busy !== null} onClick={() => void run(`switch-${task.id}`, () => api.switchDailyPlanTask(plan, task.id), "Current commitment switched")}><Play size={15} />Switch now to {task.title}</button>
+                <button type="button" className="secondary" disabled={busy !== null} onClick={() => void run(`review-${task.id}`, () => api.reviewDailyPlanNow(plan, task.id), "Round completed and commitment switched")}><Check size={15} />Review &amp; switch</button>
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
@@ -156,12 +172,27 @@ export function TodayView({
         </div>
       )}
 
-      <Commitments tasks={commitments} currentTaskId={plan.currentTaskId} />
+      <Commitments
+        tasks={commitments}
+        currentTaskId={plan.currentTaskId}
+        busy={busy !== null}
+        onEdit={setEditingTaskId}
+        onToggle={(stepId, completed) => run(`step-${stepId}`, () => api.setStepCompleted(stepId, completed, localDate), completed ? "Subtask completed" : "Subtask reopened")}
+      />
       {error && <p className="form-error" role="alert">{error}</p>}
+      {editingTaskId !== null && tasks.find((task) => task.id === editingTaskId) && (
+        <TaskEditor
+          task={tasks.find((task) => task.id === editingTaskId)!}
+          localDate={localDate}
+          onClose={() => setEditingTaskId(null)}
+          onChanged={onChanged}
+          onError={setError}
+        />
+      )}
       <ConfirmDialog
         open={ending}
         title="End today"
-        message="End this daily plan? It will become read-only."
+        message="End this daily plan? You can reset it to Ready later."
         confirmLabel="End today"
         danger
         busy={busy !== null}
@@ -169,6 +200,19 @@ export function TodayView({
         onConfirm={() => {
           setEnding(false);
           void run("end", () => api.endDailyPlan(plan), "Today ended");
+        }}
+      />
+      <ConfirmDialog
+        open={resetting}
+        title="Reset today"
+        message="Reset execution to Ready? The first move and commitments stay selected. Subtask completion is unchanged."
+        confirmLabel="Reset to Ready"
+        danger
+        busy={busy !== null}
+        onCancel={() => setResetting(false)}
+        onConfirm={() => {
+          setResetting(false);
+          void run("reset", () => api.resetDailyPlan(plan), "Today reset to Ready");
         }}
       />
     </section>
@@ -181,6 +225,8 @@ function PlanEditor({
   tasks,
   busy,
   onCancel,
+  onChanged,
+  onError,
   onSave,
 }: {
   localDate: string;
@@ -188,11 +234,14 @@ function PlanEditor({
   tasks: TodoTask[];
   busy: boolean;
   onCancel?: () => void;
+  onChanged: (message: string) => Promise<void>;
+  onError: (message: string) => void;
   onSave: (input: { firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) => Promise<void>;
 }) {
   const [firstMove, setFirstMove] = useState(plan?.firstMove ?? "");
   const [primaryTaskId, setPrimaryTaskId] = useState(plan?.primaryTaskId ? String(plan.primaryTaskId) : "");
   const [secondaryTaskId, setSecondaryTaskId] = useState(plan?.secondaryTaskId ? String(plan.secondaryTaskId) : "");
+  const [taskDialog, setTaskDialog] = useState<number | "new" | null>(null);
   const primaryTask = tasks.find((task) => task.id === Number(primaryTaskId));
   const secondaryTask = tasks.find((task) => task.id === Number(secondaryTaskId));
   const primaryLocked = primaryTask?.completedAt !== null && primaryTask !== undefined;
@@ -209,8 +258,11 @@ function PlanEditor({
     });
   }
 
+  const editingTask = typeof taskDialog === "number" ? tasks.find((task) => task.id === taskDialog) : undefined;
+
   return (
-    <form className="today-plan-form" onSubmit={(event) => void submit(event)}>
+    <>
+      <form className="today-plan-form" onSubmit={(event) => void submit(event)}>
       <div className="section-heading">
         <div><p className="eyebrow">{formatLocalDate(localDate)}</p><h2>{plan === null ? "Plan today" : "Edit today"}</h2></div>
       </div>
@@ -219,13 +271,40 @@ function PlanEditor({
         <label>Primary task<select required value={primaryTaskId} disabled={busy || primaryLocked} onChange={(event) => setPrimaryTaskId(event.target.value)}><option value="">Choose task</option>{taskOptions(tasks, selectable, secondaryTaskId, primaryTaskId)}</select></label>
         <label>Secondary task<select value={secondaryTaskId} disabled={busy || secondaryLocked} onChange={(event) => setSecondaryTaskId(event.target.value)}><option value="">No secondary task</option>{taskOptions(tasks, selectable, primaryTaskId, secondaryTaskId)}</select></label>
       </div>
+      <div className="today-task-tools">
+        <button type="button" className="secondary compact" onClick={() => setTaskDialog("new")} disabled={busy}><Plus size={15} />New task</button>
+        {primaryTask && <button type="button" className="secondary compact" onClick={() => setTaskDialog(primaryTask.id)} disabled={busy}><Edit3 size={15} />Edit primary</button>}
+        {secondaryTask && <button type="button" className="secondary compact" onClick={() => setTaskDialog(secondaryTask.id)} disabled={busy}><Edit3 size={15} />Edit secondary</button>}
+      </div>
       {primaryTaskId && primaryTaskId === secondaryTaskId && <p className="form-error" role="alert">Primary and secondary tasks must be different.</p>}
       {!primaryTaskId && selectable.length === 0 && <p className="form-error" role="alert">Create or reopen a task before planning today.</p>}
       <div className="modal-actions">
         {onCancel && <button type="button" className="secondary" onClick={onCancel} disabled={busy}>Cancel</button>}
         <button disabled={busy || !firstMove.trim() || !primaryTaskId || primaryTaskId === secondaryTaskId}><Save size={16} />{busy ? "Saving..." : "Save today"}</button>
       </div>
-    </form>
+      </form>
+      {taskDialog === "new" && (
+        <NewTaskForm
+          localDate={localDate}
+          onClose={() => setTaskDialog(null)}
+          onSaved={async (task) => {
+            if (!primaryTaskId) setPrimaryTaskId(String(task.id));
+            else if (!secondaryTaskId) setSecondaryTaskId(String(task.id));
+            setTaskDialog(null);
+            await onChanged("Task created");
+          }}
+        />
+      )}
+      {editingTask && (
+        <TaskEditor
+          task={editingTask}
+          localDate={localDate}
+          onClose={() => setTaskDialog(null)}
+          onChanged={onChanged}
+          onError={onError}
+        />
+      )}
+    </>
   );
 }
 
@@ -237,20 +316,31 @@ function taskOptions(tasks: TodoTask[], selectable: TodoTask[], unavailableId: s
   ));
 }
 
-function CurrentSteps({ task, busy, onToggle }: { task: TodoTask; busy: boolean; onToggle: (stepId: number, completed: boolean) => Promise<void> }) {
+function DateNavigator({ localDate, onChange }: { localDate: string; onChange: (localDate: string) => void }) {
+  const today = localToday();
   return (
-    <div className="today-step-list">
-      {task.steps.map((step) => (
-        <label key={step.id} className={step.completedAt === null ? "today-step" : "today-step completed"}>
-          <input type="checkbox" checked={step.completedAt !== null} disabled={busy} onChange={(event) => void onToggle(step.id, event.target.checked)} />
-          <span>{step.title}</span>
-        </label>
-      ))}
+    <div className="today-date-toolbar">
+      <button type="button" className="icon-button" aria-label="Previous date" title="Previous date" onClick={() => onChange(shiftLocalDate(localDate, -1))}><ChevronLeft size={18} /></button>
+      <label className="today-date-input"><input type="date" aria-label="Today plan date" value={localDate} onChange={(event) => { if (event.target.value) onChange(event.target.value); }} /></label>
+      <button type="button" className="icon-button" aria-label="Next date" title="Next date" onClick={() => onChange(shiftLocalDate(localDate, 1))}><ChevronRight size={18} /></button>
+      <button type="button" className="secondary compact" disabled={localDate === today} onClick={() => onChange(today)}>Today</button>
     </div>
   );
 }
 
-function Commitments({ tasks, currentTaskId }: { tasks: TodoTask[]; currentTaskId: number | null }) {
+function Commitments({
+  tasks,
+  currentTaskId,
+  busy,
+  onEdit,
+  onToggle,
+}: {
+  tasks: TodoTask[];
+  currentTaskId: number | null;
+  busy: boolean;
+  onEdit: (taskId: number) => void;
+  onToggle: (stepId: number, completed: boolean) => Promise<void>;
+}) {
   return (
     <section className="today-commitments">
       <div className="section-heading"><div><p className="eyebrow">Commitments</p><h3>1 + 1</h3></div></div>
@@ -259,9 +349,20 @@ function Commitments({ tasks, currentTaskId }: { tasks: TodoTask[]; currentTaskI
           const completed = task.steps.filter((step) => step.completedAt !== null).length;
           return (
             <div className={task.id === currentTaskId ? "commitment-row current" : "commitment-row"} key={task.id}>
-              <span className="step-index">{index + 1}</span>
-              <div><strong>{task.title}</strong><span>{completed} / {task.steps.length} subtasks · {task.repeatMode === "DAILY" ? "Daily" : "Once"}</span></div>
-              {task.completedAt !== null ? <Badge tone="muted">Completed</Badge> : task.id === currentTaskId ? <Badge tone="accent">Current</Badge> : <Badge tone="neutral">Open</Badge>}
+              <div className="commitment-heading">
+                <span className="step-index">{index + 1}</span>
+                <div><strong>{task.title}</strong><span>{completed} / {task.steps.length} subtasks · {task.repeatMode === "DAILY" ? "Daily" : "Once"}</span></div>
+                {task.completedAt !== null ? <Badge tone="muted">Completed</Badge> : task.id === currentTaskId ? <Badge tone="accent">Current</Badge> : <Badge tone="neutral">Open</Badge>}
+                <button type="button" className="icon-button" aria-label={`Edit ${task.title}`} title="Edit task" disabled={busy} onClick={() => onEdit(task.id)}><Edit3 size={16} /></button>
+              </div>
+              <div className="today-step-list">
+                {task.steps.map((step) => (
+                  <label key={step.id} className={step.completedAt === null ? "today-step" : "today-step completed"}>
+                    <input type="checkbox" checked={step.completedAt !== null} disabled={busy} onChange={(event) => void onToggle(step.id, event.target.checked)} />
+                    <span>{step.title}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           );
         })}

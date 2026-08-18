@@ -117,12 +117,24 @@ export const api = {
     return dailyPlanTransition(plan, "review", currentTaskId);
   },
 
+  async reviewDailyPlanNow(plan: DailyPlan, currentTaskId: number) {
+    return dailyPlanTransition(plan, "review-now", currentTaskId);
+  },
+
+  async switchDailyPlanTask(plan: DailyPlan, currentTaskId: number) {
+    return dailyPlanTransition(plan, "switch", currentTaskId);
+  },
+
   async startExtraRound(plan: DailyPlan, currentTaskId: number) {
     return dailyPlanTransition(plan, "extra-round", currentTaskId);
   },
 
   async endDailyPlan(plan: DailyPlan) {
     return dailyPlanTransition(plan, "end");
+  },
+
+  async resetDailyPlan(plan: DailyPlan) {
+    return dailyPlanTransition(plan, "reset");
   },
 
   async entries(startDate: string, endDate: string, itemId?: string, mode?: RecordMode): Promise<RecordEntry[]> {
@@ -158,7 +170,7 @@ export const api = {
   },
 };
 
-function dailyPlanTransition(plan: DailyPlan, action: "start" | "review" | "extra-round" | "end", currentTaskId?: number) {
+function dailyPlanTransition(plan: DailyPlan, action: "start" | "review" | "review-now" | "switch" | "extra-round" | "end" | "reset", currentTaskId?: number) {
   return request<{ dailyPlan: DailyPlan }>(`daily-plans/${plan.localDate}/${action}`, {
     method: "PUT",
     body: JSON.stringify({

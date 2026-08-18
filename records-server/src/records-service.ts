@@ -122,7 +122,10 @@ interface DailyPlanAuditSnapshot {
   firstMove: string;
   primaryTaskId: number | null;
   secondaryTaskId: number | null;
+  currentTaskId: number | null;
   state: string;
+  completedRounds: number;
+  nextReviewAt: number | null;
 }
 
 type AuditSnapshot = ItemAuditSnapshot | EntryAuditSnapshot | TaskAuditSnapshot | StepAuditSnapshot | DailyPlanAuditSnapshot;
@@ -452,7 +455,14 @@ export class RecordsService {
         createdAt: now,
         updatedAt: now,
       }).returning({ id: dailyPlans.id }).get();
-      const plan = { id: created.id, ...input, state: "READY" as const };
+      const plan = {
+        id: created.id,
+        ...input,
+        currentTaskId: null,
+        state: "READY" as const,
+        completedRounds: 0,
+        nextReviewAt: null,
+      };
       this.writeAudit(tx, {
         action: "DAILY_PLAN_CREATED",
         entityType: "DAILY_PLAN",
@@ -1291,7 +1301,7 @@ function taskSnapshot(
 }
 
 function dailyPlanSnapshot(
-  plan: Pick<DailyPlanRow, "id" | "localDate" | "firstMove" | "primaryTaskId" | "secondaryTaskId" | "state">,
+  plan: Pick<DailyPlanRow, "id" | "localDate" | "firstMove" | "primaryTaskId" | "secondaryTaskId" | "currentTaskId" | "state" | "completedRounds" | "nextReviewAt">,
 ): DailyPlanAuditSnapshot {
   return {
     id: plan.id,
@@ -1299,7 +1309,10 @@ function dailyPlanSnapshot(
     firstMove: plan.firstMove,
     primaryTaskId: plan.primaryTaskId,
     secondaryTaskId: plan.secondaryTaskId,
+    currentTaskId: plan.currentTaskId,
     state: plan.state,
+    completedRounds: plan.completedRounds,
+    nextReviewAt: plan.nextReviewAt,
   };
 }
 

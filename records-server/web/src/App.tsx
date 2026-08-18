@@ -32,6 +32,8 @@ export function App() {
   const [activeItems, setActiveItems] = useState<RecordItem[]>([]);
   const [archivedItems, setArchivedItems] = useState<RecordItem[]>([]);
   const [tasks, setTasks] = useState<TodoTask[]>([]);
+  const [todayDate, setTodayDate] = useState(localToday);
+  const [todayTasks, setTodayTasks] = useState<TodoTask[]>([]);
   const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
   const [entries, setEntries] = useState<RecordEntry[]>([]);
   const [logs, setLogs] = useState<RecordAuditLog[]>([]);
@@ -56,17 +58,21 @@ export function App() {
     setError(null);
     try {
       const today = localToday();
-      const [active, archived, taskList, plan, entryList, auditPage] = await Promise.all([
+      const taskListRequest = api.tasks(today);
+      const todayTaskListRequest = todayDate === today ? taskListRequest : api.tasks(todayDate);
+      const [active, archived, taskList, todayTaskList, plan, entryList, auditPage] = await Promise.all([
         api.items(false),
         api.items(true),
-        api.tasks(today),
-        api.dailyPlan(today),
+        taskListRequest,
+        todayTaskListRequest,
+        api.dailyPlan(todayDate),
         api.entries(filters.startDate, filters.endDate, filters.itemId, filters.mode || undefined),
         api.auditLogs(),
       ]);
       setActiveItems(active);
       setArchivedItems(archived);
       setTasks(taskList);
+      setTodayTasks(todayTaskList);
       setDailyPlan(plan);
       setEntries(entryList);
       setLogs(auditPage.logs);
@@ -76,7 +82,7 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, todayDate]);
 
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
@@ -92,6 +98,13 @@ export function App() {
   async function changed(success: string) {
     setToast(success);
     await refresh();
+  }
+
+  function changeTodayDate(value: string) {
+    setLoading(true);
+    setDailyPlan(null);
+    setTodayTasks([]);
+    setTodayDate(value);
   }
 
   return (
@@ -124,7 +137,7 @@ export function App() {
 
         <main className="page-content">
           {view === "overview" && <OverviewView tasks={tasks} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
-          {view === "today" && <TodayView localDate={localToday()} plan={dailyPlan} tasks={tasks} loading={loading} onChanged={changed} onRefresh={refresh} />}
+          {view === "today" && <TodayView localDate={todayDate} plan={dailyPlan} tasks={todayTasks} loading={loading} onDateChange={changeTodayDate} onChanged={changed} onRefresh={refresh} />}
           {view === "tasks" && <TasksView localDate={localToday()} tasks={tasks} loading={loading} onChanged={changed} onError={setError} />}
           {view === "accumulate" && <RecordItemsView mode="ACCUMULATE" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "measurement" && <RecordItemsView mode="MEASUREMENT" items={allItems} loading={loading} onChanged={changed} onError={setError} />}

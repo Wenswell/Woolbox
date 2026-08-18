@@ -100,6 +100,10 @@ export function auditChanges(log: RecordAuditLog): string {
       fieldChange("First move", before.firstMove, after.firstMove),
       fieldChange("Primary task", before.primaryTaskId, after.primaryTaskId),
       fieldChange("Secondary task", before.secondaryTaskId, after.secondaryTaskId),
+      fieldChange("Current task", before.currentTaskId, after.currentTaskId),
+      fieldChange("Status", before.state, after.state),
+      fieldChange("Completed rounds", before.completedRounds, after.completedRounds),
+      fieldChange("Next review", before.nextReviewAt, after.nextReviewAt),
     ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
   }
   if (log.action === "TASK_DELETED" && before && isTaskSnapshot(before)) {
