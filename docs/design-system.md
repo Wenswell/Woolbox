@@ -14,9 +14,9 @@ AppTheme
    ├─ root
    │  └─ AppSurface
    │     ├─ Records
-   │     │  ├─ page header (title + date)
-   │     │  ├─ Tasks ──> Task progress Sheet ──> Manage tasks ──> Edit task
-   │     │  ├─ Accumulate ──> Record Sheet
+   │     │  ├─ Today ──> Plan / Edit today
+   │     │  ├─ Tasks ──> Manage tasks ──> Edit task
+   │     │  ├─ Routines ──> Record Sheet
    │     │  └─ Measurement ──> Measurement preview Sheet
    │     ├─ Tools
    │     │  ├─ Access / Accessibility service entry
@@ -114,18 +114,19 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页：无页头大标题；同一 `LazyColumn` 固定为 **Focus → Tasks → Accumulate → Measurement**。三个 section 使用中性 `titleSmall` 整行标题 + chevron 进入 Manage，无根页新建。区内间距 `8dp`，区间 `16dp`（`8 + 8` spacer）。Focus 仅在今日有承诺或队列非空时出现。分段进度、液面和卡色变化使用短动画；系统关闭动画时瞬时到位。根列表滑动期间冻结液面波与任务条纹等装饰性循环动画，避免与滚动抢帧；停滑后再延迟 `800ms` 恢复。
+Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks → Routines → Measurement**。Today 是唯一执行区；其余 section 使用中性 `titleSmall` 标题、数量副文案和 chevron 进入管理页，根页不提供新建。
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Focus` | 顶部状态行左侧为英文 `EEE, d MMM` 与连续天数，右侧为 `HH:mm · closed/total today`；下方为 `2dp` 已过时间规则。唯一强视觉 Hero 使用 `8dp` 圆角，保留累计液面/子事项分段进度、`Not now` 与原写入动作。后续最多 3 项归入一个 `Up next` 列表组：累计显示记录图标与进度/理由，子事项显示复选框与父待办/理由，行尾统一 chevron。队列为空时使用 `Day closed` / `Nothing due right now` 完成卡。 |
-| `Tasks` | Overdue 与 Today 仅在非空时显示标题和预览卡；Planned 与 Unscheduled 分别显示带数量的 Manage 摘要，不在根页展开；Completed 只在 Manage tasks。没有未完成项时显示紧凑的 `No active tasks`。任务卡仍按子事项固定位序显示分段进度。 |
-| `Manage tasks` / `Edit task` | 管理页按 Overdue、Today、Planned、Unscheduled、Completed 展示全部任务；顶栏加号新建；编辑路由负责标题、单一可选计划日期、子事项增删排序和删除。 |
+| `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH` 显示完成轮次与可选额外一轮；`ENDED` 为只读状态。 |
+| `Plan/Edit today` | 全屏路由；第一步文本、主任务必选、次任务可空。任务使用选择 Dialog；已完成槽位锁定，次任务可明确清空。顶栏 Check 是唯一保存操作。 |
+| `Tasks` | 根页只显示 Open 数量并进入 Manage，不展示任务预览或完成操作。 |
+| `Manage tasks` / `Edit task` | 管理页仅按 Open、Completed 分组；顶栏加号新建。编辑路由负责标题、子事项增删排序和删除，不显示日期。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
-| `Accumulate` | 2 列 grid，卡高约 `120dp`；整卡自下而上液面进度（双层正弦波，可减动画）；弱化名称 + 主值；日目标：旗帜 + 近 7 日达标饼；7 日目标：滚动近 7 日累计 / 目标；日历图标 + `· 7 days` 文案 + 与 7 饼同宽的 7 段独立描边进度（两端 A=6dp、切口/填充 B=1.5dp，高 8dp、缝 2dp，满额完成绿）；点卡打开快速记录 Sheet。 |
+| `Routines` | 逐行显示名称与今日累计，点行打开累计记录 Sheet；本区不显示任务或回顾状态。 |
 | `New/Edit accumulate` | 固定 `ACCUMULATE` 表单；Check 保存。 |
-| `Measurement` | 2 列 grid，卡高约 `120dp`；首字圆 + 主值/时间；点卡打开预览 Sheet。 |
+| `Measurement` | 逐行显示名称与最新值，点行打开预览 Sheet。 |
 | `New/Edit measurement` | 固定 `MEASUREMENT` 表单；Check 保存。 |
 | Measurement preview Sheet | 标题、最新值、24 小时图、流水和离散 Slider。 |
 | 累计记录 Sheet | 身份与进度同一标题行；下方数值输入与今日流水。 |
@@ -134,26 +135,18 @@ Records 根页：无页头大标题；同一 `LazyColumn` 固定为 **Focus → 
 
 ### Records 视觉规则
 
-- 字阶：section `titleSmall` + `onSurface`；任务子组与 `Up next` 使用 `labelLarge` + `onSurfaceVariant`；Accumulate 名称 `labelMedium` 弱化（约 0.62 alpha）；主值 `titleMedium` SemiBold + accent；次文案 `labelMedium`/`bodySmall`。
-- 色：按进度，不用名称哈希，不用 secondary/tertiary（避免动态色偏粉）。进行中为 **primary 单色加深**（浅色 wash 约 7%→46%，深色 10%→36%，文案用 `onSurface`）；`LATE` 仍为 primary；**`DONE` 固定成功绿**（深/浅分套，与 LATE 色相分离）。档位阈值 0 / 1/3 / 2/3 / 1。Tasks 用子事项比；有目标累计用累计/目标；无目标累计用近 7 日有值天数比；Measurement 用最新值在 min–max 位置。Manage/表单无实时进度时 IDLE。卡色随进度 `animateColorAsState`。
-- 首字圆：`accent` 16% 底 + `accent` 字，保证在色卡上可辨。
-- 运动：`Focus` 队首用 `AnimatedContent` 表达补位——离场向上 `180ms`，入场自下 `220ms`，`SizeTransform` 不裁剪。这是卡内唯一承重运动，减动画或根列表滑动时退化为瞬时替换（与液面波、任务条纹同一 `LocalPauseDecorativeMotion` 契约）。
-- 时间：`Focus` 的 `2dp` 时间规则仅表达当日已过比例，轨道为 `onSurfaceVariant` 14%，已过部分为同色 42%，不使用完成绿、当前点或手动时间刻度。当日闭环和连续天数均为日信息单行文本。Hero 使用目标自身进度色（累计用累计/目标或近 7 日活跃度，子事项用所属待办的子事项比），并只在自身作用域读取时钟，分钟跳动不触发整页重组。
-- 动作：根页 section 标题整行进入 Manage，chevron 只表达导航；新建只在 Manage 顶栏 tonal 加号。Focus 累计 Hero 的步进控件只改本地数量，确认图标是唯一写入目标，提交中禁用全部写入控件；子事项 Hero 和队列行只有复选框写入，行体一律导航。Planned 与 Unscheduled 摘要只导航，不展开或写入。
-- Accumulate 液面表达进度（有目标用累计/目标 0–1；无目标用近 7 日活跃天数/7）；主值只显示当前累计；目标用旗帜图标 + 目标值单独一行；有日目标时近 7 日饼状图另起一行（左旧右今；扇区=当日量/日目标；未满 primary 加深，满额完成绿；今日 15dp）；有7 日目标时底部为与近 7 日饼行同宽、高 8dp 的 7 段独立描边块（按滚动近 7 日累计/目标比例填充；段外框 A=6dp、进度填充 B=1.5dp、段间 2dp 透明；描边同圆饼 track 16%）；目标行用日历图标与 `· 7 days` 区分；不重复百分比或 `current / target`。Records 根列表滚动时液面波冻结当前相位与波形，停滑并延迟 `800ms` 后从该相位等速续播；系统关闭动画、0% 或 100% 时为水平液面；高度变化仍可短动画到位。
-- Tasks 分段竖条与子事项**固定位序**一一对应（完成第 1、3 项则只填第 1、3 格，不把完成项挤到左侧）；顺序只在 `Edit task` / `New task` 手动调整。未完成格固定使用 `recordProgressColors(progress = 0f).container`，与 Accumulate 0% 卡底色一致；完成格使用任务进度底色，并在其上铺同色 `fillColor` 洗色（spring 弹出）。仅在部分完成且 Motion 已启用时，全部完成格共享一组 45° 斜向条纹（条宽 `89dp`，条纹仅为底色上的增量洗色 `alpha 0.1`（避免半透明叠加以免对比翻倍），低对比若有若无），按整条分段条坐标系从左到右匀速滚动，每圈 `5.6s`（`Linear`，滚动一个条纹周期，无可见跳变）；Records 根列表滑动时冻结当前相位，停滑并再延迟 `800ms` 后按剩余相位续播。全完成、Motion 关闭时为静态实心洗色。格间透明，直接露出页面底色。全完成时完成格与强调色为完成绿。标题旁对勾（完成时）、右侧 `N/M`。子事项完成轻触觉，父项刚完成强触觉 + Snackbar `{title} done`。
-- 累计写入轻触觉；刚达标强触觉，Snackbar 为 `Goal reached · {name}` 并保留 `Undo`。当日环刚满时强触觉 + Snackbar `Day closed · {total} done`；只在跨越那一刻触发，打开已闭环的一天不提示。
-- Measurement 与 Accumulate 共用标题/主值字阶，避免网格卡字号分叉。
-
-验收：根页不显示 `Today (0)`、`No today tasks.` 或 Completed；Up next 无裸文字行；Planned 与 Unscheduled 各自只出现一次摘要；浅/深色 Tasks 与 Manage tasks 均非灰底；Accumulate 与 Measurement 两列卡高 `120dp`；根页内容卡统一 `8dp` 圆角；点击与数据路径不变。
+- Today 卡标题使用 `labelLarge` primary；当前动作使用 `titleLarge` SemiBold；说明与轮次使用 `bodySmall/bodyMedium` 的 `onSurfaceVariant`。卡与记录行统一 `8dp` 圆角。
+- 一个状态只显示当前可执行命令。启动、继续、切换和额外一轮使用明确按钮；编辑用铅笔 icon；当前子事项用 checkbox；结束今天使用弱化文本按钮。
+- 回顾到期由分钟时钟触发重组，不显示倒计时或精确工时。通知不可用时用阻塞状态替换活动内容，只保留启用通知和结束今天。
+- Routines 与 Measurement 行只突出当前数值，不显示 Today 颜色、轮次或承诺标签。累计写入和刚达标的触觉、Snackbar 与 `Undo` 沿用记录 Sheet 规则。
 
 `Manage accumulates` 与 `Manage measurements` 使用相同的标准路由骨架；每页顶栏仅提供本模式新建入口，编辑路由固定为本模式表单。
 
-Task progress Sheet 只显示子事项复选框和完成时间；标题、计划日期、子事项增删排序和删除任务只在 `Edit task`。`New task` 与 `Edit task` 共用一个整行日期按钮，日期选择使用 Material DatePicker；新建默认显示 `Choose date`，选中日期后显示独立清除图标。子事项行只有标题与排序操作，不出现日期或时间控件。累计与测量表单也不出现计划时间控件。Measurement 录入使用与 OLED 同类的 Material `Slider`；当前值、最小值和最大值稳定显示，滑块以配置步进离散取值。
+Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删排序和删除任务只在 `Edit task`。任务、累计与测量表单均不出现计划日期或时间段控件。Measurement 录入使用 Material `Slider`，以配置步进离散取值。
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
-PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Tasks、Accumulate、Measurement、Entries、Activity。页面顶栏只显示当前页名称、上下文和刷新 icon；页面主操作跟随筛选栏。Overview 使用紧凑指标卡和任务、流水、审计预览，不承担写入。Tasks 使用状态分段、搜索与表格，编辑 Dialog 内按固定位序管理子事项；完成用 checkbox，重命名、上下移动和删除使用 icon。Accumulate 与 Measurement 分页管理，分别使用固定模式表单；状态分段、搜索、行选择、归档、恢复和永久删除保持同一布局。Entries 提供 Today/7 days/30 days、起止日期、模式与记录项筛选，可新增流水和危险确认后的批量删除，不提供编辑。Activity 以只读表格显示时间、对象、动作和变更摘要，支持对象筛选、搜索和游标加载。成功操作显示 toast；刷新失败保留已有数据并显示重试错误条；Dialog 写入失败保留表单和明确错误。
+PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Tasks、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和任务、流水、审计预览。Tasks 只使用 Open/Completed 分段、搜索与表格，编辑 Dialog 内按固定位序管理子事项；不显示日期或每日计划。Accumulate 与 Measurement 使用固定模式表单。Entries 提供日期、模式与记录项筛选，可新增流水和批量删除。Activity 只读展示对象、动作和变更摘要。
 
 
 ## 状态呈现

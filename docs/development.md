@@ -9,7 +9,7 @@
 | Compose BOM | `2026.05.01` |
 | Java | Android Studio JBR `17` |
 | Android SDK | `compileSdk 36.1`、`minSdk 31`、`targetSdk 36` |
-| Android 数据与测试 | OkHttp `4.12.0`、Room `2.8.4`、KSP `2.3.10`、JUnit `4.13.2` |
+| Android 数据与测试 | OkHttp `4.12.0`、Room `2.8.4`、WorkManager `2.11.2`、KSP `2.3.10`、JUnit `4.13.2` |
 | Records server | Node `22+`、pnpm `11.11.0`、Fastify `5.10.0`、Drizzle ORM `0.45.2`、SQLite |
 
 项目使用 Gradle Wrapper。标准 macOS 环境变量：
@@ -23,12 +23,13 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 | 路径 | 修改入口 |
 | --- | --- |
-| `MainActivity.kt` | 普通入口退到后台、指定应用启动和 `onStop` 命令提交。 |
-| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records 三分区、管理页和 Sheet 接线。 |
+| `MainActivity.kt` | 普通入口退到后台、指定应用启动、`onStop` 命令提交和每日回顾通知入口。 |
+| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records Today/Tasks/Routines/Measurement、通知权限和 Sheet 接线。 |
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `res/values*/strings.xml`、`res/xml/locales_config.xml` | 默认英文、简体中文资源与系统应用语言声明；可见文案从资源读取。 |
-| `record/{model,data,ui}/` | 累计/测量记录和待办规则、HTTPS Repository、Keystore 凭据、ViewModel、任务/测量预览 Sheet、管理页、记录 Sheet 和记录项表单。 |
+| `record/{model,data,ui}/` | 每日承诺、任务库存、量化记录、HTTPS Repository、Keystore 凭据、ViewModel、管理页、Sheet 和表单。 |
+| `record/reminder/` | 唯一 WorkManager 调度、服务端二次校验、通知权限/Channel 和回顾通知。 |
 | `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
 | `records-server/web/`、`deploy/` | PC 管理页（`App` shell、`views/`、`components/`、`lib/`）、systemd、备份及恢复验证。 |
@@ -89,13 +90,14 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化、累计/测量值规则、目标累计和十进制步进。 |
-| `TodoModelsTest` | 待办标题、完成进度和计划日期分组派生。 |
-| `RecordFocusTest` | Focus 理由排序、逾期优先级、每任务下一子事项、计划日期边界和当日环统计。 |
-| `RecordsScreenTest` | Records 首字符与标题裁剪、待办排序、管理列表模式隔离、目标周期分组、进度边界、今日累计和下一个子事项。 |
+| `TodoModelsTest` | 待办子事项完成进度和下一动作派生。 |
+| `DailyPlanTest` | 回顾到期边界与主次承诺解析。 |
+| `DailyReminderSchedulerTest` | 仅活动当日计划产生 revision 绑定提醒。 |
+| `RecordsScreenTest` | 记录项排序、今日累计和目标跨越。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
-| `records-server/test/api.test.ts` | 空库迁移、累计/测量规则、流水创建/删除、待办计划日期、手动时间字段拒绝、审计快照、含多个 Measurement 最新值的根页 overview、模式筛选和批量 API。 |
-| `records-server/web/src/App.test.tsx` | PC 六区导航与总览、任务子事项完成和排序、固定模式记录项表单、流水新增/筛选/批量删除及审计日志。 |
+| `records-server/test/api.test.ts` | 六表迁移、记录规则、任务库存、每日计划状态/revision、overview、审计和批量 API。 |
+| `records-server/web/src/App.test.tsx` | PC 六区导航、Open/Completed 任务、固定模式记录项、流水和审计日志。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 
@@ -167,13 +169,14 @@ node --check tools/publish-update.mjs
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Woolbox、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 凭据时确认用户名键盘 `Next` 聚焦密码，密码使用 Password 键盘且 `Done` 可连接。默认进入 Records 根页 Tasks，新建任务应默认 Unscheduled，只显示一个日期入口且可独立清除；任务与累计表单均无时间段控件。创建标题和至少两个子事项并用箭头调整顺序；依次在进度 Sheet 勾选、重开子事项，确认 Focus 中同一任务只显示下一条未完成子事项，完成后按固定位序接替。进入 Manage tasks / Edit task，确认 Overdue、Today、Planned、Unscheduled、Completed 分组和日期副文案；逾期任务保留在 Focus，改为未来日期或清除日期后退出；刷新后服务端顺序一致。
-16. 在同一 Records 根页创建累计记录后确认液面、日目标饼或7 日目标分段条、快速记录、`Undo` 与断网错误行为；断网前启动刷新并立即记录一次，确认服务端写入成功不会被报告为写入失败，恢复网络后可刷新到新快照。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`。快速切换两个 Measurement，确认预览不被前一个请求覆盖；点卡确认预览 Sheet 显示 24 小时原始点位和流水，Slider 只能选择配置步进，录入后值和当前设备时间更新，短时 `Undo` 可删除该条流水；检查浅色与深色的可读性。
-17. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
-18. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
-19. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
-20. 发布 debug 通道后，在低版本 debug APK 打开 Setting；确认自动检查显示远端版本。确认下载 Dialog 的版本和大小；下载完成后断网重试安装仍复用并校验缓存。首次安装打开“安装未知应用”授权，返回后再次选择安装，确认 Android 安装器要求用户确认；篡改缓存 APK 后确认安装前会重新下载，非同包名、非同 build type 或非 `dl.1662803.xyz` manifest 均被拒绝。
-21. 在 Setting → Language 依次选择 `English`、`简体中文` 和 `Follow system`，确认 Activity 重建后底栏、Setting、Tools、工具详情与系统 Tile 标签使用目标语言；重启应用确认选择保持，并检查两种语言下列表副文案不截断关键状态。
+15. 配置 Records 后确认根页顺序为 Today、Tasks、Routines、Measurement。新建两个含子事项的任务，确认任务表单无日期，Manage tasks 只有 Open/Completed；创建 Today 时主任务必选、次任务可空且不能相同，第一步完成前不出现回顾。
+16. Android 13+ 拒绝通知权限时确认计划保持 `READY`，设置入口可恢复权限；授权后开始第一轮，使用 `adb shell dumpsys jobscheduler | rg "com.wswensw.woolbox|records-daily-review"` 确认只有一个调度。到期通知点击后应回到 Records Today；继续/切换后 revision 和下一提醒更新，第四轮、两项完成、结束今天及跨日均停止旧提醒。Android 12 直接检查系统通知开关。
+17. 在 Routines 创建累计记录后确认今日值、记录 Sheet、`Undo` 与断网错误行为。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`；确认 24 小时预览、离散 Slider、当前设备时间和短时 `Undo`。
+18. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
+19. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
+20. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
+21. 发布 debug 通道后，在低版本 debug APK 打开 Setting；确认自动检查、下载校验、安装来源授权和系统确认符合更新规则。
+22. 在 Setting → Language 依次选择 `English`、`简体中文` 和 `Follow system`，确认 Activity 重建后页面与系统 Tile 标签使用目标语言；重启应用确认选择保持。
 
 ## 设备诊断
 
