@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.R
+import com.wswensw.woolbox.record.model.TaskRepeatMode
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.validatedTaskTitle
@@ -51,7 +52,7 @@ fun TaskDetailScreen(
     task: TodoTask?,
     loading: Boolean,
     onBack: () -> Unit,
-    onSave: (String, (String?) -> Unit) -> Unit,
+    onSave: (String, TaskRepeatMode, (String?) -> Unit) -> Unit,
     onCreateStep: (String, (String?) -> Unit) -> Unit,
     onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
@@ -83,9 +84,10 @@ fun TaskDetailScreen(
     }
 
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
+    var repeatModeName by rememberSaveable(task.id) { mutableStateOf(task.repeatMode.name) }
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
-    var savingTitle by rememberSaveable { mutableStateOf(false) }
+    var savingTask by rememberSaveable { mutableStateOf(false) }
     var creatingStep by rememberSaveable { mutableStateOf(false) }
     var editingStepId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingStepId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -111,15 +113,16 @@ fun TaskDetailScreen(
             errorMessage = checkFieldsMessage
             return
         }
-        if (normalizedTitle == task.title) return
-        savingTitle = true
-        onSave(normalizedTitle) { error ->
-            savingTitle = false
+        val repeatMode = TaskRepeatMode.valueOf(repeatModeName)
+        if (normalizedTitle == task.title && repeatMode == task.repeatMode) return
+        savingTask = true
+        onSave(normalizedTitle, repeatMode) { error ->
+            savingTask = false
             errorMessage = error
         }
     }
 
-    val titleDirty = title.trim() != task.title
+    val taskDirty = title.trim() != task.title || repeatModeName != task.repeatMode.name
     AppRouteScaffold(
         title = stringResource(R.string.edit_task),
         onBack = onBack,
@@ -131,11 +134,11 @@ fun TaskDetailScreen(
             Spacer(Modifier.width(4.dp))
             FilledTonalIconButton(
                 onClick = ::saveTask,
-                enabled = !savingTitle && titleDirty && title.isNotBlank(),
+                enabled = !savingTask && taskDirty && title.isNotBlank(),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
-                    contentDescription = stringResource(if (savingTitle) R.string.saving else R.string.save_title),
+                    contentDescription = stringResource(if (savingTask) R.string.saving else R.string.action_save),
                 )
             }
         },
@@ -147,7 +150,7 @@ fun TaskDetailScreen(
                     title = it
                     titleError = null
                 },
-                enabled = !savingTitle,
+                enabled = !savingTask,
                 label = { Text(stringResource(R.string.field_title)) },
                 isError = titleError != null,
                 supportingText = titleError?.let { message -> { Text(message) } },
@@ -155,6 +158,14 @@ fun TaskDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
+            )
+        }
+
+        AppSection(title = stringResource(R.string.task_repeat)) {
+            TaskRepeatModeField(
+                value = TaskRepeatMode.valueOf(repeatModeName),
+                onChange = { repeatModeName = it.name },
+                enabled = !savingTask,
             )
         }
 

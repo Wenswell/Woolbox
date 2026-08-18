@@ -577,8 +577,8 @@ fun WoolboxApp(
             composable(AppRoutes.TASK_NEW) {
                 TaskCreateScreen(
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, steps, onResult ->
-                        recordsViewModel.createTask(title, steps) { taskId, error ->
+                    onCreate = { title, repeatMode, steps, onResult ->
+                        recordsViewModel.createTask(title, repeatMode, steps) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -594,8 +594,8 @@ fun WoolboxApp(
                     task = recordsState.findTask(taskId),
                     loading = recordsState.isLoading,
                     onBack = { navController.popBackStack() },
-                    onSave = { title, onResult ->
-                        recordsViewModel.updateTask(taskId, title, onResult)
+                    onSave = { title, repeatMode, onResult ->
+                        recordsViewModel.updateTask(taskId, title, repeatMode, onResult)
                     },
                     onCreateStep = { title, onResult ->
                         recordsViewModel.createStep(taskId, title, onResult)

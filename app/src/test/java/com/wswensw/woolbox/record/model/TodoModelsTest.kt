@@ -21,6 +21,7 @@ class TodoModelsTest {
     private fun task(steps: List<TodoStep>) = TodoTask(
         id = 1,
         title = "Outcome",
+        repeatMode = TaskRepeatMode.ONCE,
         completedAt = null,
         createdAt = 0,
         updatedAt = 0,

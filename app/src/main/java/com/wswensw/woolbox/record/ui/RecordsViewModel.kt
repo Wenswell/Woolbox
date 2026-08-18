@@ -16,6 +16,7 @@ import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.RecordsClock
+import com.wswensw.woolbox.record.model.TaskRepeatMode
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.reminder.DailyReminderScheduler
 import java.time.LocalDate
@@ -213,12 +214,13 @@ class RecordsViewModel(
 
     fun createTask(
         title: String,
+        repeatMode: TaskRepeatMode,
         steps: List<TodoStepDraft>,
         onResult: (taskId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
             writeAndRefresh(
-                action = { repository.createTask(title, steps) },
+                action = { repository.createTask(title, repeatMode, steps, LocalDate.now()) },
                 onWritten = { taskId -> onResult(taskId, null) },
             ).onFailure { failure ->
                 onResult(null, failure.localizedFailure(R.string.task_create_failed))
@@ -226,11 +228,16 @@ class RecordsViewModel(
         }
     }
 
-    fun updateTask(taskId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
+    fun updateTask(
+        taskId: Long,
+        title: String,
+        repeatMode: TaskRepeatMode,
+        onResult: (String?) -> Unit,
+    ) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.task_update_failed,
     ) {
-        repository.updateTask(taskId, title)
+        repository.updateTask(taskId, title, repeatMode, LocalDate.now())
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
@@ -288,7 +295,7 @@ class RecordsViewModel(
         onResult = onResult,
         failureMessageRes = R.string.subtask_add_failed,
     ) {
-        repository.createStep(taskId, title)
+        repository.createStep(taskId, title, LocalDate.now())
     }
 
     fun updateStep(
@@ -299,28 +306,28 @@ class RecordsViewModel(
         onResult = onResult,
         failureMessageRes = R.string.subtask_update_failed,
     ) {
-        repository.updateStep(stepId, title)
+        repository.updateStep(stepId, title, LocalDate.now())
     }
 
     fun setStepCompleted(stepId: Long, completed: Boolean, onResult: (String?) -> Unit = {}) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.subtask_update_failed,
     ) {
-        repository.setStepCompleted(stepId, completed)
+        repository.setStepCompleted(stepId, completed, LocalDate.now())
     }
 
     fun deleteStep(stepId: Long, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.subtask_delete_failed,
     ) {
-        repository.deleteStep(stepId)
+        repository.deleteStep(stepId, LocalDate.now())
     }
 
     fun reorderSteps(taskId: Long, stepIds: List<Long>, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.subtask_reorder_failed,
     ) {
-        repository.reorderSteps(taskId, stepIds)
+        repository.reorderSteps(taskId, stepIds, LocalDate.now())
     }
 
     fun loadMeasurementPreview(itemId: Long) {

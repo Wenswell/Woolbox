@@ -243,6 +243,10 @@
     <string name="more_actions_for">More actions for %1$s</string>
     <string name="task_not_found">Task not found.</string>
     <string name="task_title">Task</string>
+    <string name="task_repeat">Repeat</string>
+    <string name="task_once">Once</string>
+    <string name="task_daily">Daily</string>
+    <string name="task_summary_repeat">%1$s · %2$s</string>
     <string name="field_title">Title</string>
     <string name="subtasks">Subtasks</string>
     <string name="move_subtask_up">Move subtask %1$d up</string>
@@ -256,7 +260,6 @@
     <string name="delete_subtask_question">Delete subtask?</string>
     <string name="delete_task_question">Delete task?</string>
     <string name="delete_task">Delete task</string>
-    <string name="save_title">Save title</string>
     <string name="move_subtask_up_generic">Move subtask up</string>
     <string name="move_subtask_down_generic">Move subtask down</string>
     <string name="delete_subtask">Delete subtask</string>

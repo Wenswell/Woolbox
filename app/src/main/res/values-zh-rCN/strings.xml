@@ -239,6 +239,10 @@
     <string name="more_actions_for">%1$s 的更多操作</string>
     <string name="task_not_found">未找到任务。</string>
     <string name="task_title">任务</string>
+    <string name="task_repeat">重复</string>
+    <string name="task_once">单次</string>
+    <string name="task_daily">每天</string>
+    <string name="task_summary_repeat">%1$s · %2$s</string>
     <string name="field_title">标题</string>
     <string name="subtasks">子任务</string>
     <string name="move_subtask_up">上移子任务 %1$d</string>
@@ -252,7 +256,6 @@
     <string name="delete_subtask_question">删除子任务？</string>
     <string name="delete_task_question">删除任务？</string>
     <string name="delete_task">删除任务</string>
-    <string name="save_title">保存标题</string>
     <string name="move_subtask_up_generic">上移子任务</string>
     <string name="move_subtask_down_generic">下移子任务</string>
     <string name="delete_subtask">删除子任务</string>

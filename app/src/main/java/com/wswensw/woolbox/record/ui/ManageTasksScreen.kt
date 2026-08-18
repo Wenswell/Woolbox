@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
+import com.wswensw.woolbox.record.model.TaskRepeatMode
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.ui.AppLazyRouteScaffold
 import com.wswensw.woolbox.ui.AppStyle
@@ -197,7 +198,17 @@ private fun TaskManageCard(
                         )
                     }
                     Text(
-                        text = stringResource(R.string.subtasks_progress, completed, total),
+                        text = stringResource(
+                            R.string.task_summary_repeat,
+                            stringResource(R.string.subtasks_progress, completed, total),
+                            stringResource(
+                                if (task.repeatMode == TaskRepeatMode.ONCE) {
+                                    R.string.task_once
+                                } else {
+                                    R.string.task_daily
+                                },
+                            ),
+                        ),
                         color = contentColor.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,

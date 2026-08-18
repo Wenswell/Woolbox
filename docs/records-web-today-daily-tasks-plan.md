@@ -1,6 +1,6 @@
 # Records 管理端 Today 与每日任务
 
-Status: in progress (server and PC complete)
+Status: in progress (server, PC, and Android complete)
 
 ## 目标
 

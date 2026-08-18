@@ -12,6 +12,7 @@ import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.DailyPlanState
 import com.wswensw.woolbox.record.model.RecordsClock
+import com.wswensw.woolbox.record.model.TaskRepeatMode
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.ui.AppTheme
@@ -113,6 +114,7 @@ class RecordsTodaySemanticsTest {
     private fun task() = TodoTask(
         id = 1,
         title = "Primary task",
+        repeatMode = TaskRepeatMode.ONCE,
         completedAt = null,
         createdAt = 0,
         updatedAt = 0,

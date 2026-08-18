@@ -1,8 +1,14 @@
 package com.wswensw.woolbox.record.model
 
+enum class TaskRepeatMode {
+    ONCE,
+    DAILY,
+}
+
 data class TodoTask(
     val id: Long,
     val title: String,
+    val repeatMode: TaskRepeatMode,
     val completedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,

@@ -42,5 +42,5 @@ class DailyPlanTest {
         updatedAt = 0,
     )
 
-    private fun task(id: Long) = TodoTask(id, "Task $id", null, 0, 0, emptyList())
+    private fun task(id: Long) = TodoTask(id, "Task $id", TaskRepeatMode.ONCE, null, 0, 0, emptyList())
 }

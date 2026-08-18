@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.TodoStepDraft
+import com.wswensw.woolbox.record.model.TaskRepeatMode
 import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
@@ -39,12 +40,14 @@ fun TaskCreateScreen(
     onBack: () -> Unit,
     onCreate: (
         title: String,
+        repeatMode: TaskRepeatMode,
         steps: List<TodoStepDraft>,
         onResult: (String?) -> Unit,
     ) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
+    var repeatModeName by rememberSaveable { mutableStateOf(TaskRepeatMode.ONCE.name) }
     var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
@@ -66,7 +69,7 @@ fun TaskCreateScreen(
             return
         }
         saving = true
-        onCreate(normalizedTitle, normalizedSteps) { error ->
+        onCreate(normalizedTitle, TaskRepeatMode.valueOf(repeatModeName), normalizedSteps) { error ->
             saving = false
             errorMessage = error
         }
@@ -103,6 +106,13 @@ fun TaskCreateScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
+            )
+        }
+        AppSection(title = stringResource(R.string.task_repeat)) {
+            TaskRepeatModeField(
+                value = TaskRepeatMode.valueOf(repeatModeName),
+                onChange = { repeatModeName = it.name },
+                enabled = !saving,
             )
         }
         AppSection(title = stringResource(R.string.subtasks)) {

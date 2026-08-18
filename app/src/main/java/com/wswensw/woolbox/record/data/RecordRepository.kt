@@ -13,6 +13,7 @@ import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordValidationException
 import com.wswensw.woolbox.record.model.RecordValueType
+import com.wswensw.woolbox.record.model.TaskRepeatMode
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
 import com.wswensw.woolbox.record.model.goalValues
@@ -157,7 +158,9 @@ class RecordRepository(context: Context) {
 
     suspend fun createTask(
         title: String,
+        repeatMode: TaskRepeatMode,
         steps: List<TodoStepDraft>,
+        localDate: LocalDate,
     ): Long = withContext(Dispatchers.IO) {
         if (steps.isEmpty()) {
             throw RecordValidationException("At least one subtask is required.")
@@ -167,22 +170,32 @@ class RecordRepository(context: Context) {
             "tasks",
             body = JSONObject().apply {
                 put("title", validatedTaskTitle(title))
+                put("repeatMode", repeatMode.name)
+                put("localDate", localDate.toString())
                 put("steps", JSONArray(steps.map(::stepJson)))
             },
         ).getJSONObject("task").getLong("id")
     }
 
-    suspend fun updateTask(taskId: Long, title: String) = withContext(Dispatchers.IO) {
+    suspend fun updateTask(
+        taskId: Long,
+        title: String,
+        repeatMode: TaskRepeatMode,
+        localDate: LocalDate,
+    ) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "tasks/$taskId",
-            body = JSONObject().put("title", validatedTaskTitle(title)),
+            body = JSONObject()
+                .put("title", validatedTaskTitle(title))
+                .put("repeatMode", repeatMode.name)
+                .put("localDate", localDate.toString()),
         )
         Unit
     }
 
-    suspend fun deleteTask(taskId: Long, planDate: LocalDate) = withContext(Dispatchers.IO) {
-        request("DELETE", "tasks/$taskId", query = mapOf("planDate" to planDate.toString()))
+    suspend fun deleteTask(taskId: Long, localDate: LocalDate) = withContext(Dispatchers.IO) {
+        request("DELETE", "tasks/$taskId", query = mapOf("localDate" to localDate.toString()))
         Unit
     }
 
@@ -263,41 +276,49 @@ class RecordRepository(context: Context) {
     suspend fun createStep(
         taskId: Long,
         title: String,
+        localDate: LocalDate,
     ): Long = withContext(Dispatchers.IO) {
         request(
             "POST",
             "tasks/$taskId/steps",
-            body = stepJson(TodoStepDraft(title = title)),
+            body = stepJson(TodoStepDraft(title = title)).put("localDate", localDate.toString()),
         ).getJSONObject("step").getLong("id")
     }
 
     suspend fun updateStep(
         stepId: Long,
         title: String,
+        localDate: LocalDate,
     ) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "steps/$stepId",
-            body = stepJson(TodoStepDraft(title = title)),
+            body = stepJson(TodoStepDraft(title = title)).put("localDate", localDate.toString()),
         )
         Unit
     }
 
-    suspend fun setStepCompleted(stepId: Long, completed: Boolean) = withContext(Dispatchers.IO) {
-        request("PUT", "steps/$stepId/completion", body = JSONObject().put("completed", completed))
+    suspend fun setStepCompleted(stepId: Long, completed: Boolean, localDate: LocalDate) = withContext(Dispatchers.IO) {
+        request(
+            "PUT",
+            "steps/$stepId/completion",
+            body = JSONObject().put("completed", completed).put("localDate", localDate.toString()),
+        )
         Unit
     }
 
-    suspend fun deleteStep(stepId: Long) = withContext(Dispatchers.IO) {
-        request("DELETE", "steps/$stepId")
+    suspend fun deleteStep(stepId: Long, localDate: LocalDate) = withContext(Dispatchers.IO) {
+        request("DELETE", "steps/$stepId", query = mapOf("localDate" to localDate.toString()))
         Unit
     }
 
-    suspend fun reorderSteps(taskId: Long, stepIds: List<Long>) = withContext(Dispatchers.IO) {
+    suspend fun reorderSteps(taskId: Long, stepIds: List<Long>, localDate: LocalDate) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "tasks/$taskId/steps/order",
-            body = JSONObject().put("ids", JSONArray(stepIds)),
+            body = JSONObject()
+                .put("ids", JSONArray(stepIds))
+                .put("localDate", localDate.toString()),
         )
         Unit
     }
@@ -406,6 +427,7 @@ private fun stepJson(step: TodoStepDraft) = JSONObject()
 private fun parseTask(value: JSONObject) = TodoTask(
     id = value.getLong("id"),
     title = value.getString("title"),
+    repeatMode = TaskRepeatMode.valueOf(value.getString("repeatMode")),
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
