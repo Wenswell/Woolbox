@@ -695,6 +695,85 @@ describe("Records API", () => {
     ]);
   });
 
+  it("supports explicit Today administration without weakening normal review timing", async () => {
+    await createTask({ title: "Primary", steps: ["Primary step"] });
+    await createTask({ title: "Secondary", steps: ["Secondary step"] });
+    await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: { localDate: TestDate, firstMove: "Start", primaryTaskId: 1, secondaryTaskId: 2 },
+    });
+    await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/start`,
+      payload: { expectedRevision: 0, occurredAt: 1_000 },
+    });
+
+    expect((await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/review`,
+      payload: { expectedRevision: 1, occurredAt: 2_000, currentTaskId: 1 },
+    })).statusCode).toBe(409);
+
+    let plan = (await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/review-now`,
+      payload: { expectedRevision: 1, occurredAt: 2_000, currentTaskId: 1 },
+    })).json().dailyPlan;
+    expect(plan).toMatchObject({ state: "ACTIVE", completedRounds: 1, currentTaskId: 1, nextReviewAt: 3_602_000, revision: 2 });
+
+    plan = (await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/switch`,
+      payload: { expectedRevision: 2, occurredAt: 3_000, currentTaskId: 2 },
+    })).json().dailyPlan;
+    expect(plan).toMatchObject({ state: "ACTIVE", completedRounds: 1, currentTaskId: 2, nextReviewAt: 3_603_000, revision: 3 });
+    expect((await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/switch`,
+      payload: { expectedRevision: 3, occurredAt: 3_500, currentTaskId: 2 },
+    })).statusCode).toBe(409);
+
+    await setStepCompleted(1, true);
+    plan = (await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/end`,
+      payload: { expectedRevision: 3, occurredAt: 4_000 },
+    })).json().dailyPlan;
+    expect(plan).toMatchObject({ state: "ENDED", completedRounds: 1, endedAt: 4_000, revision: 4 });
+
+    plan = (await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/reset`,
+      payload: { expectedRevision: 4, occurredAt: 5_000 },
+    })).json().dailyPlan;
+    expect(plan).toMatchObject({
+      state: "READY",
+      firstMove: "Start",
+      primaryTaskId: 1,
+      secondaryTaskId: 2,
+      firstMoveCompletedAt: null,
+      currentTaskId: null,
+      completedRounds: 0,
+      nextReviewAt: null,
+      endedAt: null,
+      revision: 5,
+    });
+    expect((await getTasks())[0]).toMatchObject({ completedAt: expect.any(Number) });
+    expect((await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/reset`,
+      payload: { expectedRevision: 5, occurredAt: 6_000 },
+    })).statusCode).toBe(409);
+
+    expect((await getAuditLogs()).map((log) => log.action).filter((action) => String(action).startsWith("DAILY_PLAN"))).toEqual([
+      "DAILY_PLAN_UPDATED",
+      "DAILY_PLAN_ENDED",
+      "DAILY_PLAN_UPDATED",
+      "DAILY_PLAN_CREATED",
+    ]);
+  });
+
   it("replaces an active commitment and advances when committed tasks complete", async () => {
     await createTask({ title: "Old primary", steps: ["Old step"] });
     await createTask({ title: "Secondary", steps: ["Secondary step"] });

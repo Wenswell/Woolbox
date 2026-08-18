@@ -140,6 +140,20 @@ export function buildApp(options: BuildAppOptions) {
     ),
   }));
 
+  app.put("/api/daily-plans/:localDate/review-now", (request) => ({
+    dailyPlan: records.reviewDailyPlanNow(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanReviewInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-plans/:localDate/switch", (request) => ({
+    dailyPlan: records.switchDailyPlanTask(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanReviewInput(request.body),
+    ),
+  }));
+
   app.put("/api/daily-plans/:localDate/extra-round", (request) => ({
     dailyPlan: records.startExtraRound(
       parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
@@ -149,6 +163,13 @@ export function buildApp(options: BuildAppOptions) {
 
   app.put("/api/daily-plans/:localDate/end", (request) => ({
     dailyPlan: records.endDailyPlan(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanTransitionInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-plans/:localDate/reset", (request) => ({
+    dailyPlan: records.resetDailyPlan(
       parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
       parseDailyPlanTransitionInput(request.body),
     ),

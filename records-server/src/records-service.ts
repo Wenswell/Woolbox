@@ -539,11 +539,93 @@ export class RecordsService {
   }
 
   reviewDailyPlan(localDate: string, input: DailyPlanReviewInput) {
+    return this.completeDailyPlanRound(localDate, input, true);
+  }
+
+  reviewDailyPlanNow(localDate: string, input: DailyPlanReviewInput) {
+    return this.completeDailyPlanRound(localDate, input, false);
+  }
+
+  switchDailyPlanTask(localDate: string, input: DailyPlanReviewInput) {
+    this.db.transaction((tx) => {
+      const plan = this.requireDailyPlan(tx, localDate);
+      this.requireRevision(plan, input.expectedRevision);
+      if (plan.state !== "ACTIVE") throw new ApiError(409, "Only active plans can switch the current task.");
+      if (input.currentTaskId === plan.currentTaskId) throw new ApiError(409, "Choose the other unfinished commitment.");
+      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId, localDate)) {
+        throw new ApiError(409, "Current task must be an unfinished commitment.");
+      }
+      const now = this.now();
+      const updated: DailyPlanRow = {
+        ...plan,
+        currentTaskId: input.currentTaskId,
+        nextReviewAt: input.occurredAt + ReviewIntervalMs,
+        revision: plan.revision + 1,
+        updatedAt: now,
+      };
+      tx.update(dailyPlans).set({
+        currentTaskId: updated.currentTaskId,
+        nextReviewAt: updated.nextReviewAt,
+        revision: updated.revision,
+        updatedAt: now,
+      }).where(eq(dailyPlans.id, plan.id)).run();
+      this.writeAudit(tx, {
+        action: "DAILY_PLAN_UPDATED",
+        entityType: "DAILY_PLAN",
+        entityId: plan.id,
+        before: dailyPlanSnapshot(plan),
+        after: dailyPlanSnapshot(updated),
+        createdAt: now,
+      });
+    });
+    return this.getDailyPlan(localDate)!;
+  }
+
+  resetDailyPlan(localDate: string, input: DailyPlanTransitionInput) {
+    this.db.transaction((tx) => {
+      const plan = this.requireDailyPlan(tx, localDate);
+      this.requireRevision(plan, input.expectedRevision);
+      if (plan.state === "READY") throw new ApiError(409, "The plan is already ready.");
+      const now = this.now();
+      const updated: DailyPlanRow = {
+        ...plan,
+        firstMoveCompletedAt: null,
+        currentTaskId: null,
+        state: "READY",
+        completedRounds: 0,
+        nextReviewAt: null,
+        endedAt: null,
+        revision: plan.revision + 1,
+        updatedAt: now,
+      };
+      tx.update(dailyPlans).set({
+        firstMoveCompletedAt: null,
+        currentTaskId: null,
+        state: updated.state,
+        completedRounds: 0,
+        nextReviewAt: null,
+        endedAt: null,
+        revision: updated.revision,
+        updatedAt: now,
+      }).where(eq(dailyPlans.id, plan.id)).run();
+      this.writeAudit(tx, {
+        action: "DAILY_PLAN_UPDATED",
+        entityType: "DAILY_PLAN",
+        entityId: plan.id,
+        before: dailyPlanSnapshot(plan),
+        after: dailyPlanSnapshot(updated),
+        createdAt: now,
+      });
+    });
+    return this.getDailyPlan(localDate)!;
+  }
+
+  private completeDailyPlanRound(localDate: string, input: DailyPlanReviewInput, requireDue: boolean) {
     return this.transitionDailyPlan(localDate, input, (tx, plan) => {
       if (plan.state !== "ACTIVE" || plan.nextReviewAt === null) {
         throw new ApiError(409, "Only active plans can be reviewed.");
       }
-      if (input.occurredAt < plan.nextReviewAt) throw new ApiError(409, "The next review is not due yet.");
+      if (requireDue && input.occurredAt < plan.nextReviewAt) throw new ApiError(409, "The next review is not due yet.");
       if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId, localDate)) {
         throw new ApiError(409, "Current task must be an unfinished commitment.");
       }

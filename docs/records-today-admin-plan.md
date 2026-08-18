@@ -1,6 +1,6 @@
 # Records Today 完整管理
 
-Status: planned
+Status: in progress (server complete)
 
 ## 目标
 
