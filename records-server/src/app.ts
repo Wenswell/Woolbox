@@ -4,12 +4,13 @@ import { resolve } from "node:path";
 import { openRecordsDatabase } from "./database.js";
 import {
   ApiError,
+  parseArchived,
+  parseCommitmentStepCompletionInput,
+  parseDailyPlanAddCommitmentInput,
   parseDailyPlanCreateInput,
   parseDailyPlanReviewInput,
   parseDailyPlanTransitionInput,
   parseDailyPlanUpdateInput,
-  parseArchived,
-  parseDatedStepInput,
   parseEntryInput,
   parseId,
   parseIds,
@@ -17,10 +18,7 @@ import {
   parseItemInput,
   parseOptionalId,
   parseOptionalRecordMode,
-  parseStepCompletionInput,
-  parseStepOrderInput,
-  parseTaskCreateInput,
-  parseTaskWriteInput,
+  parseTemplateWriteInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
 
@@ -94,9 +92,14 @@ export function buildApp(options: BuildAppOptions) {
     return { item };
   });
 
-  app.get("/api/tasks", (request) => {
+  app.get("/api/templates", (request) => {
     const query = request.query as Record<string, unknown>;
-    return { tasks: records.listTasks(parseIsoDate(query.localDate, "Local date")) };
+    const archived = query.archived === undefined ? false : query.archived === "true"
+      ? true
+      : query.archived === "false"
+        ? false
+        : invalidBoolean();
+    return { templates: records.listTemplates(archived) };
   });
 
   app.get("/api/overview", (request) => {
@@ -148,18 +151,26 @@ export function buildApp(options: BuildAppOptions) {
   }));
 
   app.put("/api/daily-plans/:localDate/switch", (request) => ({
-    dailyPlan: records.switchDailyPlanTask(
+    dailyPlan: records.switchDailyPlanCommitment(
       parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
       parseDailyPlanReviewInput(request.body),
     ),
   }));
 
-  app.put("/api/daily-plans/:localDate/extra-round", (request) => ({
-    dailyPlan: records.startExtraRound(
+  app.put("/api/daily-plans/:localDate/continue", (request) => ({
+    dailyPlan: records.continueDailyPlan(
       parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
       parseDailyPlanReviewInput(request.body),
     ),
   }));
+
+  app.post("/api/daily-plans/:localDate/commitments", (request, reply) => {
+    const dailyPlan = records.addDailyPlanCommitment(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyPlanAddCommitmentInput(request.body),
+    );
+    return reply.status(201).send({ dailyPlan });
+  });
 
   app.put("/api/daily-plans/:localDate/end", (request) => ({
     dailyPlan: records.endDailyPlan(
@@ -175,72 +186,36 @@ export function buildApp(options: BuildAppOptions) {
     ),
   }));
 
-  app.post("/api/tasks", (request, reply) => {
-    const task = records.createTask(parseTaskCreateInput(request.body));
-    return reply.status(201).send({ task });
+  app.post("/api/templates", (request, reply) => {
+    const template = records.createTemplate(parseTemplateWriteInput(request.body));
+    return reply.status(201).send({ template });
   });
 
-  app.put("/api/tasks/:id", (request) => ({
-    task: records.updateTask(
-      parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseTaskWriteInput(request.body),
+  app.put("/api/templates/:id", (request) => ({
+    template: records.updateTemplate(
+      parseId((request.params as { id?: unknown }).id, "Template ID"),
+      parseTemplateWriteInput(request.body),
     ),
   }));
 
-  app.delete("/api/tasks/:id", (request) => {
-    const query = request.query as Record<string, unknown>;
-    return {
-      task: records.deleteTask(
-        parseId((request.params as { id?: unknown }).id, "Task ID"),
-        parseIsoDate(query.localDate, "Local date"),
-      ),
-    };
+  app.post("/api/templates/batch-archive", (request) => {
+    const templates = records.setTemplatesArchived(parseIds(request.body), parseArchived(request.body));
+    return { templates };
   });
 
-  app.post("/api/tasks/:id/steps", (request, reply) => {
-    const step = records.createStep(
-      parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseDatedStepInput(request.body),
+  app.delete("/api/templates/:id", (request) => {
+    const template = records.deleteArchivedTemplate(
+      parseId((request.params as { id?: unknown }).id, "Template ID"),
     );
-    return reply.status(201).send({ step });
+    return { template };
   });
 
-  app.put("/api/tasks/:id/steps/order", (request) => {
-    const input = parseStepOrderInput(request.body);
+  app.put("/api/commitment-steps/:id/completion", (request) => {
+    const input = parseCommitmentStepCompletionInput(request.body);
     return {
-      task: records.reorderSteps(
-        parseId((request.params as { id?: unknown }).id, "Task ID"),
-        input.ids,
-        input.localDate,
-      ),
-    };
-  });
-
-
-  app.put("/api/steps/:id", (request) => ({
-    step: records.updateStep(
-      parseId((request.params as { id?: unknown }).id, "Step ID"),
-      parseDatedStepInput(request.body),
-    ),
-  }));
-
-  app.put("/api/steps/:id/completion", (request) => {
-    const input = parseStepCompletionInput(request.body);
-    return {
-      step: records.setStepCompleted(
-        parseId((request.params as { id?: unknown }).id, "Step ID"),
-        input.completed,
-        input.localDate,
-      ),
-    };
-  });
-
-  app.delete("/api/steps/:id", (request) => {
-    const query = request.query as Record<string, unknown>;
-    return {
-      step: records.deleteStep(
-        parseId((request.params as { id?: unknown }).id, "Step ID"),
-        parseIsoDate(query.localDate, "Local date"),
+      dailyPlan: records.setCommitmentStepCompleted(
+        parseId((request.params as { id?: unknown }).id, "Commitment step ID"),
+        input,
       ),
     };
   });

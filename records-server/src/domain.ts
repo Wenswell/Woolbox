@@ -2,16 +2,16 @@ export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
-export const DAILY_PLAN_STATES = ["READY", "ACTIVE", "ENOUGH", "ENDED"] as const;
-export const DAILY_PLAN_COMPLETION_REASONS = ["ROUNDS", "COMMITMENTS"] as const;
-export const TASK_REPEAT_MODES = ["ONCE", "DAILY"] as const;
+export const DAILY_PLAN_STATES = ["READY", "ACTIVE", "PAUSED", "ENDED"] as const;
+export const DAILY_PLAN_PAUSE_REASONS = ["COMMITMENTS_COMPLETED", "TARGET_REACHED"] as const;
+export const TEMPLATE_CADENCES = ["MANUAL", "DAILY"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
 export type DailyPlanState = (typeof DAILY_PLAN_STATES)[number];
-export type DailyPlanCompletionReason = (typeof DAILY_PLAN_COMPLETION_REASONS)[number];
-export type TaskRepeatMode = (typeof TASK_REPEAT_MODES)[number];
+export type DailyPlanPauseReason = (typeof DAILY_PLAN_PAUSE_REASONS)[number];
+export type TemplateCadence = (typeof TEMPLATE_CADENCES)[number];
 
 export interface RecordItemInput {
   name: string;
@@ -36,48 +36,33 @@ export interface RecordEntryInput {
   value: number;
 }
 
-export interface TaskTitleInput {
+export interface StepTitleInput {
   title: string;
 }
 
-export type StepTitleInput = TaskTitleInput;
-
-export interface DatedStepInput extends StepTitleInput {
-  localDate: string;
-}
-
-export interface TaskWriteInput extends TaskTitleInput {
-  repeatMode: TaskRepeatMode;
-  localDate: string;
-}
-
-export interface TaskCreateInput extends TaskTitleInput {
-  repeatMode: TaskRepeatMode;
-  localDate: string;
+export interface TemplateWriteInput {
+  title: string;
+  cadence: TemplateCadence;
   steps: StepTitleInput[];
 }
 
-export interface StepCompletionInput {
+export interface CommitmentStepCompletionInput {
   completed: boolean;
-  localDate: string;
-}
-
-export interface StepOrderInput {
-  ids: number[];
-  localDate: string;
+  expectedRevision: number;
+  occurredAt: number;
 }
 
 export interface DailyPlanCreateInput {
   localDate: string;
   firstMove: string;
-  primaryTaskId: number;
-  secondaryTaskId: number | null;
+  primaryTemplateId: number;
+  secondaryTemplateId: number | null;
 }
 
 export interface DailyPlanUpdateInput {
   firstMove: string;
-  primaryTaskId: number;
-  secondaryTaskId: number | null;
+  primaryTemplateId: number;
+  secondaryTemplateId: number | null;
   expectedRevision: number;
   occurredAt: number;
 }
@@ -88,7 +73,11 @@ export interface DailyPlanTransitionInput {
 }
 
 export interface DailyPlanReviewInput extends DailyPlanTransitionInput {
-  currentTaskId: number;
+  currentCommitmentId: number;
+}
+
+export interface DailyPlanAddCommitmentInput extends DailyPlanTransitionInput {
+  templateId: number;
 }
 
 export class ApiError extends Error {
@@ -163,14 +152,6 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
   return entry;
 }
 
-export function parseTaskInput(value: unknown): TaskTitleInput {
-  const input = objectInput(value);
-  requireRule(input.plannedDate === undefined, "Task dates are not supported.");
-  const title = stringField(input, "title").trim();
-  requireRule(title.length > 0, "Title is required.");
-  return { title };
-}
-
 export function parseStepTitleInput(value: unknown): StepTitleInput {
   const input = objectInput(value);
   requireRule(input.windows === undefined, "Manual time windows are not supported.");
@@ -179,47 +160,22 @@ export function parseStepTitleInput(value: unknown): StepTitleInput {
   return { title };
 }
 
-export function parseTaskWriteInput(value: unknown): TaskWriteInput {
+export function parseTemplateWriteInput(value: unknown): TemplateWriteInput {
   const input = objectInput(value);
-  return {
-    ...parseTaskInput(input),
-    repeatMode: enumField(input, "repeatMode", TASK_REPEAT_MODES),
-    localDate: parseIsoDate(input.localDate, "Local date"),
-  };
-}
-
-export function parseTaskCreateInput(value: unknown): TaskCreateInput {
-  const input = objectInput(value);
-  const { title } = parseTaskInput(input);
-  const repeatMode = enumField(input, "repeatMode", TASK_REPEAT_MODES);
-  const localDate = parseIsoDate(input.localDate, "Local date");
+  const title = requiredTrimmedString(input, "title", "Title is required.");
+  const cadence = enumField(input, "cadence", TEMPLATE_CADENCES);
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
   const steps = input.steps.map(parseStepTitleInput);
-  return { title, repeatMode, localDate, steps };
+  return { title, cadence, steps };
 }
 
-export function parseDatedStepInput(value: unknown): DatedStepInput {
-  const input = objectInput(value);
-  return {
-    ...parseStepTitleInput(input),
-    localDate: parseIsoDate(input.localDate, "Local date"),
-  };
-}
-
-export function parseStepCompletionInput(value: unknown): StepCompletionInput {
+export function parseCommitmentStepCompletionInput(value: unknown): CommitmentStepCompletionInput {
   const input = objectInput(value);
   requireRule(typeof input.completed === "boolean", "Completed must be a boolean.");
   return {
     completed: input.completed,
-    localDate: parseIsoDate(input.localDate, "Local date"),
-  };
-}
-
-export function parseStepOrderInput(value: unknown): StepOrderInput {
-  const input = objectInput(value);
-  return {
-    ids: parseIds(input),
-    localDate: parseIsoDate(input.localDate, "Local date"),
+    expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
   };
 }
 
@@ -228,10 +184,10 @@ export function parseDailyPlanCreateInput(value: unknown): DailyPlanCreateInput 
   const result = {
     localDate: parseIsoDate(input.localDate, "Local date"),
     firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
-    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
-    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
+    primaryTemplateId: positiveIntegerField(input, "primaryTemplateId"),
+    secondaryTemplateId: nullablePositiveIntegerField(input, "secondaryTemplateId"),
   };
-  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary tasks must be different.");
+  requireRule(result.primaryTemplateId !== result.secondaryTemplateId, "Primary and secondary templates must be different.");
   return result;
 }
 
@@ -239,12 +195,12 @@ export function parseDailyPlanUpdateInput(value: unknown): DailyPlanUpdateInput 
   const input = objectInput(value);
   const result = {
     firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
-    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
-    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
+    primaryTemplateId: positiveIntegerField(input, "primaryTemplateId"),
+    secondaryTemplateId: nullablePositiveIntegerField(input, "secondaryTemplateId"),
     expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
     occurredAt: nonNegativeIntegerField(input, "occurredAt"),
   };
-  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary tasks must be different.");
+  requireRule(result.primaryTemplateId !== result.secondaryTemplateId, "Primary and secondary templates must be different.");
   return result;
 }
 
@@ -260,7 +216,15 @@ export function parseDailyPlanReviewInput(value: unknown): DailyPlanReviewInput 
   const input = objectInput(value);
   return {
     ...parseDailyPlanTransitionInput(input),
-    currentTaskId: positiveIntegerField(input, "currentTaskId"),
+    currentCommitmentId: positiveIntegerField(input, "currentCommitmentId"),
+  };
+}
+
+export function parseDailyPlanAddCommitmentInput(value: unknown): DailyPlanAddCommitmentInput {
+  const input = objectInput(value);
+  return {
+    ...parseDailyPlanTransitionInput(input),
+    templateId: positiveIntegerField(input, "templateId"),
   };
 }
 

@@ -14,7 +14,7 @@ describe("Records migrations", () => {
     if (directory) rmSync(directory, { recursive: true, force: true });
   });
 
-  it("upgrades legacy tasks into the daily commitment schema", async () => {
+  it("replaces legacy planning data while preserving record data and audits", async () => {
     directory = mkdtempSync(join(tmpdir(), "records-migration-test-"));
     const databaseFile = join(directory, "records.sqlite");
     const publishedMigrations = join(directory, "published-migrations");
@@ -48,6 +48,12 @@ describe("Records migrations", () => {
     sqlite.prepare(
       "INSERT INTO record_windows (item_id, start_minute, end_minute) VALUES (?, ?, ?)",
     ).run(itemId, 480, 540);
+    sqlite.prepare(
+      "INSERT INTO record_audit_logs (action, entity_type, entity_id, before_json, after_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run("TASK_CREATED", "TASK", taskId, null, "{}", 2);
+    sqlite.prepare(
+      "INSERT INTO record_audit_logs (action, entity_type, entity_id, before_json, after_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run("ITEM_CREATED", "ITEM", itemId, null, "{}", 2);
     sqlite.close();
 
     const app = buildApp({ databaseFile });
@@ -62,21 +68,21 @@ describe("Records migrations", () => {
     expect(tableNames(migrated)).not.toContain("todo_step_windows");
     expect(tableNames(migrated)).not.toContain("record_windows");
     expect(tableNames(migrated)).not.toContain("todo_task_windows");
-    expect(tableNames(migrated)).toContain("daily_plans");
-    expect(columnNames(migrated, "daily_plans")).toContain("completion_reason");
-    expect(tableNames(migrated)).toContain("todo_step_completions");
-    expect(columnNames(migrated, "todo_tasks")).not.toContain("planned_date");
-    expect(columnNames(migrated, "todo_tasks")).not.toContain("horizon");
-    expect(columnNames(migrated, "todo_tasks")).not.toContain("completed_at");
-    expect(columnNames(migrated, "todo_steps")).not.toContain("completed_at");
-    expect(migrated.prepare("SELECT title, repeat_mode FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({
-      title: "Legacy task",
-      repeat_mode: "ONCE",
-    });
-    expect(migrated.prepare("SELECT title, position FROM todo_steps WHERE id = ?").get(stepId)).toEqual({ title: "Legacy step", position: 0 });
-    expect(migrated.prepare(
-      "SELECT step_id, scope, local_date, completed_at FROM todo_step_completions WHERE step_id = ?",
-    ).get(stepId)).toEqual({ step_id: stepId, scope: "ONCE", local_date: null, completed_at: 2 });
+    expect(tableNames(migrated)).not.toContain("todo_tasks");
+    expect(tableNames(migrated)).not.toContain("todo_steps");
+    expect(tableNames(migrated)).not.toContain("todo_step_completions");
+    expect(tableNames(migrated)).toEqual(expect.arrayContaining([
+      "task_templates",
+      "task_template_steps",
+      "daily_plans",
+      "today_commitments",
+      "today_commitment_steps",
+    ]));
+    expect(migrated.prepare("SELECT COUNT(*) AS count FROM daily_plans").get()).toEqual({ count: 0 });
+    expect(migrated.prepare("SELECT name FROM record_items WHERE id = ?").get(itemId)).toEqual({ name: "Water" });
+    expect(migrated.prepare("SELECT entity_type FROM record_audit_logs ORDER BY id").all()).toEqual([
+      { entity_type: "ITEM" },
+    ]);
     migrated.close();
   });
 });
@@ -88,12 +94,6 @@ function readMigrationFilename(migrationsDirectory: string, index: number): stri
 
 function tableNames(database: Database.Database): string[] {
   return database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-    .all()
-    .map((row) => (row as { name: string }).name);
-}
-
-function columnNames(database: Database.Database, table: string): string[] {
-  return database.prepare(`SELECT name FROM pragma_table_info('${table}')`)
     .all()
     .map((row) => (row as { name: string }).name);
 }

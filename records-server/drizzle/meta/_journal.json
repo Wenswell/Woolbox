@@ -120,6 +120,13 @@
       "when": 1787062541101,
       "tag": "0016_reconcile_daily_plan_reopening",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1787064637440,
+      "tag": "0017_template_today_instances",
+      "breakpoints": true
     }
   ]
 }
