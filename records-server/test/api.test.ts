@@ -5,6 +5,8 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
 
+const TestDate = "2026-07-20";
+
 describe("Records API", () => {
   let app: FastifyInstance;
   let directory: string;
@@ -366,7 +368,7 @@ describe("Records API", () => {
     const added = await createStep(1, { title: "Check documents" });
     expect(added.statusCode).toBe(201);
     expect((await setStepCompleted(3, true)).statusCode).toBe(200);
-    const deleted = await app.inject({ method: "DELETE", url: "/api/steps/1" });
+    const deleted = await app.inject({ method: "DELETE", url: `/api/steps/1?localDate=${TestDate}` });
     expect(deleted.statusCode).toBe(200);
     expect((await getTasks())[0]).toMatchObject({
       completedAt: 1_700_000_000_000,
@@ -379,10 +381,14 @@ describe("Records API", () => {
     const directComplete = await app.inject({ method: "PUT", url: "/api/tasks/1/completion", payload: { completed: true } });
     expect(directComplete.statusCode).toBe(404);
 
-    expect((await app.inject({ method: "DELETE", url: "/api/steps/2" })).statusCode).toBe(200);
-    expect((await app.inject({ method: "DELETE", url: "/api/steps/3" })).statusCode).toBe(400);
+    expect((await app.inject({ method: "DELETE", url: `/api/steps/2?localDate=${TestDate}` })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: `/api/steps/3?localDate=${TestDate}` })).statusCode).toBe(400);
 
-    const renamed = await app.inject({ method: "PUT", url: "/api/tasks/1", payload: { title: "Prepare journey" } });
+    const renamed = await app.inject({
+      method: "PUT",
+      url: "/api/tasks/1",
+      payload: { title: "Prepare journey", repeatMode: "ONCE", localDate: TestDate },
+    });
     expect(renamed.statusCode).toBe(200);
     expect(renamed.json().task.title).toBe("Prepare journey");
     expect((await getAuditLogs()).map((log) => log.action)).toContain("TASK_COMPLETED");
@@ -402,6 +408,70 @@ describe("Records API", () => {
     expect(step.statusCode).toBe(404);
     expect(await getTasks()).toEqual([]);
     expect(await getAuditLogs()).toEqual([]);
+  });
+
+  it("keeps one daily task while completion is isolated by local date", async () => {
+    const created = await createTask({
+      title: "Daily review",
+      repeatMode: "DAILY",
+      steps: ["Open notes", "Write summary"],
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().task).toMatchObject({ repeatMode: "DAILY", completedAt: null });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: { localDate: TestDate, firstMove: "Open notes", primaryTaskId: 1, secondaryTaskId: null },
+    });
+    expect((await setStepCompleted(1, true, "2026-07-21")).statusCode).toBe(200);
+    expect((await getDailyPlan(TestDate))?.state).toBe("READY");
+
+    expect((await setStepCompleted(1, true)).statusCode).toBe(200);
+    expect((await setStepCompleted(2, true)).statusCode).toBe(200);
+    expect(await getTasks()).toMatchObject([{
+      id: 1,
+      completedAt: 1_700_000_000_000,
+      steps: [{ completedAt: 1_700_000_000_000 }, { completedAt: 1_700_000_000_000 }],
+    }]);
+    expect((await getDailyPlan(TestDate))?.state).toBe("ENOUGH");
+
+    expect(await getTasks("2026-07-21")).toMatchObject([{
+      id: 1,
+      completedAt: null,
+      steps: [{ completedAt: 1_700_000_000_000 }, { completedAt: null }],
+    }]);
+    expect(await getTasks("2026-07-22")).toMatchObject([{
+      id: 1,
+      completedAt: null,
+      steps: [{ completedAt: null }, { completedAt: null }],
+    }]);
+  });
+
+  it("resets the target scope when repeat mode changes and protects Today references", async () => {
+    await createTask({ title: "Reusable", steps: ["Finish"] });
+    await setStepCompleted(1, true);
+
+    const changed = await app.inject({
+      method: "PUT",
+      url: "/api/tasks/1",
+      payload: { title: "Reusable", repeatMode: "DAILY", localDate: TestDate },
+    });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.json().task).toMatchObject({ repeatMode: "DAILY", completedAt: null });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/daily-plans",
+      payload: { localDate: TestDate, firstMove: "Start", primaryTaskId: 1, secondaryTaskId: null },
+    });
+    const protectedChange = await app.inject({
+      method: "PUT",
+      url: "/api/tasks/1",
+      payload: { title: "Reusable", repeatMode: "ONCE", localDate: TestDate },
+    });
+    expect(protectedChange.statusCode).toBe(409);
+    expect((await getTasks())[0]).toMatchObject({ repeatMode: "DAILY", completedAt: null });
   });
 
   it("batch deletes entries atomically and returns deleted resources", async () => {
@@ -457,7 +527,7 @@ describe("Records API", () => {
     const reordered = await app.inject({
       method: "PUT",
       url: `/api/tasks/${task.id}/steps/order`,
-      payload: { ids: [ids[2], ids[0], ids[1]] },
+      payload: { ids: [ids[2], ids[0], ids[1]], localDate: TestDate },
     });
     expect(reordered.statusCode).toBe(200);
     const steps = reordered.json().task.steps as Array<{ id: number; title: string; completedAt: number | null }>;
@@ -472,14 +542,14 @@ describe("Records API", () => {
     const incomplete = await app.inject({
       method: "PUT",
       url: `/api/tasks/${task.id}/steps/order`,
-      payload: { ids: [ids[0], ids[1]] },
+      payload: { ids: [ids[0], ids[1]], localDate: TestDate },
     });
     expect(incomplete.statusCode).toBe(400);
 
     const foreign = await app.inject({
       method: "PUT",
       url: `/api/tasks/${task.id}/steps/order`,
-      payload: { ids: [ids[0], ids[1], 999999] },
+      payload: { ids: [ids[0], ids[1], 999999], localDate: TestDate },
     });
     expect(foreign.statusCode).toBe(400);
   });
@@ -503,7 +573,7 @@ describe("Records API", () => {
     const step = await app.inject({
       method: "PUT",
       url: "/api/steps/1",
-      payload: { title: "Stretch", windows: [] },
+      payload: { title: "Stretch", windows: [], localDate: TestDate },
     });
     expect(step.statusCode).toBe(400);
     expect(step.json().error.message).toBe("Manual time windows are not supported.");
@@ -523,16 +593,16 @@ describe("Records API", () => {
     const removedDate = await app.inject({
       method: "PUT",
       url: `/api/tasks/${taskId}`,
-      payload: { title: "Pack", plannedDate: null },
+      payload: { title: "Pack", repeatMode: "ONCE", localDate: TestDate, plannedDate: null },
     });
     expect(removedDate.statusCode).toBe(400);
     expect(removedDate.json().error.message).toBe("Task dates are not supported.");
 
-    expect((await app.inject({ method: "DELETE", url: `/api/steps/${stepId}` })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: `/api/steps/${stepId}?localDate=${TestDate}` })).statusCode).toBe(200);
     const remaining = (await getTasks())[0] as { steps: Array<{ id: number }> };
     expect(remaining.steps.map((step) => step.id)).toEqual([1]);
 
-    expect((await app.inject({ method: "DELETE", url: `/api/tasks/${taskId}?planDate=2026-07-20` })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: `/api/tasks/${taskId}?localDate=${TestDate}` })).statusCode).toBe(200);
     expect(await getTasks()).toEqual([]);
   });
 
@@ -660,14 +730,14 @@ describe("Records API", () => {
     await setStepCompleted(2, true);
     plan = (await getDailyPlan("2026-07-20"))!;
     expect(plan).toMatchObject({ state: "ENOUGH", currentTaskId: null, nextReviewAt: null, revision: 4 });
-    expect((await app.inject({ method: "DELETE", url: "/api/tasks/2?planDate=2026-07-20" })).statusCode).toBe(409);
+    expect((await app.inject({ method: "DELETE", url: `/api/tasks/2?localDate=${TestDate}` })).statusCode).toBe(409);
 
     await app.inject({
       method: "PUT",
       url: "/api/daily-plans/2026-07-20/end",
       payload: { expectedRevision: 4, occurredAt: 5_000 },
     });
-    expect((await app.inject({ method: "DELETE", url: "/api/tasks/2?planDate=2026-07-20" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: `/api/tasks/2?localDate=${TestDate}` })).statusCode).toBe(200);
   });
 
 
@@ -678,22 +748,30 @@ describe("Records API", () => {
     return app.inject({
       method: "POST",
       url: "/api/tasks",
-      payload: { ...payload, steps },
+      payload: { repeatMode: "ONCE", localDate: TestDate, ...payload, steps },
     });
   }
 
-  async function getTasks(): Promise<Array<Record<string, unknown>>> {
-    const response = await app.inject({ method: "GET", url: "/api/tasks" });
+  async function getTasks(localDate = TestDate): Promise<Array<Record<string, unknown>>> {
+    const response = await app.inject({ method: "GET", url: `/api/tasks?localDate=${localDate}` });
     expect(response.statusCode).toBe(200);
     return response.json().tasks;
   }
 
   async function createStep(taskId: number, payload: Record<string, unknown>) {
-    return app.inject({ method: "POST", url: `/api/tasks/${taskId}/steps`, payload });
+    return app.inject({
+      method: "POST",
+      url: `/api/tasks/${taskId}/steps`,
+      payload: { localDate: TestDate, ...payload },
+    });
   }
 
-  async function setStepCompleted(stepId: number, completed: boolean) {
-    return app.inject({ method: "PUT", url: `/api/steps/${stepId}/completion`, payload: { completed } });
+  async function setStepCompleted(stepId: number, completed: boolean, localDate = TestDate) {
+    return app.inject({
+      method: "PUT",
+      url: `/api/steps/${stepId}/completion`,
+      payload: { completed, localDate },
+    });
   }
 
   async function getDailyPlan(localDate: string): Promise<Record<string, unknown> | null> {

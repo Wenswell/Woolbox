@@ -3,11 +3,13 @@ export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
 export const DAILY_PLAN_STATES = ["READY", "ACTIVE", "ENOUGH", "ENDED"] as const;
+export const TASK_REPEAT_MODES = ["ONCE", "DAILY"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
 export type DailyPlanState = (typeof DAILY_PLAN_STATES)[number];
+export type TaskRepeatMode = (typeof TASK_REPEAT_MODES)[number];
 
 export interface RecordItemInput {
   name: string;
@@ -36,12 +38,31 @@ export interface TaskTitleInput {
   title: string;
 }
 
-export type StepInput = TaskTitleInput;
+export type StepTitleInput = TaskTitleInput;
 
-export type TaskWriteInput = TaskTitleInput;
+export interface DatedStepInput extends StepTitleInput {
+  localDate: string;
+}
 
-export interface TaskCreateInput extends TaskWriteInput {
-  steps: StepInput[];
+export interface TaskWriteInput extends TaskTitleInput {
+  repeatMode: TaskRepeatMode;
+  localDate: string;
+}
+
+export interface TaskCreateInput extends TaskTitleInput {
+  repeatMode: TaskRepeatMode;
+  localDate: string;
+  steps: StepTitleInput[];
+}
+
+export interface StepCompletionInput {
+  completed: boolean;
+  localDate: string;
+}
+
+export interface StepOrderInput {
+  ids: number[];
+  localDate: string;
 }
 
 export interface DailyPlanCreateInput {
@@ -148,7 +169,7 @@ export function parseTaskInput(value: unknown): TaskTitleInput {
   return { title };
 }
 
-export function parseStepInput(value: unknown): StepInput {
+export function parseStepTitleInput(value: unknown): StepTitleInput {
   const input = objectInput(value);
   requireRule(input.windows === undefined, "Manual time windows are not supported.");
   const title = stringField(input, "title").trim();
@@ -157,15 +178,47 @@ export function parseStepInput(value: unknown): StepInput {
 }
 
 export function parseTaskWriteInput(value: unknown): TaskWriteInput {
-  return parseTaskInput(value);
+  const input = objectInput(value);
+  return {
+    ...parseTaskInput(input),
+    repeatMode: enumField(input, "repeatMode", TASK_REPEAT_MODES),
+    localDate: parseIsoDate(input.localDate, "Local date"),
+  };
 }
 
 export function parseTaskCreateInput(value: unknown): TaskCreateInput {
   const input = objectInput(value);
-  const { title } = parseTaskWriteInput(input);
+  const { title } = parseTaskInput(input);
+  const repeatMode = enumField(input, "repeatMode", TASK_REPEAT_MODES);
+  const localDate = parseIsoDate(input.localDate, "Local date");
   requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
-  const steps = input.steps.map(parseStepInput);
-  return { title, steps };
+  const steps = input.steps.map(parseStepTitleInput);
+  return { title, repeatMode, localDate, steps };
+}
+
+export function parseDatedStepInput(value: unknown): DatedStepInput {
+  const input = objectInput(value);
+  return {
+    ...parseStepTitleInput(input),
+    localDate: parseIsoDate(input.localDate, "Local date"),
+  };
+}
+
+export function parseStepCompletionInput(value: unknown): StepCompletionInput {
+  const input = objectInput(value);
+  requireRule(typeof input.completed === "boolean", "Completed must be a boolean.");
+  return {
+    completed: input.completed,
+    localDate: parseIsoDate(input.localDate, "Local date"),
+  };
+}
+
+export function parseStepOrderInput(value: unknown): StepOrderInput {
+  const input = objectInput(value);
+  return {
+    ids: parseIds(input),
+    localDate: parseIsoDate(input.localDate, "Local date"),
+  };
 }
 
 export function parseDailyPlanCreateInput(value: unknown): DailyPlanCreateInput {
@@ -207,12 +260,6 @@ export function parseDailyPlanReviewInput(value: unknown): DailyPlanReviewInput 
     ...parseDailyPlanTransitionInput(input),
     currentTaskId: positiveIntegerField(input, "currentTaskId"),
   };
-}
-
-export function parseCompleted(value: unknown): boolean {
-  const input = objectInput(value);
-  requireRule(typeof input.completed === "boolean", "Completed must be a boolean.");
-  return input.completed;
 }
 
 export function parseOptionalRecordMode(value: unknown): RecordMode | undefined {

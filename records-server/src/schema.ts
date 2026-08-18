@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const recordItems = sqliteTable(
   "record_items",
@@ -49,7 +49,7 @@ export const todoTasks = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     title: text("title").notNull(),
-    completedAt: integer("completed_at"),
+    repeatMode: text("repeat_mode", { enum: ["ONCE", "DAILY"] }).notNull().default("ONCE"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -65,13 +65,38 @@ export const todoSteps = sqliteTable(
       .references(() => todoTasks.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     position: integer("position").notNull(),
-    completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
     index("todo_steps_task_created_at_index").on(table.taskId, table.createdAt),
     index("todo_steps_task_position_index").on(table.taskId, table.position),
+  ],
+);
+
+export const todoStepCompletions = sqliteTable(
+  "todo_step_completions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    stepId: integer("step_id")
+      .notNull()
+      .references(() => todoSteps.id, { onDelete: "cascade" }),
+    scope: text("scope", { enum: ["ONCE", "DAILY"] }).notNull(),
+    localDate: text("local_date"),
+    completedAt: integer("completed_at").notNull(),
+  },
+  (table) => [
+    check(
+      "todo_step_completions_scope_date_check",
+      sql`(${table.scope} = 'ONCE' AND ${table.localDate} IS NULL) OR (${table.scope} = 'DAILY' AND ${table.localDate} IS NOT NULL)`,
+    ),
+    uniqueIndex("todo_step_completions_once_unique")
+      .on(table.stepId)
+      .where(sql`${table.scope} = 'ONCE'`),
+    uniqueIndex("todo_step_completions_daily_unique")
+      .on(table.stepId, table.localDate)
+      .where(sql`${table.scope} = 'DAILY'`),
+    index("todo_step_completions_step_id_index").on(table.stepId),
   ],
 );
 

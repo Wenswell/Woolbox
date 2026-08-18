@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import type {
   DailyPlanCreateInput,
   DailyPlanReviewInput,
@@ -8,9 +8,9 @@ import type {
   RecordEntryInput,
   RecordItemInput,
   RecordMode,
-  StepInput,
+  DatedStepInput,
   TaskCreateInput,
-  TaskTitleInput,
+  TaskRepeatMode,
   TaskWriteInput,
 } from "./domain.js";
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
@@ -20,6 +20,7 @@ import {
   recordAuditLogs,
   recordEntries,
   recordItems,
+  todoStepCompletions,
   todoSteps,
   todoTasks,
 } from "./schema.js";
@@ -33,6 +34,16 @@ type TodoTaskRow = typeof todoTasks.$inferSelect;
 type TodoStepRow = typeof todoSteps.$inferSelect;
 type DailyPlanRow = typeof dailyPlans.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
+type RecordsReader = Pick<RecordsTransaction, "select">;
+
+interface TodoStepResponse extends TodoStepRow {
+  completedAt: number | null;
+}
+
+interface TodoTaskResponse extends TodoTaskRow {
+  completedAt: number | null;
+  steps: TodoStepResponse[];
+}
 
 type AuditAction =
   | "ITEM_CREATED"
@@ -88,6 +99,8 @@ interface EntryAuditSnapshot {
 interface TaskAuditSnapshot {
   id: number;
   title: string;
+  repeatMode: TaskRepeatMode;
+  localDate: string;
   completedAt: number | null;
   stepCount?: number;
   stepIds?: number[];
@@ -97,6 +110,8 @@ interface StepAuditSnapshot {
   id: number;
   taskId: number;
   taskTitle: string;
+  repeatMode: TaskRepeatMode;
+  localDate: string;
   title: string;
   completedAt: number | null;
 }
@@ -140,7 +155,7 @@ export class RecordsService {
   overview(startDate: string, endDate: string, planDate: string) {
     if (startDate > endDate) throw new ApiError(400, "Start date must not be after end date.");
     const items = this.listItems(false);
-    const tasks = this.listTasks();
+    const tasks = this.listTasks(planDate);
     const accumulateEntries = this.listEntries(startDate, endDate, undefined, "ACCUMULATE");
     return {
       items,
@@ -387,25 +402,25 @@ export class RecordsService {
     return ids.map((id) => byId.get(id)!);
   }
 
-  listTasks() {
+  listTasks(localDate: string) {
     const tasks = this.db
       .select()
       .from(todoTasks)
       .orderBy(asc(todoTasks.createdAt), asc(todoTasks.id))
       .all();
-    return this.attachSteps(tasks);
+    return this.attachSteps(this.db, tasks, localDate);
   }
 
-  getTask(id: number) {
+  getTask(id: number, localDate: string) {
     const task = this.db.select().from(todoTasks).where(eq(todoTasks.id, id)).get();
     if (!task) throw new ApiError(404, "Task not found.");
-    return this.attachSteps([task])[0]!;
+    return this.attachSteps(this.db, [task], localDate)[0]!;
   }
 
-  getStep(id: number) {
+  getStep(id: number, localDate: string) {
     const step = this.db.select().from(todoSteps).where(eq(todoSteps.id, id)).get();
     if (!step) throw new ApiError(404, "Step not found.");
-    return step;
+    return this.getTask(step.taskId, localDate).steps.find((candidate) => candidate.id === id)!;
   }
 
   getDailyPlan(localDate: string) {
@@ -417,8 +432,10 @@ export class RecordsService {
       if (tx.select({ id: dailyPlans.id }).from(dailyPlans).where(eq(dailyPlans.localDate, input.localDate)).get()) {
         throw new ApiError(409, "A plan already exists for this date.");
       }
-      this.requireOpenTask(tx, input.primaryTaskId, "Primary task");
-      if (input.secondaryTaskId !== null) this.requireOpenTask(tx, input.secondaryTaskId, "Secondary task");
+      this.requireOpenTask(tx, input.primaryTaskId, "Primary task", input.localDate);
+      if (input.secondaryTaskId !== null) {
+        this.requireOpenTask(tx, input.secondaryTaskId, "Secondary task", input.localDate);
+      }
       const now = this.now();
       const created = tx.insert(dailyPlans).values({
         localDate: input.localDate,
@@ -458,8 +475,8 @@ export class RecordsService {
       if (plan.state !== "READY" && input.firstMove !== plan.firstMove) {
         throw new ApiError(409, "The first move cannot change after the plan starts.");
       }
-      this.requireReplaceableSlot(tx, plan.primaryTaskId, input.primaryTaskId, "Primary task");
-      this.requireReplaceableSlot(tx, plan.secondaryTaskId, input.secondaryTaskId, "Secondary task");
+      this.requireReplaceableSlot(tx, plan.primaryTaskId, input.primaryTaskId, "Primary task", localDate);
+      this.requireReplaceableSlot(tx, plan.secondaryTaskId, input.secondaryTaskId, "Secondary task", localDate);
 
       if (
         input.firstMove === plan.firstMove
@@ -469,8 +486,11 @@ export class RecordsService {
 
       let currentTaskId = plan.currentTaskId;
       let nextReviewAt = plan.nextReviewAt;
-      if (plan.state === "ACTIVE" && !this.isOpenCommitment(tx, plan.currentTaskId, input.primaryTaskId, input.secondaryTaskId)) {
-        currentTaskId = this.firstOpenCommitment(tx, input.primaryTaskId, input.secondaryTaskId);
+      if (
+        plan.state === "ACTIVE"
+        && !this.isOpenCommitment(tx, plan.currentTaskId, input.primaryTaskId, input.secondaryTaskId, localDate)
+      ) {
+        currentTaskId = this.firstOpenCommitment(tx, input.primaryTaskId, input.secondaryTaskId, localDate);
         nextReviewAt = input.occurredAt + ReviewIntervalMs;
       }
       const now = this.now();
@@ -508,7 +528,7 @@ export class RecordsService {
   startDailyPlan(localDate: string, input: DailyPlanTransitionInput) {
     return this.transitionDailyPlan(localDate, input, (tx, plan) => {
       if (plan.state !== "READY") throw new ApiError(409, "Only ready plans can start.");
-      const currentTaskId = this.firstOpenCommitment(tx, plan.primaryTaskId, plan.secondaryTaskId);
+      const currentTaskId = this.firstOpenCommitment(tx, plan.primaryTaskId, plan.secondaryTaskId, localDate);
       return {
         firstMoveCompletedAt: input.occurredAt,
         currentTaskId,
@@ -524,7 +544,7 @@ export class RecordsService {
         throw new ApiError(409, "Only active plans can be reviewed.");
       }
       if (input.occurredAt < plan.nextReviewAt) throw new ApiError(409, "The next review is not due yet.");
-      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId)) {
+      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId, localDate)) {
         throw new ApiError(409, "Current task must be an unfinished commitment.");
       }
       const completedRounds = plan.completedRounds + 1;
@@ -541,7 +561,7 @@ export class RecordsService {
   startExtraRound(localDate: string, input: DailyPlanReviewInput) {
     return this.transitionDailyPlan(localDate, input, (tx, plan) => {
       if (plan.state !== "ENOUGH") throw new ApiError(409, "Only enough plans can start an extra round.");
-      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId)) {
+      if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId, localDate)) {
         throw new ApiError(409, "An extra round requires an unfinished commitment.");
       }
       return {
@@ -592,7 +612,7 @@ export class RecordsService {
       const now = this.now();
       const task = tx
         .insert(todoTasks)
-        .values({ title: input.title, completedAt: null, createdAt: now, updatedAt: now })
+        .values({ title: input.title, repeatMode: input.repeatMode, createdAt: now, updatedAt: now })
         .returning({ id: todoTasks.id })
         .get();
       const steps = tx.insert(todoSteps)
@@ -600,7 +620,6 @@ export class RecordsService {
           taskId: task.id,
           title: step.title,
           position,
-          completedAt: null,
           createdAt: now,
           updatedAt: now,
         })))
@@ -611,7 +630,12 @@ export class RecordsService {
         entityType: "TASK",
         entityId: task.id,
         after: {
-          ...taskSnapshot({ id: task.id, title: input.title, completedAt: null }),
+          ...taskSnapshot({
+            id: task.id,
+            title: input.title,
+            repeatMode: input.repeatMode,
+            completedAt: null,
+          }, input.localDate),
           stepCount: steps.length,
         },
         createdAt: now,
@@ -623,41 +647,50 @@ export class RecordsService {
           entityId: step.id,
           after: stepSnapshot(
             { id: step.id, taskId: task.id, title: step.title, completedAt: null },
-            input.title,
+            { title: input.title, repeatMode: input.repeatMode },
+            input.localDate,
           ),
           createdAt: now,
         });
       });
       return task.id;
     });
-    return this.getTask(id);
+    return this.getTask(id, input.localDate);
   }
 
   updateTask(id: number, input: TaskWriteInput) {
     this.db.transaction((tx) => {
       const current = this.requireTask(tx, id);
+      const before = this.attachSteps(tx, [current], input.localDate)[0]!;
+      if (current.repeatMode !== input.repeatMode) {
+        this.requireTaskOutsidePlan(tx, id, input.localDate, "Change the repeat mode after replacing this task in Today or ending the plan.");
+        this.clearCompletionScope(tx, id, input.repeatMode, input.localDate);
+      }
+      if (current.title === input.title && current.repeatMode === input.repeatMode) return;
       const now = this.now();
-      const updated = { ...current, title: input.title, updatedAt: now };
-      tx.update(todoTasks).set({ title: input.title, updatedAt: now }).where(eq(todoTasks.id, id)).run();
+      const updated = { ...current, title: input.title, repeatMode: input.repeatMode, updatedAt: now };
+      tx.update(todoTasks)
+        .set({ title: input.title, repeatMode: input.repeatMode, updatedAt: now })
+        .where(eq(todoTasks.id, id))
+        .run();
+      const after = this.attachSteps(tx, [updated], input.localDate)[0]!;
       this.writeAudit(tx, {
         action: "TASK_UPDATED",
         entityType: "TASK",
         entityId: id,
-        before: taskSnapshot(current),
-        after: taskSnapshot(updated),
+        before: taskSnapshot(before, input.localDate),
+        after: taskSnapshot(after, input.localDate),
         createdAt: now,
       });
     });
-    return this.getTask(id);
+    return this.getTask(id, input.localDate);
   }
 
-  deleteTask(id: number, planDate: string) {
+  deleteTask(id: number, localDate: string) {
     return this.db.transaction((tx) => {
       const task = this.requireTask(tx, id);
-      const plan = tx.select().from(dailyPlans).where(eq(dailyPlans.localDate, planDate)).get();
-      if (plan && plan.state !== "ENDED" && (plan.primaryTaskId === id || plan.secondaryTaskId === id)) {
-        throw new ApiError(409, "Replace this task in Today or end the plan before deleting it.");
-      }
+      const response = this.attachSteps(tx, [task], localDate)[0]!;
+      this.requireTaskOutsidePlan(tx, id, localDate, "Replace this task in Today or end the plan before deleting it.");
       const stepCount = tx
         .select({ value: count() })
         .from(todoSteps)
@@ -667,89 +700,104 @@ export class RecordsService {
         action: "TASK_DELETED",
         entityType: "TASK",
         entityId: id,
-        before: { ...taskSnapshot(task), stepCount },
+        before: { ...taskSnapshot(response, localDate), stepCount },
         createdAt: this.now(),
       });
       tx.delete(todoTasks).where(eq(todoTasks.id, id)).run();
-      return task;
+      return response;
     });
   }
 
-  createStep(taskId: number, input: StepInput) {
+  createStep(taskId: number, input: DatedStepInput) {
     const id = this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
+      const beforeTask = this.attachSteps(tx, [task], input.localDate)[0]!;
       const now = this.now();
       const existing = tx.select().from(todoSteps).where(eq(todoSteps.taskId, taskId)).all();
       const position = existing.reduce((max, step) => Math.max(max, step.position), -1) + 1;
       const step = tx
         .insert(todoSteps)
-        .values({ taskId, title: input.title, position, completedAt: null, createdAt: now, updatedAt: now })
+        .values({ taskId, title: input.title, position, createdAt: now, updatedAt: now })
         .returning({ id: todoSteps.id })
         .get();
+      tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, taskId)).run();
       this.writeAudit(tx, {
         action: "STEP_CREATED",
         entityType: "STEP",
         entityId: step.id,
         after: stepSnapshot(
           { id: step.id, taskId, title: input.title, completedAt: null },
-          task.title,
+          task,
+          input.localDate,
         ),
         createdAt: now,
       });
-      this.setTaskCompletion(tx, task, false, now);
+      const afterTask = this.attachSteps(tx, [{ ...task, updatedAt: now }], input.localDate)[0]!;
+      this.reconcileTaskCompletion(tx, beforeTask, afterTask, input.localDate, now);
       return step.id;
     });
-    return this.getStep(id);
+    return this.getStep(id, input.localDate);
   }
 
-  updateStep(id: number, input: StepInput) {
+  updateStep(id: number, input: DatedStepInput) {
     this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
+      const before = this.stepResponse(tx, task, step, input.localDate);
+      if (step.title === input.title) return;
       const now = this.now();
       const updated = { ...step, title: input.title, updatedAt: now };
       tx.update(todoSteps).set({ title: input.title, updatedAt: now }).where(eq(todoSteps.id, id)).run();
+      tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, task.id)).run();
       this.writeAudit(tx, {
         action: "STEP_UPDATED",
         entityType: "STEP",
         entityId: id,
-        before: stepSnapshot(step, task.title),
-        after: stepSnapshot(updated, task.title),
+        before: stepSnapshot(before, task, input.localDate),
+        after: stepSnapshot({ ...updated, completedAt: before.completedAt }, task, input.localDate),
         createdAt: now,
       });
     });
-    return this.getStep(id);
+    return this.getStep(id, input.localDate);
   }
 
-  setStepCompleted(id: number, completed: boolean) {
+  setStepCompleted(id: number, completed: boolean, localDate: string) {
     this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
+      const beforeTask = this.attachSteps(tx, [task], localDate)[0]!;
+      const beforeStep = beforeTask.steps.find((candidate) => candidate.id === id)!;
+      if ((beforeStep.completedAt !== null) === completed) return;
       const now = this.now();
-      if ((step.completedAt !== null) !== completed) {
-        const updated = { ...step, completedAt: completed ? now : null, updatedAt: now };
-        tx.update(todoSteps)
-          .set({ completedAt: updated.completedAt, updatedAt: now })
-          .where(eq(todoSteps.id, id))
-          .run();
-        this.writeAudit(tx, {
-          action: completed ? "STEP_COMPLETED" : "STEP_REOPENED",
-          entityType: "STEP",
-          entityId: id,
-          before: stepSnapshot(step, task.title),
-          after: stepSnapshot(updated, task.title),
-          createdAt: now,
-        });
+      const scope = this.completionScope(task.repeatMode, localDate);
+      if (completed) {
+        tx.insert(todoStepCompletions).values({ stepId: id, ...scope, completedAt: now }).run();
+      } else {
+        tx.delete(todoStepCompletions).where(this.completionCondition(id, task.repeatMode, localDate)).run();
       }
-      this.reconcileTaskCompletion(tx, task, now);
+      tx.update(todoSteps).set({ updatedAt: now }).where(eq(todoSteps.id, id)).run();
+      tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, task.id)).run();
+      const afterStep = { ...beforeStep, completedAt: completed ? now : null, updatedAt: now };
+      this.writeAudit(tx, {
+        action: completed ? "STEP_COMPLETED" : "STEP_REOPENED",
+        entityType: "STEP",
+        entityId: id,
+        before: stepSnapshot(beforeStep, task, localDate),
+        after: stepSnapshot(afterStep, task, localDate),
+        createdAt: now,
+      });
+      const afterTask = this.attachSteps(tx, [{ ...task, updatedAt: now }], localDate)[0]!;
+      this.reconcileTaskCompletion(tx, beforeTask, afterTask, localDate, now);
     });
-    return this.getStep(id);
+    return this.getStep(id, localDate);
   }
 
-  deleteStep(id: number) {
+  deleteStep(id: number, localDate: string) {
     return this.db.transaction((tx) => {
       const step = this.requireStep(tx, id);
       const task = this.requireTask(tx, step.taskId);
+      const beforeTask = this.attachSteps(tx, [task], localDate)[0]!;
+      const beforeStep = beforeTask.steps.find((candidate) => candidate.id === id)!;
       const stepCount = tx
         .select({ value: count() })
         .from(todoSteps)
@@ -761,19 +809,21 @@ export class RecordsService {
         action: "STEP_DELETED",
         entityType: "STEP",
         entityId: id,
-        before: stepSnapshot(step, task.title),
+        before: stepSnapshot(beforeStep, task, localDate),
         createdAt: now,
       });
       tx.delete(todoSteps).where(eq(todoSteps.id, id)).run();
-      const remaining = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
-      this.setTaskCompletion(tx, task, remaining.every((candidate) => candidate.completedAt !== null), now);
-      return step;
+      tx.update(todoTasks).set({ updatedAt: now }).where(eq(todoTasks.id, task.id)).run();
+      const afterTask = this.attachSteps(tx, [{ ...task, updatedAt: now }], localDate)[0]!;
+      this.reconcileTaskCompletion(tx, beforeTask, afterTask, localDate, now);
+      return beforeStep;
     });
   }
 
-  reorderSteps(taskId: number, stepIds: number[]) {
+  reorderSteps(taskId: number, stepIds: number[], localDate: string) {
     this.db.transaction((tx) => {
       const task = this.requireTask(tx, taskId);
+      const taskResponse = this.attachSteps(tx, [task], localDate)[0]!;
       const current = tx
         .select()
         .from(todoSteps)
@@ -804,12 +854,12 @@ export class RecordsService {
         action: "TASK_STEPS_REORDERED",
         entityType: "TASK",
         entityId: taskId,
-        before: { ...taskSnapshot(task), stepIds: before },
-        after: { ...taskSnapshot(task), stepIds },
+        before: { ...taskSnapshot(taskResponse, localDate), stepIds: before },
+        after: { ...taskSnapshot(taskResponse, localDate), stepIds },
         createdAt: now,
       });
     });
-    return this.getTask(taskId);
+    return this.getTask(taskId, localDate);
   }
 
   listAuditLogs(beforeId?: number) {
@@ -828,25 +878,99 @@ export class RecordsService {
     };
   }
 
-  private attachSteps(tasks: TodoTaskRow[]) {
+  private attachSteps(reader: RecordsReader, tasks: TodoTaskRow[], localDate: string): TodoTaskResponse[] {
     if (tasks.length === 0) return [];
     const taskIds = tasks.map((task) => task.id);
-    const steps = this.db
+    const steps = reader
       .select()
       .from(todoSteps)
       .where(inArray(todoSteps.taskId, taskIds))
       .orderBy(asc(todoSteps.taskId), asc(todoSteps.position), asc(todoSteps.id))
       .all();
-    const stepsByTask = new Map<number, TodoStepRow[]>();
+    const stepIds = steps.map((step) => step.id);
+    const completions = stepIds.length === 0 ? [] : reader
+      .select()
+      .from(todoStepCompletions)
+      .where(and(
+        inArray(todoStepCompletions.stepId, stepIds),
+        or(
+          and(eq(todoStepCompletions.scope, "ONCE"), isNull(todoStepCompletions.localDate)),
+          and(eq(todoStepCompletions.scope, "DAILY"), eq(todoStepCompletions.localDate, localDate)),
+        ),
+      ))
+      .all();
+    const completionByStepAndScope = new Map(
+      completions.map((completion) => [`${completion.stepId}:${completion.scope}`, completion.completedAt]),
+    );
+    const taskById = new Map(tasks.map((task) => [task.id, task]));
+    const stepsByTask = new Map<number, TodoStepResponse[]>();
     for (const step of steps) {
+      const task = taskById.get(step.taskId)!;
       const taskSteps = stepsByTask.get(step.taskId) ?? [];
-      taskSteps.push(step);
+      taskSteps.push({
+        ...step,
+        completedAt: completionByStepAndScope.get(`${step.id}:${task.repeatMode}`) ?? null,
+      });
       stepsByTask.set(step.taskId, taskSteps);
     }
-    return tasks.map((task) => ({
-      ...task,
-      steps: stepsByTask.get(task.id) ?? [],
-    }));
+    return tasks.map((task) => {
+      const taskSteps = stepsByTask.get(task.id) ?? [];
+      const completedAt = taskSteps.length > 0 && taskSteps.every((step) => step.completedAt !== null)
+        ? Math.max(...taskSteps.map((step) => step.completedAt!))
+        : null;
+      return { ...task, completedAt, steps: taskSteps };
+    });
+  }
+
+  private stepResponse(
+    reader: RecordsReader,
+    task: TodoTaskRow,
+    step: TodoStepRow,
+    localDate: string,
+  ): TodoStepResponse {
+    const completion = reader
+      .select({ completedAt: todoStepCompletions.completedAt })
+      .from(todoStepCompletions)
+      .where(this.completionCondition(step.id, task.repeatMode, localDate))
+      .get();
+    return { ...step, completedAt: completion?.completedAt ?? null };
+  }
+
+  private completionScope(repeatMode: TaskRepeatMode, localDate: string) {
+    return repeatMode === "ONCE"
+      ? { scope: "ONCE" as const, localDate: null }
+      : { scope: "DAILY" as const, localDate };
+  }
+
+  private completionCondition(stepId: number, repeatMode: TaskRepeatMode, localDate: string) {
+    return repeatMode === "ONCE"
+      ? and(
+        eq(todoStepCompletions.stepId, stepId),
+        eq(todoStepCompletions.scope, "ONCE"),
+        isNull(todoStepCompletions.localDate),
+      )
+      : and(
+        eq(todoStepCompletions.stepId, stepId),
+        eq(todoStepCompletions.scope, "DAILY"),
+        eq(todoStepCompletions.localDate, localDate),
+      );
+  }
+
+  private clearCompletionScope(
+    tx: RecordsTransaction,
+    taskId: number,
+    repeatMode: TaskRepeatMode,
+    localDate: string,
+  ) {
+    const stepIds = tx.select({ id: todoSteps.id }).from(todoSteps).where(eq(todoSteps.taskId, taskId)).all()
+      .map((step) => step.id);
+    if (stepIds.length === 0) return;
+    const scope = repeatMode === "ONCE"
+      ? and(eq(todoStepCompletions.scope, "ONCE"), isNull(todoStepCompletions.localDate))
+      : and(eq(todoStepCompletions.scope, "DAILY"), eq(todoStepCompletions.localDate, localDate));
+    tx.delete(todoStepCompletions)
+      .where(and(inArray(todoStepCompletions.stepId, stepIds), scope))
+      .run();
   }
 
   private requireTask(tx: RecordsTransaction, id: number) {
@@ -861,34 +985,23 @@ export class RecordsService {
     return step;
   }
 
-  private reconcileTaskCompletion(tx: RecordsTransaction, task: TodoTaskRow, now: number) {
-    const steps = tx.select().from(todoSteps).where(eq(todoSteps.taskId, task.id)).all();
-    if (steps.length === 0) throw new ApiError(500, "Task must have at least one subtask.");
-    this.setTaskCompletion(tx, task, steps.every((step) => step.completedAt !== null), now);
-  }
-
-  private setTaskCompletion(
+  private reconcileTaskCompletion(
     tx: RecordsTransaction,
-    task: TodoTaskRow,
-    completed: boolean,
+    before: TodoTaskResponse,
+    after: TodoTaskResponse,
+    localDate: string,
     now: number,
   ) {
-    if ((task.completedAt !== null) === completed) return task;
-    const updated = { ...task, completedAt: completed ? now : null, updatedAt: now };
-    tx.update(todoTasks)
-      .set({ completedAt: updated.completedAt, updatedAt: now })
-      .where(eq(todoTasks.id, task.id))
-      .run();
+    if ((before.completedAt !== null) === (after.completedAt !== null)) return;
     this.writeAudit(tx, {
-      action: completed ? "TASK_COMPLETED" : "TASK_REOPENED",
+      action: after.completedAt !== null ? "TASK_COMPLETED" : "TASK_REOPENED",
       entityType: "TASK",
-      entityId: task.id,
-      before: taskSnapshot(task),
-      after: taskSnapshot(updated),
+      entityId: after.id,
+      before: taskSnapshot(before, localDate),
+      after: taskSnapshot(after, localDate),
       createdAt: now,
     });
-    if (completed) this.reconcileDailyPlanCompletion(tx, task.id, now);
-    return updated;
+    if (after.completedAt !== null) this.reconcileDailyPlanCompletion(tx, after.id, localDate, now);
   }
 
   private transitionDailyPlan(
@@ -922,10 +1035,18 @@ export class RecordsService {
     if (plan.revision !== expectedRevision) throw new ApiError(409, "Daily plan has changed. Refresh and try again.");
   }
 
-  private requireOpenTask(tx: RecordsTransaction, id: number, label: string) {
+  private requireOpenTask(tx: RecordsTransaction, id: number, label: string, localDate: string) {
     const task = this.requireTask(tx, id);
-    if (task.completedAt !== null) throw new ApiError(409, `${label} must be open.`);
+    const response = this.attachSteps(tx, [task], localDate)[0]!;
+    if (response.completedAt !== null) throw new ApiError(409, `${label} must be open.`);
     return task;
+  }
+
+  private requireTaskOutsidePlan(tx: RecordsTransaction, taskId: number, localDate: string, message: string) {
+    const plan = tx.select().from(dailyPlans).where(eq(dailyPlans.localDate, localDate)).get();
+    if (plan && plan.state !== "ENDED" && (plan.primaryTaskId === taskId || plan.secondaryTaskId === taskId)) {
+      throw new ApiError(409, message);
+    }
   }
 
   private requireReplaceableSlot(
@@ -933,13 +1054,16 @@ export class RecordsService {
     currentId: number | null,
     replacementId: number | null,
     label: string,
+    localDate: string,
   ) {
     if (currentId === replacementId) return;
     if (currentId !== null) {
       const current = this.requireTask(tx, currentId);
-      if (current.completedAt !== null) throw new ApiError(409, `A completed ${label.toLowerCase()} cannot be replaced.`);
+      if (this.attachSteps(tx, [current], localDate)[0]!.completedAt !== null) {
+        throw new ApiError(409, `A completed ${label.toLowerCase()} cannot be replaced.`);
+      }
     }
-    if (replacementId !== null) this.requireOpenTask(tx, replacementId, label);
+    if (replacementId !== null) this.requireOpenTask(tx, replacementId, label, localDate);
   }
 
   private isOpenCommitment(
@@ -947,31 +1071,39 @@ export class RecordsService {
     taskId: number | null,
     primaryTaskId: number | null,
     secondaryTaskId: number | null,
+    localDate: string,
   ) {
     if (taskId === null || (taskId !== primaryTaskId && taskId !== secondaryTaskId)) return false;
-    return tx.select({ completedAt: todoTasks.completedAt }).from(todoTasks).where(eq(todoTasks.id, taskId)).get()?.completedAt === null;
+    const task = tx.select().from(todoTasks).where(eq(todoTasks.id, taskId)).get();
+    return task !== undefined && this.attachSteps(tx, [task], localDate)[0]!.completedAt === null;
   }
 
   private firstOpenCommitment(
     tx: RecordsTransaction,
     primaryTaskId: number | null,
     secondaryTaskId: number | null,
+    localDate: string,
   ) {
-    if (this.isOpenCommitment(tx, primaryTaskId, primaryTaskId, secondaryTaskId)) return primaryTaskId;
-    if (this.isOpenCommitment(tx, secondaryTaskId, primaryTaskId, secondaryTaskId)) return secondaryTaskId;
+    if (this.isOpenCommitment(tx, primaryTaskId, primaryTaskId, secondaryTaskId, localDate)) return primaryTaskId;
+    if (this.isOpenCommitment(tx, secondaryTaskId, primaryTaskId, secondaryTaskId, localDate)) return secondaryTaskId;
     return null;
   }
 
-  private reconcileDailyPlanCompletion(tx: RecordsTransaction, taskId: number, occurredAt: number) {
+  private reconcileDailyPlanCompletion(
+    tx: RecordsTransaction,
+    taskId: number,
+    localDate: string,
+    occurredAt: number,
+  ) {
     const plan = tx.select().from(dailyPlans)
       .where(and(
+        eq(dailyPlans.localDate, localDate),
         inArray(dailyPlans.state, ["READY", "ACTIVE"]),
         or(eq(dailyPlans.primaryTaskId, taskId), eq(dailyPlans.secondaryTaskId, taskId)),
       ))
-      .orderBy(desc(dailyPlans.localDate), desc(dailyPlans.id))
       .get();
     if (!plan) return;
-    const nextTaskId = this.firstOpenCommitment(tx, plan.primaryTaskId, plan.secondaryTaskId);
+    const nextTaskId = this.firstOpenCommitment(tx, plan.primaryTaskId, plan.secondaryTaskId, localDate);
     if (nextTaskId === null) {
       tx.update(dailyPlans).set({
         state: "ENOUGH",
@@ -1063,10 +1195,15 @@ function entrySnapshot(entry: RecordEntryRow, itemName: string): EntryAuditSnaps
   };
 }
 
-function taskSnapshot(task: { id: number; title: string; completedAt: number | null }): TaskAuditSnapshot {
+function taskSnapshot(
+  task: { id: number; title: string; repeatMode: TaskRepeatMode; completedAt: number | null },
+  localDate: string,
+): TaskAuditSnapshot {
   return {
     id: task.id,
     title: task.title,
+    repeatMode: task.repeatMode,
+    localDate,
     completedAt: task.completedAt,
   };
 }
@@ -1085,13 +1222,16 @@ function dailyPlanSnapshot(
 }
 
 function stepSnapshot(
-  step: Pick<TodoStepRow, "id" | "taskId" | "title" | "completedAt">,
-  taskTitle: string,
+  step: Pick<TodoStepResponse, "id" | "taskId" | "title" | "completedAt">,
+  task: Pick<TodoTaskRow, "title" | "repeatMode">,
+  localDate: string,
 ): StepAuditSnapshot {
   return {
     id: step.id,
     taskId: step.taskId,
-    taskTitle,
+    taskTitle: task.title,
+    repeatMode: task.repeatMode,
+    localDate,
     title: step.title,
     completedAt: step.completedAt,
   };

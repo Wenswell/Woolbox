@@ -9,7 +9,7 @@ import {
   parseDailyPlanTransitionInput,
   parseDailyPlanUpdateInput,
   parseArchived,
-  parseCompleted,
+  parseDatedStepInput,
   parseEntryInput,
   parseId,
   parseIds,
@@ -17,8 +17,9 @@ import {
   parseItemInput,
   parseOptionalId,
   parseOptionalRecordMode,
+  parseStepCompletionInput,
+  parseStepOrderInput,
   parseTaskCreateInput,
-  parseStepInput,
   parseTaskWriteInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
@@ -93,7 +94,10 @@ export function buildApp(options: BuildAppOptions) {
     return { item };
   });
 
-  app.get("/api/tasks", () => ({ tasks: records.listTasks() }));
+  app.get("/api/tasks", (request) => {
+    const query = request.query as Record<string, unknown>;
+    return { tasks: records.listTasks(parseIsoDate(query.localDate, "Local date")) };
+  });
 
   app.get("/api/overview", (request) => {
     const query = request.query as Record<string, unknown>;
@@ -167,7 +171,7 @@ export function buildApp(options: BuildAppOptions) {
     return {
       task: records.deleteTask(
         parseId((request.params as { id?: unknown }).id, "Task ID"),
-        parseIsoDate(query.planDate, "Plan date"),
+        parseIsoDate(query.localDate, "Local date"),
       ),
     };
   });
@@ -175,36 +179,50 @@ export function buildApp(options: BuildAppOptions) {
   app.post("/api/tasks/:id/steps", (request, reply) => {
     const step = records.createStep(
       parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseStepInput(request.body),
+      parseDatedStepInput(request.body),
     );
     return reply.status(201).send({ step });
   });
 
-  app.put("/api/tasks/:id/steps/order", (request) => ({
-    task: records.reorderSteps(
-      parseId((request.params as { id?: unknown }).id, "Task ID"),
-      parseIds(request.body),
-    ),
-  }));
+  app.put("/api/tasks/:id/steps/order", (request) => {
+    const input = parseStepOrderInput(request.body);
+    return {
+      task: records.reorderSteps(
+        parseId((request.params as { id?: unknown }).id, "Task ID"),
+        input.ids,
+        input.localDate,
+      ),
+    };
+  });
 
 
   app.put("/api/steps/:id", (request) => ({
     step: records.updateStep(
       parseId((request.params as { id?: unknown }).id, "Step ID"),
-      parseStepInput(request.body),
+      parseDatedStepInput(request.body),
     ),
   }));
 
-  app.put("/api/steps/:id/completion", (request) => ({
-    step: records.setStepCompleted(
-      parseId((request.params as { id?: unknown }).id, "Step ID"),
-      parseCompleted(request.body),
-    ),
-  }));
+  app.put("/api/steps/:id/completion", (request) => {
+    const input = parseStepCompletionInput(request.body);
+    return {
+      step: records.setStepCompleted(
+        parseId((request.params as { id?: unknown }).id, "Step ID"),
+        input.completed,
+        input.localDate,
+      ),
+    };
+  });
 
-  app.delete("/api/steps/:id", (request) => ({
-    step: records.deleteStep(parseId((request.params as { id?: unknown }).id, "Step ID")),
-  }));
+  app.delete("/api/steps/:id", (request) => {
+    const query = request.query as Record<string, unknown>;
+    return {
+      step: records.deleteStep(
+        parseId((request.params as { id?: unknown }).id, "Step ID"),
+        parseIsoDate(query.localDate, "Local date"),
+      ),
+    };
+  });
 
   app.get("/api/audit-logs", (request) => {
     const query = request.query as Record<string, unknown>;

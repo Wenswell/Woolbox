@@ -28,6 +28,7 @@ try {
       "record_entries",
       "todo_tasks",
       "todo_steps",
+      "todo_step_completions",
       "daily_plans",
       "record_audit_logs",
     ]) {

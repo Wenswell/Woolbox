@@ -99,6 +99,13 @@
       "when": 1787019083340,
       "tag": "0013_daily_commitment",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1787025169914,
+      "tag": "0014_daily_task_completions",
+      "breakpoints": true
     }
   ]
 }

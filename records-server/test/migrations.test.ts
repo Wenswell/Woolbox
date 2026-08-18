@@ -35,10 +35,10 @@ describe("Records migrations", () => {
     migrate(drizzle(sqlite), { migrationsFolder: publishedMigrations });
     const taskId = sqlite.prepare(
       "INSERT INTO todo_tasks (title, horizon, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-    ).run("Legacy task", "TODAY", null, 1, 1).lastInsertRowid;
+    ).run("Legacy task", "TODAY", 2, 1, 2).lastInsertRowid;
     const stepId = sqlite.prepare(
       "INSERT INTO todo_steps (task_id, title, position, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    ).run(taskId, "Legacy step", 0, null, 1, 1).lastInsertRowid;
+    ).run(taskId, "Legacy step", 0, 2, 1, 2).lastInsertRowid;
     sqlite.prepare(
       "INSERT INTO todo_step_windows (step_id, start_minute, end_minute) VALUES (?, ?, ?)",
     ).run(stepId, 480, 540);
@@ -63,10 +63,19 @@ describe("Records migrations", () => {
     expect(tableNames(migrated)).not.toContain("record_windows");
     expect(tableNames(migrated)).not.toContain("todo_task_windows");
     expect(tableNames(migrated)).toContain("daily_plans");
+    expect(tableNames(migrated)).toContain("todo_step_completions");
     expect(columnNames(migrated, "todo_tasks")).not.toContain("planned_date");
     expect(columnNames(migrated, "todo_tasks")).not.toContain("horizon");
-    expect(migrated.prepare("SELECT title FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({ title: "Legacy task" });
+    expect(columnNames(migrated, "todo_tasks")).not.toContain("completed_at");
+    expect(columnNames(migrated, "todo_steps")).not.toContain("completed_at");
+    expect(migrated.prepare("SELECT title, repeat_mode FROM todo_tasks WHERE id = ?").get(taskId)).toEqual({
+      title: "Legacy task",
+      repeat_mode: "ONCE",
+    });
     expect(migrated.prepare("SELECT title, position FROM todo_steps WHERE id = ?").get(stepId)).toEqual({ title: "Legacy step", position: 0 });
+    expect(migrated.prepare(
+      "SELECT step_id, scope, local_date, completed_at FROM todo_step_completions WHERE step_id = ?",
+    ).get(stepId)).toEqual({ step_id: stepId, scope: "ONCE", local_date: null, completed_at: 2 });
     migrated.close();
   });
 });
