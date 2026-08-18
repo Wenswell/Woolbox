@@ -54,12 +54,12 @@ const plannedDateColumn = database.prepare("SELECT name FROM pragma_table_info('
 if (plannedDateColumn) throw new Error("Removed todo task planned date still exists.");
 const repeatModeColumn = database.prepare("SELECT name FROM pragma_table_info('todo_tasks') WHERE name = 'repeat_mode'").get();
 if (!repeatModeColumn) throw new Error("Todo task repeat mode migration is missing.");
-const removedCompletionColumns = database.prepare(`
-  SELECT m.name AS table_name, p.name AS column_name
-  FROM sqlite_master AS m
-  JOIN pragma_table_info(m.name) AS p
-  WHERE m.name IN ('todo_tasks', 'todo_steps') AND p.name = 'completed_at'
-`).all();
+const removedCompletionColumns = database.prepare(
+  "SELECT m.name AS table_name, p.name AS column_name " +
+  "FROM sqlite_master AS m " +
+  "JOIN pragma_table_info(m.name) AS p " +
+  "WHERE m.name IN ('todo_tasks', 'todo_steps') AND p.name = 'completed_at'"
+).all();
 if (removedCompletionColumns.length !== 0) throw new Error("Removed todo completion columns still exist.");
 const completionsTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'todo_step_completions'").get();
 if (!completionsTable) throw new Error("Todo step completion migration is missing.");

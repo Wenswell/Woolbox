@@ -65,6 +65,7 @@ Records server 定向验证：
 
 ```bash
 cd records-server
+node --check scripts/*.mjs
 pnpm typecheck && pnpm test && pnpm test:web && pnpm build
 ```
 
