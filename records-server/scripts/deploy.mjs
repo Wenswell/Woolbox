@@ -60,14 +60,14 @@ for (const table of [
   "today_commitment_steps",
   "record_audit_logs",
 ]) {
-  if (!tables.includes(table)) throw new Error(\`Database is missing ${table}.\`);
+  if (!tables.includes(table)) throw new Error(\`Database is missing \${table}.\`);
 }
 for (const table of ["todo_tasks", "todo_steps", "todo_step_completions", "record_windows", "todo_step_windows"]) {
-  if (tables.includes(table)) throw new Error(\`Removed table still exists: ${table}.\`);
+  if (tables.includes(table)) throw new Error(\`Removed table still exists: \${table}.\`);
 }
 const planColumns = database.prepare("SELECT name FROM pragma_table_info('daily_plans')").all().map(({ name }) => name);
 for (const column of ["current_commitment_id", "pause_reason", "completed_rounds", "revision"]) {
-  if (!planColumns.includes(column)) throw new Error(\`Daily plan column is missing: ${column}.\`);
+  if (!planColumns.includes(column)) throw new Error(\`Daily plan column is missing: \${column}.\`);
 }
 console.log("Database schema verified.");
 NODE
