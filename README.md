@@ -81,7 +81,7 @@ git diff --check
 pnpm run publish:debug
 ```
 
-`pnpm run publish:debug` 一次完成 debug APK 构建、`latest.json` 生成、版本化 APK 上传和远端校验。release 使用 `pnpm run publish:release`，只处理 release 包。远端校验要求见 [开发指南](docs/development.md)。
+`pnpm run publish:debug` 不依赖当前 shell 的 Java/Android 环境，一次完成 debug APK 构建、`latest.json` 生成、版本化 APK 上传和远端校验。release 使用 `pnpm run publish:release`，只处理 release 包。远端校验要求见 [开发指南](docs/development.md)。
 
 功能交付顺序为开发、测试、提交、服务迁移（涉及服务端契约时）、对应通道 APK 发布和真机验收；完整命令与边界见[开发指南](docs/development.md#功能交付)。
 
@@ -89,7 +89,7 @@ pnpm run publish:debug
 
 | 构建类型 | 当前发布版本 |
 | --- | --- |
-| debug | `0.1.35` (`versionCode 36`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.35-debug.apk`，远端 `content-length` `69,087,328`，SHA-256 `cdec01ae07568db5f5cb98ed38757dfd7b08098b49b101187d1781f6dd0bd4a4`。 |
+| debug | `0.1.36` (`versionCode 37`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.36-debug.apk`，远端 `content-length` `69,104,960`，SHA-256 `fb1240cb851eb0c243e62ebaa8abccf23fb205946ef0dfc2974d56478f6f6872`。 |
 | release | 尚未发布。 |
 
 安装到已连接设备：

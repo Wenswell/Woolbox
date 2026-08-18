@@ -1,12 +1,19 @@
-import { readdir } from "node:fs/promises";
-import { copyFile, mkdtemp, readFile, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { constants as fsConstants } from "node:fs";
+import { access, copyFile, mkdtemp, readFile, readdir, stat } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 const projectRoot = resolve(import.meta.dirname, "..");
 const downloaderProject = "/Users/wswensw/Documents/repos/debian-cloud-server";
 const downloadBaseUrl = "https://dl.1662803.xyz/d/woolbox/releases";
+const androidHome = join(homedir(), "Library", "Android", "sdk");
+const javaHome = "/Applications/Android Studio.app/Contents/jbr/Contents/Home";
+const androidBuildEnvironment = {
+  ...process.env,
+  ANDROID_HOME: androidHome,
+  JAVA_HOME: javaHome,
+};
 const scriptArguments = process.argv.slice(2);
 if (scriptArguments[0] === "--") scriptArguments.shift();
 const argumentsMap = parseArguments(scriptArguments);
@@ -17,6 +24,8 @@ if (!["debug", "release"].includes(buildType)) {
 }
 
 const variantDir = join(projectRoot, "app", "build", "outputs", "apk", buildType);
+const apksigner = await resolveApkSigner();
+await assertExecutable(join(javaHome, "bin", "java"), "Android Studio JBR");
 await buildVariant(buildType);
 
 const metadataPath = argumentsMap.get("metadata")
@@ -29,7 +38,7 @@ if (!apkElement?.outputFile) throw new Error(`No APK output in ${metadataPath}.`
 const sourceApk = argumentsMap.get("apk")
   ? resolve(projectRoot, argumentsMap.get("apk"))
   : join(dirname(metadataPath), apkElement.outputFile);
-await assertSignedApk(sourceApk);
+await assertSignedApk(sourceApk, apksigner);
 
 const publishedApkName = `woolbox-${apkElement.versionName}${buildType === "debug" ? "-debug" : ""}.apk`;
 const stagingRoot = await mkdtemp(join(tmpdir(), "woolbox-update-"));
@@ -76,26 +85,34 @@ async function buildVariant(type) {
   const tasks = type === "debug"
     ? [":app:testDebugUnitTest", ":app:lintDebug", ":app:assembleDebug"]
     : [":app:assembleRelease"];
-  await run("./gradlew", tasks, { cwd: projectRoot });
+  await run("./gradlew", tasks, { cwd: projectRoot, env: androidBuildEnvironment });
 }
 
-async function assertSignedApk(apkPath) {
+async function assertSignedApk(apkPath, signerPath) {
   await stat(apkPath);
-  const apksigner = await resolveApkSigner();
-  await run(apksigner, ["verify", "--verbose", apkPath]);
+  await run(signerPath, ["verify", "--verbose", apkPath], { env: androidBuildEnvironment });
 }
 
 async function resolveApkSigner() {
-  const androidHome = process.env.ANDROID_HOME ?? "/Users/wswensw/Library/Android/sdk";
   const buildToolsDir = join(androidHome, "build-tools");
-  const versions = await readdir(buildToolsDir, { withFileTypes: true });
+  const versions = await readdir(buildToolsDir, { withFileTypes: true }).catch(() => {
+    throw new Error(`Android build-tools directory is missing: ${buildToolsDir}`);
+  });
   const latest = versions
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }))
     .at(0);
   if (!latest) throw new Error(`No Android build-tools found under ${buildToolsDir}.`);
-  return join(buildToolsDir, latest, "apksigner");
+  const signerPath = join(buildToolsDir, latest, "apksigner");
+  await assertExecutable(signerPath, "Android APK signer");
+  return signerPath;
+}
+
+async function assertExecutable(path, label) {
+  await access(path, fsConstants.X_OK).catch(() => {
+    throw new Error(`${label} is missing or not executable: ${path}`);
+  });
 }
 
 function assertManifest(manifest, expectedBuildType, expectedVersionCode, expectedVersionName) {
@@ -142,6 +159,7 @@ function run(command, argumentsList, options = {}) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, argumentsList, {
       cwd: options.cwd,
+      env: options.env,
       stdio: "inherit",
     });
     child.on("error", rejectPromise);

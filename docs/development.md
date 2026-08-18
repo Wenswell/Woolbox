@@ -140,7 +140,7 @@ https://dl.1662803.xyz/d/woolbox/releases/release/latest.json
 pnpm run publish:debug
 ```
 
-`pnpm run publish:debug` 一次运行 debug 测试、lint 和构建，验证 APK 签名，从 `output-metadata.json` 生成 `latest.json`，上传版本化 APK 与 manifest，并校验远端 manifest 和 APK `content-length`。`pnpm run publish:release` 会执行 `assembleRelease`，且只接受已签名 APK；未配置 release 签名时必须失败，不能上传 unsigned APK。
+`pnpm run publish:debug` 固定使用当前用户的 `~/Library/Android/sdk` 和 Android Studio JBR `/Applications/Android Studio.app/Contents/jbr/Contents/Home`，不读取调用 shell 的 `ANDROID_HOME/JAVA_HOME`。脚本在构建前验证 JBR 与 build-tools，再运行 debug 测试、lint 和构建，验证 APK 签名，从 `output-metadata.json` 生成 `latest.json`，上传版本化 APK 与 manifest，并校验远端 manifest 和 APK `content-length`。`pnpm run publish:release` 使用同一环境执行 `assembleRelease`，且只接受已签名 APK；未配置 release 签名时必须失败，不能上传 unsigned APK。
 
 ```bash
 pnpm run publish:release
