@@ -30,6 +30,7 @@ class RecordsTodaySemanticsTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val today = LocalDate.of(2026, 8, 18)
         val tasks = listOf(task())
+        val clock = mutableStateOf(RecordsClock(today, 12 * 60))
         var plan by mutableStateOf<DailyPlan?>(null)
 
         compose.setContent {
@@ -41,7 +42,7 @@ class RecordsTodaySemanticsTest {
                         tasks = tasks,
                         dailyPlan = plan,
                     ),
-                    clock = mutableStateOf(RecordsClock(today, 12 * 60)),
+                    clock = clock,
                     onPlanToday = {},
                     onManageTasks = {},
                     onManageAccumulates = {},
