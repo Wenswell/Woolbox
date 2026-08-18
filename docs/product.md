@@ -8,11 +8,11 @@ Woolbox 是 Android 12 及以上的工具应用。当前提供两项跨应用无
 | --- | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，选择并复制到剪贴板。 | `Start Global Copy` | `Global Copy` Quick Settings Tile |
 | `OLED shield` | 在目标应用上方显示可触摸的黑色遮罩。 | `Show shield` | `OLED shield` Quick Settings Tile |
-| `Records` | 管理待办和量化记录；量化记录可累计，也可按指定时间保存测量值。 | `Records` 底栏 | 分区与独立路由 |
+| `Records` | 用模板建立当天承诺并管理量化记录；量化记录可累计，也可按指定时间保存测量值。 | `Records` 底栏 | 分区与独立路由 |
 
 Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。
 
-当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、任务日期、日历视图、每日以外的周期配置、标签、协作、多级子事项、精确闹钟或可配置图表。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
+当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、日历视图、每日以外的模板周期、标签、协作、多级步骤、精确闹钟或可配置图表。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
 
 ## 入口语义
 
@@ -36,7 +36,7 @@ Setting 打开时检查当前 build type 的 `latest.json`：debug 只检查、�
 
 ### 应用语言
 
-Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选择后立即重建当前 Activity 并应用对应 Android 资源；`Follow system` 清除应用语言覆盖。Android 13 及以上与系统“应用语言”设置使用同一状态，Android 12 由 AppCompat 保存选择。应用页面、覆盖层、系统 Tile、本地状态与错误使用目标语言；用户输入的任务、记录名称与服务端错误正文保持原文。
+Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选择后立即重建当前 Activity 并应用对应 Android 资源；`Follow system` 清除应用语言覆盖。Android 13 及以上与系统“应用语言”设置使用同一状态，Android 12 由 AppCompat 保存选择。应用页面、覆盖层、系统 Tile、本地状态与错误使用目标语言；用户输入的模板、记录名称与服务端错误正文保持原文。
 
 ## 状态语义
 
@@ -113,29 +113,29 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 ### 用户流程
 
 1. 首次使用在 Setting 的 `Records connection` 配置 Basic Auth 用户名和密码；凭据使用 Android Keystore 加密保存。
-2. 根列表固定为 **Today → Tasks → Routines → Measurement**。Today 承担每日承诺与当前动作；Tasks 只显示库存摘要；Routines 与 Measurement 独立记录，不进入 Today 或每日结束判定。
-3. Today 未规划时选择一个主任务、最多一个不同的次任务，并填写独立的 `firstMove`。完成第一步后才开始第一轮；活动状态只突出当前承诺的首个未完成子事项。
-4. 每轮开始约 60 分钟后提醒回顾。回顾不输入总结，只能继续当前任务、切换到另一项未完成承诺，或结束今天。第四轮完成后显示 `Enough for today`，此时可显式选择未完成承诺开始额外一轮；承诺全部完成时显示 `Today's commitments completed`，不提供额外一轮。
-5. `READY` 或 `ACTIVE` 可显式调整未完成槽位；已完成槽位不能补入新任务。跨本地日期后旧计划不继承，未完成任务继续留在 Open 库存，不产生逾期或失败状态。
-6. Tasks 在 Android 与 PC 均只分 `Open` 和 `Completed`。新建与编辑可选 `ONCE` 或 `DAILY`，不提供日期；一级子事项可增删、重命名和调整固定位序。
+2. 根列表固定为 **Today → Templates → Routines → Measurement**。Today 是执行区；Templates 只保存可复用定义；Routines 与 Measurement 不进入 Today 状态判断。
+3. Today 未规划时从活跃模板选择一个主承诺、最多一个不同的次承诺，并填写 `firstMove`。系统复制模板标题、周期和步骤为当天实例；完成第一步后才开始第一轮。
+4. 每轮开始约 60 分钟后提醒回顾。回顾不输入总结，只能继续当前承诺、切换到另一未完成承诺或结束今天。第四轮及以后每次回顾后暂停；有未完成实例时可继续一轮，全部完成时可从模板添加承诺。
+5. 初始计划只在 `READY` 可调整。跨本地日期后旧计划不继承；Daily 模板在选择器中优先显示，但不会自动创建实例。同一模板当天可多次添加。
+6. Templates 保存标题、步骤和 `MANUAL/DAILY` 周期，没有完成状态。Android 管理活跃模板的创建、整体编辑和归档；PC 另提供归档恢复与永久删除。
 7. Routines 显示今日累计并通过记录 Sheet 写入；Measurement 显示最新值并通过 24 小时预览 Sheet 的离散 Slider 录入。成功写入仍提供短时 `Undo`。
-8. PC 管理页固定为 `Overview`、`Today`、`Tasks`、`Accumulate`、`Measurement`、`Entries`、`Activity`；Today 可切换任意本地日期，快捷管理任务，处理全部承诺步骤，并执行开始、提前回顾、即时切换、追加一轮、结束和重置，Android 刷新后读取同一服务端状态。
+8. PC 管理页固定为 `Overview`、`Today`、`Templates`、`Accumulate`、`Measurement`、`Entries`、`Activity`；Today 可切换任意本地日期，处理全部实例步骤，并执行开始、提前回顾、即时切换、添加承诺、继续一轮、结束和重置，Android 刷新后读取同一服务端状态。
 
 ### 每日承诺规则
 
-- 每个 ISO 本地日期至多一份计划，状态为 `READY`、`ACTIVE`、`ENOUGH` 或 `ENDED`；`REVIEW_DUE` 由活动状态和 `nextReviewAt` 派生。`ENOUGH` 的 `completionReason` 必须为 `ROUNDS` 或 `COMMITMENTS`，其他活动过程为空。
-- 主任务必填，次任务可空且不得与主任务相同。选入时任务必须未完成；完成当前任务后自动切到另一项未完成承诺，两项都完成时立即进入 `ENOUGH + COMMITMENTS`，步骤完成不增加轮次。第四次回顾进入 `ENOUGH + ROUNDS`。
-- `ENOUGH + COMMITMENTS` 中的承诺重新变为未完成时自动恢复原计划：第一动作未完成则恢复 `READY`；第一动作已完成则恢复 `ACTIVE`，以重新打开时刻计算下一次 60 分钟回顾。`ENDED` 不自动恢复。
-- 计划写操作携带当前 revision；服务端拒绝重复或过期操作。删除被当日未结束计划引用的任务前，必须先替换承诺或结束今天。
-- 开始第一轮和 `ENOUGH + ROUNDS` 的额外一轮要求系统通知可用。活动中关闭通知后，Today 只提供恢复通知或结束今天；提醒允许受系统省电策略延迟，不承诺精确到时。
-- PC 管理端可提前完成当前轮，或不增加完成轮次地立即切换到另一项未完成承诺；即时切换从操作时刻重新计算 60 分钟。`Reset to Ready` 保留第一步和主次承诺，清空执行进度与结束状态，但不修改任务步骤完成记录。
+- 每个 ISO 本地日期至多一份计划，状态为 `READY`、`ACTIVE`、`PAUSED` 或 `ENDED`；`REVIEW_DUE` 由 `ACTIVE` 和 `nextReviewAt` 派生。`PAUSED` 必须带 `COMMITMENTS_COMPLETED` 或 `TARGET_REACHED` 原因。
+- 初始主模板必填，次模板可空且不得与主模板相同。创建计划时生成 `PRIMARY` 和可选 `SECONDARY` 快照；之后模板编辑或归档不改变这些实例。
+- 完成当前实例后自动切到下一未完成实例；全部完成则进入 `PAUSED + COMMITMENTS_COMPLETED`。该状态只提供添加承诺；新增 `ADDITIONAL` 实例后立即恢复 `ACTIVE`。步骤完成、添加实例和继续一轮都不增加轮次。
+- 第四次及后续回顾进入 `PAUSED + TARGET_REACHED`。仍有未完成实例时只提供“继续一轮”；没有未完成实例时只提供“添加承诺”。轮次只在到期回顾或 PC 提前回顾时增加。
+- 在 `COMMITMENTS_COMPLETED` 暂停中重新打开实例：第一步未完成则恢复 `READY`，否则恢复 `ACTIVE` 并从操作时刻计算 60 分钟。`ENDED` 不自动恢复。
+- 计划与实例步骤写操作携带当前 revision；服务端拒绝重复、过期或非法状态操作。开始、继续一轮和添加承诺要求通知可用；活动中关闭通知后只提供恢复通知或结束今天。
+- PC 可提前完成当前轮，或不增加轮次地即时切换未完成实例。`Reset to Ready` 保留第一步、实例快照及其完成状态，只重置计划执行状态。
 
-### 待办规则
+### 模板规则
 
-- 待办定义保存标题、`ONCE/DAILY` 重复类型和时间戳；子事项保存标题与固定位序。任务和子事项都没有计划日期、时间段、优先级或标签。标题保存前去除首尾空白且不能为空；每个待办必须有至少一个一级子事项。
-- `ONCE` 的子事项完成状态跨日期保持；`DAILY` 按 ISO 本地日期独立保存完成状态。父项只由目标日期全部子事项的完成状态派生，不提供父项完成开关。
-- 每日任务今天完成后进入今天的 Completed，下一本地日期自动回到 Open；漏做不创建实例、逾期或待补状态，也不自动加入 Today。一次性任务重开任一子事项或新增子事项后恢复 Open。
-- 切换重复类型会清空目标当前作用域的完成状态；被当日未结束计划引用时不能切换。删除待办会级联删除子事项与完成记录，编辑页不能删除最后一个子事项。本轮不提供周几、间隔、截止日、多级嵌套、优先级、项目、标签、附件或协作。
+- 模板保存标题、`MANUAL/DAILY` 周期、归档状态和至少一个有固定位序的一级步骤。标题与步骤保存前去除首尾空白且不能为空；步骤随表单整体替换。
+- 模板不保存完成状态、计划日期、优先级或标签。`DAILY` 只影响选择排序和提示，不触发自动加入、补做或午夜重置。
+- 归档模板不进入 Today 选择器；永久删除只接受已归档模板。既有 Today 实例保留快照，模板删除后其 `templateId` 可为空。
 
 ### Record items
 
@@ -151,10 +151,10 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - 测量发生时间固定为提交时的当前设备时间。客户端提交 `occurredAt`、`localDate`、`localMinute` 与滑块值；预览只显示最近 24 小时，图表使用真实发生时间和原始数据点，不补零、聚合或平滑。点位标记显示发生时间和值；只有成功提交后的短时 `Undo` 可以删除该条流水。
 ### 在线数据规则
 
-- 服务端是 `record_items`、`record_entries`、`todo_tasks`、`todo_steps`、`todo_step_completions`、`daily_plans` 和 `record_audit_logs` 的唯一事实来源；App 与 PC 管理页均通过 HTTPS API 读写。
+- 服务端的记录项、模板、DailyPlan、Today 实例及审计表是唯一事实来源；App 与 PC 管理页均通过 HTTPS API 读写。
 - App 只在当前进程保存最近一次成功的根页快照，不写入本地记录数据库。首次加载显示 loading；底栏切换立即显示快照；恢复前台时刷新，成功写入后串行获取新快照。写入结果与刷新结果独立：写入成功后立即返回成功；刷新失败时保留已有快照并显示重试入口。
 - 服务端统一执行名称忽略大小写唯一、记录模式和值规则、Measurement 闭区间步进、归档项不可新增流水、已有流水后模式/数值类型/单位/Measurement 范围不可变、永久删除仅归档项等规则。手动时间段字段不属于 API，携带该字段的写请求会被拒绝。
-- 每次实际创建、修改、归档、恢复或删除记录项，创建或删除流水，创建、修改、完成、删除待办或子事项，以及创建、调整或结束每日计划，均在同一事务写入审计日志；小时回顾和额外一轮不保存逐轮历史。记录项更新内容未变化时不写入。失败请求不产生业务数据或日志。
+- 每次实际创建、修改、归档、恢复或删除记录项与模板，创建或删除流水，修改实例步骤，以及创建、调整、切换、添加承诺、重置或结束每日计划，均在同一事务写入审计日志；逐轮回顾不单独保存正文。无变化写入和失败请求不产生业务数据或日志。
 - 流水查询支持日期范围、记录项和模式筛选并按记录时间倒序；另提供测量记录的最新流水。服务端不依赖自身时区，客户端提交的 `occurredAt`、`localDate` 和 `localMinute` 原样保存。
 
 ## 共同关闭规则
@@ -184,10 +184,10 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - OLED shield 的默认配置、按应用记录、应用图标、删除、定向启用、长按面板、实时调整、保存和关闭符合上述规则。
 - OLED 的无障碍覆盖层从完整显示区域左上角计算尺寸；顶部遮罩覆盖状态栏和显示刘海区域。
 - Records 配置凭据后可从空库创建并编辑服务端记录项；无网络时显示可重试错误且不产生本地记录数据。
-- Today 强制一个主任务和最多一个次任务；第一步完成前不启动回顾；第四轮显示今天已足够，两项完成显示今日承诺已完成，首次回顾前完成时不显示“完成 0 轮”。
-- 小时回顾不保存正文；继续或切换只更新当前承诺、轮次和下一提醒。过期 revision、相同主次任务和非法状态转换均被拒绝。
-- 任务表单没有日期并可选 Once/Daily；Manage tasks 只显示 Open 与 Completed。每日任务同日完成后进入 Completed，下一本地日期重新 Open，漏做不产生实例且不自动进入 Today。
-- Android 与 PC 刷新后读取同一 Today 和任务状态；PC Today 可按任意日期管理任务与计划、提前回顾、即时切换并重置执行状态。PC 七个入口同时管理任务库存、两类记录项、流水和审计。Routines 与 Measurement 不影响 Today 状态。
+- Today 强制一个主模板和最多一个次模板；第一步完成前不启动回顾；第四轮进入 `TARGET_REACHED`，全部实例完成进入 `COMMITMENTS_COMPLETED`，首次回顾前完成时不显示“完成 0 轮”。
+- 暂停后的主操作严格由暂停原因与未完成实例决定：完成暂停只添加承诺，目标暂停优先继续未完成实例，否则添加承诺。
+- 模板没有完成入口；Daily 模板只优先显示，同一模板可多次创建 Today 实例，模板修改不改变既有实例。
+- Android 与 PC 刷新后读取同一 Today 和模板状态；PC Today 可按任意日期执行计划、提前回顾、即时切换并重置。Routines 与 Measurement 不影响 Today 状态。
 - Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
 - Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。

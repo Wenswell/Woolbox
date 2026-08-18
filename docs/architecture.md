@@ -45,7 +45,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布包含当日计划、任务库存、活跃记录项、今天流水、最新测量值和近 7 日累计的 overview 快照；凭据由 Keystore 加密保存。分钟时钟只负责回顾到期显示和跨日刷新。 |
+| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布包含活跃模板、当日计划及其实例、活跃记录项、今天流水、最新测量值和近 7 日累计的 overview 快照；凭据由 Keystore 加密保存。分钟时钟只负责回顾到期显示和跨日刷新。 |
 | `DailyReminderScheduler` / `DailyReminderWorker` | 以唯一一次性 WorkManager 任务调度 `nextReviewAt`。Worker 联网重读计划并核对本地日期、revision 和时间后发布通知；非活动、跨日或已替换任务直接结束。 |
 
 ## 命令状态机
@@ -137,23 +137,24 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | --- | --- |
 | `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值或 Measurement 最小值/最大值、步进、单位、目标、优先级、归档状态和时间戳。 |
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
-| `todo_tasks` | 保存待办标题、`ONCE/DAILY` 重复类型和创建/更新时间；任务不保存计划日期或完成时间。 |
-| `todo_steps` | 保存待办的一级子事项、列表位置 `position` 和创建/更新时间；`taskId` 外键级联删除；列表按 `(taskId, position)` 排序。 |
-| `todo_step_completions` | 保存子事项完成作用域与时间；`ONCE` 的本地日期为空且每个步骤唯一，`DAILY` 按 `(stepId, localDate)` 唯一；随步骤级联删除。 |
-| `daily_plans` | `local_date` 唯一；保存第一步、主/次/当前任务、`READY/ACTIVE/ENOUGH/ENDED`、`ROUNDS/COMMITMENTS` 完成原因、完成轮次、下一回顾时刻和 revision。任务外键删除时置空。 |
-| `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TASK`、`STEP`、`DAILY_PLAN` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表。 |
+| `task_templates` | 保存模板标题、`MANUAL/DAILY` 周期、归档状态和时间戳；模板没有完成状态。 |
+| `task_template_steps` | 保存模板步骤与固定位序；随模板级联删除。模板更新时步骤在同一事务整体替换。 |
+| `daily_plans` | `local_date` 唯一；保存第一步、当前实例、`READY/ACTIVE/PAUSED/ENDED`、暂停原因、完成轮次、下一回顾时刻和 revision。 |
+| `today_commitments` | 保存计划下的 `PRIMARY/SECONDARY/ADDITIONAL` 实例，以及创建时复制的模板 ID、标题和周期；模板删除时 ID 置空，快照内容保留。 |
+| `today_commitment_steps` | 保存实例步骤快照、固定位序和完成时刻；完成状态只属于该实例。 |
+| `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TEMPLATE`、`COMMITMENT`、`COMMITMENT_STEP`、`DAILY_PLAN` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表。 |
 
 服务端在事务内校验并写入记录项。累计记录使用正数流水和可选目标；测量记录固定为数字，要求有限的最小值、最大值和正步进，且只接受闭区间内的步进值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型、单位和 Measurement 范围必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。记录项更新先比较规范化快照，无变化时不写表或审计；其他成功写操作在同一事务插入一条审计日志。手动时间段不属于服务端 schema 或 API，写请求携带 `windows` 会被明确拒绝。日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。
 
-新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，按该日期派生任务完成状态并返回对应每日计划、范围内累计流水和最新 Measurement 流水。独立任务查询和所有任务/步骤写操作必须携带显式 `localDate`，服务端不推断调用者时区。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
+新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，返回活跃模板、该日期计划及实例、范围内累计流水和最新 Measurement 流水。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
 
-待办创建在一个事务内写入父项和至少一个子事项；完成状态只从目标作用域的子事项完成记录派生。`ONCE` 使用唯一的无日期作用域，`DAILY` 使用请求中的 ISO 本地日期；每日任务跨日自然恢复未完成，不执行午夜重置。删除最后一个子事项会被拒绝。目标日期任务完成时，同一事务只协调该日期的活动计划，切换至另一项未完成承诺或进入 `ENOUGH + COMMITMENTS`，不增加完成轮次。
+模板创建与更新在一个事务内写入定义和至少一个步骤；`DAILY` 只改变列表排序，不创建执行记录。计划创建或追加承诺时，服务端把模板字段复制到 `today_commitments` 与 `today_commitment_steps`，之后两边独立。归档模板不允许创建新实例；删除已归档模板只清空既有实例的外键引用。
 
-每日计划由 `POST /api/daily-plans` 创建，`PUT /api/daily-plans/:localDate` 替换未完成槽位。`start`、`review`、`extra-round`、`end` 执行正常状态转换；PC 管理端另用 `review-now` 提前完成轮次、`switch` 即时切换未完成承诺、`reset` 保留配置并恢复 `READY`。第四次回顾写入 `ENOUGH + ROUNDS`，且只有该组合可开始额外一轮；承诺完成写入 `ENOUGH + COMMITMENTS`。该原因下任务重新变为未完成时，服务端按第一动作状态恢复 `READY` 或 `ACTIVE`，活动计划从操作时刻重新计算 60 分钟；额外一轮和重置清空完成原因。即时切换不增加轮次；重置不修改任务步骤完成记录。所有写请求携带 `expectedRevision` 和 `occurredAt`，服务端事务校验状态、任务引用和 revision。创建、调整、即时切换、重置和结束写审计；小时回顾与额外一轮不存逐轮历史。
+每日计划由 `POST /api/daily-plans` 创建，`PUT /api/daily-plans/:localDate` 只在 `READY` 替换初始实例。`start`、`review`、`continue`、`commitments` 和 `end` 执行用户流程；PC 另用 `review-now`、`switch` 和 `reset`。第四次及后续回顾写入 `PAUSED + TARGET_REACHED`；全部实例完成写入 `PAUSED + COMMITMENTS_COMPLETED`。前者有未完成实例时只允许 `continue`，否则允许追加实例；后者允许追加实例。重新打开完成暂停中的实例时，服务端按第一步状态恢复 `READY` 或 `ACTIVE`。`reset` 保留实例及步骤完成状态，只重置执行字段。轮次仅由回顾增加；所有实例步骤和计划写请求携带 `expectedRevision` 与 `occurredAt`，服务端事务校验状态、引用和 revision。
 
-Android 每次刷新后按服务端计划覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始新一轮；进入 `ENOUGH`、`ENDED` 或跨日时先取消任务和可见通知，再读取新日期计划。
+Android 每次刷新后按服务端计划覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始、继续或追加承诺；进入 `PAUSED`、`ENDED` 或跨日时取消任务和可见通知。
 
-服务端还提供 PC 管理页静态资源；Today 为所选 ISO 本地日期独立读取计划和任务，可复用 Tasks 弹窗管理任务定义。Overview 与 Tasks 固定读取浏览器真实今天，不受 Today 日期选择影响。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和七张 Records 表。
+服务端还提供 PC 管理页静态资源；Today 按所选 ISO 本地日期读取计划实例，Templates 独立管理活跃与归档定义。Overview 固定读取浏览器真实今天，不受 Today 日期选择影响。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和八张 Records 业务表。
 
 ## App 更新
 

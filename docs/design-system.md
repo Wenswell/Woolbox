@@ -15,7 +15,7 @@ AppTheme
    │  └─ AppSurface
    │     ├─ Records
    │     │  ├─ Today ──> Plan / Edit today
-   │     │  ├─ Tasks ──> Manage tasks ──> Edit task
+   │     │  ├─ Templates ──> Manage templates ──> New / Edit template
    │     │  ├─ Routines ──> Record Sheet
    │     │  └─ Measurement ──> Measurement preview Sheet
    │     ├─ Tools
@@ -27,7 +27,7 @@ AppTheme
    │        ├─ Language entry
    │        ├─ Theme entry
    │        └─ Records connection ──> Credentials form
-   ├─ Manage tasks ──> New / Edit task
+   ├─ Manage templates ──> New / Edit template
    ├─ Manage accumulates ──> New / Edit accumulate
    └─ Manage measurements ──> New / Edit measurement
    ├─ Global Copy
@@ -114,14 +114,14 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks → Routines → Measurement**。Today 是唯一执行区；其余 section 使用中性 `titleSmall` 标题、数量副文案和 chevron 进入管理页，根页不提供新建。
+Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates → Routines → Measurement**。Today 是唯一执行区；其余 section 使用中性 `titleSmall` 标题、数量副文案和 chevron 进入管理页，根页不提供新建。
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH + ROUNDS` 显示今天已足够并可为未完成承诺开始额外一轮，`ENOUGH + COMMITMENTS` 只显示今日承诺已完成；`ENDED` 为只读状态。 |
-| `Plan/Edit today` | 全屏路由；第一步文本、主任务必选、次任务可空。任务使用选择 Dialog；已完成槽位锁定，次任务可明确清空。顶栏 Check 是唯一保存操作。 |
-| `Tasks` | 根页只显示 Open 数量并进入 Manage，不展示任务预览或完成操作。 |
-| `Manage tasks` / `Edit task` | 管理页仅按 Open、Completed 分组；顶栏加号新建。新建与编辑使用 Once/Daily 分段控件，并负责标题、子事项增删排序和删除，不显示日期。 |
+| `Today` | 单张 `8dp` 卡按计划状态切换主操作，并在下方列出全部实例。`READY` 突出第一步；`ACTIVE` 显示当前实例与下一步骤；到期时显示继续、切换、结束；`PAUSED + TARGET_REACHED` 有未完成实例时显示继续一轮，否则显示添加承诺；`PAUSED + COMMITMENTS_COMPLETED` 显示添加承诺；`ENDED` 为只读状态。实例行进入步骤 Sheet。 |
+| `Plan/Edit today` | 全屏路由；第一步文本、主模板必选、次模板可空且不同。模板使用选择 Dialog，只有 `READY` 可编辑；顶栏 Check 是唯一保存操作。 |
+| `Templates` | 根页只显示活跃模板数量并进入 Manage，不展示完成进度。 |
+| `Manage templates` / `New/Edit template` | Daily 优先的活跃模板列表；顶栏加号新建。编辑表单使用 Manual/Daily 分段控件，并整体保存标题与步骤；编辑页可归档。模板步骤没有 checkbox。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
 | `Routines` | 逐行显示名称与今日累计，点行打开累计记录 Sheet；本区不显示任务或回顾状态。 |
@@ -137,17 +137,17 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks →
 
 - Today 卡标题使用 `labelLarge` primary；当前动作使用 `titleLarge` SemiBold；说明与轮次使用 `bodySmall/bodyMedium` 的 `onSurfaceVariant`。卡与记录行统一 `8dp` 圆角。
 - 承诺在首次回顾前完成时，轮次说明使用“在首次回顾前完成”，不显示“完成 0 轮”；PC 状态 badge 使用 `Completed`，不使用 `Enough`。
-- 一个状态只显示当前可执行命令。启动、继续、切换和额外一轮使用明确按钮；编辑用铅笔 icon；当前子事项用 checkbox；结束今天使用弱化文本按钮。
+- 一个状态只显示当前可执行命令。启动、继续、切换、继续一轮和添加承诺使用明确按钮；编辑用铅笔 icon；当前步骤用 checkbox；结束今天使用弱化文本按钮。
 - 回顾到期由分钟时钟触发重组，不显示倒计时或精确工时。通知不可用时用阻塞状态替换活动内容，只保留启用通知和结束今天。
 - Routines 与 Measurement 行只突出当前数值，不显示 Today 颜色、轮次或承诺标签。累计写入和刚达标的触觉、Snackbar 与 `Undo` 沿用记录 Sheet 规则。
 
 `Manage accumulates` 与 `Manage measurements` 使用相同的标准路由骨架；每页顶栏仅提供本模式新建入口，编辑路由固定为本模式表单。
 
-Task progress Sheet 只显示子事项复选框和完成时间；标题、子事项增删排序和删除任务只在 `Edit task`。任务、累计与测量表单均不出现计划日期或时间段控件。Measurement 录入使用 Material `Slider`，以配置步进离散取值。
+Commitment progress Sheet 只显示当天实例步骤的 checkbox 和完成时间。模板步骤的增删与排序只在模板编辑表单，修改不会同步到已有实例。累计与测量表单不出现计划日期或时间段控件；Measurement 录入使用 Material `Slider`，以配置步进离散取值。
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
-PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Today、Tasks、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和任务、流水、审计预览。Today 顶部使用前后日期图标、原生日期输入和 Today 按钮；状态区呈现 `READY/ACTIVE/ENOUGH/ENDED` 与 revision 管理动作，全部承诺展开步骤 checkbox 和任务编辑入口。提前回顾、即时切换、重置与结束使用明确命令，重置和结束经确认 Dialog。Plan/Edit today 可复用 Tasks 弹窗新建或编辑任务。Tasks 使用 Open/Completed 分段、搜索与表格，表单提供 Once/Daily 并按固定位序管理子事项。Accumulate 与 Measurement 使用固定模式表单。Entries 提供日期、模式与记录项筛选，可新增流水和批量删除。Activity 只读展示对象、动作和变更摘要。
+PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Today、Templates、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和模板、流水、审计预览。Today 顶部使用前后日期图标、原生日期输入和 Today 按钮；状态区呈现 `READY/ACTIVE/PAUSED/ENDED` 与 revision 管理动作，全部实例展开步骤 checkbox。提前回顾、即时切换、添加承诺、继续一轮、重置与结束使用明确命令。Templates 使用 Active/Archived 分段、搜索与表格，表单提供 Manual/Daily 并整体管理步骤。Accumulate 与 Measurement 使用固定模式表单；Entries 提供日期、模式与记录项筛选；Activity 只读展示对象、动作和变更摘要。
 
 
 ## 状态呈现

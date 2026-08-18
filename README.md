@@ -8,7 +8,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
 | `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Woolbox，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
-| `Records` | 用一个主任务和最多一个次任务建立每日承诺，按小时回顾；任务库存支持单次与每日重复。 | `Records` 底栏；Android 与 PC Today。 |
+| `Records` | 从任务模板建立当天承诺，按小时回顾并在四轮后主动暂停；模板与当天完成状态相互独立。 | `Records` 底栏；Android 与 PC Today。 |
 
 `Global Copy` 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。OLED 没有服务时可在 Woolbox 内直接使用；服务连接后，页面入口会先把 Woolbox 移到后台，再对恢复的应用执行系统级遮罩。Tile 用于在目标应用内快速启动。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍授权，也不在本地保存记录数据。Setting 可选择跟随系统、English 或简体中文，并仅检查当前构建类型的版本化 APK：debug 只更新 debug，release 只更新 release。
 
@@ -27,7 +27,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
-从 `Records` 进入后，同一页按 Today、Tasks、Routines、Measurement 展示。Today 选择一个主任务、最多一个次任务和独立第一步；开始后约每 60 分钟提醒一次，只确认继续、切换承诺或结束。第四轮后显示今天已足够，此时可显式开始额外一轮；承诺全部完成时显示今日承诺已完成，重新打开承诺会恢复原计划。Tasks 是 Open/Completed 库存，可选单次或每日重复；每日任务按本地日期独立计算完成状态，但仍需显式加入 Today。PC 管理页可切换任意日期完成 Today 全流程，并提供任务快捷编辑、提前回顾、即时切换和重置纠偏。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
+从 `Records` 进入后，同一页按 Today、Templates、Routines、Measurement 展示。Today 从模板选择一个主承诺、最多一个次承诺并填写第一步；模板内容会复制为当天实例，之后编辑模板不改变既有实例。开始后约每 60 分钟只确认继续、切换承诺或结束；第四轮后暂停，有未完成承诺时可继续一轮，全部完成时可从模板添加承诺。Daily 模板仅在选择器中优先显示，不会自动加入 Today。PC 管理页可切换任意日期执行 Today 全流程，并管理模板、提前回顾、即时切换和重置。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 
@@ -50,7 +50,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 
 ```text
 app/src/main/java/com/wswensw/woolbox/
-├─ record/             每日承诺、任务库存、量化记录、提醒、网络 Repository 和 Compose 页面
+├─ record/             Today 实例、任务模板、量化记录、提醒、网络 Repository 和 Compose 页面
 ├─ ui/                 应用页面、主题和模板组件
 └─ tool/
    ├─ model/           文本与 OLED 领域模型
