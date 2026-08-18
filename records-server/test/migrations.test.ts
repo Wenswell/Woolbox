@@ -63,6 +63,7 @@ describe("Records migrations", () => {
     expect(tableNames(migrated)).not.toContain("record_windows");
     expect(tableNames(migrated)).not.toContain("todo_task_windows");
     expect(tableNames(migrated)).toContain("daily_plans");
+    expect(columnNames(migrated, "daily_plans")).toContain("completion_reason");
     expect(tableNames(migrated)).toContain("todo_step_completions");
     expect(columnNames(migrated, "todo_tasks")).not.toContain("planned_date");
     expect(columnNames(migrated, "todo_tasks")).not.toContain("horizon");

@@ -434,7 +434,24 @@ describe("Records API", () => {
       completedAt: 1_700_000_000_000,
       steps: [{ completedAt: 1_700_000_000_000 }, { completedAt: 1_700_000_000_000 }],
     }]);
-    expect((await getDailyPlan(TestDate))?.state).toBe("ENOUGH");
+    expect(await getDailyPlan(TestDate)).toMatchObject({ state: "ENOUGH", completionReason: "COMMITMENTS", completedRounds: 0 });
+
+    const reset = await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/reset`,
+      payload: { expectedRevision: 1, occurredAt: 1_700_000_000_001 },
+    });
+    expect(reset.statusCode).toBe(200);
+    const restarted = await app.inject({
+      method: "PUT",
+      url: `/api/daily-plans/${TestDate}/start`,
+      payload: { expectedRevision: 2, occurredAt: 1_700_000_000_002 },
+    });
+    expect(restarted.json().dailyPlan).toMatchObject({
+      state: "ENOUGH",
+      completionReason: "COMMITMENTS",
+      completedRounds: 0,
+    });
 
     expect(await getTasks("2026-07-21")).toMatchObject([{
       id: 1,
@@ -624,6 +641,7 @@ describe("Records API", () => {
     expect(created.json().dailyPlan).toMatchObject({
       firstMove: "Go to the library",
       state: "READY",
+      completionReason: null,
       completedRounds: 0,
       revision: 0,
     });
@@ -673,14 +691,14 @@ describe("Records API", () => {
       plan = response.json().dailyPlan;
       expect(plan.completedRounds).toBe(round);
     }
-    expect(plan).toMatchObject({ state: "ENOUGH", currentTaskId: null, nextReviewAt: null, revision: 5 });
+    expect(plan).toMatchObject({ state: "ENOUGH", completionReason: "ROUNDS", currentTaskId: null, nextReviewAt: null, revision: 5 });
 
     plan = (await app.inject({
       method: "PUT",
       url: "/api/daily-plans/2026-07-20/extra-round",
       payload: { expectedRevision: 5, occurredAt: 20_000_000, currentTaskId: 1 },
     })).json().dailyPlan;
-    expect(plan).toMatchObject({ state: "ACTIVE", completedRounds: 4, currentTaskId: 1, revision: 6 });
+    expect(plan).toMatchObject({ state: "ACTIVE", completionReason: null, completedRounds: 4, currentTaskId: 1, revision: 6 });
 
     const ended = await app.inject({
       method: "PUT",
@@ -754,6 +772,7 @@ describe("Records API", () => {
       secondaryTaskId: 2,
       firstMoveCompletedAt: null,
       currentTaskId: null,
+      completionReason: null,
       completedRounds: 0,
       nextReviewAt: null,
       endedAt: null,
@@ -817,7 +836,7 @@ describe("Records API", () => {
 
     await setStepCompleted(2, true);
     plan = (await getDailyPlan("2026-07-20"))!;
-    expect(plan).toMatchObject({ state: "ENOUGH", currentTaskId: null, nextReviewAt: null, revision: 4 });
+    expect(plan).toMatchObject({ state: "ENOUGH", completionReason: "COMMITMENTS", completedRounds: 0, currentTaskId: null, nextReviewAt: null, revision: 4 });
     expect((await app.inject({ method: "DELETE", url: `/api/tasks/2?localDate=${TestDate}` })).statusCode).toBe(409);
 
     await app.inject({

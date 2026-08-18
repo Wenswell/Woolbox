@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { localToday, shiftLocalDate } from "./lib/format";
+import type { DailyPlan } from "./types";
 
 const activeItem = {
   id: 1, name: "Water", description: "Daily hydration", mode: "ACCUMULATE", valueType: "NUMBER",
@@ -27,7 +28,7 @@ const secondaryTask = {
   title: "Write notes",
   steps: [{ id: 21, taskId: 20, title: "Draft outline", position: 0, completedAt: null, createdAt: 1, updatedAt: 1 }],
 };
-const activePlan = {
+const activePlan: DailyPlan = {
   id: 40,
   localDate: localToday(),
   firstMove: "Open the project",
@@ -36,6 +37,7 @@ const activePlan = {
   secondaryTaskId: 20,
   currentTaskId: 10,
   state: "ACTIVE",
+  completionReason: null,
   completedRounds: 1,
   nextReviewAt: 1,
   revision: 2,
@@ -54,7 +56,7 @@ const auditLog = {
 };
 
 describe("Records administration", () => {
-  let dailyPlan: typeof activePlan | null;
+  let dailyPlan: DailyPlan | null;
 
   beforeEach(() => {
     dailyPlan = null;
@@ -138,6 +140,25 @@ describe("Records administration", () => {
       method: "PUT",
       body: expect.stringContaining('"currentTaskId":10'),
     })));
+  });
+
+  it("distinguishes completed commitments from completed review rounds", async () => {
+    dailyPlan = {
+      ...activePlan,
+      state: "ENOUGH",
+      completionReason: "COMMITMENTS",
+      completedRounds: 0,
+      currentTaskId: null,
+      nextReviewAt: null,
+    };
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Today" }));
+
+    expect(await screen.findByText("Today's commitments completed")).toBeTruthy();
+    expect(screen.getByText("Completed before the first review")).toBeTruthy();
+    expect(screen.queryByText("0 rounds completed")).toBeNull();
   });
 
   it("switches Today dates without changing the inventory date", async () => {

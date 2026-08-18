@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.DailyPlanCompletionReason
 import com.wswensw.woolbox.record.model.DailyPlanState
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.TaskRepeatMode
@@ -80,10 +81,20 @@ class RecordsTodaySemanticsTest {
         compose.runOnIdle {
             plan = plan(today, DailyPlanState.ENOUGH).copy(
                 firstMoveCompletedAt = 1,
+                completionReason = DailyPlanCompletionReason.ROUNDS,
                 completedRounds = 4,
             )
         }
         compose.onNodeWithText(context.getString(R.string.enough_for_today)).assertIsDisplayed()
+
+        compose.runOnIdle {
+            plan = plan(today, DailyPlanState.ENOUGH).copy(
+                firstMoveCompletedAt = 1,
+                completionReason = DailyPlanCompletionReason.COMMITMENTS,
+            )
+        }
+        compose.onNodeWithText(context.getString(R.string.commitments_completed)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.completed_before_first_review)).assertIsDisplayed()
 
         compose.runOnIdle {
             plan = plan(today, DailyPlanState.ENDED).copy(
@@ -103,6 +114,7 @@ class RecordsTodaySemanticsTest {
         secondaryTaskId = null,
         currentTaskId = null,
         state = state,
+        completionReason = null,
         completedRounds = 0,
         nextReviewAt = null,
         revision = 1,

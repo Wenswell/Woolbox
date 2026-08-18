@@ -43,6 +43,7 @@ class DailyReminderSchedulerTest {
         secondaryTaskId = null,
         currentTaskId = 1,
         state = DailyPlanState.ACTIVE,
+        completionReason = null,
         completedRounds = 0,
         nextReviewAt = 3_600_000,
         revision = 7,

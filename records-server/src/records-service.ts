@@ -124,6 +124,7 @@ interface DailyPlanAuditSnapshot {
   secondaryTaskId: number | null;
   currentTaskId: number | null;
   state: string;
+  completionReason: string | null;
   completedRounds: number;
   nextReviewAt: number | null;
 }
@@ -448,6 +449,7 @@ export class RecordsService {
         secondaryTaskId: input.secondaryTaskId,
         currentTaskId: null,
         state: "READY",
+        completionReason: null,
         completedRounds: 0,
         nextReviewAt: null,
         revision: 0,
@@ -460,6 +462,7 @@ export class RecordsService {
         ...input,
         currentTaskId: null,
         state: "READY" as const,
+        completionReason: null,
         completedRounds: 0,
         nextReviewAt: null,
       };
@@ -543,6 +546,7 @@ export class RecordsService {
         firstMoveCompletedAt: input.occurredAt,
         currentTaskId,
         state: currentTaskId === null ? "ENOUGH" as const : "ACTIVE" as const,
+        completionReason: currentTaskId === null ? "COMMITMENTS" as const : null,
         nextReviewAt: currentTaskId === null ? null : input.occurredAt + ReviewIntervalMs,
       };
     });
@@ -602,6 +606,7 @@ export class RecordsService {
         firstMoveCompletedAt: null,
         currentTaskId: null,
         state: "READY",
+        completionReason: null,
         completedRounds: 0,
         nextReviewAt: null,
         endedAt: null,
@@ -612,6 +617,7 @@ export class RecordsService {
         firstMoveCompletedAt: null,
         currentTaskId: null,
         state: updated.state,
+        completionReason: null,
         completedRounds: 0,
         nextReviewAt: null,
         endedAt: null,
@@ -645,6 +651,7 @@ export class RecordsService {
         completedRounds,
         currentTaskId: enough ? null : input.currentTaskId,
         state: enough ? "ENOUGH" as const : "ACTIVE" as const,
+        completionReason: enough ? "ROUNDS" as const : null,
         nextReviewAt: enough ? null : input.occurredAt + ReviewIntervalMs,
       };
     });
@@ -659,6 +666,7 @@ export class RecordsService {
       return {
         currentTaskId: input.currentTaskId,
         state: "ACTIVE" as const,
+        completionReason: null,
         nextReviewAt: input.occurredAt + ReviewIntervalMs,
       };
     });
@@ -1199,6 +1207,7 @@ export class RecordsService {
     if (nextTaskId === null) {
       tx.update(dailyPlans).set({
         state: "ENOUGH",
+        completionReason: "COMMITMENTS",
         currentTaskId: null,
         nextReviewAt: null,
         revision: plan.revision + 1,
@@ -1301,7 +1310,7 @@ function taskSnapshot(
 }
 
 function dailyPlanSnapshot(
-  plan: Pick<DailyPlanRow, "id" | "localDate" | "firstMove" | "primaryTaskId" | "secondaryTaskId" | "currentTaskId" | "state" | "completedRounds" | "nextReviewAt">,
+  plan: Pick<DailyPlanRow, "id" | "localDate" | "firstMove" | "primaryTaskId" | "secondaryTaskId" | "currentTaskId" | "state" | "completionReason" | "completedRounds" | "nextReviewAt">,
 ): DailyPlanAuditSnapshot {
   return {
     id: plan.id,
@@ -1311,6 +1320,7 @@ function dailyPlanSnapshot(
     secondaryTaskId: plan.secondaryTaskId,
     currentTaskId: plan.currentTaskId,
     state: plan.state,
+    completionReason: plan.completionReason,
     completedRounds: plan.completedRounds,
     nextReviewAt: plan.nextReviewAt,
   };

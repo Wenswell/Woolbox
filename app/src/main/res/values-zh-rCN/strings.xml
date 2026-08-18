@@ -188,6 +188,8 @@
     <string name="round_progress">第 %1$d 轮</string>
     <string name="review_around_hour">约 60 分钟后回顾。</string>
     <string name="enough_for_today">今天已经足够</string>
+    <string name="commitments_completed">今日承诺已完成</string>
+    <string name="completed_before_first_review">在首次回顾前完成</string>
     <string name="extra_round">开始额外一轮</string>
     <string name="today_ended">今天已结束</string>
     <string name="today_ended_detail">今天不再承诺其他工作。</string>

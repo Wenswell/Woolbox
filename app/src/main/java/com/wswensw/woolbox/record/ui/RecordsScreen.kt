@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.DailyPlanCompletionReason
 import com.wswensw.woolbox.record.model.DailyPlanState
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.RecordEntry
@@ -327,9 +328,22 @@ private fun TodayCard(
                     )
                 }
                 plan.state == DailyPlanState.ENOUGH -> {
-                    TodayHeader(stringResource(R.string.enough_for_today), null)
+                    TodayHeader(
+                        stringResource(
+                            if (plan.completionReason == DailyPlanCompletionReason.COMMITMENTS) {
+                                R.string.commitments_completed
+                            } else {
+                                R.string.enough_for_today
+                            },
+                        ),
+                        null,
+                    )
                     Text(
-                        pluralStringResource(R.plurals.rounds_completed, plan.completedRounds, plan.completedRounds),
+                        if (plan.completedRounds == 0) {
+                            stringResource(R.string.completed_before_first_review)
+                        } else {
+                            pluralStringResource(R.plurals.rounds_completed, plan.completedRounds, plan.completedRounds)
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (openCommitments.isNotEmpty()) {

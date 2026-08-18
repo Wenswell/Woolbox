@@ -34,6 +34,7 @@ class DailyPlanTest {
         secondaryTaskId = 2,
         currentTaskId = 1,
         state = DailyPlanState.ACTIVE,
+        completionReason = null,
         completedRounds = 0,
         nextReviewAt = nextReviewAt,
         revision = 0,

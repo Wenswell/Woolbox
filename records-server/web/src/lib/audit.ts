@@ -102,6 +102,7 @@ export function auditChanges(log: RecordAuditLog): string {
       fieldChange("Secondary task", before.secondaryTaskId, after.secondaryTaskId),
       fieldChange("Current task", before.currentTaskId, after.currentTaskId),
       fieldChange("Status", before.state, after.state),
+      fieldChange("Completion reason", before.completionReason, after.completionReason),
       fieldChange("Completed rounds", before.completedRounds, after.completedRounds),
       fieldChange("Next review", before.nextReviewAt, after.nextReviewAt),
     ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";

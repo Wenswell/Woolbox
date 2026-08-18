@@ -3,12 +3,14 @@ export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
 export const DAILY_PLAN_STATES = ["READY", "ACTIVE", "ENOUGH", "ENDED"] as const;
+export const DAILY_PLAN_COMPLETION_REASONS = ["ROUNDS", "COMMITMENTS"] as const;
 export const TASK_REPEAT_MODES = ["ONCE", "DAILY"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
 export type DailyPlanState = (typeof DAILY_PLAN_STATES)[number];
+export type DailyPlanCompletionReason = (typeof DAILY_PLAN_COMPLETION_REASONS)[number];
 export type TaskRepeatMode = (typeof TASK_REPEAT_MODES)[number];
 
 export interface RecordItemInput {

@@ -104,7 +104,7 @@ export function TodayView({
       <div className="today-status-bar">
         <div>
           <p className="eyebrow">{formatLocalDate(localDate)}</p>
-          <div className="today-title"><h2>{stateTitle(plan)}</h2><PlanBadge state={plan.state} /></div>
+          <div className="today-title"><h2>{stateTitle(plan)}</h2><PlanBadge plan={plan} /></div>
         </div>
         <div className="row-actions">
           {(plan.state === "READY" || plan.state === "ACTIVE") && (
@@ -153,8 +153,8 @@ export function TodayView({
 
       {plan.state === "ENOUGH" && (
         <div className="today-focus">
-          <p className="eyebrow">{plan.completedRounds} rounds completed</p>
-          <h3>Enough for today</h3>
+          <p className="eyebrow">{roundSummary(plan.completedRounds)}</p>
+          <h3>{plan.completionReason === "COMMITMENTS" ? "Today's commitments completed" : "Enough for today"}</h3>
           {openCommitments.length > 0 && (
             <div className="today-actions">
               {openCommitments.map((task) => (
@@ -371,22 +371,27 @@ function Commitments({
   );
 }
 
-function PlanBadge({ state }: { state: DailyPlan["state"] }) {
+function PlanBadge({ plan }: { plan: DailyPlan }) {
   const values = {
     READY: { tone: "warning" as const, label: "Ready" },
     ACTIVE: { tone: "accent" as const, label: "Active" },
-    ENOUGH: { tone: "neutral" as const, label: "Enough" },
+    ENOUGH: { tone: "neutral" as const, label: plan.completionReason === "COMMITMENTS" ? "Completed" : "Enough" },
     ENDED: { tone: "muted" as const, label: "Ended" },
   };
-  const value = values[state];
+  const value = values[plan.state];
   return <Badge tone={value.tone}>{value.label}</Badge>;
 }
 
 function stateTitle(plan: DailyPlan) {
   if (plan.state === "READY") return "First move";
   if (plan.state === "ACTIVE") return plan.nextReviewAt !== null && Date.now() >= plan.nextReviewAt ? "Hourly review" : "Current round";
-  if (plan.state === "ENOUGH") return "Daily commitment complete";
+  if (plan.state === "ENOUGH") return plan.completionReason === "COMMITMENTS" ? "Commitments complete" : "Daily target reached";
   return "Daily plan closed";
+}
+
+function roundSummary(completedRounds: number) {
+  if (completedRounds === 0) return "Completed before the first review";
+  return `${completedRounds} ${completedRounds === 1 ? "round" : "rounds"} completed`;
 }
 
 function formatTime(value: number) {

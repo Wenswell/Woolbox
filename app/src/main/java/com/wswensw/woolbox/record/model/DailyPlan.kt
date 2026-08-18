@@ -9,6 +9,11 @@ enum class DailyPlanState {
     ENDED,
 }
 
+enum class DailyPlanCompletionReason {
+    ROUNDS,
+    COMMITMENTS,
+}
+
 data class DailyPlan(
     val id: Long,
     val localDate: LocalDate,
@@ -18,6 +23,7 @@ data class DailyPlan(
     val secondaryTaskId: Long?,
     val currentTaskId: Long?,
     val state: DailyPlanState,
+    val completionReason: DailyPlanCompletionReason?,
     val completedRounds: Int,
     val nextReviewAt: Long?,
     val revision: Int,

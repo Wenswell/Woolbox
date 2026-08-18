@@ -7,6 +7,7 @@ import android.util.Base64
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.DailyPlanState
+import com.wswensw.woolbox.record.model.DailyPlanCompletionReason
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
@@ -443,6 +444,7 @@ internal fun parseDailyPlan(value: JSONObject) = DailyPlan(
     secondaryTaskId = value.nullableLong("secondaryTaskId"),
     currentTaskId = value.nullableLong("currentTaskId"),
     state = DailyPlanState.valueOf(value.getString("state")),
+    completionReason = value.nullableString("completionReason")?.let(DailyPlanCompletionReason::valueOf),
     completedRounds = value.getInt("completedRounds"),
     nextReviewAt = value.nullableLong("nextReviewAt"),
     revision = value.getInt("revision"),

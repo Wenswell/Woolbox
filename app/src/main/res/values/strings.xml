@@ -189,6 +189,8 @@
     <string name="round_progress">Round %1$d</string>
     <string name="review_around_hour">Review after about 60 minutes.</string>
     <string name="enough_for_today">Enough for today</string>
+    <string name="commitments_completed">Today\'s commitments completed</string>
+    <string name="completed_before_first_review">Completed before the first review</string>
     <string name="extra_round">Start an extra round</string>
     <string name="today_ended">Today ended</string>
     <string name="today_ended_detail">No more work is committed for today.</string>

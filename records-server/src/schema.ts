@@ -114,6 +114,7 @@ export const dailyPlans = sqliteTable(
     currentTaskId: integer("current_task_id")
       .references(() => todoTasks.id, { onDelete: "set null" }),
     state: text("state", { enum: ["READY", "ACTIVE", "ENOUGH", "ENDED"] }).notNull(),
+    completionReason: text("completion_reason", { enum: ["ROUNDS", "COMMITMENTS"] }),
     completedRounds: integer("completed_rounds").notNull(),
     nextReviewAt: integer("next_review_at"),
     revision: integer("revision").notNull(),
