@@ -121,7 +121,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks →
 | `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH` 显示完成轮次与可选额外一轮；`ENDED` 为只读状态。 |
 | `Plan/Edit today` | 全屏路由；第一步文本、主任务必选、次任务可空。任务使用选择 Dialog；已完成槽位锁定，次任务可明确清空。顶栏 Check 是唯一保存操作。 |
 | `Tasks` | 根页只显示 Open 数量并进入 Manage，不展示任务预览或完成操作。 |
-| `Manage tasks` / `Edit task` | 管理页仅按 Open、Completed 分组；顶栏加号新建。编辑路由负责标题、子事项增删排序和删除，不显示日期。 |
+| `Manage tasks` / `Edit task` | 管理页仅按 Open、Completed 分组；顶栏加号新建。新建与编辑使用 Once/Daily 分段控件，并负责标题、子事项增删排序和删除，不显示日期。 |
 | `Manage accumulates` | 只显示 `ACCUMULATE`；顶栏加号 → `New accumulate`，色卡 → `Edit accumulate`。 |
 | `Manage measurements` | 只显示 `MEASUREMENT`；顶栏加号 → `New measurement`，色卡副文案为范围与步进（无类型前缀、无 default）；色卡 → `Edit measurement`。 |
 | `Routines` | 逐行显示名称与今日累计，点行打开累计记录 Sheet；本区不显示任务或回顾状态。 |
@@ -146,7 +146,7 @@ Task progress Sheet 只显示子事项复选框和完成时间；标题、子事
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
-PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Tasks、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和任务、流水、审计预览。Tasks 只使用 Open/Completed 分段、搜索与表格，编辑 Dialog 内按固定位序管理子事项；不显示日期或每日计划。Accumulate 与 Measurement 使用固定模式表单。Entries 提供日期、模式与记录项筛选，可新增流水和批量删除。Activity 只读展示对象、动作和变更摘要。
+PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Today、Tasks、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和任务、流水、审计预览。Today 按本地日期呈现与 Android 相同的 `READY/ACTIVE/ENOUGH/ENDED` 状态和当前 revision，只显示当前可执行操作；步骤使用 checkbox，结束今天使用确认 Dialog。Tasks 使用 Open/Completed 分段、搜索与表格，表单提供 Once/Daily 并按固定位序管理子事项。Accumulate 与 Measurement 使用固定模式表单。Entries 提供日期、模式与记录项筛选，可新增流水和批量删除。Activity 只读展示对象、动作和变更摘要。
 
 
 ## 状态呈现

@@ -137,22 +137,23 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | --- | --- |
 | `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值或 Measurement 最小值/最大值、步进、单位、目标、优先级、归档状态和时间戳。 |
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
-| `todo_tasks` | 保存待办标题、完成时间和创建/更新时间；任务不保存计划日期。 |
-| `todo_steps` | 保存待办的一级子事项、列表位置 `position`、完成时间、创建/更新时间；`taskId` 外键级联删除；列表按 `(taskId, position)` 排序，另保留 `(taskId, createdAt)` 索引。 |
+| `todo_tasks` | 保存待办标题、`ONCE/DAILY` 重复类型和创建/更新时间；任务不保存计划日期或完成时间。 |
+| `todo_steps` | 保存待办的一级子事项、列表位置 `position` 和创建/更新时间；`taskId` 外键级联删除；列表按 `(taskId, position)` 排序。 |
+| `todo_step_completions` | 保存子事项完成作用域与时间；`ONCE` 的本地日期为空且每个步骤唯一，`DAILY` 按 `(stepId, localDate)` 唯一；随步骤级联删除。 |
 | `daily_plans` | `local_date` 唯一；保存第一步、主/次/当前任务、`READY/ACTIVE/ENOUGH/ENDED`、完成轮次、下一回顾时刻和 revision。任务外键删除时置空。 |
 | `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TASK`、`STEP`、`DAILY_PLAN` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表。 |
 
 服务端在事务内校验并写入记录项。累计记录使用正数流水和可选目标；测量记录固定为数字，要求有限的最小值、最大值和正步进，且只接受闭区间内的步进值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型、单位和 Measurement 范围必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。记录项更新先比较规范化快照，无变化时不写表或审计；其他成功写操作在同一事务插入一条审计日志。手动时间段不属于服务端 schema 或 API，写请求携带 `windows` 会被明确拒绝。日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。
 
-新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，一次返回活跃记录项、任务、对应每日计划、范围内累计流水和每个活跃 Measurement 的最新流水。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
+新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，按该日期派生任务完成状态并返回对应每日计划、范围内累计流水和最新 Measurement 流水。独立任务查询和所有任务/步骤写操作必须携带显式 `localDate`，服务端不推断调用者时区。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
 
-待办创建在一个事务内写入父项和至少一个子事项；完成状态只由子事项派生。全部子事项完成时父项完成，重开任一子事项或新增子事项时父项重开，删除最后一个子事项会被拒绝。任务完成时，同一事务把活动计划切换至另一项未完成承诺，或进入 `ENOUGH`。
+待办创建在一个事务内写入父项和至少一个子事项；完成状态只从目标作用域的子事项完成记录派生。`ONCE` 使用唯一的无日期作用域，`DAILY` 使用请求中的 ISO 本地日期；每日任务跨日自然恢复未完成，不执行午夜重置。删除最后一个子事项会被拒绝。目标日期任务完成时，同一事务只协调该日期的活动计划，切换至另一项未完成承诺或进入 `ENOUGH`。
 
 每日计划由 `POST /api/daily-plans` 创建，`PUT /api/daily-plans/:localDate` 替换未完成槽位，`start`、`review`、`extra-round`、`end` 子路径执行状态转换。写请求携带 `expectedRevision` 和设备 `occurredAt`；服务端事务校验状态、任务引用和 revision，并用发生时刻加 60 分钟生成 `nextReviewAt`。创建、调整和结束写审计；小时回顾不存逐轮历史。
 
 Android 每次刷新后按服务端计划覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始新一轮；进入 `ENOUGH`、`ENDED` 或跨日时先取消任务和可见通知，再读取新日期计划。
 
-服务端还提供 PC 管理页静态资源；Tasks 只管理 Open/Completed 库存。备份脚本使用 SQLite 在线备份 API写入 `/srv/records/backups`，恢复检查验证完整性和六张 Records 表。
+服务端还提供 PC 管理页静态资源；Today 复用每日计划 API 和 revision 状态机，Tasks 按浏览器本地日期管理 Open/Completed 与 Once/Daily。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和七张 Records 表。
 
 ## App 更新
 
