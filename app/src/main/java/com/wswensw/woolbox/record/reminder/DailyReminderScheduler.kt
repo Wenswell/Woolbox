@@ -27,12 +27,17 @@ fun dailyReminderSpec(plan: DailyPlan?, today: LocalDate): DailyReminderSpec? {
 class DailyReminderScheduler(context: Context) {
     private val applicationContext = context.applicationContext
     private val workManager = WorkManager.getInstance(applicationContext)
+    private val deliveryStore = DailyReminderDeliveryStore(applicationContext)
 
     fun reconcile(plan: DailyPlan?, now: Long = System.currentTimeMillis(), today: LocalDate = LocalDate.now()) {
         val spec = dailyReminderSpec(plan, today)
         if (spec == null) {
             workManager.cancelUniqueWork(UNIQUE_WORK)
             DailyReminderNotifications.cancelReview(applicationContext)
+            return
+        }
+        if (deliveryStore.wasDelivered(spec)) {
+            workManager.cancelUniqueWork(UNIQUE_WORK)
             return
         }
         if (spec.nextReviewAt > now) DailyReminderNotifications.cancelReview(applicationContext)

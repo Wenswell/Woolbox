@@ -92,8 +92,9 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `RecordRulesTest` | 记录项规范化、累计/测量值规则、目标累计和十进制步进。 |
 | `TodoModelsTest` | 待办子事项完成进度和下一动作派生。 |
 | `DailyPlanTest` | 回顾到期边界与主次承诺解析。 |
-| `DailyReminderSchedulerTest` | 仅活动当日计划产生 revision 绑定提醒。 |
+| `DailyReminderSchedulerTest` | 仅活动当日计划产生 revision 绑定提醒，送达标识随 revision 或回顾时刻变化。 |
 | `RecordsScreenTest` | 记录项排序、今日累计和目标跨越。 |
+| `RecordsTodaySemanticsTest` | Today 无计划、待启动、回顾到期、足量和结束状态的可见语义。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
 | `records-server/test/api.test.ts` | 六表迁移、记录规则、任务库存、每日计划状态/revision、overview、审计和批量 API。 |
@@ -170,7 +171,7 @@ node --check tools/publish-update.mjs
 13. 工具活动时切换应用、重新打开 Woolbox、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
 15. 配置 Records 后确认根页顺序为 Today、Tasks、Routines、Measurement。新建两个含子事项的任务，确认任务表单无日期，Manage tasks 只有 Open/Completed；创建 Today 时主任务必选、次任务可空且不能相同，第一步完成前不出现回顾。
-16. Android 13+ 拒绝通知权限时确认计划保持 `READY`，设置入口可恢复权限；授权后开始第一轮，使用 `adb shell dumpsys jobscheduler | rg "com.wswensw.woolbox|records-daily-review"` 确认只有一个调度。到期通知点击后应回到 Records Today；继续/切换后 revision 和下一提醒更新，第四轮、两项完成、结束今天及跨日均停止旧提醒。Android 12 直接检查系统通知开关。
+16. Android 13+ 拒绝通知权限时确认计划保持 `READY`，设置入口可恢复权限；授权后开始第一轮，使用 `adb shell dumpsys jobscheduler | rg "com.wswensw.woolbox|records-daily-review"` 确认只有一个调度。到期通知点击后应回到 Records Today，点击或忽略通知后刷新均不重发同一 revision；继续/切换后 revision 和下一提醒更新，第四轮、两项完成、结束今天及跨日均停止旧提醒。Android 12 直接检查系统通知开关。
 17. 在 Routines 创建累计记录后确认今日值、记录 Sheet、`Undo` 与断网错误行为。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`；确认 24 小时预览、离散 Slider、当前设备时间和短时 `Undo`。
 18. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 19. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。

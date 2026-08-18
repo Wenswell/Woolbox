@@ -79,7 +79,10 @@ class RecordsViewModel(
     }
         .onEach { tick ->
             val loaded = loadedDate
-            if (loaded != null && tick.date != loaded) refresh()
+            if (loaded != null && tick.date != loaded) {
+                reminderScheduler.reconcile(null)
+                refresh()
+            }
         }
         .stateIn(
             scope = viewModelScope,

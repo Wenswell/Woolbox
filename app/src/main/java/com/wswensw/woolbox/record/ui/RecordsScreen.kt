@@ -422,8 +422,8 @@ internal fun TaskChoiceDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
-                tasks.forEach { task ->
+            LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                items(tasks, key = TodoTask::id) { task ->
                     TextButton(onClick = { onSelect(task) }, modifier = Modifier.fillMaxWidth()) {
                         Text(task.title, modifier = Modifier.fillMaxWidth())
                     }

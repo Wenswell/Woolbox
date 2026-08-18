@@ -4,6 +4,7 @@ import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.DailyPlanState
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -22,6 +23,15 @@ class DailyReminderSchedulerTest {
     fun inactiveOrDifferentDayHasNoReminder() {
         assertNull(dailyReminderSpec(plan().copy(state = DailyPlanState.ENOUGH, nextReviewAt = null), today))
         assertNull(dailyReminderSpec(plan().copy(localDate = today.minusDays(1)), today))
+    }
+
+    @Test
+    fun deliveryTokenChangesWithServerReminderIdentity() {
+        val spec = DailyReminderSpec(today.toString(), 7, 3_600_000)
+
+        assertEquals("2026-08-18|7|3600000", spec.deliveryToken())
+        assertNotEquals(spec.deliveryToken(), spec.copy(revision = 8).deliveryToken())
+        assertNotEquals(spec.deliveryToken(), spec.copy(nextReviewAt = 7_200_000).deliveryToken())
     }
 
     private fun plan() = DailyPlan(

@@ -15,6 +15,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.wswensw.woolbox.MainActivity
 import com.wswensw.woolbox.R
+import java.time.Duration
+import java.time.ZonedDateTime
 
 object DailyReminderNotifications {
     const val EXTRA_OPEN_DAILY_REVIEW = "open_daily_review"
@@ -40,8 +42,13 @@ object DailyReminderNotifications {
     }
 
     @SuppressLint("MissingPermission")
-    fun showReview(context: Context) {
-        if (!areEnabled(context)) return
+    fun showReview(context: Context): Boolean {
+        if (!areEnabled(context)) return false
+        val now = ZonedDateTime.now()
+        val timeoutAfter = Duration.between(
+            now,
+            now.toLocalDate().plusDays(1).atStartOfDay(now.zone),
+        ).toMillis()
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
@@ -68,8 +75,10 @@ object DailyReminderNotifications {
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setTimeoutAfter(timeoutAfter)
                 .build(),
         )
+        return true
     }
 
     private const val CHANNEL_ID = "records_daily_review"

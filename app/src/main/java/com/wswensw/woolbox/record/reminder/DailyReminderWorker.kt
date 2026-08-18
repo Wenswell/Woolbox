@@ -30,7 +30,11 @@ class DailyReminderWorker(
         if (dailyReminderSpec(plan, localDate) != expected) return Result.success()
         if (!DailyReminderNotifications.areEnabled(applicationContext)) return Result.success()
 
-        DailyReminderNotifications.showReview(applicationContext)
+        val deliveryStore = DailyReminderDeliveryStore(applicationContext)
+        if (deliveryStore.wasDelivered(expected)) return Result.success()
+        if (DailyReminderNotifications.showReview(applicationContext)) {
+            deliveryStore.markDelivered(expected)
+        }
         return Result.success()
     }
 }
