@@ -4,8 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.wswensw.woolbox.R
@@ -86,6 +88,7 @@ class RecordsTodaySemanticsTest {
             )
         }
         compose.onNodeWithText(context.getString(R.string.enough_for_today)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.extra_round)).assertIsDisplayed()
 
         compose.runOnIdle {
             plan = plan(today, DailyPlanState.ENOUGH).copy(
@@ -95,6 +98,7 @@ class RecordsTodaySemanticsTest {
         }
         compose.onNodeWithText(context.getString(R.string.commitments_completed)).assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.completed_before_first_review)).assertIsDisplayed()
+        compose.onAllNodesWithText(context.getString(R.string.extra_round)).assertCountEquals(0)
 
         compose.runOnIdle {
             plan = plan(today, DailyPlanState.ENDED).copy(

@@ -659,7 +659,9 @@ export class RecordsService {
 
   startExtraRound(localDate: string, input: DailyPlanReviewInput) {
     return this.transitionDailyPlan(localDate, input, (tx, plan) => {
-      if (plan.state !== "ENOUGH") throw new ApiError(409, "Only enough plans can start an extra round.");
+      if (plan.state !== "ENOUGH" || plan.completionReason !== "ROUNDS") {
+        throw new ApiError(409, "An extra round is available only after completing four rounds.");
+      }
       if (!this.isOpenCommitment(tx, input.currentTaskId, plan.primaryTaskId, plan.secondaryTaskId, localDate)) {
         throw new ApiError(409, "An extra round requires an unfinished commitment.");
       }
@@ -1101,7 +1103,11 @@ export class RecordsService {
       after: taskSnapshot(after, localDate),
       createdAt: now,
     });
-    if (after.completedAt !== null) this.reconcileDailyPlanCompletion(tx, after.id, localDate, now);
+    if (after.completedAt !== null) {
+      this.reconcileDailyPlanCompletion(tx, after.id, localDate, now);
+    } else {
+      this.reconcileDailyPlanReopening(tx, after.id, localDate, now);
+    }
   }
 
   private transitionDailyPlan(
@@ -1221,6 +1227,32 @@ export class RecordsService {
         updatedAt: occurredAt,
       }).where(eq(dailyPlans.id, plan.id)).run();
     }
+  }
+
+  private reconcileDailyPlanReopening(
+    tx: RecordsTransaction,
+    taskId: number,
+    localDate: string,
+    occurredAt: number,
+  ) {
+    const plan = tx.select().from(dailyPlans)
+      .where(and(
+        eq(dailyPlans.localDate, localDate),
+        eq(dailyPlans.state, "ENOUGH"),
+        eq(dailyPlans.completionReason, "COMMITMENTS"),
+        or(eq(dailyPlans.primaryTaskId, taskId), eq(dailyPlans.secondaryTaskId, taskId)),
+      ))
+      .get();
+    if (!plan) return;
+    const active = plan.firstMoveCompletedAt !== null;
+    tx.update(dailyPlans).set({
+      state: active ? "ACTIVE" : "READY",
+      completionReason: null,
+      currentTaskId: active ? taskId : null,
+      nextReviewAt: active ? occurredAt + ReviewIntervalMs : null,
+      revision: plan.revision + 1,
+      updatedAt: occurredAt,
+    }).where(eq(dailyPlans.id, plan.id)).run();
   }
 
   private entryQuery() {

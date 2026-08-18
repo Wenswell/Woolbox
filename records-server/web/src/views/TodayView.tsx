@@ -155,7 +155,7 @@ export function TodayView({
         <div className="today-focus">
           <p className="eyebrow">{roundSummary(plan.completedRounds)}</p>
           <h3>{plan.completionReason === "COMMITMENTS" ? "Today's commitments completed" : "Enough for today"}</h3>
-          {openCommitments.length > 0 && (
+          {plan.completionReason === "ROUNDS" && openCommitments.length > 0 && (
             <div className="today-actions">
               {openCommitments.map((task) => (
                 <button key={task.id} type="button" disabled={busy !== null} onClick={() => void run(`extra-${task.id}`, () => api.startExtraRound(plan, task.id), "Extra round started")}><Play size={15} />Start {task.title}</button>

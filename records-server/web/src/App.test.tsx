@@ -159,6 +159,7 @@ describe("Records administration", () => {
     expect(await screen.findByText("Today's commitments completed")).toBeTruthy();
     expect(screen.getByText("Completed before the first review")).toBeTruthy();
     expect(screen.queryByText("0 rounds completed")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start Prepare launch" })).toBeNull();
   });
 
   it("switches Today dates without changing the inventory date", async () => {

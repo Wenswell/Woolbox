@@ -436,16 +436,26 @@ describe("Records API", () => {
     }]);
     expect(await getDailyPlan(TestDate)).toMatchObject({ state: "ENOUGH", completionReason: "COMMITMENTS", completedRounds: 0 });
 
+    expect((await setStepCompleted(2, false)).statusCode).toBe(200);
+    expect(await getDailyPlan(TestDate)).toMatchObject({
+      state: "READY",
+      completionReason: null,
+      currentTaskId: null,
+      nextReviewAt: null,
+      revision: 2,
+    });
+    expect((await setStepCompleted(2, true)).statusCode).toBe(200);
+
     const reset = await app.inject({
       method: "PUT",
       url: `/api/daily-plans/${TestDate}/reset`,
-      payload: { expectedRevision: 1, occurredAt: 1_700_000_000_001 },
+      payload: { expectedRevision: 3, occurredAt: 1_700_000_000_001 },
     });
     expect(reset.statusCode).toBe(200);
     const restarted = await app.inject({
       method: "PUT",
       url: `/api/daily-plans/${TestDate}/start`,
-      payload: { expectedRevision: 2, occurredAt: 1_700_000_000_002 },
+      payload: { expectedRevision: 4, occurredAt: 1_700_000_000_002 },
     });
     expect(restarted.json().dailyPlan).toMatchObject({
       state: "ENOUGH",
@@ -837,12 +847,30 @@ describe("Records API", () => {
     await setStepCompleted(2, true);
     plan = (await getDailyPlan("2026-07-20"))!;
     expect(plan).toMatchObject({ state: "ENOUGH", completionReason: "COMMITMENTS", completedRounds: 0, currentTaskId: null, nextReviewAt: null, revision: 4 });
+    const extra = await app.inject({
+      method: "PUT",
+      url: "/api/daily-plans/2026-07-20/extra-round",
+      payload: { expectedRevision: 4, occurredAt: 4_000, currentTaskId: 2 },
+    });
+    expect(extra.statusCode).toBe(409);
+    expect(extra.json().error.message).toBe("An extra round is available only after completing four rounds.");
+
+    await setStepCompleted(2, false);
+    plan = (await getDailyPlan("2026-07-20"))!;
+    expect(plan).toMatchObject({
+      state: "ACTIVE",
+      completionReason: null,
+      completedRounds: 0,
+      currentTaskId: 2,
+      nextReviewAt: 1_700_003_600_000,
+      revision: 5,
+    });
     expect((await app.inject({ method: "DELETE", url: `/api/tasks/2?localDate=${TestDate}` })).statusCode).toBe(409);
 
     await app.inject({
       method: "PUT",
       url: "/api/daily-plans/2026-07-20/end",
-      payload: { expectedRevision: 4, occurredAt: 5_000 },
+      payload: { expectedRevision: 5, occurredAt: 5_000 },
     });
     expect((await app.inject({ method: "DELETE", url: `/api/tasks/2?localDate=${TestDate}` })).statusCode).toBe(200);
   });

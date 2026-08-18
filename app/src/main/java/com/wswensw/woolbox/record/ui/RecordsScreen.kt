@@ -346,7 +346,10 @@ private fun TodayCard(
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (openCommitments.isNotEmpty()) {
+                    if (
+                        plan.completionReason == DailyPlanCompletionReason.ROUNDS &&
+                        openCommitments.isNotEmpty()
+                    ) {
                         Button(
                             onClick = {
                                 if (openCommitments.size == 1) {
@@ -389,15 +392,21 @@ private fun TodayCard(
     if (choosingReviewTask && plan != null) {
         TaskChoiceDialog(
             title = stringResource(
-                if (plan.state == DailyPlanState.ENOUGH) R.string.extra_round else R.string.correct_course,
+                if (plan.completionReason == DailyPlanCompletionReason.ROUNDS) {
+                    R.string.extra_round
+                } else {
+                    R.string.correct_course
+                },
             ),
-            tasks = openCommitments.filter { plan.state == DailyPlanState.ENOUGH || it.id != currentTask?.id },
+            tasks = openCommitments.filter {
+                plan.completionReason == DailyPlanCompletionReason.ROUNDS || it.id != currentTask?.id
+            },
             onDismiss = { choosingReviewTask = false },
             onSelect = { task ->
                 choosingReviewTask = false
                 busy = true
                 val complete: (String?) -> Unit = { result -> busy = false; error = result }
-                if (plan.state == DailyPlanState.ENOUGH) {
+                if (plan.completionReason == DailyPlanCompletionReason.ROUNDS) {
                     onExtraRound(plan, task.id, complete)
                 } else {
                     onReview(plan, task.id, complete)
