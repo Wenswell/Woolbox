@@ -41,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
@@ -68,7 +67,6 @@ import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
 import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.record.ui.RecordSheet
-import com.wswensw.woolbox.record.model.dayRing
 import com.wswensw.woolbox.record.ui.crossedGoalThreshold
 import com.wswensw.woolbox.record.ui.displayRecordName
 import com.wswensw.woolbox.record.ui.RecordsConnectionScreen
@@ -76,6 +74,7 @@ import com.wswensw.woolbox.record.ui.RecordsScreen
 import com.wswensw.woolbox.record.ui.RecordsViewModel
 import com.wswensw.woolbox.record.ui.TaskCreateScreen
 import com.wswensw.woolbox.record.ui.TaskDetailScreen
+import com.wswensw.woolbox.record.ui.DailyPlanScreen
 import com.wswensw.woolbox.record.ui.TaskProgressSheet
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
@@ -123,8 +122,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
-    val recordsToday by recordsViewModel.today.collectAsStateWithLifecycle()
-    val rootTaskPreviewLimit by recordsViewModel.rootTaskPreviewLimit.collectAsStateWithLifecycle()
     val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
     val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.RECORDS) }
@@ -208,33 +205,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
         }
     }
 
-    // The moment today's last commitment closes, announced once. Closing the
-    // ring is the day's own result, so it does not wait for a screen to notice.
-    val dayRing = dayRing(
-        items = recordsState.activeItems,
-        tasks = recordsState.tasks,
-        goalValues = recordsState.goalValues,
-        today = recordsToday,
-    )
-    val dayClosedMessage = pluralStringResource(
-        R.plurals.day_closed,
-        dayRing.total,
-        dayRing.total,
-    )
-    // Starts from whatever is already true, so opening the app on an
-    // already-closed day says nothing; only the crossing is worth announcing.
-    var ringWasComplete by remember { mutableStateOf(dayRing.isComplete) }
-    LaunchedEffect(dayRing.isComplete) {
-        val justClosed = dayRing.isComplete && !ringWasComplete
-        ringWasComplete = dayRing.isComplete
-        if (!justClosed) return@LaunchedEffect
-        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-        snackbarHostState.showSnackbar(
-            message = dayClosedMessage,
-            duration = SnackbarDuration.Short,
-        )
-    }
-
     LaunchedEffect(selectedTab) {
         if (selectedTab == MainTab.SETTING) AppUpdateManager.checkForUpdate()
     }
@@ -308,8 +278,7 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
                                 clock = recordsClock,
-                                today = recordsToday,
-                                rootTaskPreviewLimit = rootTaskPreviewLimit,
+                                onPlanToday = { navController.navigate(AppRoutes.DAILY_PLAN) },
                                 onManageTasks = {
                                     taskSheetId = null
                                     navController.navigate(AppRoutes.MANAGE_TASKS)
@@ -327,16 +296,15 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 },
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
-                                onQuickRecord = recordValue,
                                 onCompleteStep = completeStep,
-                                onDeferTarget = recordsViewModel::deferTarget,
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
                                 },
-                                onOpenTask = { task ->
-                                    taskSheetId = task.id
-                                },
+                                onStartPlan = recordsViewModel::startDailyPlan,
+                                onReviewPlan = recordsViewModel::reviewDailyPlan,
+                                onExtraRound = recordsViewModel::startExtraRound,
+                                onEndPlan = recordsViewModel::endDailyPlan,
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -356,8 +324,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                                 onOpenRecordsConnection = {
                                     navController.navigate(AppRoutes.RECORDS_CONNECTION)
                                 },
-                                rootTaskPreviewLimit = rootTaskPreviewLimit,
-                                onRootTaskPreviewLimitChange = recordsViewModel::setRootTaskPreviewLimit,
                                 updateState = updateState,
                                 onCheckForUpdate = AppUpdateManager::checkForUpdate,
                                 onDownloadAndInstall = AppUpdateManager::downloadAndInstall,
@@ -488,7 +454,6 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             composable(AppRoutes.MANAGE_TASKS) {
                 ManageTasksScreen(
                     state = recordsState,
-                    today = recordsToday,
                     onBack = { navController.popBackStack() },
                     onCreate = { navController.navigate(AppRoutes.TASK_NEW) },
                     onEdit = { taskId -> navController.navigate(AppRoutes.taskDetail(taskId)) },
@@ -529,10 +494,9 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
             }
             composable(AppRoutes.TASK_NEW) {
                 TaskCreateScreen(
-                    today = recordsToday,
                     onBack = { navController.popBackStack() },
-                    onCreate = { title, steps, plannedDate, onResult ->
-                        recordsViewModel.createTask(title, steps, plannedDate) { taskId, error ->
+                    onCreate = { title, steps, onResult ->
+                        recordsViewModel.createTask(title, steps) { taskId, error ->
                             onResult(error)
                             if (taskId != null) navController.popBackStack()
                         }
@@ -547,10 +511,9 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                 TaskDetailScreen(
                     task = recordsState.findTask(taskId),
                     loading = recordsState.isLoading,
-                    today = recordsToday,
                     onBack = { navController.popBackStack() },
-                    onSave = { title, plannedDate, onResult ->
-                        recordsViewModel.updateTask(taskId, title, plannedDate, onResult)
+                    onSave = { title, onResult ->
+                        recordsViewModel.updateTask(taskId, title, onResult)
                     },
                     onCreateStep = { title, onResult ->
                         recordsViewModel.createStep(taskId, title, onResult)
@@ -569,6 +532,24 @@ fun WoolboxApp(onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult) {
                     },
                     onDeleteTask = { onResult ->
                         recordsViewModel.deleteTask(taskId, onResult)
+                    },
+                )
+            }
+            composable(AppRoutes.DAILY_PLAN) {
+                DailyPlanScreen(
+                    plan = recordsState.dailyPlan,
+                    tasks = recordsState.tasks,
+                    onBack = { navController.popBackStack() },
+                    onSave = { firstMove, primaryTaskId, secondaryTaskId, onResult ->
+                        recordsViewModel.saveDailyPlan(
+                            recordsState.dailyPlan,
+                            firstMove,
+                            primaryTaskId,
+                            secondaryTaskId,
+                        ) { error ->
+                            onResult(error)
+                            if (error == null) navController.popBackStack()
+                        }
                     },
                 )
             }
@@ -834,6 +815,7 @@ private object AppRoutes {
     const val MANAGE_MEASUREMENTS = "manage-measurements"
     const val RECORDS_CONNECTION = "records-connection"
     const val TASK_NEW = "task/new"
+    const val DAILY_PLAN = "records/today"
     const val TASK_ID = "taskId"
     const val TASK_DETAIL = "task/{$TASK_ID}"
     const val RECORD_ITEM_ID = "recordItemId"

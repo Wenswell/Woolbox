@@ -8,32 +8,24 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.data.RecordRepository
-import com.wswensw.woolbox.record.data.RecordsUiPreferences
-import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.data.RecordsSnapshot
 import com.wswensw.woolbox.record.data.TodoStepDraft
 import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
-import com.wswensw.woolbox.record.model.DeferredTargets
-import com.wswensw.woolbox.record.model.NowTarget
+import com.wswensw.woolbox.record.model.DailyPlan
 import com.wswensw.woolbox.record.model.RecordsClock
-import com.wswensw.woolbox.record.model.StreakDays
-import com.wswensw.woolbox.record.model.focusTargetKey
 import com.wswensw.woolbox.record.model.TodoTask
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class RecordsUiState(
@@ -43,12 +35,9 @@ data class RecordsUiState(
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val tasks: List<TodoTask> = emptyList(),
+    val dailyPlan: DailyPlan? = null,
     val goalValues: Map<Long, Double> = emptyMap(),
     val recentDayValues: Map<Long, List<Double>> = emptyMap(),
-    val habitMinutes: Map<Long, Int> = emptyMap(),
-    val itemStreaks: Map<Long, Int> = emptyMap(),
-    val goalStreak: StreakDays = StreakDays(days = 0, atHistoryLimit = false),
-    val deferredTargets: DeferredTargets = DeferredTargets.none(),
     val error: String? = null,
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
@@ -66,19 +55,9 @@ data class MeasurementPreviewUiState(
 
 class RecordsViewModel(
     private val repository: RecordRepository,
-    private val uiPreferences: RecordsUiPreferences,
     private val resources: Resources,
 ) : ViewModel() {
-    val rootTaskPreviewLimit = uiPreferences.rootTaskPreviewLimit
-
-    fun setRootTaskPreviewLimit(limit: RootTaskPreviewLimit) {
-        uiPreferences.setRootTaskPreviewLimit(limit)
-    }
-
     private val error = MutableStateFlow<String?>(null)
-    // Deferral is a decision about today only, so it lives with the process and
-    // is discarded by date rather than persisted and later reconciled.
-    private val deferredTargets = MutableStateFlow(DeferredTargets.none())
     private val _measurementPreview = MutableStateFlow(MeasurementPreviewUiState())
     private val recordsOperations = RecordsOperationCoordinator()
     private var measurementPreviewRequestId = 0L
@@ -106,26 +85,14 @@ class RecordsViewModel(
             initialValue = RecordsClock.now(),
         )
 
-    /** Local date derived from [clock] without emitting every minute. */
-    val today: StateFlow<LocalDate> = clock
-        .map { clock -> clock.date }
-        .distinctUntilChanged()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = clock.value.date,
-        )
-
     val uiState: StateFlow<RecordsUiState> = combine(
         repository.snapshot,
         repository.connection,
         error,
-        deferredTargets,
-    ) { snapshot, connection, message, deferred ->
+    ) { snapshot, connection, message ->
         (snapshot?.toUiState() ?: RecordsUiState()).copy(
             isLoading = snapshot == null && message == null,
             connection = connection,
-            deferredTargets = deferred,
             error = message,
         )
     }.stateIn(
@@ -136,15 +103,6 @@ class RecordsViewModel(
 
     fun refresh() {
         recordsOperations.refresh(viewModelScope) { refreshSnapshot() }
-    }
-
-    /** Sends a target to the back of today's queue. A new day clears the set. */
-    fun deferTarget(target: NowTarget) {
-        val today = LocalDate.now()
-        deferredTargets.update { current ->
-            val keys = current.on(today) + focusTargetKey(target)
-            DeferredTargets(date = today, keys = keys)
-        }
     }
 
     private suspend fun refreshSnapshot(): Result<Unit> {
@@ -164,11 +122,9 @@ class RecordsViewModel(
             entries = entries,
             latestEntries = latestEntries,
             tasks = tasks,
+            dailyPlan = dailyPlan,
             goalValues = goalValues,
             recentDayValues = recentDayValues,
-            habitMinutes = habitMinutes,
-            itemStreaks = itemStreaks,
-            goalStreak = goalStreak,
         )
 
     fun configureCredentials(username: String, password: String, onResult: (String?) -> Unit) {
@@ -250,12 +206,11 @@ class RecordsViewModel(
     fun createTask(
         title: String,
         steps: List<TodoStepDraft>,
-        plannedDate: LocalDate?,
         onResult: (taskId: Long?, error: String?) -> Unit,
     ) {
         viewModelScope.launch {
             writeAndRefresh(
-                action = { repository.createTask(title, steps, plannedDate) },
+                action = { repository.createTask(title, steps) },
                 onWritten = { taskId -> onResult(taskId, null) },
             ).onFailure { failure ->
                 onResult(null, failure.localizedFailure(R.string.task_create_failed))
@@ -263,19 +218,59 @@ class RecordsViewModel(
         }
     }
 
-    fun updateTask(taskId: Long, title: String, plannedDate: LocalDate?, onResult: (String?) -> Unit) = runTaskAction(
+    fun updateTask(taskId: Long, title: String, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.task_update_failed,
     ) {
-        repository.updateTask(taskId, title, plannedDate)
+        repository.updateTask(taskId, title)
     }
 
     fun deleteTask(taskId: Long, onResult: (String?) -> Unit) = runTaskAction(
         onResult = onResult,
         failureMessageRes = R.string.task_delete_failed,
     ) {
-        repository.deleteTask(taskId)
+        repository.deleteTask(taskId, LocalDate.now())
     }
+
+    fun saveDailyPlan(
+        existing: DailyPlan?,
+        firstMove: String,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+        onResult: (String?) -> Unit,
+    ) = runTaskAction(onResult, R.string.daily_plan_save_failed) {
+        if (existing == null) {
+            repository.createDailyPlan(LocalDate.now(), firstMove, primaryTaskId, secondaryTaskId)
+        } else {
+            repository.updateDailyPlan(
+                existing,
+                firstMove,
+                primaryTaskId,
+                secondaryTaskId,
+                System.currentTimeMillis(),
+            )
+        }
+    }
+
+    fun startDailyPlan(plan: DailyPlan, onResult: (String?) -> Unit) =
+        runTaskAction(onResult, R.string.daily_plan_start_failed) {
+            repository.startDailyPlan(plan, System.currentTimeMillis())
+        }
+
+    fun reviewDailyPlan(plan: DailyPlan, taskId: Long, onResult: (String?) -> Unit) =
+        runTaskAction(onResult, R.string.daily_plan_review_failed) {
+            repository.reviewDailyPlan(plan, taskId, System.currentTimeMillis())
+        }
+
+    fun startExtraRound(plan: DailyPlan, taskId: Long, onResult: (String?) -> Unit) =
+        runTaskAction(onResult, R.string.daily_plan_review_failed) {
+            repository.startExtraRound(plan, taskId, System.currentTimeMillis())
+        }
+
+    fun endDailyPlan(plan: DailyPlan, onResult: (String?) -> Unit) =
+        runTaskAction(onResult, R.string.daily_plan_end_failed) {
+            repository.endDailyPlan(plan, System.currentTimeMillis())
+        }
 
     fun createStep(
         taskId: Long,
@@ -393,7 +388,6 @@ class RecordsViewModel(
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
             return RecordsViewModel(
                 repository = RecordRepository(applicationContext),
-                uiPreferences = RecordsUiPreferences(applicationContext),
                 resources = applicationContext.resources,
             ) as T
         }

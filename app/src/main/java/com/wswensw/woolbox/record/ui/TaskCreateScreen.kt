@@ -33,23 +33,18 @@ import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
-import java.time.LocalDate
 
 @Composable
 fun TaskCreateScreen(
-    today: LocalDate,
     onBack: () -> Unit,
     onCreate: (
         title: String,
         steps: List<TodoStepDraft>,
-        plannedDate: LocalDate?,
         onResult: (String?) -> Unit,
     ) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
-    var plannedDateValue by rememberSaveable { mutableStateOf<String?>(null) }
-    val plannedDate = plannedDateValue?.let(LocalDate::parse)
     var stepTitles by rememberSaveable { mutableStateOf(listOf("")) }
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
@@ -71,7 +66,7 @@ fun TaskCreateScreen(
             return
         }
         saving = true
-        onCreate(normalizedTitle, normalizedSteps, plannedDate) { error ->
+        onCreate(normalizedTitle, normalizedSteps) { error ->
             saving = false
             errorMessage = error
         }
@@ -108,12 +103,6 @@ fun TaskCreateScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
-            )
-            TaskScheduleFields(
-                plannedDate = plannedDate,
-                today = today,
-                enabled = !saving,
-                onPlannedDateChange = { selectedDate -> plannedDateValue = selectedDate?.toString() },
             )
         }
         AppSection(title = stringResource(R.string.subtasks)) {

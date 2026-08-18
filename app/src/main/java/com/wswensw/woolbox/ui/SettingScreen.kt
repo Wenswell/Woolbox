@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.BuildConfig
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
 import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.update.AppUpdatePhase
 import com.wswensw.woolbox.update.AppUpdateUiState
@@ -35,8 +34,6 @@ fun SettingScreen(
     onMotionModeChange: (MotionMode) -> Unit,
     recordsConnection: String,
     onOpenRecordsConnection: () -> Unit,
-    rootTaskPreviewLimit: RootTaskPreviewLimit,
-    onRootTaskPreviewLimitChange: (RootTaskPreviewLimit) -> Unit,
     updateState: AppUpdateUiState,
     onCheckForUpdate: () -> Unit,
     onDownloadAndInstall: () -> Unit,
@@ -58,14 +55,10 @@ fun SettingScreen(
         MotionMode.ON to stringResource(R.string.motion_on),
         MotionMode.OFF to stringResource(R.string.motion_off),
     )
-    val previewLabels = RootTaskPreviewLimit.entries.associateWith { limit ->
-        limit.count?.toString() ?: stringResource(R.string.option_all)
-    }
     val updateStatus = updateState.status.asString()
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     var showMotionDialog by rememberSaveable { mutableStateOf(false) }
-    var showPreviewLimitDialog by rememberSaveable { mutableStateOf(false) }
     var showVersionDialog by rememberSaveable { mutableStateOf(false) }
     var showDownloadConfirmation by rememberSaveable { mutableStateOf(false) }
 
@@ -110,14 +103,6 @@ fun SettingScreen(
                 },
                 navigate = true,
                 onClick = onOpenRecordsConnection,
-            )
-            AppListItem(
-                title = stringResource(R.string.setting_root_task_preview),
-                subtitle = previewLabels.getValue(rootTaskPreviewLimit),
-                leadingContent = {
-                    AppListLeadingIcon(imageVector = Icons.Outlined.Info)
-                },
-                onClick = { showPreviewLimitDialog = true },
             )
         }
 
@@ -209,17 +194,6 @@ fun SettingScreen(
             label = motionLabels::getValue,
             onSelected = onMotionModeChange,
             onDismiss = { showMotionDialog = false },
-        )
-    }
-
-    if (showPreviewLimitDialog) {
-        AppSingleChoiceDialog(
-            title = stringResource(R.string.setting_root_task_preview),
-            options = RootTaskPreviewLimit.entries,
-            selected = rootTaskPreviewLimit,
-            label = previewLabels::getValue,
-            onSelected = onRootTaskPreviewLimitChange,
-            onDismiss = { showPreviewLimitDialog = false },
         )
     }
 

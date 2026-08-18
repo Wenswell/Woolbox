@@ -16,7 +16,6 @@
     <string name="setting_motion">Motion</string>
     <string name="setting_records">Records</string>
     <string name="setting_connection">Connection</string>
-    <string name="setting_root_task_preview">Root task preview</string>
     <string name="setting_about">About</string>
     <string name="setting_version">Version</string>
     <string name="setting_updates">Updates</string>
@@ -32,7 +31,6 @@
     <string name="motion_follow_system">Follow system</string>
     <string name="motion_on">On</string>
     <string name="motion_off">Off</string>
-    <string name="option_all">All</string>
     <string name="not_configured">Not configured</string>
 
     <string name="update_install_version">Install %1$s</string>
@@ -64,10 +62,6 @@
     <string name="goal_reached">Goal reached · %1$s</string>
     <string name="recorded_item">Recorded %1$s.</string>
     <string name="action_undo">Undo</string>
-    <plurals name="day_closed">
-        <item quantity="one">Day closed · %d done</item>
-        <item quantity="other">Day closed · %d done</item>
-    </plurals>
     <string name="tools_title">Tools</string>
     <string name="tools_subtitle">Accessibility tools for the active app.</string>
     <string name="tools_access">Access</string>
@@ -172,12 +166,36 @@
     <string name="field_priority">Priority</string>
     <string name="track_a_goal">Track a goal</string>
     <string name="today">Today</string>
-    <string name="overdue">Overdue</string>
-    <string name="planned">Planned</string>
-    <string name="unscheduled">Unscheduled</string>
+    <string name="open">Open</string>
     <string name="completed">Completed</string>
-    <string name="choose_date">Choose date</string>
-    <string name="remove_date">Remove date</string>
+    <string name="plan_today">Plan today</string>
+    <string name="edit_today">Edit today</string>
+    <string name="no_plan_today">Choose one primary task and, optionally, one secondary task.</string>
+    <string name="first_move">First move</string>
+    <string name="first_move_label">What starts the day?</string>
+    <string name="first_move_done">First move done</string>
+    <string name="today_commitments">Today commitments</string>
+    <string name="primary_task">Primary task</string>
+    <string name="secondary_task">Secondary task</string>
+    <string name="choose_task">Choose a task</string>
+    <string name="no_secondary_task">None</string>
+    <string name="primary_task_required">Primary task is required.</string>
+    <string name="commitments_must_differ">Primary and secondary tasks must be different.</string>
+    <string name="hourly_review">Hourly review</string>
+    <string name="still_on_commitment">Still moving the commitment forward?</string>
+    <string name="continue_current">Continue current task</string>
+    <string name="correct_course">Switch commitment</string>
+    <string name="end_today">End today</string>
+    <string name="round_progress">Round %1$d</string>
+    <string name="review_around_hour">Review after about 60 minutes.</string>
+    <string name="enough_for_today">Enough for today</string>
+    <string name="extra_round">Start an extra round</string>
+    <string name="today_ended">Today ended</string>
+    <string name="today_ended_detail">No more work is committed for today.</string>
+    <plurals name="rounds_completed">
+        <item quantity="one">%d round completed</item>
+        <item quantity="other">%d rounds completed</item>
+    </plurals>
     <string name="edit_accumulate">Edit accumulate</string>
     <string name="edit_measurement">Edit measurement</string>
     <string name="editing_accumulate">Editing accumulate</string>
@@ -199,23 +217,16 @@
     <string name="action_retry">Retry</string>
     <string name="configure_connection">Configure connection</string>
     <string name="records_tasks">Tasks</string>
+    <string name="records_routines">Routines</string>
     <string name="records_accumulate">Accumulate</string>
     <string name="records_measurement">Measurement</string>
+    <string name="open_tasks_count">%1$d open</string>
+    <string name="routines_count">%1$d routines</string>
+    <string name="measurements_count">%1$d measurements</string>
+    <string name="subtasks_progress">%1$d / %2$d subtasks</string>
     <plurals name="more_in_manage">
         <item quantity="one">+%d more in Manage</item>
         <item quantity="other">+%d more in Manage</item>
-    </plurals>
-    <plurals name="tasks_planned">
-        <item quantity="one">%d task planned for a future date</item>
-        <item quantity="other">%d tasks planned for future dates</item>
-    </plurals>
-    <plurals name="tasks_unscheduled">
-        <item quantity="one">%d task without a date</item>
-        <item quantity="other">%d tasks without dates</item>
-    </plurals>
-    <plurals name="days_overdue">
-        <item quantity="one">%d day overdue</item>
-        <item quantity="other">%d days overdue</item>
     </plurals>
     <plurals name="subtasks_count">
         <item quantity="one">%1$d / %2$d subtask</item>
@@ -226,15 +237,10 @@
     <string name="daily_goal">Daily goal</string>
     <string name="seven_day_goal">7-day goal</string>
     <string name="no_measurements_yet">No measurements yet.</string>
-    <string name="focus_up_next">Up next</string>
     <string name="decrease_by">Decrease by %1$s</string>
     <string name="increase_by">Increase by %1$s</string>
     <string name="record_value_for">Record %1$s %2$s for %3$s</string>
     <string name="more_actions_for">More actions for %1$s</string>
-    <string name="not_now">Not now</string>
-    <string name="day_closed_short">Day closed</string>
-    <string name="nothing_due">Nothing due right now</string>
-    <string name="no_daily_goals">No daily goals</string>
     <string name="task_not_found">Task not found.</string>
     <string name="task_title">Task</string>
     <string name="field_title">Title</string>
@@ -304,6 +310,10 @@
     <string name="record_save_failed">Unable to save record.</string>
     <string name="record_undo_failed">Unable to undo record.</string>
     <string name="task_create_failed">Unable to create task.</string>
+    <string name="daily_plan_save_failed">Unable to save today.</string>
+    <string name="daily_plan_start_failed">Unable to start today.</string>
+    <string name="daily_plan_review_failed">Unable to update the review.</string>
+    <string name="daily_plan_end_failed">Unable to end today.</string>
     <string name="task_update_failed">Unable to update task.</string>
     <string name="task_delete_failed">Unable to delete task.</string>
     <string name="subtask_add_failed">Unable to add subtask.</string>
@@ -314,7 +324,4 @@
     <string name="streak_days">%1$d-day streak</string>
     <string name="streak_days_limited">%1$d+ day streak</string>
     <string name="today_progress">%1$d/%2$d today</string>
-    <string name="usually_at">usually %1$s</string>
-    <string name="streak_risk">%1$d-day streak</string>
-    <string name="behind_percent">behind · %1$d%%</string>
 </resources>

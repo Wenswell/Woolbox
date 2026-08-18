@@ -5,6 +5,8 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.wswensw.woolbox.record.model.GoalPeriod
+import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.DailyPlanState
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
@@ -13,16 +15,12 @@ import com.wswensw.woolbox.record.model.RecordValidationException
 import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
-import com.wswensw.woolbox.record.model.FOCUS_HISTORY_DAYS
-import com.wswensw.woolbox.record.model.StreakDays
-import com.wswensw.woolbox.record.model.dailyGoalStreak
 import com.wswensw.woolbox.record.model.goalValues
-import com.wswensw.woolbox.record.model.habitMinutes
-import com.wswensw.woolbox.record.model.itemStreaks
 import com.wswensw.woolbox.record.model.itemRecentDayValues
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.record.model.validated
+import com.wswensw.woolbox.record.model.validatedFirstMove
 import com.wswensw.woolbox.record.model.validatedTaskTitle
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
@@ -60,14 +58,9 @@ data class RecordsSnapshot(
     val entries: List<RecordEntry>,
     val latestEntries: Map<Long, RecordEntry>,
     val tasks: List<TodoTask>,
+    val dailyPlan: DailyPlan?,
     val goalValues: Map<Long, Double>,
     val recentDayValues: Map<Long, List<Double>>,
-    /** Time of day each item is normally recorded at, learned from history. */
-    val habitMinutes: Map<Long, Int>,
-    /** Consecutive days each item was done, counting back from today. */
-    val itemStreaks: Map<Long, Int>,
-    /** Consecutive days every daily goal was met. */
-    val goalStreak: StreakDays,
 )
 
 class RecordRepository(context: Context) {
@@ -80,15 +73,14 @@ class RecordRepository(context: Context) {
 
     suspend fun refresh(localDate: String) = withContext(Dispatchers.IO) {
         val date = LocalDate.parse(localDate)
-        // Habits and streaks need more than the card window, so one range
-        // covers both: the cards read the last 7 days out of the same entries.
-        val lookbackStart = date.minusDays((FOCUS_HISTORY_DAYS - 1).toLong()).toString()
+        val lookbackStart = date.minusDays(6).toString()
         val overview = request(
             "GET",
             "overview",
             query = mapOf(
                 "startDate" to lookbackStart,
                 "endDate" to localDate,
+                "planDate" to localDate,
             ),
         )
         val activeItems = overview.getJSONArray("items").mapObjects(::parseItem)
@@ -101,6 +93,7 @@ class RecordRepository(context: Context) {
             .mapObjects(::parseEntry)
             .associateBy(RecordEntry::itemId),
             tasks = overview.getJSONArray("tasks").mapObjects(::parseTask),
+            dailyPlan = overview.nullableObject("dailyPlan")?.let(::parseDailyPlan),
             goalValues = goalValues(activeItems, date, todayEntries, rangeEntries),
             recentDayValues = itemRecentDayValues(
                 itemIds = activeItems
@@ -109,9 +102,6 @@ class RecordRepository(context: Context) {
                 entries = rangeEntries,
                 today = date,
             ),
-            habitMinutes = habitMinutes(rangeEntries, date),
-            itemStreaks = itemStreaks(activeItems, rangeEntries, date),
-            goalStreak = dailyGoalStreak(activeItems, rangeEntries, date),
         )
     }
 
@@ -168,7 +158,6 @@ class RecordRepository(context: Context) {
     suspend fun createTask(
         title: String,
         steps: List<TodoStepDraft>,
-        plannedDate: LocalDate?,
     ): Long = withContext(Dispatchers.IO) {
         if (steps.isEmpty()) {
             throw RecordValidationException("At least one subtask is required.")
@@ -178,28 +167,92 @@ class RecordRepository(context: Context) {
             "tasks",
             body = JSONObject().apply {
                 put("title", validatedTaskTitle(title))
-                putNullable("plannedDate", plannedDate?.toString())
                 put("steps", JSONArray(steps.map(::stepJson)))
             },
         ).getJSONObject("task").getLong("id")
     }
 
-    suspend fun updateTask(taskId: Long, title: String, plannedDate: LocalDate?) = withContext(Dispatchers.IO) {
+    suspend fun updateTask(taskId: Long, title: String) = withContext(Dispatchers.IO) {
         request(
             "PUT",
             "tasks/$taskId",
+            body = JSONObject().put("title", validatedTaskTitle(title)),
+        )
+        Unit
+    }
+
+    suspend fun deleteTask(taskId: Long, planDate: LocalDate) = withContext(Dispatchers.IO) {
+        request("DELETE", "tasks/$taskId", query = mapOf("planDate" to planDate.toString()))
+        Unit
+    }
+
+    suspend fun createDailyPlan(
+        localDate: LocalDate,
+        firstMove: String,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+    ) = withContext(Dispatchers.IO) {
+        request(
+            "POST",
+            "daily-plans",
             body = JSONObject().apply {
-                put("title", validatedTaskTitle(title))
-                putNullable("plannedDate", plannedDate?.toString())
+                put("localDate", localDate.toString())
+                put("firstMove", validatedFirstMove(firstMove))
+                put("primaryTaskId", primaryTaskId)
+                putNullable("secondaryTaskId", secondaryTaskId)
             },
         )
         Unit
     }
 
-    suspend fun deleteTask(taskId: Long) = withContext(Dispatchers.IO) {
-        request("DELETE", "tasks/$taskId")
-        Unit
-    }
+    suspend fun updateDailyPlan(
+        plan: DailyPlan,
+        firstMove: String,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+        occurredAt: Long,
+    ) = dailyPlanWrite(
+        plan = plan,
+        suffix = "",
+        body = JSONObject().apply {
+            put("firstMove", validatedFirstMove(firstMove))
+            put("primaryTaskId", primaryTaskId)
+            putNullable("secondaryTaskId", secondaryTaskId)
+            put("occurredAt", occurredAt)
+        },
+    )
+
+    suspend fun startDailyPlan(plan: DailyPlan, occurredAt: Long) =
+        dailyPlanTransition(plan, "start", occurredAt)
+
+    suspend fun reviewDailyPlan(plan: DailyPlan, currentTaskId: Long, occurredAt: Long) =
+        dailyPlanTransition(plan, "review", occurredAt, currentTaskId)
+
+    suspend fun startExtraRound(plan: DailyPlan, currentTaskId: Long, occurredAt: Long) =
+        dailyPlanTransition(plan, "extra-round", occurredAt, currentTaskId)
+
+    suspend fun endDailyPlan(plan: DailyPlan, occurredAt: Long) =
+        dailyPlanTransition(plan, "end", occurredAt)
+
+    private suspend fun dailyPlanTransition(
+        plan: DailyPlan,
+        suffix: String,
+        occurredAt: Long,
+        currentTaskId: Long? = null,
+    ) = dailyPlanWrite(
+        plan = plan,
+        suffix = "/$suffix",
+        body = JSONObject()
+            .put("occurredAt", occurredAt)
+            .apply { currentTaskId?.let { put("currentTaskId", it) } },
+    )
+
+    private suspend fun dailyPlanWrite(plan: DailyPlan, suffix: String, body: JSONObject) =
+        withContext(Dispatchers.IO) {
+            body.put("expectedRevision", plan.revision)
+            request("PUT", "daily-plans/${plan.localDate}$suffix", body = body)
+            Unit
+        }
 
     suspend fun createStep(
         taskId: Long,
@@ -347,11 +400,27 @@ private fun stepJson(step: TodoStepDraft) = JSONObject()
 private fun parseTask(value: JSONObject) = TodoTask(
     id = value.getLong("id"),
     title = value.getString("title"),
-    plannedDate = value.nullableString("plannedDate")?.let(LocalDate::parse),
     completedAt = value.nullableLong("completedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
     steps = value.getJSONArray("steps").mapObjects(::parseStep),
+)
+
+internal fun parseDailyPlan(value: JSONObject) = DailyPlan(
+    id = value.getLong("id"),
+    localDate = LocalDate.parse(value.getString("localDate")),
+    firstMove = value.getString("firstMove"),
+    firstMoveCompletedAt = value.nullableLong("firstMoveCompletedAt"),
+    primaryTaskId = value.nullableLong("primaryTaskId"),
+    secondaryTaskId = value.nullableLong("secondaryTaskId"),
+    currentTaskId = value.nullableLong("currentTaskId"),
+    state = DailyPlanState.valueOf(value.getString("state")),
+    completedRounds = value.getInt("completedRounds"),
+    nextReviewAt = value.nullableLong("nextReviewAt"),
+    revision = value.getInt("revision"),
+    endedAt = value.nullableLong("endedAt"),
+    createdAt = value.getLong("createdAt"),
+    updatedAt = value.getLong("updatedAt"),
 )
 
 private fun parseStep(value: JSONObject) = TodoStep(
@@ -378,6 +447,9 @@ private fun JSONObject.nullableLong(key: String): Long? =
 
 private fun JSONObject.nullableString(key: String): String? =
     if (isNull(key)) null else getString(key)
+
+private fun JSONObject.nullableObject(key: String): JSONObject? =
+    if (isNull(key)) null else getJSONObject(key)
 
 private fun requireEntryValue(item: RecordItem, value: Double) {
     if (!value.isFinite()) {

@@ -34,34 +34,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.model.TaskDateBucket
 import com.wswensw.woolbox.record.model.TodoTask
-import com.wswensw.woolbox.record.model.dateBucket
 import com.wswensw.woolbox.ui.AppLazyRouteScaffold
 import com.wswensw.woolbox.ui.AppStyle
-import java.time.LocalDate
 
 @Composable
 fun ManageTasksScreen(
     state: RecordsUiState,
-    today: LocalDate,
     onBack: () -> Unit,
     onCreate: () -> Unit,
     onEdit: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
     val groups: List<Pair<Int, List<TodoTask>>> = listOf(
-        R.string.overdue to openTasks
-            .filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
-            .sortedBy(TodoTask::plannedDate),
-        R.string.today to openTasks
-            .filter { it.dateBucket(today) == TaskDateBucket.TODAY },
-        R.string.planned to openTasks
-            .filter { it.dateBucket(today) == TaskDateBucket.PLANNED }
-            .sortedBy(TodoTask::plannedDate),
-        R.string.unscheduled to openTasks
-            .filter { it.dateBucket(today) == TaskDateBucket.UNSCHEDULED },
+        R.string.open to state.tasks
+            .filterNot(TodoTask::isCompleted)
+            .sortedBy { it.title.lowercase() },
         R.string.completed to state.tasks
             .filter(TodoTask::isCompleted)
             .sortedByDescending(TodoTask::completedAt),
@@ -121,7 +109,6 @@ fun ManageTasksScreen(
                 items(tasks, key = TodoTask::id) { task ->
                     TaskManageCard(
                         task = task,
-                        today = today,
                         onClick = { onEdit(task.id) },
                         modifier = Modifier
                             .padding(horizontal = AppStyle.spacing.pageHorizontal)
@@ -136,7 +123,6 @@ fun ManageTasksScreen(
 @Composable
 private fun TaskManageCard(
     task: TodoTask,
-    today: LocalDate,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -211,7 +197,7 @@ private fun TaskManageCard(
                         )
                     }
                     Text(
-                        text = "${taskScheduleLabel(task, today)} · $completed / $total subtasks",
+                        text = stringResource(R.string.subtasks_progress, completed, total),
                         color = contentColor.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -235,18 +221,5 @@ private fun TaskManageCard(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun taskScheduleLabel(task: TodoTask, today: LocalDate): String {
-    val plannedDate = task.plannedDate ?: return stringResource(R.string.unscheduled)
-    if (task.isCompleted) return taskDateLabel(plannedDate, today)
-    return when (task.dateBucket(today)) {
-        TaskDateBucket.OVERDUE -> "${stringResource(R.string.overdue)} · ${taskDateLabel(plannedDate, today)}"
-        TaskDateBucket.TODAY,
-        TaskDateBucket.PLANNED,
-        TaskDateBucket.UNSCHEDULED,
-        -> taskDateLabel(plannedDate, today)
     }
 }

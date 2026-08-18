@@ -1,17 +1,12 @@
 package com.wswensw.woolbox.record.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,34 +16,32 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DateRange
-import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -57,101 +50,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
+import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.DailyPlanState
 import com.wswensw.woolbox.record.model.GoalPeriod
-import com.wswensw.woolbox.record.model.dayRing
-import com.wswensw.woolbox.record.model.emptyRecentDayValues
-import com.wswensw.woolbox.record.model.hasFocusCommitments
-import com.wswensw.woolbox.record.model.isGoalSatisfied
-import com.wswensw.woolbox.record.model.NowTarget
-import com.wswensw.woolbox.record.model.recentDayPieProgress
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordsClock
-import com.wswensw.woolbox.record.data.RootTaskPreviewLimit
-import com.wswensw.woolbox.record.model.TaskDateBucket
 import com.wswensw.woolbox.record.model.TodoStep
 import com.wswensw.woolbox.record.model.TodoTask
-import com.wswensw.woolbox.record.model.dateBucket
 import com.wswensw.woolbox.ui.AppStyle
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-
-private val GridCardHeight = 120.dp
-private val GridCardSpacing = 8.dp
 
 @Composable
 fun RecordsScreen(
     state: RecordsUiState,
     clock: State<RecordsClock>,
-    today: LocalDate,
-    rootTaskPreviewLimit: RootTaskPreviewLimit,
+    onPlanToday: () -> Unit,
     onManageTasks: () -> Unit,
     onManageAccumulates: () -> Unit,
     onManageMeasurements: () -> Unit,
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
-    onQuickRecord: (RecordItem, Double, (String?) -> Unit) -> Unit,
     onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
-    onDeferTarget: (NowTarget) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
-    onOpenTask: (TodoTask) -> Unit,
+    onStartPlan: (DailyPlan, (String?) -> Unit) -> Unit,
+    onReviewPlan: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onExtraRound: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onEndPlan: (DailyPlan, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val openTasks = state.tasks.filterNot(TodoTask::isCompleted)
-    val overdueTasks = openTasks
-        .filter { it.dateBucket(today) == TaskDateBucket.OVERDUE }
-        .sortedBy(TodoTask::plannedDate)
-    val todayTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.TODAY }
-    val plannedTasks = openTasks
-        .filter { it.dateBucket(today) == TaskDateBucket.PLANNED }
-        .sortedBy(TodoTask::plannedDate)
-    val unscheduledTasks = openTasks.filter { it.dateBucket(today) == TaskDateBucket.UNSCHEDULED }
-    val previewLimit = rootTaskPreviewLimit.count
-    val accumulateItems = orderedRecordItems(state.activeItems)
-        .filter { it.mode == RecordMode.ACCUMULATE }
+    val accumulateItems = orderedRecordItems(state.activeItems).filter { it.mode == RecordMode.ACCUMULATE }
     val measurementItems = state.activeItems
         .filter { it.mode == RecordMode.MEASUREMENT }
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
-    val recordMinutes = todayRecordMinutes(state.entries)
-    val ring = dayRing(
-        items = accumulateItems,
-        tasks = state.tasks,
-        goalValues = state.goalValues,
-        today = today,
-    )
-    // Decided without the clock, so the card never appears or disappears on a
-    // minute tick; only its contents follow time.
-    val hasFocus = ring.isVisible || hasFocusCommitments(
-        items = accumulateItems,
-        tasks = openTasks,
-        today = today,
-        goalValues = state.goalValues,
-        todayValues = todayValues,
-        habitMinutes = state.habitMinutes,
-    )
-    val listState = rememberLazyListState()
-    var pauseDecorativeMotion by remember { mutableStateOf(false) }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .collectLatest { scrolling ->
-                if (scrolling) {
-                    pauseDecorativeMotion = true
-                } else {
-                    delay(800)
-                    pauseDecorativeMotion = false
-                }
-            }
-    }
+    clock.value
 
-    CompositionLocalProvider(LocalPauseDecorativeMotion provides pauseDecorativeMotion) {
     LazyColumn(
-        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = AppStyle.spacing.pageHorizontal,
@@ -163,12 +100,7 @@ fun RecordsScreen(
     ) {
         when {
             state.isLoading -> item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
+                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
@@ -182,649 +114,338 @@ fun RecordsScreen(
                 )
             }
             else -> {
-                if (state.error != null) {
+                state.error?.let { message ->
                     item {
                         RecordsStatusCard(
-                            message = state.error,
+                            message = message,
                             actionLabel = stringResource(R.string.action_retry),
                             onAction = onRetry,
                         )
                     }
                 }
-                if (hasFocus) {
-                    item {
-                        RecordsFocusCard(
-                            clock = clock,
-                            items = accumulateItems,
-                            tasks = openTasks,
-                            ring = ring,
-                            streak = state.goalStreak,
-                            goalValues = state.goalValues,
-                            todayValues = todayValues,
-                            todayMinutes = recordMinutes,
-                            habitMinutes = state.habitMinutes,
-                            itemStreaks = state.itemStreaks,
-                            deferred = state.deferredTargets,
-                            colorProgressOf = { target ->
-                                when (target) {
-                                    is NowTarget.Accumulate -> accumulateColorProgress(
-                                        item = target.item,
-                                        cumulative = state.goalValues[target.item.id]
-                                            ?: todayValues[target.item.id]
-                                            ?: 0.0,
-                                        recentDayValues = state.recentDayValues[target.item.id],
-                                    )
-                                    is NowTarget.Task -> taskColorProgress(target.task)
-                                }
-                            },
-                            cumulativeOf = { item ->
-                                state.goalValues[item.id] ?: todayValues[item.id] ?: 0.0
-                            },
-                            onRecord = onQuickRecord,
-                            onOpenItem = onRecordItem,
-                            onOpenTask = onOpenTask,
-                            onCompleteStep = onCompleteStep,
-                            onDefer = onDeferTarget,
-                        )
-                    }
-                    item { Spacer(Modifier.height(4.dp)) }
+                item {
+                    SectionTitle(stringResource(R.string.today))
+                    TodayCard(
+                        plan = state.dailyPlan,
+                        tasks = state.tasks,
+                        now = System.currentTimeMillis(),
+                        onPlan = onPlanToday,
+                        onCompleteStep = onCompleteStep,
+                        onStart = onStartPlan,
+                        onReview = onReviewPlan,
+                        onExtraRound = onExtraRound,
+                        onEnd = onEndPlan,
+                    )
                 }
                 item {
-                    RecordsSectionHeader(
+                    Spacer(Modifier.height(8.dp))
+                    SectionLink(
                         title = stringResource(R.string.records_tasks),
-                        onManage = onManageTasks,
+                        subtitle = stringResource(
+                            R.string.open_tasks_count,
+                            state.tasks.count { !it.isCompleted },
+                        ),
+                        onClick = onManageTasks,
                     )
                 }
-                if (openTasks.isEmpty()) {
-                    item { EmptyTaskSummary() }
-                } else {
-                    if (overdueTasks.isNotEmpty()) {
-                        item { TaskGroupHeader(title = stringResource(R.string.overdue), count = overdueTasks.size) }
-                        val visibleOverdue = previewLimit?.let { overdueTasks.take(it) } ?: overdueTasks
-                        items(visibleOverdue, key = { "overdue-${it.id}" }) { task ->
-                            TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
-                        }
-                        if (previewLimit != null && overdueTasks.size > previewLimit) {
-                            item {
-                                TextButton(onClick = onManageTasks) {
-                                    val more = overdueTasks.size - previewLimit
-                                    Text(pluralStringResource(R.plurals.more_in_manage, more, more))
-                                }
-                            }
-                        }
-                    }
-                    if (todayTasks.isNotEmpty()) {
-                        item { TaskGroupHeader(title = stringResource(R.string.today), count = todayTasks.size) }
-                        val visibleToday = previewLimit?.let { todayTasks.take(it) } ?: todayTasks
-                        items(visibleToday, key = { "today-${it.id}" }) { task ->
-                            TaskProgressCard(task = task, onOpen = { onOpenTask(task) })
-                        }
-                        if (previewLimit != null && todayTasks.size > previewLimit) {
-                            item {
-                                TextButton(onClick = onManageTasks) {
-                                    val more = todayTasks.size - previewLimit
-                                    Text(pluralStringResource(R.plurals.more_in_manage, more, more))
-                                }
-                            }
-                        }
-                    }
-                    if (plannedTasks.isNotEmpty()) {
-                        item {
-                            TaskBucketSummary(
-                                title = stringResource(R.string.planned),
-                                subtitle = pluralStringResource(
-                                    R.plurals.tasks_planned,
-                                    plannedTasks.size,
-                                    plannedTasks.size,
-                                ),
-                                onClick = onManageTasks,
-                            )
-                        }
-                    }
-                    if (unscheduledTasks.isNotEmpty()) {
-                        item {
-                            TaskBucketSummary(
-                                title = stringResource(R.string.unscheduled),
-                                subtitle = pluralStringResource(
-                                    R.plurals.tasks_unscheduled,
-                                    unscheduledTasks.size,
-                                    unscheduledTasks.size,
-                                ),
-                                onClick = onManageTasks,
-                            )
-                        }
-                    }
-                }
-
-                item { Spacer(Modifier.height(8.dp)) }
                 item {
-                    RecordsSectionHeader(
-                        title = stringResource(R.string.records_accumulate),
-                        onManage = onManageAccumulates,
+                    Spacer(Modifier.height(8.dp))
+                    SectionLink(
+                        title = stringResource(R.string.records_routines),
+                        subtitle = stringResource(R.string.routines_count, accumulateItems.size),
+                        onClick = onManageAccumulates,
                     )
                 }
-                if (accumulateItems.isEmpty()) {
-                    item {
-                        RecordsStatusCard(
-                            message = stringResource(R.string.no_accumulate_items),
-                            actionLabel = stringResource(R.string.manage_accumulates),
-                            onAction = onManageAccumulates,
-                        )
-                    }
-                } else {
-                    items(
-                        accumulateItems.chunked(2),
-                        key = { row -> "acc-" + row.joinToString("-") { it.id.toString() } },
-                    ) { row ->
-                        RecordGridRow {
-                            row.forEach { item ->
-                                AccumulateRailCard(
-                                    item = item,
-                                    todayValue = todayValues[item.id] ?: 0.0,
-                                    goalCumulative = state.goalValues[item.id],
-                                    recentDayValues = state.recentDayValues[item.id],
-                                    lastRecordMinute = recordMinutes[item.id]?.maxOrNull(),
-                                    onClick = { onRecordItem(item) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
+                items(accumulateItems, key = { "routine-${it.id}" }) { item ->
+                    RecordHomeRow(
+                        title = displayRecordName(item.name),
+                        value = "${formatValue(todayValues[item.id] ?: 0.0)} ${item.unit}",
+                        onClick = { onRecordItem(item) },
+                    )
                 }
-
-                item { Spacer(Modifier.height(8.dp)) }
                 item {
-                    RecordsSectionHeader(
+                    Spacer(Modifier.height(8.dp))
+                    SectionLink(
                         title = stringResource(R.string.records_measurement),
-                        onManage = onManageMeasurements,
+                        subtitle = stringResource(R.string.measurements_count, measurementItems.size),
+                        onClick = onManageMeasurements,
                     )
                 }
-                if (measurementItems.isEmpty()) {
-                    item {
-                        RecordsStatusCard(
-                            message = stringResource(R.string.no_measurement_items),
-                            actionLabel = stringResource(R.string.manage_measurements),
-                            onAction = onManageMeasurements,
-                        )
-                    }
-                } else {
-                    items(
-                        measurementItems.chunked(2),
-                        key = { row -> "mes-" + row.joinToString("-") { it.id.toString() } },
-                    ) { row ->
-                        RecordGridRow {
-                            row.forEach { item ->
-                                MeasurementRailCard(
-                                    item = item,
-                                    latest = state.latestEntries[item.id],
-                                    onOpen = { onOpenMeasurement(item) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
+                items(measurementItems, key = { "measurement-${it.id}" }) { item ->
+                    val latest = state.latestEntries[item.id]
+                    RecordHomeRow(
+                        title = displayRecordName(item.name),
+                        value = latest?.let { "${formatValue(it.value)} ${item.unit}" } ?: "--",
+                        onClick = { onOpenMeasurement(item) },
+                    )
                 }
             }
         }
     }
-    }
 }
 
 @Composable
-private fun RecordsSectionHeader(
-    title: String,
-    onManage: () -> Unit,
+private fun TodayCard(
+    plan: DailyPlan?,
+    tasks: List<TodoTask>,
+    now: Long,
+    onPlan: () -> Unit,
+    onCompleteStep: (TodoTask, TodoStep, (String?) -> Unit) -> Unit,
+    onStart: (DailyPlan, (String?) -> Unit) -> Unit,
+    onReview: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onExtraRound: (DailyPlan, Long, (String?) -> Unit) -> Unit,
+    onEnd: (DailyPlan, (String?) -> Unit) -> Unit,
 ) {
-    Surface(
-        onClick = onManage,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp),
-        color = Color.Transparent,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-    }
-}
+    var busy by remember(plan?.revision) { mutableStateOf(false) }
+    var error by remember(plan?.revision) { mutableStateOf<String?>(null) }
+    var choosingReviewTask by remember { mutableStateOf(false) }
+    val currentTask = tasks.firstOrNull { it.id == plan?.currentTaskId }
+    val openCommitments = plan?.committedTasks(tasks)?.filterNot(TodoTask::isCompleted).orEmpty()
 
-@Composable
-private fun TaskBucketSummary(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = RecordsCardShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = subtitle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            when {
+                plan == null -> {
+                    Text(stringResource(R.string.no_plan_today), style = MaterialTheme.typography.bodyLarge)
+                    Button(onClick = onPlan, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.plan_today))
+                    }
+                }
+                plan.state == DailyPlanState.READY -> {
+                    TodayHeader(stringResource(R.string.first_move), onPlan)
+                    Text(plan.firstMove, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Button(
+                        onClick = {
+                            busy = true
+                            onStart(plan) { result -> busy = false; error = result }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Rounded.CheckCircle, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.first_move_done))
+                    }
+                }
+                plan.state == DailyPlanState.ACTIVE && plan.isReviewDue(now) -> {
+                    TodayHeader(stringResource(R.string.hourly_review), onPlan)
+                    Text(stringResource(R.string.still_on_commitment), style = MaterialTheme.typography.titleLarge)
+                    currentTask?.let { Text(it.title, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Button(
+                        onClick = {
+                            val taskId = currentTask?.id ?: return@Button
+                            busy = true
+                            onReview(plan, taskId) { result -> busy = false; error = result }
+                        },
+                        enabled = !busy && currentTask != null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.continue_current)) }
+                    if (openCommitments.any { it.id != currentTask?.id }) {
+                        OutlinedButton(
+                            onClick = { choosingReviewTask = true },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.correct_course)) }
+                    }
+                    TextButton(
+                        onClick = {
+                            busy = true
+                            onEnd(plan) { result -> busy = false; error = result }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text(stringResource(R.string.end_today)) }
+                }
+                plan.state == DailyPlanState.ACTIVE -> {
+                    TodayHeader(stringResource(R.string.round_progress, plan.completedRounds + 1), onPlan)
+                    currentTask?.let { task ->
+                        Text(task.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        task.nextStep?.let { step ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                shape = RecordsCardShape,
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Checkbox(
+                                        checked = false,
+                                        onCheckedChange = {
+                                            busy = true
+                                            onCompleteStep(task, step) { result -> busy = false; error = result }
+                                        },
+                                        enabled = !busy,
+                                    )
+                                    Text(step.title, modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                    Text(
+                        stringResource(R.string.review_around_hour),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                plan.state == DailyPlanState.ENOUGH -> {
+                    TodayHeader(stringResource(R.string.enough_for_today), null)
+                    Text(
+                        pluralStringResource(R.plurals.rounds_completed, plan.completedRounds, plan.completedRounds),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (openCommitments.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                if (openCommitments.size == 1) {
+                                    busy = true
+                                    onExtraRound(plan, openCommitments.single().id) { result ->
+                                        busy = false
+                                        error = result
+                                    }
+                                } else {
+                                    choosingReviewTask = true
+                                }
+                            },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.extra_round)) }
+                    }
+                    TextButton(
+                        onClick = {
+                            busy = true
+                            onEnd(plan) { result -> busy = false; error = result }
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text(stringResource(R.string.end_today)) }
+                }
+                else -> {
+                    TodayHeader(stringResource(R.string.today_ended), null)
+                    Text(
+                        stringResource(R.string.today_ended_detail),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
-}
 
-@Composable
-private fun EmptyTaskSummary() {
-    Text(
-        text = stringResource(R.string.no_active_tasks),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .padding(vertical = 12.dp),
-    )
-}
-
-@Composable
-private fun TaskGroupHeader(title: String, count: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "$title ($count)",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
+    if (choosingReviewTask && plan != null) {
+        TaskChoiceDialog(
+            title = stringResource(
+                if (plan.state == DailyPlanState.ENOUGH) R.string.extra_round else R.string.correct_course,
+            ),
+            tasks = openCommitments.filter { plan.state == DailyPlanState.ENOUGH || it.id != currentTask?.id },
+            onDismiss = { choosingReviewTask = false },
+            onSelect = { task ->
+                choosingReviewTask = false
+                busy = true
+                val complete: (String?) -> Unit = { result -> busy = false; error = result }
+                if (plan.state == DailyPlanState.ENOUGH) {
+                    onExtraRound(plan, task.id, complete)
+                } else {
+                    onReview(plan, task.id, complete)
+                }
+            },
         )
     }
 }
 
 @Composable
-private fun RecordGridRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(GridCardSpacing),
-        content = content,
-    )
-}
-
-@Composable
-private fun TaskProgressCard(
-    task: TodoTask,
-    onOpen: () -> Unit,
-) {
-    val completed = task.completedStepCount
-    val total = task.steps.size
-    val reduceMotion = prefersReducedMotion()
-    val nextStepTitle = nextTaskStepTitle(task)
-    val targetColors = recordProgressColors(
-        progress = taskColorProgress(task),
-        completed = task.isCompleted,
-    )
-    val unfinishedContainer = recordProgressColors(progress = 0f).container
-    val container by animateColorAsState(
-        targetValue = targetColors.container,
-        label = "TaskCardContainer",
-    )
-    val accent by animateColorAsState(
-        targetValue = targetColors.accent,
-        label = "TaskCardAccent",
-    )
-    val onContainer by animateColorAsState(
-        targetValue = targetColors.onContainer,
-        label = "TaskCardOnContainer",
-    )
-    val cardContentColor = onContainer
-    Card(
-        onClick = onOpen,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RecordsCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent,
-            contentColor = cardContentColor,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp),
-        ) {
-            SegmentedProgressFill(
-                stepFilled = task.steps.map { it.isCompleted },
-                unfinishedBackgroundColor = unfinishedContainer,
-                completedBackgroundColor = container,
-                fillColor = accent.copy(alpha = 0.32f),
-                reduceMotion = reduceMotion,
-                modifier = Modifier.matchParentSize(),
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (task.isCompleted) {
-                        Icon(
-                            imageVector = Icons.Rounded.CheckCircle,
-                            contentDescription = null,
-                            tint = accent,
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(18.dp),
-                        )
-                    }
-                    Text(
-                        text = task.title,
-                        color = cardContentColor,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "$completed/$total",
-                        color = accent,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                if (nextStepTitle != null) {
-                    Text(
-                        text = stringResource(R.string.next_step, nextStepTitle),
-                        color = cardContentColor.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                } else if (task.isCompleted) {
-                    task.completedAt?.let { completedAt ->
-                        Text(
-                            text = taskCompletedAtLabel(completedAt),
-                            color = cardContentColor.copy(alpha = 0.72f),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
+private fun TodayHeader(title: String, onEdit: (() -> Unit)?) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        onEdit?.let {
+            IconButton(onClick = it, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit_today))
             }
         }
     }
 }
 
 @Composable
-private fun AccumulateRailCard(
-    item: RecordItem,
-    todayValue: Double,
-    goalCumulative: Double?,
-    recentDayValues: List<Double>?,
-    lastRecordMinute: Int?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+internal fun TaskChoiceDialog(
+    title: String,
+    tasks: List<TodoTask>,
+    onDismiss: () -> Unit,
+    onSelect: (TodoTask) -> Unit,
+    onClear: (() -> Unit)? = null,
 ) {
-    val target = item.goalValue
-    val period = item.goalPeriod
-    val hasGoal = target != null && target > 0.0 && period != null
-    val cumulative = goalCumulative ?: todayValue
-    val resolvedDayValues = recentDayValues ?: emptyRecentDayValues()
-    val colorProgress = accumulateColorProgress(
-        item = item,
-        cumulative = cumulative,
-        recentDayValues = resolvedDayValues,
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                tasks.forEach { task ->
+                    TextButton(onClick = { onSelect(task) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(task.title, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            onClear?.let { clear ->
+                TextButton(onClick = clear) { Text(stringResource(R.string.no_secondary_task)) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
-    val fillProgress = if (hasGoal) {
-        goalProgressFraction(cumulative, checkNotNull(target))
-    } else {
-        colorProgress.coerceIn(0f, 1f)
-    }
-    val goalReached = hasGoal && cumulative >= checkNotNull(target)
-    val colors = recordProgressColors(
-        progress = colorProgress,
-        completed = goalReached,
-    )
-    val progressColor by animateColorAsState(
-        targetValue = colors.accent,
-        label = "AccumulateRailAccent",
-    )
-    val container by animateColorAsState(
-        targetValue = colors.container,
-        label = "AccumulateRailContainer",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = colors.onContainer,
-        label = "AccumulateRailOnContainer",
-    )
-    val reduceMotion = prefersReducedMotion()
+}
 
-    Card(
+@Composable
+private fun SectionTitle(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun SectionLink(title: String, subtitle: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, color = Color.Transparent, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+            Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+        }
+    }
+}
+
+@Composable
+private fun RecordHomeRow(title: String, value: String, onClick: () -> Unit) {
+    Surface(
         onClick = onClick,
-        modifier = modifier.height(GridCardHeight),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         shape = RecordsCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = container,
-            contentColor = contentColor,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            LiquidProgressFill(
-                progress = fillProgress,
-                fillColor = progressColor,
-                reduceMotion = reduceMotion,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = displayRecordName(item.name),
-                        color = contentColor.copy(alpha = 0.62f),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (lastRecordMinute != null) {
-                        Text(
-                            text = formatMinute(lastRecordMinute),
-                            color = contentColor.copy(alpha = 0.62f),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                        )
-                    }
-                }
-                Text(
-                    text = "${formatValue(todayValue)} ${item.unit}",
-                    color = progressColor,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.weight(1f))
-                if (hasGoal) {
-                    val isDays7Goal = period == GoalPeriod.DAYS_7
-                    val goalText = buildString {
-                        append(formatValue(checkNotNull(target)))
-                        if (item.unit.isNotBlank()) {
-                            append(' ')
-                            append(item.unit)
-                        }
-                        if (isDays7Goal) {
-                            append(" · 7 days")
-                        }
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isDays7Goal) {
-                                Icons.Outlined.DateRange
-                            } else {
-                                Icons.Outlined.Flag
-                            },
-                            contentDescription = stringResource(
-                                if (isDays7Goal) R.string.seven_day_goal else R.string.daily_goal,
-                            ),
-                            tint = progressColor,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Text(
-                            text = goalText,
-                            color = progressColor,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-                if (hasGoal) {
-                    if (period == GoalPeriod.DAYS_7) {
-                        Days7GoalProgressBar(
-                            progress = fillProgress,
-                            fillColor = progressColor,
-                            reduceMotion = reduceMotion,
-                        )
-                    } else {
-                        RecentDayPies(
-                            progresses = recentDayPieProgress(
-                                dayValues = resolvedDayValues,
-                                goalValue = requireNotNull(target),
-                            ),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MeasurementRailCard(
-    item: RecordItem,
-    latest: RecordEntry?,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val targetColors = recordProgressColors(
-        progress = measurementColorProgress(item.minValue, item.maxValue, latest?.value),
-    )
-    val container by animateColorAsState(
-        targetValue = targetColors.container,
-        label = "MeasurementCardContainer",
-    )
-    val accent by animateColorAsState(
-        targetValue = targetColors.accent,
-        label = "MeasurementCardAccent",
-    )
-    val onContainer by animateColorAsState(
-        targetValue = targetColors.onContainer,
-        label = "MeasurementCardOnContainer",
-    )
-    val colors = targetColors.copy(accent = accent, container = container, onContainer = onContainer)
-    Card(
-        onClick = onOpen,
-        modifier = modifier.height(GridCardHeight),
-        shape = RecordsCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = container,
-            contentColor = onContainer,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                RecordItemInitial(name = item.name, size = 36.dp, colors = colors)
-                Text(
-                    text = displayRecordName(item.name),
-                    color = colors.onContainer,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = latest?.let { "${formatValue(it.value)} ${item.unit}" } ?: "--",
-                    color = colors.accent,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = latest?.let { measurementDateTimeLabel(it.occurredAt) }
-                        ?: stringResource(R.string.no_measurements_yet),
-                    color = colors.onContainer.copy(alpha = 0.72f),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(value, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -840,30 +461,13 @@ internal fun RecordsStatusCard(
         modifier = modifier.fillMaxWidth(),
         shape = AppStyle.cardShape,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = onAction,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_records_24),
-                    contentDescription = null,
-                )
+            Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) {
+                Icon(painterResource(R.drawable.ic_records_24), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(actionLabel)
             }
@@ -871,17 +475,10 @@ internal fun RecordsStatusCard(
     }
 }
 
-internal fun crossedGoalThreshold(
-    previous: Double,
-    current: Double,
-    target: Double?,
-): Boolean {
-    if (target == null || target <= 0.0) return false
-    return previous < target && current >= target
-}
+internal fun crossedGoalThreshold(previous: Double, current: Double, target: Double?): Boolean =
+    target != null && target > 0.0 && previous < target && current >= target
 
-internal fun nextTaskStepTitle(task: TodoTask): String? =
-    task.steps.firstOrNull { !it.isCompleted }?.title
+internal fun nextTaskStepTitle(task: TodoTask): String? = task.nextStep?.title
 
 internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
     items.sortedWith(
@@ -892,17 +489,12 @@ internal fun orderedRecordItems(items: List<RecordItem>): List<RecordItem> =
 
 internal fun goalItems(items: List<RecordItem>, period: GoalPeriod? = null): List<RecordItem> =
     orderedRecordItems(items).filter { item ->
-        item.mode == RecordMode.ACCUMULATE &&
-            item.goalValue != null &&
-            item.goalPeriod != null &&
+        item.mode == RecordMode.ACCUMULATE && item.goalValue != null && item.goalPeriod != null &&
             (period == null || item.goalPeriod == period)
     }
 
 internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =
-    entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) -> itemEntries.sumOf(RecordEntry::value) }
+    entries.groupBy(RecordEntry::itemId).mapValues { (_, values) -> values.sumOf(RecordEntry::value) }
 
-/** Local minutes each item was recorded at today. */
 internal fun todayRecordMinutes(entries: List<RecordEntry>): Map<Long, List<Int>> =
-    entries.groupBy(RecordEntry::itemId).mapValues { (_, itemEntries) ->
-        itemEntries.map(RecordEntry::localMinute)
-    }
+    entries.groupBy(RecordEntry::itemId).mapValues { (_, values) -> values.map(RecordEntry::localMinute) }

@@ -17,7 +17,6 @@
     <string name="setting_motion">动效</string>
     <string name="setting_records">记录</string>
     <string name="setting_connection">连接</string>
-    <string name="setting_root_task_preview">首页任务预览</string>
     <string name="setting_about">关于</string>
     <string name="setting_version">版本</string>
     <string name="setting_updates">更新</string>
@@ -33,7 +32,6 @@
     <string name="motion_follow_system">跟随系统</string>
     <string name="motion_on">开启</string>
     <string name="motion_off">关闭</string>
-    <string name="option_all">全部</string>
     <string name="not_configured">未配置</string>
 
     <string name="update_install_version">安装 %1$s</string>
@@ -65,9 +63,6 @@
     <string name="goal_reached">已达目标 · %1$s</string>
     <string name="recorded_item">已记录 %1$s。</string>
     <string name="action_undo">撤销</string>
-    <plurals name="day_closed">
-        <item quantity="other">今日闭环 · 已完成 %d 项</item>
-    </plurals>
     <string name="tools_title">工具</string>
     <string name="tools_subtitle">用于当前应用的无障碍工具。</string>
     <string name="tools_access">权限</string>
@@ -170,12 +165,35 @@
     <string name="field_priority">优先级</string>
     <string name="track_a_goal">跟踪目标</string>
     <string name="today">今天</string>
-    <string name="overdue">已逾期</string>
-    <string name="planned">已计划</string>
-    <string name="unscheduled">未计划</string>
+    <string name="open">进行中</string>
     <string name="completed">已完成</string>
-    <string name="choose_date">选择日期</string>
-    <string name="remove_date">移除日期</string>
+    <string name="plan_today">规划今天</string>
+    <string name="edit_today">调整今天</string>
+    <string name="no_plan_today">选择一个主任务，可再选择一个次任务。</string>
+    <string name="first_move">第一步</string>
+    <string name="first_move_label">用什么动作开始今天？</string>
+    <string name="first_move_done">第一步已完成</string>
+    <string name="today_commitments">今日承诺</string>
+    <string name="primary_task">主任务</string>
+    <string name="secondary_task">次任务</string>
+    <string name="choose_task">选择任务</string>
+    <string name="no_secondary_task">无</string>
+    <string name="primary_task_required">必须选择主任务。</string>
+    <string name="commitments_must_differ">主任务和次任务不能相同。</string>
+    <string name="hourly_review">小时回顾</string>
+    <string name="still_on_commitment">仍在推进承诺吗？</string>
+    <string name="continue_current">继续当前任务</string>
+    <string name="correct_course">切换承诺</string>
+    <string name="end_today">结束今天</string>
+    <string name="round_progress">第 %1$d 轮</string>
+    <string name="review_around_hour">约 60 分钟后回顾。</string>
+    <string name="enough_for_today">今天已经足够</string>
+    <string name="extra_round">开始额外一轮</string>
+    <string name="today_ended">今天已结束</string>
+    <string name="today_ended_detail">今天不再承诺其他工作。</string>
+    <plurals name="rounds_completed">
+        <item quantity="other">已完成 %d 轮</item>
+    </plurals>
     <string name="edit_accumulate">编辑累计</string>
     <string name="edit_measurement">编辑测量</string>
     <string name="editing_accumulate">正在编辑累计</string>
@@ -197,19 +215,15 @@
     <string name="action_retry">重试</string>
     <string name="configure_connection">配置连接</string>
     <string name="records_tasks">任务</string>
+    <string name="records_routines">日常记录</string>
     <string name="records_accumulate">累计</string>
     <string name="records_measurement">测量</string>
+    <string name="open_tasks_count">%1$d 个进行中</string>
+    <string name="routines_count">%1$d 个日常记录</string>
+    <string name="measurements_count">%1$d 个测量项</string>
+    <string name="subtasks_progress">%1$d / %2$d 个子任务</string>
     <plurals name="more_in_manage">
         <item quantity="other">在管理页查看另外 %d 项</item>
-    </plurals>
-    <plurals name="tasks_planned">
-        <item quantity="other">%d 个任务已安排未来日期</item>
-    </plurals>
-    <plurals name="tasks_unscheduled">
-        <item quantity="other">%d 个任务没有日期</item>
-    </plurals>
-    <plurals name="days_overdue">
-        <item quantity="other">已逾期 %d 天</item>
     </plurals>
     <plurals name="subtasks_count">
         <item quantity="other">%1$d / %2$d 个子任务</item>
@@ -219,15 +233,10 @@
     <string name="daily_goal">每日目标</string>
     <string name="seven_day_goal">7 日目标</string>
     <string name="no_measurements_yet">暂无测量记录。</string>
-    <string name="focus_up_next">接下来</string>
     <string name="decrease_by">减少 %1$s</string>
     <string name="increase_by">增加 %1$s</string>
     <string name="record_value_for">为 %3$s 记录 %1$s %2$s</string>
     <string name="more_actions_for">%1$s 的更多操作</string>
-    <string name="not_now">暂不处理</string>
-    <string name="day_closed_short">今日已闭环</string>
-    <string name="nothing_due">当前没有待处理事项</string>
-    <string name="no_daily_goals">没有每日目标</string>
     <string name="task_not_found">未找到任务。</string>
     <string name="task_title">任务</string>
     <string name="field_title">标题</string>
@@ -297,6 +306,10 @@
     <string name="record_save_failed">无法保存记录。</string>
     <string name="record_undo_failed">无法撤销记录。</string>
     <string name="task_create_failed">无法创建任务。</string>
+    <string name="daily_plan_save_failed">无法保存今天。</string>
+    <string name="daily_plan_start_failed">无法开始今天。</string>
+    <string name="daily_plan_review_failed">无法更新回顾。</string>
+    <string name="daily_plan_end_failed">无法结束今天。</string>
     <string name="task_update_failed">无法更新任务。</string>
     <string name="task_delete_failed">无法删除任务。</string>
     <string name="subtask_add_failed">无法添加子任务。</string>
@@ -307,7 +320,4 @@
     <string name="streak_days">连续 %1$d 天</string>
     <string name="streak_days_limited">连续 %1$d+ 天</string>
     <string name="today_progress">今日 %1$d/%2$d</string>
-    <string name="usually_at">通常 %1$s</string>
-    <string name="streak_risk">连续 %1$d 天</string>
-    <string name="behind_percent">落后 · %1$d%%</string>
 </resources>

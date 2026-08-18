@@ -1,20 +1,8 @@
 package com.wswensw.woolbox.record.model
 
-import java.time.LocalDate
-
-/** A task's derived position relative to the local date being viewed. */
-enum class TaskDateBucket {
-    OVERDUE,
-    TODAY,
-    PLANNED,
-    UNSCHEDULED,
-}
-
 data class TodoTask(
     val id: Long,
     val title: String,
-    /** The local date this task belongs to, or null when it is unscheduled. */
-    val plannedDate: LocalDate?,
     val completedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
@@ -29,13 +17,6 @@ data class TodoTask(
     /** First unfinished subtask in fixed position order. */
     val nextStep: TodoStep?
         get() = steps.firstOrNull { !it.isCompleted }
-}
-
-fun TodoTask.dateBucket(today: LocalDate): TaskDateBucket = when {
-    plannedDate == null -> TaskDateBucket.UNSCHEDULED
-    plannedDate.isAfter(today) -> TaskDateBucket.PLANNED
-    plannedDate.isBefore(today) -> TaskDateBucket.OVERDUE
-    else -> TaskDateBucket.TODAY
 }
 
 data class TodoStep(

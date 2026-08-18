@@ -45,15 +45,13 @@ import com.wswensw.woolbox.record.model.validatedTaskTitle
 import com.wswensw.woolbox.ui.AppRouteScaffold
 import com.wswensw.woolbox.ui.AppSection
 import com.wswensw.woolbox.ui.AppStyle
-import java.time.LocalDate
 
 @Composable
 fun TaskDetailScreen(
     task: TodoTask?,
     loading: Boolean,
-    today: LocalDate,
     onBack: () -> Unit,
-    onSave: (String, LocalDate?, (String?) -> Unit) -> Unit,
+    onSave: (String, (String?) -> Unit) -> Unit,
     onCreateStep: (String, (String?) -> Unit) -> Unit,
     onUpdateStep: (TodoStep, String, (String?) -> Unit) -> Unit,
     onToggleStep: (TodoStep, Boolean) -> Unit,
@@ -85,8 +83,6 @@ fun TaskDetailScreen(
     }
 
     var title by rememberSaveable(task.id) { mutableStateOf(task.title) }
-    var plannedDateValue by rememberSaveable(task.id) { mutableStateOf(task.plannedDate?.toString()) }
-    val plannedDate = plannedDateValue?.let(LocalDate::parse)
     var titleError by rememberSaveable { mutableStateOf<String?>(null) }
     var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var savingTitle by rememberSaveable { mutableStateOf(false) }
@@ -115,15 +111,15 @@ fun TaskDetailScreen(
             errorMessage = checkFieldsMessage
             return
         }
-        if (normalizedTitle == task.title && plannedDate == task.plannedDate) return
+        if (normalizedTitle == task.title) return
         savingTitle = true
-        onSave(normalizedTitle, plannedDate) { error ->
+        onSave(normalizedTitle) { error ->
             savingTitle = false
             errorMessage = error
         }
     }
 
-    val titleDirty = title.trim() != task.title || plannedDate != task.plannedDate
+    val titleDirty = title.trim() != task.title
     AppRouteScaffold(
         title = stringResource(R.string.edit_task),
         onBack = onBack,
@@ -159,12 +155,6 @@ fun TaskDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppStyle.spacing.pageHorizontal, vertical = 8.dp),
-            )
-            TaskScheduleFields(
-                plannedDate = plannedDate,
-                today = today,
-                enabled = !savingTitle,
-                onPlannedDateChange = { selectedDate -> plannedDateValue = selectedDate?.toString() },
             )
         }
 
