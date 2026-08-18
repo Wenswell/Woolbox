@@ -3,26 +3,26 @@ import { Activity, CalendarCheck, ClipboardList, LayoutDashboard, ListTodo, Refr
 import { api } from "./api";
 import { Toast } from "./components/Toast";
 import { localToday, message, shiftLocalDate } from "./lib/format";
-import type { DailyPlan, RecordAuditLog, RecordEntry, RecordItem, TodoTask } from "./types";
+import type { DailyPlan, RecordAuditLog, RecordEntry, RecordItem, TaskTemplate } from "./types";
 import { AuditLogView } from "./views/AuditLogView";
 import { EntriesView, type EntryFilters } from "./views/EntriesView";
 import { OverviewView } from "./views/OverviewView";
 import { RecordItemsView } from "./views/RecordItemsView";
-import { TasksView } from "./views/TasksView";
+import { TemplatesView } from "./views/TemplatesView";
 import { TodayView } from "./views/TodayView";
 
-type View = "overview" | "today" | "tasks" | "accumulate" | "measurement" | "entries" | "activity";
+type View = "overview" | "today" | "templates" | "accumulate" | "measurement" | "entries" | "activity";
 const VIEWS: Record<View, { label: string; description: string }> = {
   overview: { label: "Overview", description: "Records status and recent work" },
   today: { label: "Today", description: "Daily commitments and hourly review" },
-  tasks: { label: "Tasks", description: "Open outcomes and ordered subtasks" },
+  templates: { label: "Templates", description: "Reusable commitment definitions and ordered steps" },
   accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },
   measurement: { label: "Measurement", description: "Bounded numerical measurements" },
   entries: { label: "Entries", description: "Recorded values across every tracker" },
   activity: { label: "Activity", description: "Immutable audit history for every change" },
 };
 const NAVIGATION = [
-  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "today" as const, icon: CalendarCheck }, { id: "tasks" as const, icon: ListTodo }] },
+  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "today" as const, icon: CalendarCheck }, { id: "templates" as const, icon: ListTodo }] },
   { title: "Records", items: [{ id: "accumulate" as const, icon: Sigma }, { id: "measurement" as const, icon: Ruler }, { id: "entries" as const, icon: ClipboardList }] },
   { title: "System", items: [{ id: "activity" as const, icon: Activity }] },
 ];
@@ -31,9 +31,9 @@ export function App() {
   const [view, setView] = useState<View>(() => viewFromHash());
   const [activeItems, setActiveItems] = useState<RecordItem[]>([]);
   const [archivedItems, setArchivedItems] = useState<RecordItem[]>([]);
-  const [tasks, setTasks] = useState<TodoTask[]>([]);
+  const [activeTemplates, setActiveTemplates] = useState<TaskTemplate[]>([]);
+  const [archivedTemplates, setArchivedTemplates] = useState<TaskTemplate[]>([]);
   const [todayDate, setTodayDate] = useState(localToday);
-  const [todayTasks, setTodayTasks] = useState<TodoTask[]>([]);
   const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
   const [entries, setEntries] = useState<RecordEntry[]>([]);
   const [logs, setLogs] = useState<RecordAuditLog[]>([]);
@@ -46,6 +46,7 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const allItems = useMemo(() => [...activeItems, ...archivedItems], [activeItems, archivedItems]);
+  const allTemplates = useMemo(() => [...activeTemplates, ...archivedTemplates], [activeTemplates, archivedTemplates]);
 
   const loadLogs = useCallback(async (beforeId?: number) => {
     const page = await api.auditLogs(beforeId);
@@ -57,22 +58,19 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const today = localToday();
-      const taskListRequest = api.tasks(today);
-      const todayTaskListRequest = todayDate === today ? taskListRequest : api.tasks(todayDate);
-      const [active, archived, taskList, todayTaskList, plan, entryList, auditPage] = await Promise.all([
+      const [active, archived, activeTemplateList, archivedTemplateList, plan, entryList, auditPage] = await Promise.all([
         api.items(false),
         api.items(true),
-        taskListRequest,
-        todayTaskListRequest,
+        api.templates(false),
+        api.templates(true),
         api.dailyPlan(todayDate),
         api.entries(filters.startDate, filters.endDate, filters.itemId, filters.mode || undefined),
         api.auditLogs(),
       ]);
       setActiveItems(active);
       setArchivedItems(archived);
-      setTasks(taskList);
-      setTodayTasks(todayTaskList);
+      setActiveTemplates(activeTemplateList);
+      setArchivedTemplates(archivedTemplateList);
       setDailyPlan(plan);
       setEntries(entryList);
       setLogs(auditPage.logs);
@@ -103,7 +101,6 @@ export function App() {
   function changeTodayDate(value: string) {
     setLoading(true);
     setDailyPlan(null);
-    setTodayTasks([]);
     setTodayDate(value);
   }
 
@@ -136,9 +133,9 @@ export function App() {
         {error && <div className="error-banner" role="alert"><span><strong>Could not refresh data.</strong>{error}</span><button type="button" className="secondary compact" onClick={() => void refresh()}>Retry</button></div>}
 
         <main className="page-content">
-          {view === "overview" && <OverviewView tasks={tasks} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
-          {view === "today" && <TodayView localDate={todayDate} plan={dailyPlan} tasks={todayTasks} loading={loading} onDateChange={changeTodayDate} onChanged={changed} onRefresh={refresh} />}
-          {view === "tasks" && <TasksView localDate={localToday()} tasks={tasks} loading={loading} onChanged={changed} onError={setError} />}
+          {view === "overview" && <OverviewView templates={activeTemplates} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
+          {view === "today" && <TodayView localDate={todayDate} plan={dailyPlan} templates={activeTemplates} loading={loading} onDateChange={changeTodayDate} onChanged={changed} onRefresh={refresh} />}
+          {view === "templates" && <TemplatesView templates={allTemplates} loading={loading} onChanged={changed} onError={setError} />}
           {view === "accumulate" && <RecordItemsView mode="ACCUMULATE" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "measurement" && <RecordItemsView mode="MEASUREMENT" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "entries" && <EntriesView entries={entries} items={allItems} filters={filters} loading={loading} onFilters={setFilters} onChanged={changed} onError={setError} />}

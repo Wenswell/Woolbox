@@ -1,36 +1,35 @@
 import { Activity, ArrowRight, CircleCheck, Gauge, ListTodo, Ruler, Sigma } from "lucide-react";
 import { actionLabel, actionTone, auditSubject } from "../lib/audit";
 import { formatDateTime } from "../lib/format";
-import type { RecordAuditLog, RecordEntry, RecordItem, TodoTask } from "../types";
+import type { RecordAuditLog, RecordEntry, RecordItem, TaskTemplate } from "../types";
 import { Badge } from "../components/Badge";
 
-type Destination = "tasks" | "accumulate" | "measurement" | "entries" | "activity";
+type Destination = "templates" | "accumulate" | "measurement" | "entries" | "activity";
 
 export function OverviewView({
-  tasks,
+  templates,
   items,
   entries,
   logs,
   loading,
   onNavigate,
 }: {
-  tasks: TodoTask[];
+  templates: TaskTemplate[];
   items: RecordItem[];
   entries: RecordEntry[];
   logs: RecordAuditLog[];
   loading: boolean;
   onNavigate: (view: Destination) => void;
 }) {
-  const openTasks = tasks.filter((task) => task.completedAt === null);
   const activeItems = items.filter((item) => !item.archived);
   const latestEntries = entries.slice(0, 6);
-  const nextTasks = [...openTasks].sort((left, right) => left.title.localeCompare(right.title)).slice(0, 5);
+  const nextTemplates = templates.slice(0, 5);
 
   return (
     <section className="overview-stack">
       <div className="metric-grid" aria-label="Records summary">
-        <Metric icon={<ListTodo size={18} />} label="Open tasks" value={openTasks.length} detail="Available task inventory" />
-        <Metric icon={<CircleCheck size={18} />} label="Completed tasks" value={tasks.length - openTasks.length} detail={`${tasks.length} total tasks`} />
+        <Metric icon={<ListTodo size={18} />} label="Daily templates" value={templates.filter((template) => template.cadence === "DAILY").length} detail="Recommended first in Today" />
+        <Metric icon={<CircleCheck size={18} />} label="Manual templates" value={templates.filter((template) => template.cadence === "MANUAL").length} detail={`${templates.length} active templates`} />
         <Metric icon={<Sigma size={18} />} label="Accumulate" value={activeItems.filter((item) => item.mode === "ACCUMULATE").length} detail="Active record items" />
         <Metric icon={<Ruler size={18} />} label="Measurement" value={activeItems.filter((item) => item.mode === "MEASUREMENT").length} detail="Active record items" />
         <Metric icon={<Gauge size={18} />} label="30-day entries" value={entries.length} detail="Across active and archived items" />
@@ -39,17 +38,17 @@ export function OverviewView({
       <div className="overview-grid">
         <section className="overview-section">
           <div className="section-heading">
-            <div><p className="eyebrow">Task inventory</p><h2>Open tasks</h2></div>
-            <button type="button" className="text-button" onClick={() => onNavigate("tasks")}>Manage tasks<ArrowRight size={15} /></button>
+            <div><p className="eyebrow">Reusable definitions</p><h2>Templates</h2></div>
+            <button type="button" className="text-button" onClick={() => onNavigate("templates")}>Manage templates<ArrowRight size={15} /></button>
           </div>
           <div className="overview-list">
-            {loading && !nextTasks.length ? <p className="empty-state">Loading tasks…</p> : nextTasks.length ? nextTasks.map((task) => (
-              <button type="button" className="overview-row" key={task.id} onClick={() => onNavigate("tasks")}>
+            {loading && !nextTemplates.length ? <p className="empty-state">Loading templates...</p> : nextTemplates.length ? nextTemplates.map((template) => (
+              <button type="button" className="overview-row" key={template.id} onClick={() => onNavigate("templates")}>
                 <span className="record-icon task-icon"><ListTodo size={17} /></span>
-                <span className="overview-row-copy"><strong>{task.title}</strong><span>{task.steps.filter((step) => step.completedAt !== null).length} of {task.steps.length} subtasks</span></span>
+                <span className="overview-row-copy"><strong>{template.title}</strong><span>{template.steps.length} steps · {template.cadence === "DAILY" ? "Daily" : "Manual"}</span></span>
                 <ArrowRight size={16} />
               </button>
-            )) : <p className="empty-state">No open tasks.</p>}
+            )) : <p className="empty-state">No active templates.</p>}
           </div>
         </section>
 

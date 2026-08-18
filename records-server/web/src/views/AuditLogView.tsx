@@ -43,7 +43,7 @@ export function AuditLogView({
     <section className="view-stack">
       <div className="filter-bar">
         <label className="search-field"><Search size={16} /><input aria-label="Search activity" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search objects, actions and changes" /></label>
-        <label>Object<select aria-label="Activity object" value={entity} onChange={(event) => setEntity(event.target.value as EntityFilter)}><option value="">All objects</option><option value="DAILY_PLAN">Daily plans</option><option value="TASK">Tasks</option><option value="STEP">Subtasks</option><option value="ITEM">Record items</option><option value="ENTRY">Entries</option></select></label>
+        <label>Object<select aria-label="Activity object" value={entity} onChange={(event) => setEntity(event.target.value as EntityFilter)}><option value="">All objects</option><option value="DAILY_PLAN">Daily plans</option><option value="TEMPLATE">Templates</option><option value="COMMITMENT">Commitments</option><option value="COMMITMENT_STEP">Commitment steps</option><option value="ITEM">Record items</option><option value="ENTRY">Entries</option></select></label>
         <span className="result-count">{loading ? "Loading…" : `${filtered.length} operations`}</span>
       </div>
       <DataTable table={table} loading={loading} empty={loading ? "Loading activity…" : "No operations match this view."} />

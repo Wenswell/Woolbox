@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Edit3, Flag, Play, Plus, RotateCcw, Save, Square } from "lucide-react";
 import { api } from "../api";
 import { Badge } from "../components/Badge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { Modal } from "../components/Modal";
 import { localToday, message, shiftLocalDate } from "../lib/format";
-import type { DailyPlan, TodoTask } from "../types";
-import { NewTaskForm, TaskEditor } from "./TasksView";
+import type { DailyPlan, TaskTemplate, TodayCommitment } from "../types";
+import { TemplateForm } from "./TemplatesView";
 
 export function TodayView({
   localDate,
   plan,
-  tasks,
+  templates,
   loading,
   onDateChange,
   onChanged,
@@ -18,14 +19,14 @@ export function TodayView({
 }: {
   localDate: string;
   plan: DailyPlan | null;
-  tasks: TodoTask[];
+  templates: TaskTemplate[];
   loading: boolean;
   onDateChange: (localDate: string) => void;
   onChanged: (message: string) => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
   const [ending, setEnding] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -40,21 +41,12 @@ export function TodayView({
 
   useEffect(() => {
     setEditing(false);
-    setEditingTaskId(null);
+    setAdding(false);
     setError(null);
   }, [localDate, plan?.revision, plan?.id]);
 
-  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
-  const commitments = plan
-    ? [
-      plan.primaryTaskId === null ? undefined : taskById.get(plan.primaryTaskId),
-      plan.secondaryTaskId === null ? undefined : taskById.get(plan.secondaryTaskId),
-    ].filter((task): task is TodoTask => task !== undefined)
-    : [];
-  const openCommitments = commitments.filter((task) => task.completedAt === null);
-  const currentTask = plan?.currentTaskId === null || plan?.currentTaskId === undefined
-    ? undefined
-    : taskById.get(plan.currentTaskId);
+  const openCommitments = plan?.commitments.filter((commitment) => commitment.completedAt === null) ?? [];
+  const currentCommitment = plan?.commitments.find((commitment) => commitment.id === plan.currentCommitmentId);
   const reviewDue = plan?.state === "ACTIVE" && plan.nextReviewAt !== null && now >= plan.nextReviewAt;
 
   async function run(key: string, action: () => Promise<unknown>, success: string) {
@@ -71,7 +63,7 @@ export function TodayView({
     }
   }
 
-  if (loading && plan === null && tasks.length === 0) {
+  if (loading && plan === null && templates.length === 0) {
     return <section className="view-stack"><DateNavigator localDate={localDate} onChange={onDateChange} /><p className="empty-state">Loading selected date...</p></section>;
   }
 
@@ -82,11 +74,10 @@ export function TodayView({
         <PlanEditor
           localDate={localDate}
           plan={plan}
-          tasks={tasks}
+          templates={templates.filter((template) => !template.archived)}
           busy={busy !== null}
           onCancel={plan === null ? undefined : () => setEditing(false)}
-          onChanged={onChanged}
-          onError={setError}
+          onTemplatesChanged={onChanged}
           onSave={(input) => run(
             "plan",
             () => plan === null ? api.createDailyPlan({ localDate, ...input }) : api.updateDailyPlan(plan, input),
@@ -107,15 +98,9 @@ export function TodayView({
           <div className="today-title"><h2>{stateTitle(plan)}</h2><PlanBadge plan={plan} /></div>
         </div>
         <div className="row-actions">
-          {(plan.state === "READY" || plan.state === "ACTIVE") && (
-            <button type="button" className="secondary" onClick={() => setEditing(true)} disabled={busy !== null}><Edit3 size={16} />Edit</button>
-          )}
-          {plan.state !== "READY" && (
-            <button type="button" className="secondary" onClick={() => setResetting(true)} disabled={busy !== null}><RotateCcw size={16} />Reset</button>
-          )}
-          {plan.state !== "ENDED" && (
-            <button type="button" className="danger-secondary" onClick={() => setEnding(true)} disabled={busy !== null}><Square size={15} />End today</button>
-          )}
+          {plan.state === "READY" && <button type="button" className="secondary" onClick={() => setEditing(true)} disabled={busy !== null}><Edit3 size={16} />Edit</button>}
+          {plan.state !== "READY" && <button type="button" className="secondary" onClick={() => setResetting(true)} disabled={busy !== null}><RotateCcw size={16} />Reset</button>}
+          {plan.state !== "ENDED" && <button type="button" className="danger-secondary" onClick={() => setEnding(true)} disabled={busy !== null}><Square size={15} />End today</button>}
         </div>
       </div>
 
@@ -132,36 +117,32 @@ export function TodayView({
       {plan.state === "ACTIVE" && (
         <div className="today-focus">
           <div className="today-focus-heading">
-            <div><p className="eyebrow">Round {plan.completedRounds + 1}</p><h3>{currentTask?.title ?? "Current commitment"}</h3></div>
+            <div><p className="eyebrow">Round {plan.completedRounds + 1}</p><h3>{currentCommitment?.title ?? "Current commitment"}</h3></div>
             {plan.nextReviewAt !== null && <span className={reviewDue ? "review-time due" : "review-time"}>{reviewDue ? "Review due" : `Review ${formatTime(plan.nextReviewAt)}`}</span>}
           </div>
           <div className="today-actions">
-            {currentTask && (
-              <button type="button" disabled={busy !== null} onClick={() => void run(`review-${currentTask.id}`, () => api.reviewDailyPlanNow(plan, currentTask.id), "Round completed")}>
-                <Check size={15} />{reviewDue ? "Complete review" : "Review now"}
-              </button>
-            )}
-            {openCommitments.filter((task) => task.id !== currentTask?.id).map((task) => (
-              <span className="today-action-pair" key={task.id}>
-                <button type="button" className="secondary" disabled={busy !== null} onClick={() => void run(`switch-${task.id}`, () => api.switchDailyPlanTask(plan, task.id), "Current commitment switched")}><Play size={15} />Switch now to {task.title}</button>
-                <button type="button" className="secondary" disabled={busy !== null} onClick={() => void run(`review-${task.id}`, () => api.reviewDailyPlanNow(plan, task.id), "Round completed and commitment switched")}><Check size={15} />Review &amp; switch</button>
+            {currentCommitment && <button type="button" disabled={busy !== null} onClick={() => void run(`review-${currentCommitment.id}`, () => api.reviewDailyPlanNow(plan, currentCommitment.id), "Round completed")}><Check size={15} />{reviewDue ? "Complete review" : "Review now"}</button>}
+            {openCommitments.filter((commitment) => commitment.id !== currentCommitment?.id).map((commitment) => (
+              <span className="today-action-pair" key={commitment.id}>
+                <button type="button" className="secondary" disabled={busy !== null} onClick={() => void run(`switch-${commitment.id}`, () => api.switchDailyPlanCommitment(plan, commitment.id), "Current commitment switched")}><Play size={15} />Switch to {commitment.title}</button>
+                <button type="button" className="secondary" disabled={busy !== null} onClick={() => void run(`review-${commitment.id}`, () => api.reviewDailyPlanNow(plan, commitment.id), "Round completed and commitment switched")}><Check size={15} />Review &amp; switch</button>
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {plan.state === "ENOUGH" && (
+      {plan.state === "PAUSED" && (
         <div className="today-focus">
           <p className="eyebrow">{roundSummary(plan.completedRounds)}</p>
-          <h3>{plan.completionReason === "COMMITMENTS" ? "Today's commitments completed" : "Enough for today"}</h3>
-          {plan.completionReason === "ROUNDS" && openCommitments.length > 0 && (
+          <h3>{plan.pauseReason === "COMMITMENTS_COMPLETED" ? "Today's commitments completed" : "Daily target reached"}</h3>
+          {plan.pauseReason === "COMMITMENTS_COMPLETED" && <button type="button" disabled={busy !== null} onClick={() => setAdding(true)}><Plus size={15} />Add commitment</button>}
+          {plan.pauseReason === "TARGET_REACHED" && openCommitments.length > 0 && (
             <div className="today-actions">
-              {openCommitments.map((task) => (
-                <button key={task.id} type="button" disabled={busy !== null} onClick={() => void run(`extra-${task.id}`, () => api.startExtraRound(plan, task.id), "Extra round started")}><Play size={15} />Start {task.title}</button>
-              ))}
+              {openCommitments.map((commitment) => <button key={commitment.id} type="button" disabled={busy !== null} onClick={() => void run(`continue-${commitment.id}`, () => api.continueDailyPlan(plan, commitment.id), "Another round started")}><Play size={15} />Continue one more round: {commitment.title}</button>)}
             </div>
           )}
+          {plan.pauseReason === "TARGET_REACHED" && openCommitments.length === 0 && <button type="button" disabled={busy !== null} onClick={() => setAdding(true)}><Plus size={15} />Add commitment</button>}
         </div>
       )}
 
@@ -173,47 +154,40 @@ export function TodayView({
       )}
 
       <Commitments
-        tasks={commitments}
-        currentTaskId={plan.currentTaskId}
-        busy={busy !== null}
-        onEdit={setEditingTaskId}
-        onToggle={(stepId, completed) => run(`step-${stepId}`, () => api.setStepCompleted(stepId, completed, localDate), completed ? "Subtask completed" : "Subtask reopened")}
+        commitments={plan.commitments}
+        currentCommitmentId={plan.currentCommitmentId}
+        busy={busy !== null || plan.state === "ENDED"}
+        onToggle={(stepId, completed) => run(`step-${stepId}`, () => api.setCommitmentStepCompleted(plan, stepId, completed), completed ? "Step completed" : "Step reopened")}
       />
       {error && <p className="form-error" role="alert">{error}</p>}
-      {editingTaskId !== null && tasks.find((task) => task.id === editingTaskId) && (
-        <TaskEditor
-          task={tasks.find((task) => task.id === editingTaskId)!}
-          localDate={localDate}
-          onClose={() => setEditingTaskId(null)}
-          onChanged={onChanged}
-          onError={setError}
+      {adding && (
+        <AddCommitmentDialog
+          templates={templates.filter((template) => !template.archived)}
+          busy={busy !== null}
+          onClose={() => setAdding(false)}
+          onTemplatesChanged={onChanged}
+          onAdd={(templateId) => run("add", () => api.addDailyPlanCommitment(plan, templateId), "Commitment added")}
         />
       )}
       <ConfirmDialog
         open={ending}
         title="End today"
-        message="End this daily plan? You can reset it to Ready later."
+        message="End this daily plan? Reset returns it to Ready while keeping commitment completion."
         confirmLabel="End today"
         danger
         busy={busy !== null}
         onCancel={() => setEnding(false)}
-        onConfirm={() => {
-          setEnding(false);
-          void run("end", () => api.endDailyPlan(plan), "Today ended");
-        }}
+        onConfirm={() => { setEnding(false); void run("end", () => api.endDailyPlan(plan), "Today ended"); }}
       />
       <ConfirmDialog
         open={resetting}
         title="Reset today"
-        message="Reset execution to Ready? The first move and commitments stay selected. Subtask completion is unchanged."
+        message="Reset execution to Ready? Commitment instances and step completion remain unchanged."
         confirmLabel="Reset to Ready"
         danger
         busy={busy !== null}
         onCancel={() => setResetting(false)}
-        onConfirm={() => {
-          setResetting(false);
-          void run("reset", () => api.resetDailyPlan(plan), "Today reset to Ready");
-        }}
+        onConfirm={() => { setResetting(false); void run("reset", () => api.resetDailyPlan(plan), "Today reset to Ready"); }}
       />
     </section>
   );
@@ -222,97 +196,93 @@ export function TodayView({
 function PlanEditor({
   localDate,
   plan,
-  tasks,
+  templates,
   busy,
   onCancel,
-  onChanged,
-  onError,
+  onTemplatesChanged,
   onSave,
 }: {
   localDate: string;
   plan: DailyPlan | null;
-  tasks: TodoTask[];
+  templates: TaskTemplate[];
   busy: boolean;
   onCancel?: () => void;
-  onChanged: (message: string) => Promise<void>;
-  onError: (message: string) => void;
-  onSave: (input: { firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) => Promise<void>;
+  onTemplatesChanged: (message: string) => Promise<void>;
+  onSave: (input: { firstMove: string; primaryTemplateId: number; secondaryTemplateId: number | null }) => Promise<void>;
 }) {
+  const primary = plan?.commitments.find((commitment) => commitment.role === "PRIMARY");
+  const secondary = plan?.commitments.find((commitment) => commitment.role === "SECONDARY");
   const [firstMove, setFirstMove] = useState(plan?.firstMove ?? "");
-  const [primaryTaskId, setPrimaryTaskId] = useState(plan?.primaryTaskId ? String(plan.primaryTaskId) : "");
-  const [secondaryTaskId, setSecondaryTaskId] = useState(plan?.secondaryTaskId ? String(plan.secondaryTaskId) : "");
-  const [taskDialog, setTaskDialog] = useState<number | "new" | null>(null);
-  const primaryTask = tasks.find((task) => task.id === Number(primaryTaskId));
-  const secondaryTask = tasks.find((task) => task.id === Number(secondaryTaskId));
-  const primaryLocked = primaryTask?.completedAt !== null && primaryTask !== undefined;
-  const secondaryLocked = secondaryTask?.completedAt !== null && secondaryTask !== undefined;
-  const selectable = tasks.filter((task) => task.completedAt === null);
+  const [primaryTemplateId, setPrimaryTemplateId] = useState(primary?.templateId ? String(primary.templateId) : "");
+  const [secondaryTemplateId, setSecondaryTemplateId] = useState(secondary?.templateId ? String(secondary.templateId) : "");
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!primaryTaskId || primaryTaskId === secondaryTaskId) return;
+    if (!primaryTemplateId || primaryTemplateId === secondaryTemplateId) return;
     await onSave({
       firstMove,
-      primaryTaskId: Number(primaryTaskId),
-      secondaryTaskId: secondaryTaskId ? Number(secondaryTaskId) : null,
+      primaryTemplateId: Number(primaryTemplateId),
+      secondaryTemplateId: secondaryTemplateId ? Number(secondaryTemplateId) : null,
     });
   }
-
-  const editingTask = typeof taskDialog === "number" ? tasks.find((task) => task.id === taskDialog) : undefined;
 
   return (
     <>
       <form className="today-plan-form" onSubmit={(event) => void submit(event)}>
-      <div className="section-heading">
-        <div><p className="eyebrow">{formatLocalDate(localDate)}</p><h2>{plan === null ? "Plan today" : "Edit today"}</h2></div>
-      </div>
-      <div className="form-grid today-plan-grid">
-        <label>First move<textarea required autoFocus={plan === null} value={firstMove} disabled={busy || plan?.state === "ACTIVE"} onChange={(event) => setFirstMove(event.target.value)} /></label>
-        <label>Primary task<select required value={primaryTaskId} disabled={busy || primaryLocked} onChange={(event) => setPrimaryTaskId(event.target.value)}><option value="">Choose task</option>{taskOptions(tasks, selectable, secondaryTaskId, primaryTaskId)}</select></label>
-        <label>Secondary task<select value={secondaryTaskId} disabled={busy || secondaryLocked} onChange={(event) => setSecondaryTaskId(event.target.value)}><option value="">No secondary task</option>{taskOptions(tasks, selectable, primaryTaskId, secondaryTaskId)}</select></label>
-      </div>
-      <div className="today-task-tools">
-        <button type="button" className="secondary compact" onClick={() => setTaskDialog("new")} disabled={busy}><Plus size={15} />New task</button>
-        {primaryTask && <button type="button" className="secondary compact" onClick={() => setTaskDialog(primaryTask.id)} disabled={busy}><Edit3 size={15} />Edit primary</button>}
-        {secondaryTask && <button type="button" className="secondary compact" onClick={() => setTaskDialog(secondaryTask.id)} disabled={busy}><Edit3 size={15} />Edit secondary</button>}
-      </div>
-      {primaryTaskId && primaryTaskId === secondaryTaskId && <p className="form-error" role="alert">Primary and secondary tasks must be different.</p>}
-      {!primaryTaskId && selectable.length === 0 && <p className="form-error" role="alert">Create or reopen a task before planning today.</p>}
-      <div className="modal-actions">
-        {onCancel && <button type="button" className="secondary" onClick={onCancel} disabled={busy}>Cancel</button>}
-        <button disabled={busy || !firstMove.trim() || !primaryTaskId || primaryTaskId === secondaryTaskId}><Save size={16} />{busy ? "Saving..." : "Save today"}</button>
-      </div>
+        <div className="section-heading"><div><p className="eyebrow">{formatLocalDate(localDate)}</p><h2>{plan === null ? "Plan today" : "Edit today"}</h2></div></div>
+        <div className="form-grid today-plan-grid">
+          <label>First move<textarea required autoFocus={plan === null} value={firstMove} disabled={busy} onChange={(event) => setFirstMove(event.target.value)} /></label>
+          <label>Primary template<select required value={primaryTemplateId} disabled={busy} onChange={(event) => setPrimaryTemplateId(event.target.value)}><option value="">Choose template</option>{templateOptions(templates, secondaryTemplateId)}</select></label>
+          <label>Secondary template<select value={secondaryTemplateId} disabled={busy} onChange={(event) => setSecondaryTemplateId(event.target.value)}><option value="">No secondary template</option>{templateOptions(templates, primaryTemplateId)}</select></label>
+        </div>
+        <div className="today-template-tools"><button type="button" className="secondary compact" onClick={() => setCreatingTemplate(true)} disabled={busy}><Plus size={15} />New template</button></div>
+        {primaryTemplateId && primaryTemplateId === secondaryTemplateId && <p className="form-error" role="alert">Primary and secondary templates must be different.</p>}
+        {!primaryTemplateId && templates.length === 0 && <p className="form-error" role="alert">Create a template before planning today.</p>}
+        <div className="modal-actions">
+          {onCancel && <button type="button" className="secondary" onClick={onCancel} disabled={busy}>Cancel</button>}
+          <button disabled={busy || !firstMove.trim() || !primaryTemplateId || primaryTemplateId === secondaryTemplateId}><Save size={16} />{busy ? "Saving..." : "Save today"}</button>
+        </div>
       </form>
-      {taskDialog === "new" && (
-        <NewTaskForm
-          localDate={localDate}
-          onClose={() => setTaskDialog(null)}
-          onSaved={async (task) => {
-            if (!primaryTaskId) setPrimaryTaskId(String(task.id));
-            else if (!secondaryTaskId) setSecondaryTaskId(String(task.id));
-            setTaskDialog(null);
-            await onChanged("Task created");
-          }}
-        />
-      )}
-      {editingTask && (
-        <TaskEditor
-          task={editingTask}
-          localDate={localDate}
-          onClose={() => setTaskDialog(null)}
-          onChanged={onChanged}
-          onError={onError}
-        />
-      )}
+      {creatingTemplate && <TemplateForm onClose={() => setCreatingTemplate(false)} onSaved={async (template) => { if (!primaryTemplateId) setPrimaryTemplateId(String(template.id)); else if (!secondaryTemplateId) setSecondaryTemplateId(String(template.id)); setCreatingTemplate(false); await onTemplatesChanged("Template created"); }} />}
     </>
   );
 }
 
-function taskOptions(tasks: TodoTask[], selectable: TodoTask[], unavailableId: string, selectedId: string) {
-  const ids = new Set(selectable.map((task) => task.id));
-  if (selectedId) ids.add(Number(selectedId));
-  return tasks.filter((task) => ids.has(task.id) && String(task.id) !== unavailableId).map((task) => (
-    <option key={task.id} value={task.id}>{task.title}{task.completedAt === null ? "" : " (Completed)"}</option>
+function AddCommitmentDialog({
+  templates,
+  busy,
+  onClose,
+  onTemplatesChanged,
+  onAdd,
+}: {
+  templates: TaskTemplate[];
+  busy: boolean;
+  onClose: () => void;
+  onTemplatesChanged: (message: string) => Promise<void>;
+  onAdd: (templateId: number) => Promise<void>;
+}) {
+  const [templateId, setTemplateId] = useState(templates[0] ? String(templates[0].id) : "");
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+
+  if (creatingTemplate) {
+    return <TemplateForm onClose={() => setCreatingTemplate(false)} onSaved={async (template) => { setTemplateId(String(template.id)); setCreatingTemplate(false); await onTemplatesChanged("Template created"); }} />;
+  }
+
+  return (
+    <Modal title="Add commitment" onClose={onClose}>
+      <form className="item-form" onSubmit={(event) => { event.preventDefault(); if (templateId) void onAdd(Number(templateId)); }}>
+        <label>Template<select aria-label="Commitment template" required value={templateId} disabled={busy} onChange={(event) => setTemplateId(event.target.value)}><option value="">Choose template</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.title} · {template.cadence === "DAILY" ? "Daily" : "Manual"}</option>)}</select></label>
+        <button type="button" className="secondary" disabled={busy} onClick={() => setCreatingTemplate(true)}><Plus size={15} />New template</button>
+        <div className="modal-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>Cancel</button><button disabled={busy || !templateId}><Plus size={15} />Add commitment</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function templateOptions(templates: TaskTemplate[], unavailableId: string) {
+  return templates.filter((template) => String(template.id) !== unavailableId).map((template) => (
+    <option key={template.id} value={template.id}>{template.title} · {template.cadence === "DAILY" ? "Daily" : "Manual"}</option>
   ));
 }
 
@@ -329,34 +299,31 @@ function DateNavigator({ localDate, onChange }: { localDate: string; onChange: (
 }
 
 function Commitments({
-  tasks,
-  currentTaskId,
+  commitments,
+  currentCommitmentId,
   busy,
-  onEdit,
   onToggle,
 }: {
-  tasks: TodoTask[];
-  currentTaskId: number | null;
+  commitments: TodayCommitment[];
+  currentCommitmentId: number | null;
   busy: boolean;
-  onEdit: (taskId: number) => void;
   onToggle: (stepId: number, completed: boolean) => Promise<void>;
 }) {
   return (
     <section className="today-commitments">
-      <div className="section-heading"><div><p className="eyebrow">Commitments</p><h3>1 + 1</h3></div></div>
+      <div className="section-heading"><div><p className="eyebrow">Commitments</p><h3>{commitments.length} planned</h3></div></div>
       <div className="commitment-list">
-        {tasks.map((task, index) => {
-          const completed = task.steps.filter((step) => step.completedAt !== null).length;
+        {commitments.map((commitment, index) => {
+          const completed = commitment.steps.filter((step) => step.completedAt !== null).length;
           return (
-            <div className={task.id === currentTaskId ? "commitment-row current" : "commitment-row"} key={task.id}>
-              <div className="commitment-heading">
+            <div className={commitment.id === currentCommitmentId ? "commitment-row current" : "commitment-row"} key={commitment.id}>
+              <div className="commitment-heading commitment-heading-static">
                 <span className="step-index">{index + 1}</span>
-                <div><strong>{task.title}</strong><span>{completed} / {task.steps.length} subtasks · {task.repeatMode === "DAILY" ? "Daily" : "Once"}</span></div>
-                {task.completedAt !== null ? <Badge tone="muted">Completed</Badge> : task.id === currentTaskId ? <Badge tone="accent">Current</Badge> : <Badge tone="neutral">Open</Badge>}
-                <button type="button" className="icon-button" aria-label={`Edit ${task.title}`} title="Edit task" disabled={busy} onClick={() => onEdit(task.id)}><Edit3 size={16} /></button>
+                <div><strong>{commitment.title}</strong><span>{completed} / {commitment.steps.length} steps · {roleLabel(commitment)} · {commitment.cadence === "DAILY" ? "Daily" : "Manual"}</span></div>
+                {commitment.completedAt !== null ? <Badge tone="muted">Completed</Badge> : commitment.id === currentCommitmentId ? <Badge tone="accent">Current</Badge> : <Badge tone="neutral">Open</Badge>}
               </div>
               <div className="today-step-list">
-                {task.steps.map((step) => (
+                {commitment.steps.map((step) => (
                   <label key={step.id} className={step.completedAt === null ? "today-step" : "today-step completed"}>
                     <input type="checkbox" checked={step.completedAt !== null} disabled={busy} onChange={(event) => void onToggle(step.id, event.target.checked)} />
                     <span>{step.title}</span>
@@ -375,7 +342,7 @@ function PlanBadge({ plan }: { plan: DailyPlan }) {
   const values = {
     READY: { tone: "warning" as const, label: "Ready" },
     ACTIVE: { tone: "accent" as const, label: "Active" },
-    ENOUGH: { tone: "neutral" as const, label: plan.completionReason === "COMMITMENTS" ? "Completed" : "Enough" },
+    PAUSED: { tone: "neutral" as const, label: plan.pauseReason === "COMMITMENTS_COMPLETED" ? "Completed" : "Target reached" },
     ENDED: { tone: "muted" as const, label: "Ended" },
   };
   const value = values[plan.state];
@@ -385,13 +352,19 @@ function PlanBadge({ plan }: { plan: DailyPlan }) {
 function stateTitle(plan: DailyPlan) {
   if (plan.state === "READY") return "First move";
   if (plan.state === "ACTIVE") return plan.nextReviewAt !== null && Date.now() >= plan.nextReviewAt ? "Hourly review" : "Current round";
-  if (plan.state === "ENOUGH") return plan.completionReason === "COMMITMENTS" ? "Commitments complete" : "Daily target reached";
+  if (plan.state === "PAUSED") return plan.pauseReason === "COMMITMENTS_COMPLETED" ? "Commitments complete" : "Daily target reached";
   return "Daily plan closed";
 }
 
 function roundSummary(completedRounds: number) {
   if (completedRounds === 0) return "Completed before the first review";
   return `${completedRounds} ${completedRounds === 1 ? "round" : "rounds"} completed`;
+}
+
+function roleLabel(commitment: TodayCommitment) {
+  if (commitment.role === "PRIMARY") return "Primary";
+  if (commitment.role === "SECONDARY") return "Secondary";
+  return "Added";
 }
 
 function formatTime(value: number) {
