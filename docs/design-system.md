@@ -118,7 +118,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks →
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH + ROUNDS` 显示今天已足够，`ENOUGH + COMMITMENTS` 显示今日承诺已完成；`ENDED` 为只读状态。 |
+| `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH + ROUNDS` 显示今天已足够并可为未完成承诺开始额外一轮，`ENOUGH + COMMITMENTS` 只显示今日承诺已完成；`ENDED` 为只读状态。 |
 | `Plan/Edit today` | 全屏路由；第一步文本、主任务必选、次任务可空。任务使用选择 Dialog；已完成槽位锁定，次任务可明确清空。顶栏 Check 是唯一保存操作。 |
 | `Tasks` | 根页只显示 Open 数量并进入 Manage，不展示任务预览或完成操作。 |
 | `Manage tasks` / `Edit task` | 管理页仅按 Open、Completed 分组；顶栏加号新建。新建与编辑使用 Once/Daily 分段控件，并负责标题、子事项增删排序和删除，不显示日期。 |

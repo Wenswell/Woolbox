@@ -27,7 +27,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 4. 如需快捷入口，Android 13 及以上可在详情页选择 Tile 的 `Add`；Android 12/12L 在系统快捷设置编辑页手动添加。
 5. Global Copy 详情页可管理采集历史；OLED shield 详情页可管理并启用已保存的应用配置。
 
-从 `Records` 进入后，同一页按 Today、Tasks、Routines、Measurement 展示。Today 选择一个主任务、最多一个次任务和独立第一步；开始后约每 60 分钟提醒一次，只确认继续、切换承诺或结束。第四轮后显示今天已足够，承诺全部完成时显示今日承诺已完成；额外一轮需显式开始。Tasks 是 Open/Completed 库存，可选单次或每日重复；每日任务按本地日期独立计算完成状态，但仍需显式加入 Today。PC 管理页可切换任意日期完成 Today 全流程，并提供任务快捷编辑、提前回顾、即时切换和重置纠偏。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
+从 `Records` 进入后，同一页按 Today、Tasks、Routines、Measurement 展示。Today 选择一个主任务、最多一个次任务和独立第一步；开始后约每 60 分钟提醒一次，只确认继续、切换承诺或结束。第四轮后显示今天已足够，此时可显式开始额外一轮；承诺全部完成时显示今日承诺已完成，重新打开承诺会恢复原计划。Tasks 是 Open/Completed 库存，可选单次或每日重复；每日任务按本地日期独立计算完成状态，但仍需显式加入 Today。PC 管理页可切换任意日期完成 Today 全流程，并提供任务快捷编辑、提前回顾、即时切换和重置纠偏。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
 
 完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
 

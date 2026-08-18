@@ -115,7 +115,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 1. 首次使用在 Setting 的 `Records connection` 配置 Basic Auth 用户名和密码；凭据使用 Android Keystore 加密保存。
 2. 根列表固定为 **Today → Tasks → Routines → Measurement**。Today 承担每日承诺与当前动作；Tasks 只显示库存摘要；Routines 与 Measurement 独立记录，不进入 Today 或每日结束判定。
 3. Today 未规划时选择一个主任务、最多一个不同的次任务，并填写独立的 `firstMove`。完成第一步后才开始第一轮；活动状态只突出当前承诺的首个未完成子事项。
-4. 每轮开始约 60 分钟后提醒回顾。回顾不输入总结，只能继续当前任务、切换到另一项未完成承诺，或结束今天。第四轮完成后显示 `Enough for today`；承诺全部完成时显示 `Today's commitments completed`。额外一轮必须显式选择未完成承诺后开始。
+4. 每轮开始约 60 分钟后提醒回顾。回顾不输入总结，只能继续当前任务、切换到另一项未完成承诺，或结束今天。第四轮完成后显示 `Enough for today`，此时可显式选择未完成承诺开始额外一轮；承诺全部完成时显示 `Today's commitments completed`，不提供额外一轮。
 5. `READY` 或 `ACTIVE` 可显式调整未完成槽位；已完成槽位不能补入新任务。跨本地日期后旧计划不继承，未完成任务继续留在 Open 库存，不产生逾期或失败状态。
 6. Tasks 在 Android 与 PC 均只分 `Open` 和 `Completed`。新建与编辑可选 `ONCE` 或 `DAILY`，不提供日期；一级子事项可增删、重命名和调整固定位序。
 7. Routines 显示今日累计并通过记录 Sheet 写入；Measurement 显示最新值并通过 24 小时预览 Sheet 的离散 Slider 录入。成功写入仍提供短时 `Undo`。
@@ -125,8 +125,9 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 
 - 每个 ISO 本地日期至多一份计划，状态为 `READY`、`ACTIVE`、`ENOUGH` 或 `ENDED`；`REVIEW_DUE` 由活动状态和 `nextReviewAt` 派生。`ENOUGH` 的 `completionReason` 必须为 `ROUNDS` 或 `COMMITMENTS`，其他活动过程为空。
 - 主任务必填，次任务可空且不得与主任务相同。选入时任务必须未完成；完成当前任务后自动切到另一项未完成承诺，两项都完成时立即进入 `ENOUGH + COMMITMENTS`，步骤完成不增加轮次。第四次回顾进入 `ENOUGH + ROUNDS`。
+- `ENOUGH + COMMITMENTS` 中的承诺重新变为未完成时自动恢复原计划：第一动作未完成则恢复 `READY`；第一动作已完成则恢复 `ACTIVE`，以重新打开时刻计算下一次 60 分钟回顾。`ENDED` 不自动恢复。
 - 计划写操作携带当前 revision；服务端拒绝重复或过期操作。删除被当日未结束计划引用的任务前，必须先替换承诺或结束今天。
-- 开始第一轮和额外一轮要求系统通知可用。活动中关闭通知后，Today 只提供恢复通知或结束今天；提醒允许受系统省电策略延迟，不承诺精确到时。
+- 开始第一轮和 `ENOUGH + ROUNDS` 的额外一轮要求系统通知可用。活动中关闭通知后，Today 只提供恢复通知或结束今天；提醒允许受系统省电策略延迟，不承诺精确到时。
 - PC 管理端可提前完成当前轮，或不增加完成轮次地立即切换到另一项未完成承诺；即时切换从操作时刻重新计算 60 分钟。`Reset to Ready` 保留第一步和主次承诺，清空执行进度与结束状态，但不修改任务步骤完成记录。
 
 ### 待办规则
