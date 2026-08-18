@@ -95,11 +95,11 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `DailyPlanTest` | 回顾到期边界与主次承诺解析。 |
 | `DailyReminderSchedulerTest` | 仅活动当日计划产生 revision 绑定提醒，送达标识随 revision 或回顾时刻变化。 |
 | `RecordsScreenTest` | 记录项排序、今日累计和目标跨越。 |
-| `RecordsTodaySemanticsTest` | Today 无计划、待启动、回顾到期、足量和结束状态的可见语义。 |
+| `RecordsTodaySemanticsTest` | Today 无计划、待启动、回顾到期、按轮次足量、承诺完成和结束状态的可见语义。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
-| `records-server/test/api.test.ts` | 七表迁移、按日期的每日任务完成作用域、每日计划正常/管理命令、revision、overview、审计和批量 API。 |
-| `records-server/web/src/App.test.tsx` | PC 七区导航、Today 日期隔离与完整管理、Once/Daily 任务、记录项、流水和审计日志。 |
+| `records-server/test/api.test.ts` | 七表迁移、按日期的每日任务完成作用域、每日计划完成原因与正常/管理命令、revision、overview、审计和批量 API。 |
+| `records-server/web/src/App.test.tsx` | PC 七区导航、Today 日期隔离、完成原因与完整管理、Once/Daily 任务、记录项、流水和审计日志。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 

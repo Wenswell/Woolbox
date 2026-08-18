@@ -118,7 +118,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks →
 
 | 区域 | 唯一职责 |
 | --- | --- |
-| `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH` 显示完成轮次与可选额外一轮；`ENDED` 为只读状态。 |
+| `Today` | 单张 `8dp` 卡按计划状态切换内容。未规划显示主按钮；`READY` 只突出第一步；`ACTIVE` 显示当前任务与首个未完成子事项；到期时显示继续、切换、结束；`ENOUGH + ROUNDS` 显示今天已足够，`ENOUGH + COMMITMENTS` 显示今日承诺已完成；`ENDED` 为只读状态。 |
 | `Plan/Edit today` | 全屏路由；第一步文本、主任务必选、次任务可空。任务使用选择 Dialog；已完成槽位锁定，次任务可明确清空。顶栏 Check 是唯一保存操作。 |
 | `Tasks` | 根页只显示 Open 数量并进入 Manage，不展示任务预览或完成操作。 |
 | `Manage tasks` / `Edit task` | 管理页仅按 Open、Completed 分组；顶栏加号新建。新建与编辑使用 Once/Daily 分段控件，并负责标题、子事项增删排序和删除，不显示日期。 |
@@ -136,6 +136,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Tasks →
 ### Records 视觉规则
 
 - Today 卡标题使用 `labelLarge` primary；当前动作使用 `titleLarge` SemiBold；说明与轮次使用 `bodySmall/bodyMedium` 的 `onSurfaceVariant`。卡与记录行统一 `8dp` 圆角。
+- 承诺在首次回顾前完成时，轮次说明使用“在首次回顾前完成”，不显示“完成 0 轮”；PC 状态 badge 使用 `Completed`，不使用 `Enough`。
 - 一个状态只显示当前可执行命令。启动、继续、切换和额外一轮使用明确按钮；编辑用铅笔 icon；当前子事项用 checkbox；结束今天使用弱化文本按钮。
 - 回顾到期由分钟时钟触发重组，不显示倒计时或精确工时。通知不可用时用阻塞状态替换活动内容，只保留启用通知和结束今天。
 - Routines 与 Measurement 行只突出当前数值，不显示 Today 颜色、轮次或承诺标签。累计写入和刚达标的触觉、Snackbar 与 `Undo` 沿用记录 Sheet 规则。
