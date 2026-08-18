@@ -149,11 +149,11 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 待办创建在一个事务内写入父项和至少一个子事项；完成状态只从目标作用域的子事项完成记录派生。`ONCE` 使用唯一的无日期作用域，`DAILY` 使用请求中的 ISO 本地日期；每日任务跨日自然恢复未完成，不执行午夜重置。删除最后一个子事项会被拒绝。目标日期任务完成时，同一事务只协调该日期的活动计划，切换至另一项未完成承诺或进入 `ENOUGH`。
 
-每日计划由 `POST /api/daily-plans` 创建，`PUT /api/daily-plans/:localDate` 替换未完成槽位，`start`、`review`、`extra-round`、`end` 子路径执行状态转换。写请求携带 `expectedRevision` 和设备 `occurredAt`；服务端事务校验状态、任务引用和 revision，并用发生时刻加 60 分钟生成 `nextReviewAt`。创建、调整和结束写审计；小时回顾不存逐轮历史。
+每日计划由 `POST /api/daily-plans` 创建，`PUT /api/daily-plans/:localDate` 替换未完成槽位。`start`、`review`、`extra-round`、`end` 执行正常状态转换；PC 管理端另用 `review-now` 提前完成轮次、`switch` 即时切换未完成承诺、`reset` 保留配置并恢复 `READY`。即时切换不增加轮次，并从 `occurredAt` 重新计算 60 分钟；重置不修改任务步骤完成记录。所有写请求携带 `expectedRevision` 和 `occurredAt`，服务端事务校验状态、任务引用和 revision。创建、调整、即时切换、重置和结束写审计；小时回顾与额外一轮不存逐轮历史。
 
 Android 每次刷新后按服务端计划覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始新一轮；进入 `ENOUGH`、`ENDED` 或跨日时先取消任务和可见通知，再读取新日期计划。
 
-服务端还提供 PC 管理页静态资源；Today 复用每日计划 API 和 revision 状态机，Tasks 按浏览器本地日期管理 Open/Completed 与 Once/Daily。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和七张 Records 表。
+服务端还提供 PC 管理页静态资源；Today 为所选 ISO 本地日期独立读取计划和任务，可复用 Tasks 弹窗管理任务定义。Overview 与 Tasks 固定读取浏览器真实今天，不受 Today 日期选择影响。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和七张 Records 表。
 
 ## App 更新
 

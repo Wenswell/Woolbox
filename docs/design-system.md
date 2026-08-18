@@ -146,7 +146,7 @@ Task progress Sheet 只显示子事项复选框和完成时间；标题、子事
 
 `Records connection` 使用 `AppSection`：Server 明文地址、Credentials 凭据输入 + 全宽连接按钮；用户名/密码在连接中禁用；用户名键盘动作切换到密码，密码使用 Password 键盘并通过 `Done` 提交（仅在合法时）；保存成功后返回。
 
-PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Today、Tasks、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和任务、流水、审计预览。Today 按本地日期呈现与 Android 相同的 `READY/ACTIVE/ENOUGH/ENDED` 状态和当前 revision，只显示当前可执行操作；步骤使用 checkbox，结束今天使用确认 Dialog。Tasks 使用 Open/Completed 分段、搜索与表格，表单提供 Once/Daily 并按固定位序管理子事项。Accumulate 与 Measurement 使用固定模式表单。Entries 提供日期、模式与记录项筛选，可新增流水和批量删除。Activity 只读展示对象、动作和变更摘要。
+PC 管理页使用响应式 App shell：桌面为固定窄侧栏，窄屏为可横向滚动的顶部导航；入口固定为 Overview、Today、Tasks、Accumulate、Measurement、Entries、Activity。Overview 使用紧凑指标卡和任务、流水、审计预览。Today 顶部使用前后日期图标、原生日期输入和 Today 按钮；状态区呈现 `READY/ACTIVE/ENOUGH/ENDED` 与 revision 管理动作，全部承诺展开步骤 checkbox 和任务编辑入口。提前回顾、即时切换、重置与结束使用明确命令，重置和结束经确认 Dialog。Plan/Edit today 可复用 Tasks 弹窗新建或编辑任务。Tasks 使用 Open/Completed 分段、搜索与表格，表单提供 Once/Daily 并按固定位序管理子事项。Accumulate 与 Measurement 使用固定模式表单。Entries 提供日期、模式与记录项筛选，可新增流水和批量删除。Activity 只读展示对象、动作和变更摘要。
 
 
 ## 状态呈现

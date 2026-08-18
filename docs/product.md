@@ -119,7 +119,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 5. `READY` 或 `ACTIVE` 可显式调整未完成槽位；已完成槽位不能补入新任务。跨本地日期后旧计划不继承，未完成任务继续留在 Open 库存，不产生逾期或失败状态。
 6. Tasks 在 Android 与 PC 均只分 `Open` 和 `Completed`。新建与编辑可选 `ONCE` 或 `DAILY`，不提供日期；一级子事项可增删、重命名和调整固定位序。
 7. Routines 显示今日累计并通过记录 Sheet 写入；Measurement 显示最新值并通过 24 小时预览 Sheet 的离散 Slider 录入。成功写入仍提供短时 `Undo`。
-8. PC 管理页固定为 `Overview`、`Today`、`Tasks`、`Accumulate`、`Measurement`、`Entries`、`Activity`；Today 可创建、调整、开始、回顾、追加一轮、完成步骤和结束，Android 刷新后读取同一服务端状态。
+8. PC 管理页固定为 `Overview`、`Today`、`Tasks`、`Accumulate`、`Measurement`、`Entries`、`Activity`；Today 可切换任意本地日期，快捷管理任务，处理全部承诺步骤，并执行开始、提前回顾、即时切换、追加一轮、结束和重置，Android 刷新后读取同一服务端状态。
 
 ### 每日承诺规则
 
@@ -127,6 +127,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - 主任务必填，次任务可空且不得与主任务相同。选入时任务必须未完成；完成当前任务后自动切到另一项未完成承诺，两项都完成时立即进入 `ENOUGH`。
 - 计划写操作携带当前 revision；服务端拒绝重复或过期操作。删除被当日未结束计划引用的任务前，必须先替换承诺或结束今天。
 - 开始第一轮和额外一轮要求系统通知可用。活动中关闭通知后，Today 只提供恢复通知或结束今天；提醒允许受系统省电策略延迟，不承诺精确到时。
+- PC 管理端可提前完成当前轮，或不增加完成轮次地立即切换到另一项未完成承诺；即时切换从操作时刻重新计算 60 分钟。`Reset to Ready` 保留第一步和主次承诺，清空执行进度与结束状态，但不修改任务步骤完成记录。
 
 ### 待办规则
 
@@ -185,7 +186,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - Today 强制一个主任务和最多一个次任务；第一步完成前不启动回顾，第四轮或两项完成后进入 `Enough for today`。
 - 小时回顾不保存正文；继续或切换只更新当前承诺、轮次和下一提醒。过期 revision、相同主次任务和非法状态转换均被拒绝。
 - 任务表单没有日期并可选 Once/Daily；Manage tasks 只显示 Open 与 Completed。每日任务同日完成后进入 Completed，下一本地日期重新 Open，漏做不产生实例且不自动进入 Today。
-- Android 与 PC 刷新后读取同一 Today 和任务状态；PC 七个入口可完成 Today 全状态流程，并管理任务库存、两类记录项、流水和审计。Routines 与 Measurement 不影响 Today 状态。
+- Android 与 PC 刷新后读取同一 Today 和任务状态；PC Today 可按任意日期管理任务与计划、提前回顾、即时切换并重置执行状态。PC 七个入口同时管理任务库存、两类记录项、流水和审计。Routines 与 Measurement 不影响 Today 状态。
 - Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
 - Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。
