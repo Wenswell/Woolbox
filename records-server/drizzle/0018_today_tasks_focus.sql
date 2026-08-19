@@ -90,6 +90,21 @@ LEFT JOIN `today_commitments` secondary_task ON secondary_task.`plan_id` = plan.
 LEFT JOIN `today_commitments` current_task ON current_task.`id` = plan.`current_commitment_id`;
 --> statement-breakpoint
 UPDATE `record_audit_logs`
+SET `before_json` = CASE WHEN `before_json` IS NULL THEN NULL ELSE json_remove(json_set(`before_json`, '$.localDate', (SELECT task.`local_date` FROM `today_tasks` task WHERE task.`id` = `record_audit_logs`.`entity_id`), '$.sourceTaskId', NULL), '$.planId', '$.role', '$.cadence') END,
+	`after_json` = CASE WHEN `after_json` IS NULL THEN NULL ELSE json_remove(json_set(`after_json`, '$.localDate', (SELECT task.`local_date` FROM `today_tasks` task WHERE task.`id` = `record_audit_logs`.`entity_id`), '$.sourceTaskId', NULL), '$.planId', '$.role', '$.cadence') END
+WHERE `entity_type` = 'COMMITMENT';
+--> statement-breakpoint
+UPDATE `record_audit_logs`
+SET `before_json` = CASE WHEN `before_json` IS NULL THEN NULL ELSE json_remove(json_set(`before_json`, '$.taskId', json_extract(`before_json`, '$.commitmentId'), '$.taskTitle', json_extract(`before_json`, '$.commitmentTitle')), '$.commitmentId', '$.commitmentTitle') END,
+	`after_json` = CASE WHEN `after_json` IS NULL THEN NULL ELSE json_remove(json_set(`after_json`, '$.taskId', json_extract(`after_json`, '$.commitmentId'), '$.taskTitle', json_extract(`after_json`, '$.commitmentTitle')), '$.commitmentId', '$.commitmentTitle') END
+WHERE `entity_type` = 'COMMITMENT_STEP';
+--> statement-breakpoint
+UPDATE `record_audit_logs`
+SET `before_json` = CASE WHEN `before_json` IS NULL THEN NULL ELSE json_remove(json_set(`before_json`, '$.primaryTaskId', (SELECT focus.`primary_task_id` FROM `daily_focus` focus WHERE focus.`id` = `record_audit_logs`.`entity_id`), '$.secondaryTaskId', (SELECT focus.`secondary_task_id` FROM `daily_focus` focus WHERE focus.`id` = `record_audit_logs`.`entity_id`), '$.currentTaskId', json_extract(`before_json`, '$.currentCommitmentId')), '$.currentCommitmentId', '$.commitmentIds') END,
+	`after_json` = CASE WHEN `after_json` IS NULL THEN NULL ELSE json_remove(json_set(`after_json`, '$.primaryTaskId', (SELECT focus.`primary_task_id` FROM `daily_focus` focus WHERE focus.`id` = `record_audit_logs`.`entity_id`), '$.secondaryTaskId', (SELECT focus.`secondary_task_id` FROM `daily_focus` focus WHERE focus.`id` = `record_audit_logs`.`entity_id`), '$.currentTaskId', json_extract(`after_json`, '$.currentCommitmentId')), '$.currentCommitmentId', '$.commitmentIds') END
+WHERE `entity_type` = 'DAILY_PLAN';
+--> statement-breakpoint
+UPDATE `record_audit_logs`
 SET `entity_type` = CASE `entity_type`
 	WHEN 'COMMITMENT' THEN 'TODAY_TASK'
 	WHEN 'COMMITMENT_STEP' THEN 'TODAY_TASK_STEP'

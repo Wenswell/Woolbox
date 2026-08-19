@@ -1,12 +1,13 @@
 import type {
   AuditLogPage,
-  DailyPlan,
+  DailyFocus,
   ItemInput,
   RecordEntry,
   RecordItem,
   RecordMode,
   TaskTemplate,
   TemplateWriteInput,
+  TodayState,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -58,61 +59,71 @@ export const api = {
     return request<{ template: TaskTemplate }>(`templates/${id}`, { method: "DELETE" });
   },
 
-  async dailyPlan(localDate: string): Promise<DailyPlan | null> {
-    return (await request<{ dailyPlan: DailyPlan | null }>(`daily-plans/${localDate}`)).dailyPlan;
+  async today(localDate: string): Promise<TodayState> {
+    return (await request<{ today: TodayState }>(`today/${localDate}`)).today;
   },
 
-  async createDailyPlan(input: { localDate: string; firstMove: string; primaryTemplateId: number; secondaryTemplateId: number | null }) {
-    return request<{ dailyPlan: DailyPlan }>("daily-plans", { method: "POST", body: JSON.stringify(input) });
+  async createTodayTask(input: { localDate: string; title: string; steps: Array<{ title: string }> }) {
+    return request<{ today: TodayState }>("today-tasks", { method: "POST", body: JSON.stringify(input) });
   },
 
-  async updateDailyPlan(plan: DailyPlan, input: { firstMove: string; primaryTemplateId: number; secondaryTemplateId: number | null }) {
-    return request<{ dailyPlan: DailyPlan }>(`daily-plans/${plan.localDate}`, {
+  async createTodayTaskFromTemplate(localDate: string, templateId: number) {
+    return request<{ today: TodayState }>("today-tasks/from-template", { method: "POST", body: JSON.stringify({ localDate, templateId }) });
+  },
+
+  async createTodayTaskFromTask(localDate: string, sourceTaskId: number) {
+    return request<{ today: TodayState }>("today-tasks/from-task", { method: "POST", body: JSON.stringify({ localDate, sourceTaskId }) });
+  },
+
+  async setTodayTaskCompleted(taskId: number, expectedRevision: number, completed: boolean) {
+    return todayTaskCompletion(`today-tasks/${taskId}/completion`, expectedRevision, completed);
+  },
+
+  async setTodayTaskStepCompleted(stepId: number, expectedRevision: number, completed: boolean) {
+    return todayTaskCompletion(`today-task-steps/${stepId}/completion`, expectedRevision, completed);
+  },
+
+  async createDailyFocus(input: { localDate: string; firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {
+    return request<{ dailyFocus: DailyFocus }>("daily-focus", { method: "POST", body: JSON.stringify(input) });
+  },
+
+  async updateDailyFocus(focus: DailyFocus, input: { firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {
+    return request<{ dailyFocus: DailyFocus }>(`daily-focus/${focus.localDate}`, {
       method: "PUT",
-      body: JSON.stringify({ ...input, expectedRevision: plan.revision, occurredAt: Date.now() }),
+      body: JSON.stringify({ ...input, expectedRevision: focus.revision, occurredAt: Date.now() }),
     });
   },
 
-  async startDailyPlan(plan: DailyPlan) {
-    return dailyPlanTransition(plan, "start");
+  async startDailyFocus(focus: DailyFocus) {
+    return dailyFocusTransition(focus, "start");
   },
 
-  async reviewDailyPlan(plan: DailyPlan, currentCommitmentId: number) {
-    return dailyPlanTransition(plan, "review", currentCommitmentId);
+  async reviewDailyFocus(focus: DailyFocus, currentTaskId: number) {
+    return dailyFocusTransition(focus, "review", { currentTaskId });
   },
 
-  async reviewDailyPlanNow(plan: DailyPlan, currentCommitmentId: number) {
-    return dailyPlanTransition(plan, "review-now", currentCommitmentId);
+  async reviewDailyFocusNow(focus: DailyFocus, currentTaskId: number) {
+    return dailyFocusTransition(focus, "review-now", { currentTaskId });
   },
 
-  async switchDailyPlanCommitment(plan: DailyPlan, currentCommitmentId: number) {
-    return dailyPlanTransition(plan, "switch", currentCommitmentId);
+  async switchDailyFocusTask(focus: DailyFocus, currentTaskId: number) {
+    return dailyFocusTransition(focus, "switch", { currentTaskId });
   },
 
-  async continueDailyPlan(plan: DailyPlan, currentCommitmentId: number) {
-    return dailyPlanTransition(plan, "continue", currentCommitmentId);
+  async refocusDailyFocus(focus: DailyFocus, primaryTaskId: number, secondaryTaskId: number | null) {
+    return dailyFocusTransition(focus, "refocus", { primaryTaskId, secondaryTaskId });
   },
 
-  async addDailyPlanCommitment(plan: DailyPlan, templateId: number) {
-    return request<{ dailyPlan: DailyPlan }>(`daily-plans/${plan.localDate}/commitments`, {
-      method: "POST",
-      body: JSON.stringify({ templateId, expectedRevision: plan.revision, occurredAt: Date.now() }),
-    });
+  async continueDailyFocus(focus: DailyFocus, primaryTaskId: number, secondaryTaskId: number | null) {
+    return dailyFocusTransition(focus, "continue", { primaryTaskId, secondaryTaskId });
   },
 
-  async setCommitmentStepCompleted(plan: DailyPlan, id: number, completed: boolean) {
-    return request<{ dailyPlan: DailyPlan }>(`commitment-steps/${id}/completion`, {
-      method: "PUT",
-      body: JSON.stringify({ completed, expectedRevision: plan.revision, occurredAt: Date.now() }),
-    });
+  async endDailyFocus(focus: DailyFocus) {
+    return dailyFocusTransition(focus, "end");
   },
 
-  async endDailyPlan(plan: DailyPlan) {
-    return dailyPlanTransition(plan, "end");
-  },
-
-  async resetDailyPlan(plan: DailyPlan) {
-    return dailyPlanTransition(plan, "reset");
+  async resetDailyFocus(focus: DailyFocus) {
+    return dailyFocusTransition(focus, "reset");
   },
 
   async entries(startDate: string, endDate: string, itemId?: string, mode?: RecordMode): Promise<RecordEntry[]> {
@@ -135,17 +146,24 @@ export const api = {
   },
 };
 
-function dailyPlanTransition(
-  plan: DailyPlan,
-  action: "start" | "review" | "review-now" | "switch" | "continue" | "end" | "reset",
-  currentCommitmentId?: number,
+function dailyFocusTransition(
+  focus: DailyFocus,
+  action: "start" | "review" | "review-now" | "switch" | "refocus" | "continue" | "end" | "reset",
+  fields: Record<string, unknown> = {},
 ) {
-  return request<{ dailyPlan: DailyPlan }>(`daily-plans/${plan.localDate}/${action}`, {
+  return request<{ dailyFocus: DailyFocus }>(`daily-focus/${focus.localDate}/${action}`, {
     method: "PUT",
     body: JSON.stringify({
-      expectedRevision: plan.revision,
+      expectedRevision: focus.revision,
       occurredAt: Date.now(),
-      ...(currentCommitmentId === undefined ? {} : { currentCommitmentId }),
+      ...fields,
     }),
+  });
+}
+
+function todayTaskCompletion(path: string, expectedRevision: number, completed: boolean) {
+  return request<{ today: TodayState }>(path, {
+    method: "PUT",
+    body: JSON.stringify({ completed, expectedRevision, occurredAt: Date.now() }),
   });
 }

@@ -121,7 +121,7 @@ export function TemplatesView({
       <ConfirmDialog
         open={deleting !== null}
         title="Delete template"
-        message={`Delete "${deleting?.title ?? ""}"? Existing Today commitments keep their snapshots.`}
+        message={`Delete "${deleting?.title ?? ""}"? Existing Today tasks keep their snapshots.`}
         confirmLabel="Delete template"
         danger
         busy={busy !== null}
@@ -143,14 +143,14 @@ export function TemplateForm({
 }) {
   const [title, setTitle] = useState(template?.title ?? "");
   const [cadence, setCadence] = useState<TemplateCadence>(template?.cadence ?? "MANUAL");
-  const [steps, setSteps] = useState(template?.steps.map((step) => step.title) ?? [""]);
+  const [steps, setSteps] = useState(template?.steps.map((step) => step.title) ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setTitle(template?.title ?? "");
     setCadence(template?.cadence ?? "MANUAL");
-    setSteps(template?.steps.map((step) => step.title) ?? [""]);
+    setSteps(template?.steps.map((step) => step.title) ?? []);
   }, [template]);
 
   async function submit(event: React.FormEvent) {
@@ -185,15 +185,16 @@ export function TemplateForm({
           <CadenceField value={cadence} onChange={setCadence} disabled={busy} />
         </div>
         <section className="form-section">
-          <div className="section-heading"><div><p className="eyebrow">Steps</p><h3>Commitment snapshot</h3></div><button type="button" className="secondary compact" disabled={busy} onClick={() => setSteps((current) => [...current, ""])}><Plus size={15} />Add step</button></div>
+          <div className="section-heading"><div><p className="eyebrow">Optional</p><h3>Task checklist</h3></div><button type="button" className="secondary compact" disabled={busy} onClick={() => setSteps((current) => [...current, ""])}><Plus size={15} />Add step</button></div>
           <div className="step-editor-list">
+            {steps.length === 0 && <p className="empty-state">No checklist. The task can be completed directly.</p>}
             {steps.map((step, index) => (
               <div className="template-step-row" key={index}>
                 <span className="step-index">{index + 1}</span>
                 <input aria-label={`Step ${index + 1}`} required value={step} disabled={busy} onChange={(event) => setSteps((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} />
                 <button type="button" className="icon-button" aria-label={`Move step ${index + 1} up`} title="Move up" disabled={busy || index === 0} onClick={() => moveStep(index, -1)}><ArrowUp size={16} /></button>
                 <button type="button" className="icon-button" aria-label={`Move step ${index + 1} down`} title="Move down" disabled={busy || index === steps.length - 1} onClick={() => moveStep(index, 1)}><ArrowDown size={16} /></button>
-                <button type="button" className="icon-button danger-icon" aria-label={`Remove step ${index + 1}`} title="Remove step" disabled={busy || steps.length === 1} onClick={() => setSteps((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /></button>
+                <button type="button" className="icon-button danger-icon" aria-label={`Remove step ${index + 1}`} title="Remove step" disabled={busy} onClick={() => setSteps((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={16} /></button>
               </div>
             ))}
           </div>

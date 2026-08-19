@@ -3,7 +3,7 @@ import { Activity, CalendarCheck, ClipboardList, LayoutDashboard, ListTodo, Refr
 import { api } from "./api";
 import { Toast } from "./components/Toast";
 import { localToday, message, shiftLocalDate } from "./lib/format";
-import type { DailyPlan, RecordAuditLog, RecordEntry, RecordItem, TaskTemplate } from "./types";
+import type { RecordAuditLog, RecordEntry, RecordItem, TaskTemplate, TodayState } from "./types";
 import { AuditLogView } from "./views/AuditLogView";
 import { EntriesView, type EntryFilters } from "./views/EntriesView";
 import { OverviewView } from "./views/OverviewView";
@@ -14,8 +14,8 @@ import { TodayView } from "./views/TodayView";
 type View = "overview" | "today" | "templates" | "accumulate" | "measurement" | "entries" | "activity";
 const VIEWS: Record<View, { label: string; description: string }> = {
   overview: { label: "Overview", description: "Records status and recent work" },
-  today: { label: "Today", description: "Daily commitments and hourly review" },
-  templates: { label: "Templates", description: "Reusable commitment definitions and ordered steps" },
+  today: { label: "Today", description: "Daily tasks and focused hourly review" },
+  templates: { label: "Templates", description: "Reusable task definitions and daily recommendations" },
   accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },
   measurement: { label: "Measurement", description: "Bounded numerical measurements" },
   entries: { label: "Entries", description: "Recorded values across every tracker" },
@@ -34,7 +34,7 @@ export function App() {
   const [activeTemplates, setActiveTemplates] = useState<TaskTemplate[]>([]);
   const [archivedTemplates, setArchivedTemplates] = useState<TaskTemplate[]>([]);
   const [todayDate, setTodayDate] = useState(localToday);
-  const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
+  const [todayState, setTodayState] = useState<TodayState | null>(null);
   const [entries, setEntries] = useState<RecordEntry[]>([]);
   const [logs, setLogs] = useState<RecordAuditLog[]>([]);
   const [nextLogId, setNextLogId] = useState<number | null>(null);
@@ -63,7 +63,7 @@ export function App() {
         api.items(true),
         api.templates(false),
         api.templates(true),
-        api.dailyPlan(todayDate),
+        api.today(todayDate),
         api.entries(filters.startDate, filters.endDate, filters.itemId, filters.mode || undefined),
         api.auditLogs(),
       ]);
@@ -71,7 +71,7 @@ export function App() {
       setArchivedItems(archived);
       setActiveTemplates(activeTemplateList);
       setArchivedTemplates(archivedTemplateList);
-      setDailyPlan(plan);
+      setTodayState(plan);
       setEntries(entryList);
       setLogs(auditPage.logs);
       setNextLogId(auditPage.nextBeforeId);
@@ -100,7 +100,7 @@ export function App() {
 
   function changeTodayDate(value: string) {
     setLoading(true);
-    setDailyPlan(null);
+    setTodayState(null);
     setTodayDate(value);
   }
 
@@ -134,7 +134,7 @@ export function App() {
 
         <main className="page-content">
           {view === "overview" && <OverviewView templates={activeTemplates} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
-          {view === "today" && <TodayView localDate={todayDate} plan={dailyPlan} templates={activeTemplates} loading={loading} onDateChange={changeTodayDate} onChanged={changed} onRefresh={refresh} />}
+          {view === "today" && <TodayView localDate={todayDate} today={todayState} templates={activeTemplates} loading={loading} onDateChange={changeTodayDate} onChanged={changed} onRefresh={refresh} />}
           {view === "templates" && <TemplatesView templates={allTemplates} loading={loading} onChanged={changed} onError={setError} />}
           {view === "accumulate" && <RecordItemsView mode="ACCUMULATE" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "measurement" && <RecordItemsView mode="MEASUREMENT" items={allItems} loading={loading} onChanged={changed} onError={setError} />}

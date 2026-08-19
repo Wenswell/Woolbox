@@ -127,10 +127,13 @@ describe("Records migrations", () => {
 
     const migrated = new Database(databaseFile, { readonly: true });
     expect(tableNames(migrated)).not.toEqual(expect.arrayContaining(["daily_plans", "today_commitments", "today_commitment_steps"]));
-    expect(migrated.prepare("SELECT action, entity_type FROM record_audit_logs ORDER BY id").all()).toEqual([
+    const audits = migrated.prepare("SELECT action, entity_type, after_json FROM record_audit_logs ORDER BY id").all() as Array<{ action: string; entity_type: string; after_json: string }>;
+    expect(audits.map(({ action, entity_type }) => ({ action, entity_type }))).toEqual([
       { action: "TODAY_TASK_CREATED", entity_type: "TODAY_TASK" },
       { action: "FOCUS_UPDATED", entity_type: "FOCUS" },
     ]);
+    expect(JSON.parse(audits[0]!.after_json)).toMatchObject({ localDate: "2026-08-18", sourceTaskId: null });
+    expect(JSON.parse(audits[1]!.after_json)).toMatchObject({ primaryTaskId: 2, secondaryTaskId: 1 });
     migrated.close();
   });
 });

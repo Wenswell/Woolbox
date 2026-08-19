@@ -1,11 +1,11 @@
 import type {
-  CommitmentAuditSnapshot,
-  CommitmentStepAuditSnapshot,
-  DailyPlanAuditSnapshot,
+  DailyFocusAuditSnapshot,
   EntryAuditSnapshot,
   ItemAuditSnapshot,
   RecordAuditLog,
   TemplateAuditSnapshot,
+  TodayTaskAuditSnapshot,
+  TodayTaskStepAuditSnapshot,
 } from "../types";
 import { minute } from "./format";
 
@@ -15,9 +15,9 @@ export function auditSubject(log: RecordAuditLog): string {
   if (log.entityType === "ITEM" && isItemSnapshot(snapshot)) return `Record item: ${snapshot.name}`;
   if (log.entityType === "ENTRY" && isEntrySnapshot(snapshot)) return `Entry: ${snapshot.itemName}`;
   if (log.entityType === "TEMPLATE" && isTemplateSnapshot(snapshot)) return `Template: ${snapshot.title}`;
-  if (log.entityType === "COMMITMENT" && isCommitmentSnapshot(snapshot)) return `Commitment: ${snapshot.title}`;
-  if (log.entityType === "COMMITMENT_STEP" && isCommitmentStepSnapshot(snapshot)) return `Step: ${snapshot.commitmentTitle}`;
-  if (log.entityType === "DAILY_PLAN" && isDailyPlanSnapshot(snapshot)) return `Daily plan: ${snapshot.localDate}`;
+  if (log.entityType === "TODAY_TASK" && isTodayTaskSnapshot(snapshot)) return `Today task: ${snapshot.title}`;
+  if (log.entityType === "TODAY_TASK_STEP" && isTodayTaskStepSnapshot(snapshot)) return `Step: ${snapshot.taskTitle}`;
+  if (log.entityType === "FOCUS" && isDailyFocusSnapshot(snapshot)) return `Focus: ${snapshot.localDate}`;
   return `${log.entityType} #${log.entityId}`;
 }
 
@@ -35,14 +35,14 @@ export function actionLabel(action: RecordAuditLog["action"]): string {
     TEMPLATE_ARCHIVED: "Archived template",
     TEMPLATE_RESTORED: "Restored template",
     TEMPLATE_DELETED: "Deleted template",
-    COMMITMENT_CREATED: "Added commitment",
-    COMMITMENT_COMPLETED: "Completed commitment",
-    COMMITMENT_REOPENED: "Reopened commitment",
-    COMMITMENT_STEP_COMPLETED: "Completed step",
-    COMMITMENT_STEP_REOPENED: "Reopened step",
-    DAILY_PLAN_CREATED: "Created daily plan",
-    DAILY_PLAN_UPDATED: "Updated daily plan",
-    DAILY_PLAN_ENDED: "Ended daily plan",
+    TODAY_TASK_CREATED: "Added Today task",
+    TODAY_TASK_COMPLETED: "Completed task",
+    TODAY_TASK_REOPENED: "Reopened task",
+    TODAY_TASK_STEP_COMPLETED: "Completed step",
+    TODAY_TASK_STEP_REOPENED: "Reopened step",
+    FOCUS_CREATED: "Created Focus",
+    FOCUS_UPDATED: "Updated Focus",
+    FOCUS_ENDED: "Ended Focus",
   }[action];
 }
 
@@ -77,25 +77,26 @@ export function auditChanges(log: RecordAuditLog): string {
   }
   if (log.action === "ITEM_ARCHIVED" || log.action === "TEMPLATE_ARCHIVED") return "Status: Active to Archived";
   if (log.action === "ITEM_RESTORED" || log.action === "TEMPLATE_RESTORED") return "Status: Archived to Active";
-  if (log.entityType === "COMMITMENT" && isCommitmentSnapshot(after ?? before)) {
-    const commitment = (after ?? before) as CommitmentAuditSnapshot;
-    return `${commitment.title}; ${commitment.steps.length} steps; ${commitment.completedAt === null ? "Open" : "Completed"}`;
+  if (log.entityType === "TODAY_TASK" && isTodayTaskSnapshot(after ?? before)) {
+    const task = (after ?? before) as TodayTaskAuditSnapshot;
+    return `${task.title}; ${task.steps.length} steps; ${task.completedAt === null ? "Open" : "Completed"}`;
   }
-  if (log.entityType === "COMMITMENT_STEP" && isCommitmentStepSnapshot(after ?? before)) {
-    const step = (after ?? before) as CommitmentStepAuditSnapshot;
-    return `${step.commitmentTitle}; ${step.title}; ${step.completedAt === null ? "Open" : "Completed"}`;
+  if (log.entityType === "TODAY_TASK_STEP" && isTodayTaskStepSnapshot(after ?? before)) {
+    const step = (after ?? before) as TodayTaskStepAuditSnapshot;
+    return `${step.taskTitle}; ${step.title}; ${step.completedAt === null ? "Open" : "Completed"}`;
   }
-  if (log.action === "DAILY_PLAN_CREATED" && isDailyPlanSnapshot(after)) return dailyPlanDescription(after);
-  if (log.action === "DAILY_PLAN_ENDED" && isDailyPlanSnapshot(after)) return `Status: ${after.state}`;
-  if (log.action === "DAILY_PLAN_UPDATED" && isDailyPlanSnapshot(before) && isDailyPlanSnapshot(after)) {
+  if (log.action === "FOCUS_CREATED" && isDailyFocusSnapshot(after)) return dailyFocusDescription(after);
+  if (log.action === "FOCUS_ENDED" && isDailyFocusSnapshot(after)) return `Status: ${after.state}`;
+  if (log.action === "FOCUS_UPDATED" && isDailyFocusSnapshot(before) && isDailyFocusSnapshot(after)) {
     return [
       fieldChange("First move", before.firstMove, after.firstMove),
-      fieldChange("Current commitment", before.currentCommitmentId, after.currentCommitmentId),
+      fieldChange("Primary task", before.primaryTaskId, after.primaryTaskId),
+      fieldChange("Secondary task", before.secondaryTaskId, after.secondaryTaskId),
+      fieldChange("Current task", before.currentTaskId, after.currentTaskId),
       fieldChange("Status", before.state, after.state),
       fieldChange("Pause reason", before.pauseReason, after.pauseReason),
       fieldChange("Completed rounds", before.completedRounds, after.completedRounds),
       fieldChange("Next review", before.nextReviewAt, after.nextReviewAt),
-      fieldChange("Commitments", before.commitmentIds.join(", "), after.commitmentIds.join(", ")),
     ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
   }
   if (isItemSnapshot(before) && isItemSnapshot(after)) {
@@ -130,8 +131,8 @@ function templateDescription(template: TemplateAuditSnapshot): string {
   return `${template.title}; ${template.cadence === "DAILY" ? "Daily" : "Manual"}; ${template.steps.length} steps`;
 }
 
-function dailyPlanDescription(plan: DailyPlanAuditSnapshot): string {
-  return `${plan.localDate}; first move: ${plan.firstMove}; ${plan.commitmentIds.length} commitments`;
+function dailyFocusDescription(focus: DailyFocusAuditSnapshot): string {
+  return `${focus.localDate}; first move: ${focus.firstMove}; primary task #${focus.primaryTaskId}`;
 }
 
 function isItemSnapshot(snapshot: unknown): snapshot is ItemAuditSnapshot {
@@ -146,16 +147,16 @@ function isTemplateSnapshot(snapshot: unknown): snapshot is TemplateAuditSnapsho
   return isObject(snapshot) && "title" in snapshot && "cadence" in snapshot && "archived" in snapshot;
 }
 
-function isCommitmentSnapshot(snapshot: unknown): snapshot is CommitmentAuditSnapshot {
-  return isObject(snapshot) && "title" in snapshot && "role" in snapshot;
+function isTodayTaskSnapshot(snapshot: unknown): snapshot is TodayTaskAuditSnapshot {
+  return isObject(snapshot) && "title" in snapshot && "localDate" in snapshot && "steps" in snapshot;
 }
 
-function isCommitmentStepSnapshot(snapshot: unknown): snapshot is CommitmentStepAuditSnapshot {
-  return isObject(snapshot) && "commitmentTitle" in snapshot;
+function isTodayTaskStepSnapshot(snapshot: unknown): snapshot is TodayTaskStepAuditSnapshot {
+  return isObject(snapshot) && "taskTitle" in snapshot;
 }
 
-function isDailyPlanSnapshot(snapshot: unknown): snapshot is DailyPlanAuditSnapshot {
-  return isObject(snapshot) && "localDate" in snapshot && "firstMove" in snapshot;
+function isDailyFocusSnapshot(snapshot: unknown): snapshot is DailyFocusAuditSnapshot {
+  return isObject(snapshot) && "localDate" in snapshot && "firstMove" in snapshot && "primaryTaskId" in snapshot;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
