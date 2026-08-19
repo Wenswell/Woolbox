@@ -7,8 +7,8 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.wswensw.woolbox.record.model.DailyPlan
-import com.wswensw.woolbox.record.model.DailyPlanState
+import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyFocusState
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
@@ -18,10 +18,10 @@ data class DailyReminderSpec(
     val nextReviewAt: Long,
 )
 
-fun dailyReminderSpec(plan: DailyPlan?, today: LocalDate): DailyReminderSpec? {
-    if (plan?.state != DailyPlanState.ACTIVE || plan.localDate != today) return null
-    val nextReviewAt = plan.nextReviewAt ?: return null
-    return DailyReminderSpec(plan.localDate.toString(), plan.revision, nextReviewAt)
+fun dailyReminderSpec(focus: DailyFocus?, today: LocalDate): DailyReminderSpec? {
+    if (focus?.state != DailyFocusState.ACTIVE || focus.localDate != today) return null
+    val nextReviewAt = focus.nextReviewAt ?: return null
+    return DailyReminderSpec(focus.localDate.toString(), focus.revision, nextReviewAt)
 }
 
 class DailyReminderScheduler(context: Context) {
@@ -29,8 +29,8 @@ class DailyReminderScheduler(context: Context) {
     private val workManager = WorkManager.getInstance(applicationContext)
     private val deliveryStore = DailyReminderDeliveryStore(applicationContext)
 
-    fun reconcile(plan: DailyPlan?, now: Long = System.currentTimeMillis(), today: LocalDate = LocalDate.now()) {
-        val spec = dailyReminderSpec(plan, today)
+    fun reconcile(focus: DailyFocus?, now: Long = System.currentTimeMillis(), today: LocalDate = LocalDate.now()) {
+        val spec = dailyReminderSpec(focus, today)
         if (spec == null) {
             workManager.cancelUniqueWork(UNIQUE_WORK)
             DailyReminderNotifications.cancelReview(applicationContext)

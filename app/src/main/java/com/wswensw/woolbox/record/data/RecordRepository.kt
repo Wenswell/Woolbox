@@ -5,10 +5,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.wswensw.woolbox.record.model.GoalPeriod
-import com.wswensw.woolbox.record.model.CommitmentRole
-import com.wswensw.woolbox.record.model.DailyPlan
-import com.wswensw.woolbox.record.model.DailyPlanPauseReason
-import com.wswensw.woolbox.record.model.DailyPlanState
+import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyFocusPauseReason
+import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
@@ -18,8 +17,8 @@ import com.wswensw.woolbox.record.model.RecordValueType
 import com.wswensw.woolbox.record.model.TaskTemplate
 import com.wswensw.woolbox.record.model.TaskTemplateStep
 import com.wswensw.woolbox.record.model.TemplateCadence
-import com.wswensw.woolbox.record.model.TodayCommitment
-import com.wswensw.woolbox.record.model.TodayCommitmentStep
+import com.wswensw.woolbox.record.model.TodayTask
+import com.wswensw.woolbox.record.model.TodayTaskStep
 import com.wswensw.woolbox.record.model.goalValues
 import com.wswensw.woolbox.record.model.itemRecentDayValues
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
@@ -63,7 +62,10 @@ data class RecordsSnapshot(
     val entries: List<RecordEntry>,
     val latestEntries: Map<Long, RecordEntry>,
     val templates: List<TaskTemplate>,
-    val dailyPlan: DailyPlan?,
+    val dailySuggestions: List<TaskTemplate>,
+    val unfinishedTasks: List<TodayTask>,
+    val todayTasks: List<TodayTask>,
+    val dailyFocus: DailyFocus?,
     val goalValues: Map<Long, Double>,
     val recentDayValues: Map<Long, List<Double>>,
 )
@@ -98,7 +100,10 @@ class RecordRepository(context: Context) {
             .mapObjects(::parseEntry)
             .associateBy(RecordEntry::itemId),
             templates = overview.getJSONArray("templates").mapObjects(::parseTemplate),
-            dailyPlan = overview.nullableObject("dailyPlan")?.let(::parseDailyPlan),
+            dailySuggestions = overview.getJSONArray("dailySuggestions").mapObjects(::parseTemplate),
+            unfinishedTasks = overview.getJSONArray("unfinishedTasks").mapObjects(::parseTodayTask),
+            todayTasks = overview.getJSONArray("todayTasks").mapObjects(::parseTodayTask),
+            dailyFocus = overview.nullableObject("dailyFocus")?.let(::parseDailyFocus),
             goalValues = goalValues(activeItems, date, todayEntries, rangeEntries),
             recentDayValues = itemRecentDayValues(
                 itemIds = activeItems
@@ -166,9 +171,6 @@ class RecordRepository(context: Context) {
         cadence: TemplateCadence,
         steps: List<TemplateStepDraft>,
     ): Long = withContext(Dispatchers.IO) {
-        if (steps.isEmpty()) {
-            throw RecordValidationException("At least one subtask is required.")
-        }
         request(
             if (templateId == null) "POST" else "PUT",
             if (templateId == null) "templates" else "templates/$templateId",
@@ -193,107 +195,169 @@ class RecordRepository(context: Context) {
         Unit
     }
 
-    suspend fun createDailyPlan(
+    suspend fun createTodayTask(
         localDate: LocalDate,
-        firstMove: String,
-        primaryTemplateId: Long,
-        secondaryTemplateId: Long?,
+        title: String,
+        steps: List<TemplateStepDraft>,
     ) = withContext(Dispatchers.IO) {
         request(
             "POST",
-            "daily-plans",
+            "today-tasks",
+            body = JSONObject()
+                .put("localDate", localDate.toString())
+                .put("title", validatedTemplateTitle(title))
+                .put("steps", JSONArray(steps.map(::templateStepJson))),
+        )
+        Unit
+    }
+
+    suspend fun createTodayTaskFromTemplate(localDate: LocalDate, templateId: Long) =
+        withContext(Dispatchers.IO) {
+            request(
+                "POST",
+                "today-tasks/from-template",
+                body = JSONObject().put("localDate", localDate.toString()).put("templateId", templateId),
+            )
+            Unit
+        }
+
+    suspend fun createTodayTaskFromTask(localDate: LocalDate, sourceTaskId: Long) =
+        withContext(Dispatchers.IO) {
+            request(
+                "POST",
+                "today-tasks/from-task",
+                body = JSONObject().put("localDate", localDate.toString()).put("sourceTaskId", sourceTaskId),
+            )
+            Unit
+        }
+
+    suspend fun createDailyFocus(
+        localDate: LocalDate,
+        firstMove: String,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+    ) = withContext(Dispatchers.IO) {
+        request(
+            "POST",
+            "daily-focus",
             body = JSONObject().apply {
                 put("localDate", localDate.toString())
                 put("firstMove", validatedFirstMove(firstMove))
-                put("primaryTemplateId", primaryTemplateId)
-                putNullable("secondaryTemplateId", secondaryTemplateId)
+                put("primaryTaskId", primaryTaskId)
+                putNullable("secondaryTaskId", secondaryTaskId)
             },
         )
         Unit
     }
 
-    suspend fun getDailyPlan(localDate: LocalDate): DailyPlan? = withContext(Dispatchers.IO) {
-        request("GET", "daily-plans/$localDate")
-            .nullableObject("dailyPlan")
-            ?.let(::parseDailyPlan)
+    suspend fun getDailyFocus(localDate: LocalDate): DailyFocus? = withContext(Dispatchers.IO) {
+        request("GET", "today/$localDate").getJSONObject("today")
+            .nullableObject("dailyFocus")?.let(::parseDailyFocus)
     }
 
-    suspend fun updateDailyPlan(
-        plan: DailyPlan,
+    suspend fun updateDailyFocus(
+        focus: DailyFocus,
         firstMove: String,
-        primaryTemplateId: Long,
-        secondaryTemplateId: Long?,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
         occurredAt: Long,
-    ) = dailyPlanWrite(
-        plan = plan,
+    ) = dailyFocusWrite(
+        focus = focus,
         suffix = "",
         body = JSONObject().apply {
             put("firstMove", validatedFirstMove(firstMove))
-            put("primaryTemplateId", primaryTemplateId)
-            putNullable("secondaryTemplateId", secondaryTemplateId)
+            put("primaryTaskId", primaryTaskId)
+            putNullable("secondaryTaskId", secondaryTaskId)
             put("occurredAt", occurredAt)
         },
     )
 
-    suspend fun startDailyPlan(plan: DailyPlan, occurredAt: Long) =
-        dailyPlanTransition(plan, "start", occurredAt)
+    suspend fun startDailyFocus(focus: DailyFocus, occurredAt: Long) =
+        dailyFocusTransition(focus, "start", occurredAt)
 
-    suspend fun reviewDailyPlan(plan: DailyPlan, currentCommitmentId: Long, occurredAt: Long) =
-        dailyPlanTransition(plan, "review", occurredAt, currentCommitmentId)
+    suspend fun reviewDailyFocus(focus: DailyFocus, currentTaskId: Long, occurredAt: Long) =
+        dailyFocusTransition(focus, "review", occurredAt, JSONObject().put("currentTaskId", currentTaskId))
 
-    suspend fun continueDailyPlan(plan: DailyPlan, currentCommitmentId: Long, occurredAt: Long) =
-        dailyPlanTransition(plan, "continue", occurredAt, currentCommitmentId)
-
-    suspend fun addDailyPlanCommitment(plan: DailyPlan, templateId: Long, occurredAt: Long) =
-        dailyPlanWrite(
-            plan = plan,
-            method = "POST",
-            suffix = "/commitments",
-            body = JSONObject()
-                .put("templateId", templateId)
-                .put("occurredAt", occurredAt),
-        )
-
-    suspend fun endDailyPlan(plan: DailyPlan, occurredAt: Long) =
-        dailyPlanTransition(plan, "end", occurredAt)
-
-    private suspend fun dailyPlanTransition(
-        plan: DailyPlan,
-        suffix: String,
+    suspend fun refocusDailyFocus(
+        focus: DailyFocus,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
         occurredAt: Long,
-        currentCommitmentId: Long? = null,
-    ) = dailyPlanWrite(
-        plan = plan,
-        suffix = "/$suffix",
-        body = JSONObject()
-            .put("occurredAt", occurredAt)
-            .apply { currentCommitmentId?.let { put("currentCommitmentId", it) } },
+    ) = dailyFocusSelection(focus, "refocus", primaryTaskId, secondaryTaskId, occurredAt)
+
+    suspend fun continueDailyFocus(
+        focus: DailyFocus,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+        occurredAt: Long,
+    ) = dailyFocusSelection(focus, "continue", primaryTaskId, secondaryTaskId, occurredAt)
+
+    suspend fun endDailyFocus(focus: DailyFocus, occurredAt: Long) =
+        dailyFocusTransition(focus, "end", occurredAt)
+
+    private suspend fun dailyFocusSelection(
+        focus: DailyFocus,
+        suffix: String,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+        occurredAt: Long,
+    ) = dailyFocusTransition(
+        focus = focus,
+        suffix = suffix,
+        occurredAt = occurredAt,
+        fields = JSONObject().apply {
+            put("primaryTaskId", primaryTaskId)
+            putNullable("secondaryTaskId", secondaryTaskId)
+        },
     )
 
-    private suspend fun dailyPlanWrite(
-        plan: DailyPlan,
+    private suspend fun dailyFocusTransition(
+        focus: DailyFocus,
+        suffix: String,
+        occurredAt: Long,
+        fields: JSONObject = JSONObject(),
+    ) = dailyFocusWrite(
+        focus = focus,
+        suffix = "/$suffix",
+        body = fields.put("occurredAt", occurredAt),
+    )
+
+    private suspend fun dailyFocusWrite(
+        focus: DailyFocus,
         suffix: String,
         body: JSONObject,
-        method: String = "PUT",
     ) =
         withContext(Dispatchers.IO) {
-            body.put("expectedRevision", plan.revision)
-            request(method, "daily-plans/${plan.localDate}$suffix", body = body)
+            body.put("expectedRevision", focus.revision)
+            request("PUT", "daily-focus/${focus.localDate}$suffix", body = body)
             Unit
         }
 
-    suspend fun setCommitmentStepCompleted(
-        plan: DailyPlan,
+    suspend fun setTodayTaskCompleted(
+        task: TodayTask,
+        completed: Boolean,
+        occurredAt: Long,
+    ) = todayTaskCompletion("today-tasks/${task.id}/completion", task, completed, occurredAt)
+
+    suspend fun setTodayTaskStepCompleted(
+        task: TodayTask,
         stepId: Long,
+        completed: Boolean,
+        occurredAt: Long,
+    ) = todayTaskCompletion("today-task-steps/$stepId/completion", task, completed, occurredAt)
+
+    private suspend fun todayTaskCompletion(
+        path: String,
+        task: TodayTask,
         completed: Boolean,
         occurredAt: Long,
     ) = withContext(Dispatchers.IO) {
         request(
             "PUT",
-            "commitment-steps/$stepId/completion",
+            path,
             body = JSONObject()
                 .put("completed", completed)
-                .put("expectedRevision", plan.revision)
+                .put("expectedRevision", task.revision)
                 .put("occurredAt", occurredAt),
         )
         Unit
@@ -410,21 +474,22 @@ private fun parseTemplate(value: JSONObject) = TaskTemplate(
     steps = value.getJSONArray("steps").mapObjects(::parseTemplateStep),
 )
 
-internal fun parseDailyPlan(value: JSONObject) = DailyPlan(
+internal fun parseDailyFocus(value: JSONObject) = DailyFocus(
     id = value.getLong("id"),
     localDate = LocalDate.parse(value.getString("localDate")),
     firstMove = value.getString("firstMove"),
     firstMoveCompletedAt = value.nullableLong("firstMoveCompletedAt"),
-    currentCommitmentId = value.nullableLong("currentCommitmentId"),
-    state = DailyPlanState.valueOf(value.getString("state")),
-    pauseReason = value.nullableString("pauseReason")?.let(DailyPlanPauseReason::valueOf),
+    primaryTaskId = value.getLong("primaryTaskId"),
+    secondaryTaskId = value.nullableLong("secondaryTaskId"),
+    currentTaskId = value.nullableLong("currentTaskId"),
+    state = DailyFocusState.valueOf(value.getString("state")),
+    pauseReason = value.nullableString("pauseReason")?.let(DailyFocusPauseReason::valueOf),
     completedRounds = value.getInt("completedRounds"),
     nextReviewAt = value.nullableLong("nextReviewAt"),
     revision = value.getInt("revision"),
     endedAt = value.nullableLong("endedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
-    commitments = value.getJSONArray("commitments").mapObjects(::parseCommitment),
 )
 
 private fun parseTemplateStep(value: JSONObject) = TaskTemplateStep(
@@ -436,23 +501,23 @@ private fun parseTemplateStep(value: JSONObject) = TaskTemplateStep(
     updatedAt = value.getLong("updatedAt"),
 )
 
-private fun parseCommitment(value: JSONObject) = TodayCommitment(
+private fun parseTodayTask(value: JSONObject) = TodayTask(
     id = value.getLong("id"),
-    planId = value.getLong("planId"),
+    localDate = LocalDate.parse(value.getString("localDate")),
     templateId = value.nullableLong("templateId"),
-    role = CommitmentRole.valueOf(value.getString("role")),
+    sourceTaskId = value.nullableLong("sourceTaskId"),
     position = value.getInt("position"),
     title = value.getString("title"),
-    cadence = TemplateCadence.valueOf(value.getString("cadence")),
     completedAt = value.nullableLong("completedAt"),
+    revision = value.getInt("revision"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
-    steps = value.getJSONArray("steps").mapObjects(::parseCommitmentStep),
+    steps = value.getJSONArray("steps").mapObjects(::parseTodayTaskStep),
 )
 
-private fun parseCommitmentStep(value: JSONObject) = TodayCommitmentStep(
+private fun parseTodayTaskStep(value: JSONObject) = TodayTaskStep(
     id = value.getLong("id"),
-    commitmentId = value.getLong("commitmentId"),
+    taskId = value.getLong("taskId"),
     title = value.getString("title"),
     position = value.getInt("position"),
     completedAt = value.nullableLong("completedAt"),

@@ -14,10 +14,13 @@ import com.wswensw.woolbox.record.data.TemplateStepDraft
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
-import com.wswensw.woolbox.record.model.DailyPlan
+import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyFocusPauseReason
+import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.TaskTemplate
 import com.wswensw.woolbox.record.model.TemplateCadence
+import com.wswensw.woolbox.record.model.TodayTask
 import com.wswensw.woolbox.record.reminder.DailyReminderScheduler
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -37,7 +40,10 @@ data class RecordsUiState(
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val templates: List<TaskTemplate> = emptyList(),
-    val dailyPlan: DailyPlan? = null,
+    val dailySuggestions: List<TaskTemplate> = emptyList(),
+    val unfinishedTasks: List<TodayTask> = emptyList(),
+    val todayTasks: List<TodayTask> = emptyList(),
+    val dailyFocus: DailyFocus? = null,
     val goalValues: Map<Long, Double> = emptyMap(),
     val recentDayValues: Map<Long, List<Double>> = emptyMap(),
     val error: String? = null,
@@ -120,7 +126,7 @@ class RecordsViewModel(
             .onFailure { error.value = it.localizedFailure(R.string.records_load_failed) }
             .onSuccess {
                 error.value = null
-                reminderScheduler.reconcile(repository.snapshot.value?.dailyPlan)
+                reminderScheduler.reconcile(repository.snapshot.value?.dailyFocus)
             }
     }
 
@@ -131,7 +137,10 @@ class RecordsViewModel(
             entries = entries,
             latestEntries = latestEntries,
             templates = templates,
-            dailyPlan = dailyPlan,
+            dailySuggestions = dailySuggestions,
+            unfinishedTasks = unfinishedTasks,
+            todayTasks = todayTasks,
+            dailyFocus = dailyFocus,
             goalValues = goalValues,
             recentDayValues = recentDayValues,
         )
@@ -236,62 +245,90 @@ class RecordsViewModel(
         repository.archiveTemplate(templateId)
     }
 
-    fun saveDailyPlan(
-        existing: DailyPlan?,
-        firstMove: String,
-        primaryTemplateId: Long,
-        secondaryTemplateId: Long?,
+    fun createTodayTask(
+        title: String,
+        steps: List<TemplateStepDraft>,
         onResult: (String?) -> Unit,
-    ) = runRecordsAction(onResult, R.string.daily_plan_save_failed) {
-        if (existing == null) {
-            repository.createDailyPlan(LocalDate.now(), firstMove, primaryTemplateId, secondaryTemplateId)
-        } else {
-            repository.updateDailyPlan(
-                existing,
-                firstMove,
-                primaryTemplateId,
-                secondaryTemplateId,
-                System.currentTimeMillis(),
+    ) = runRecordsAction(onResult, R.string.today_task_add_failed) {
+        repository.createTodayTask(LocalDate.now(), title, steps)
+    }
+
+    fun createTodayTaskFromTemplate(templateId: Long, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.today_task_add_failed) {
+            repository.createTodayTaskFromTemplate(LocalDate.now(), templateId)
+        }
+
+    fun createTodayTaskFromTask(sourceTaskId: Long, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.today_task_add_failed) {
+            repository.createTodayTaskFromTask(LocalDate.now(), sourceTaskId)
+        }
+
+    fun saveDailyFocus(
+        existing: DailyFocus?,
+        firstMove: String,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+        onResult: (String?) -> Unit,
+    ) = runRecordsAction(onResult, R.string.daily_focus_save_failed) {
+        when {
+            existing == null -> repository.createDailyFocus(
+                LocalDate.now(), firstMove, primaryTaskId, secondaryTaskId,
             )
+            existing.state == DailyFocusState.READY -> repository.updateDailyFocus(
+                existing, firstMove, primaryTaskId, secondaryTaskId, System.currentTimeMillis(),
+            )
+            else -> error("Only a ready Focus can be edited.")
         }
     }
 
-    fun startDailyPlan(plan: DailyPlan, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_plan_start_failed) {
-            repository.startDailyPlan(plan, System.currentTimeMillis())
+    fun resumeDailyFocus(
+        focus: DailyFocus,
+        primaryTaskId: Long,
+        secondaryTaskId: Long?,
+        onResult: (String?) -> Unit,
+    ) = runRecordsAction(onResult, R.string.daily_focus_save_failed) {
+        when (focus.pauseReason) {
+            DailyFocusPauseReason.FOCUS_CLEARED -> repository.refocusDailyFocus(
+                focus, primaryTaskId, secondaryTaskId, System.currentTimeMillis(),
+            )
+            DailyFocusPauseReason.TARGET_REACHED -> repository.continueDailyFocus(
+                focus, primaryTaskId, secondaryTaskId, System.currentTimeMillis(),
+            )
+            null -> error("Paused Focus reason is required.")
+        }
+    }
+
+    fun startDailyFocus(focus: DailyFocus, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.daily_focus_start_failed) {
+            repository.startDailyFocus(focus, System.currentTimeMillis())
         }
 
-    fun reviewDailyPlan(plan: DailyPlan, commitmentId: Long, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_plan_review_failed) {
-            repository.reviewDailyPlan(plan, commitmentId, System.currentTimeMillis())
+    fun reviewDailyFocus(focus: DailyFocus, taskId: Long, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.daily_focus_review_failed) {
+            repository.reviewDailyFocus(focus, taskId, System.currentTimeMillis())
         }
 
-    fun continueDailyPlan(plan: DailyPlan, commitmentId: Long, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_plan_review_failed) {
-            repository.continueDailyPlan(plan, commitmentId, System.currentTimeMillis())
+    fun endDailyFocus(focus: DailyFocus, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.daily_focus_end_failed) {
+            repository.endDailyFocus(focus, System.currentTimeMillis())
         }
 
-    fun addDailyPlanCommitment(plan: DailyPlan, templateId: Long, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_plan_add_commitment_failed) {
-            repository.addDailyPlanCommitment(plan, templateId, System.currentTimeMillis())
-        }
+    fun setTodayTaskCompleted(
+        task: TodayTask,
+        completed: Boolean,
+        onResult: (String?) -> Unit,
+    ) = runRecordsAction(onResult, R.string.today_task_update_failed) {
+        repository.setTodayTaskCompleted(task, completed, System.currentTimeMillis())
+    }
 
-    fun endDailyPlan(plan: DailyPlan, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_plan_end_failed) {
-            repository.endDailyPlan(plan, System.currentTimeMillis())
-        }
-
-    fun setCommitmentStepCompleted(
-        plan: DailyPlan,
+    fun setTodayTaskStepCompleted(
+        task: TodayTask,
         stepId: Long,
         completed: Boolean,
         onResult: (String?) -> Unit,
-    ) = runRecordsAction(
-        onResult = onResult,
-        failureMessageRes = R.string.commitment_step_update_failed,
-    ) {
-        repository.setCommitmentStepCompleted(
-            plan = plan,
+    ) = runRecordsAction(onResult, R.string.today_task_update_failed) {
+        repository.setTodayTaskStepCompleted(
+            task = task,
             stepId = stepId,
             completed = completed,
             occurredAt = System.currentTimeMillis(),

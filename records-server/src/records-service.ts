@@ -618,7 +618,7 @@ export class RecordsService {
   startDailyFocus(localDate: string, input: DailyFocusTransitionInput) {
     return this.transitionDailyFocus(localDate, input, (tx, focus) => {
       if (focus.state !== "READY") throw new ApiError(409, "Only ready Focus can start.");
-      this.requireOpenTodayTask(tx, localDate, focus.primaryTaskId);
+      this.requireFocusSelection(tx, localDate, focus.primaryTaskId, focus.secondaryTaskId);
       return {
         firstMoveCompletedAt: input.occurredAt,
         currentTaskId: focus.primaryTaskId,

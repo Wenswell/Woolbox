@@ -66,10 +66,10 @@ import com.wswensw.woolbox.record.ui.ManageRecordsScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
-import com.wswensw.woolbox.record.model.DailyPlan
-import com.wswensw.woolbox.record.model.TodayCommitment
-import com.wswensw.woolbox.record.model.TodayCommitmentStep
+import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
+import com.wswensw.woolbox.record.ui.AddTodayTaskSheet
+import com.wswensw.woolbox.record.ui.DailyFocusScreen
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
 import com.wswensw.woolbox.record.ui.MotionMode
@@ -80,8 +80,7 @@ import com.wswensw.woolbox.record.ui.RecordsConnectionScreen
 import com.wswensw.woolbox.record.ui.RecordsScreen
 import com.wswensw.woolbox.record.ui.RecordsViewModel
 import com.wswensw.woolbox.record.ui.TemplateEditorScreen
-import com.wswensw.woolbox.record.ui.DailyPlanScreen
-import com.wswensw.woolbox.record.ui.CommitmentProgressSheet
+import com.wswensw.woolbox.record.ui.TodayTaskProgressSheet
 import com.wswensw.woolbox.record.reminder.DailyReminderNotifications
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
@@ -112,7 +111,7 @@ fun WoolboxApp(
     onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult,
 ) {
     val context = LocalContext.current
-    val commitmentDoneTemplate = stringResource(R.string.commitment_done)
+    val taskDoneTemplate = stringResource(R.string.task_done)
     val goalReachedTemplate = stringResource(R.string.goal_reached)
     val recordedItemTemplate = stringResource(R.string.recorded_item)
     val undoLabel = stringResource(R.string.action_undo)
@@ -140,7 +139,8 @@ fun WoolboxApp(
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
     var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var commitmentSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var todayTaskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showAddTodayTask by rememberSaveable { mutableStateOf(false) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
     var notificationsEnabled by remember {
@@ -189,35 +189,6 @@ fun WoolboxApp(
                 }
             }
         }
-
-    val completeStep: (
-        DailyPlan,
-        TodayCommitment,
-        TodayCommitmentStep,
-        (String?) -> Unit,
-    ) -> Unit = { plan, commitment, step, onResult ->
-        val commitmentCompleting = commitment.steps.all { it.id == step.id || it.isCompleted }
-        recordsViewModel.setCommitmentStepCompleted(plan, step.id, true) { error ->
-            onResult(error)
-            if (error == null) {
-                hapticFeedback.performHapticFeedback(
-                    if (commitmentCompleting) {
-                        HapticFeedbackType.LongPress
-                    } else {
-                        HapticFeedbackType.ContextClick
-                    },
-                )
-                if (commitmentCompleting) {
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar(
-                            message = commitmentDoneTemplate.formatLocalized(commitment.title),
-                            duration = SnackbarDuration.Short,
-                        )
-                    }
-                }
-            }
-        }
-    }
 
     // Shared by the record Sheet and the focus card so both produce the same
     // haptics, goal detection and undo.
@@ -311,7 +282,8 @@ fun WoolboxApp(
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
                                     recordSheetItemId = null
-                                    commitmentSheetId = null
+                                    todayTaskSheetId = null
+                                    showAddTodayTask = false
                                     measurementSheetItemId = null
                                 }
                             },
@@ -342,9 +314,10 @@ fun WoolboxApp(
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
                                 clock = recordsClock,
-                                onPlanToday = { navController.navigate(AppRoutes.DAILY_PLAN) },
+                                onPlanFocus = { navController.navigate(AppRoutes.DAILY_FOCUS) },
+                                onAddTask = { showAddTodayTask = true },
                                 onManageTemplates = {
-                                    commitmentSheetId = null
+                                    todayTaskSheetId = null
                                     navController.navigate(AppRoutes.MANAGE_TEMPLATES)
                                 },
                                 onManageAccumulates = {
@@ -360,8 +333,21 @@ fun WoolboxApp(
                                 },
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
-                                onCompleteStep = completeStep,
-                                onOpenCommitment = { commitmentSheetId = it.id },
+                                onToggleTask = { task, completed, onResult ->
+                                    recordsViewModel.setTodayTaskCompleted(task, completed) { error ->
+                                        onResult(error)
+                                        if (error == null && completed) {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = taskDoneTemplate.formatLocalized(task.title),
+                                                    duration = SnackbarDuration.Short,
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                                onOpenTask = { todayTaskSheetId = it.id },
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
@@ -377,26 +363,14 @@ fun WoolboxApp(
                                         {},
                                     )
                                 },
-                                onStartPlan = { plan, onResult ->
+                                onStartFocus = { focus, onResult ->
                                     requireNotifications(
                                         { onResult(notificationsNotEnabledMessage) },
-                                        { recordsViewModel.startDailyPlan(plan, onResult) },
+                                        { recordsViewModel.startDailyFocus(focus, onResult) },
                                     )
                                 },
-                                onReviewPlan = recordsViewModel::reviewDailyPlan,
-                                onContinuePlan = { plan, commitmentId, onResult ->
-                                    requireNotifications(
-                                        { onResult(notificationsNotEnabledMessage) },
-                                        { recordsViewModel.continueDailyPlan(plan, commitmentId, onResult) },
-                                    )
-                                },
-                                onAddCommitment = { plan, templateId, onResult ->
-                                    requireNotifications(
-                                        { onResult(notificationsNotEnabledMessage) },
-                                        { recordsViewModel.addDailyPlanCommitment(plan, templateId, onResult) },
-                                    )
-                                },
-                                onEndPlan = recordsViewModel::endDailyPlan,
+                                onReviewFocus = recordsViewModel::reviewDailyFocus,
+                                onEndFocus = recordsViewModel::endDailyFocus,
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -618,20 +592,43 @@ fun WoolboxApp(
                     onArchive = { onResult -> recordsViewModel.archiveTemplate(templateId, onResult) },
                 )
             }
-            composable(AppRoutes.DAILY_PLAN) {
-                DailyPlanScreen(
-                    plan = recordsState.dailyPlan,
-                    templates = recordsState.templates,
+            composable(AppRoutes.DAILY_FOCUS) {
+                DailyFocusScreen(
+                    focus = recordsState.dailyFocus,
+                    tasks = recordsState.todayTasks,
+                    loading = recordsState.isLoading,
                     onBack = { navController.popBackStack() },
-                    onSave = { firstMove, primaryTemplateId, secondaryTemplateId, onResult ->
-                        recordsViewModel.saveDailyPlan(
-                            recordsState.dailyPlan,
-                            firstMove,
-                            primaryTemplateId,
-                            secondaryTemplateId,
-                        ) { error ->
-                            onResult(error)
-                            if (error == null) navController.popBackStack()
+                    onSave = { firstMove, primaryTaskId, secondaryTaskId, onResult ->
+                        val save = {
+                            val finish: (String?) -> Unit = { error ->
+                                onResult(error)
+                                if (error == null) navController.popBackStack()
+                            }
+                            val focus = recordsState.dailyFocus
+                            if (focus?.state == DailyFocusState.PAUSED) {
+                                recordsViewModel.resumeDailyFocus(
+                                    focus,
+                                    primaryTaskId,
+                                    secondaryTaskId,
+                                    finish,
+                                )
+                            } else {
+                                recordsViewModel.saveDailyFocus(
+                                    focus,
+                                    firstMove,
+                                    primaryTaskId,
+                                    secondaryTaskId,
+                                    finish,
+                                )
+                            }
+                        }
+                        if (recordsState.dailyFocus?.state == DailyFocusState.PAUSED) {
+                            requireNotifications(
+                                { onResult(notificationsNotEnabledMessage) },
+                                save,
+                            )
+                        } else {
+                            save()
                         }
                     },
                 )
@@ -728,30 +725,55 @@ fun WoolboxApp(
                 }
             }
 
-            commitmentSheetId?.let { commitmentId ->
-                val plan = recordsState.dailyPlan
-                plan?.commitments?.firstOrNull { it.id == commitmentId }?.let { commitment ->
-                    CommitmentProgressSheet(
-                        commitment = commitment,
-                        onDismiss = { commitmentSheetId = null },
+            if (showAddTodayTask) {
+                AddTodayTaskSheet(
+                    dailySuggestions = recordsState.dailySuggestions,
+                    unfinishedTasks = recordsState.unfinishedTasks,
+                    templates = recordsState.templates,
+                    onDismiss = { showAddTodayTask = false },
+                    onAddTemplate = recordsViewModel::createTodayTaskFromTemplate,
+                    onContinueTask = recordsViewModel::createTodayTaskFromTask,
+                    onCreateTask = recordsViewModel::createTodayTask,
+                )
+            }
+
+            todayTaskSheetId?.let { taskId ->
+                recordsState.todayTasks.firstOrNull { it.id == taskId }?.let { task ->
+                    TodayTaskProgressSheet(
+                        task = task,
+                        onDismiss = { todayTaskSheetId = null },
+                        onToggleTask = { completed, onResult ->
+                            recordsViewModel.setTodayTaskCompleted(task, completed) { error ->
+                                onResult(error)
+                                if (error == null && completed) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = taskDoneTemplate.formatLocalized(task.title),
+                                            duration = SnackbarDuration.Short,
+                                        )
+                                    }
+                                }
+                            }
+                        },
                         onToggleStep = { step, completed, onResult ->
                             val completing = completed && !step.isCompleted
-                            val commitmentCompleting = completing &&
-                                commitment.steps.all { it.id == step.id || it.isCompleted }
-                            recordsViewModel.setCommitmentStepCompleted(plan, step.id, completed) { error ->
+                            val taskCompleting = completing &&
+                                task.steps.all { it.id == step.id || it.isCompleted }
+                            recordsViewModel.setTodayTaskStepCompleted(task, step.id, completed) { error ->
                                 onResult(error)
                                 if (error == null && completing) {
                                     hapticFeedback.performHapticFeedback(
-                                        if (commitmentCompleting) {
+                                        if (taskCompleting) {
                                             HapticFeedbackType.LongPress
                                         } else {
                                             HapticFeedbackType.ContextClick
                                         },
                                     )
-                                    if (commitmentCompleting) {
+                                    if (taskCompleting) {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = commitmentDoneTemplate.formatLocalized(commitment.title),
+                                                message = taskDoneTemplate.formatLocalized(task.title),
                                                 duration = SnackbarDuration.Short,
                                             )
                                         }
@@ -899,7 +921,7 @@ private object AppRoutes {
     const val MANAGE_MEASUREMENTS = "manage-measurements"
     const val RECORDS_CONNECTION = "records-connection"
     const val TEMPLATE_NEW = "template/new"
-    const val DAILY_PLAN = "records/today"
+    const val DAILY_FOCUS = "records/focus"
     const val TEMPLATE_ID = "templateId"
     const val TEMPLATE_EDIT = "template/{$TEMPLATE_ID}"
     const val RECORD_ITEM_ID = "recordItemId"

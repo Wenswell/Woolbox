@@ -1,7 +1,7 @@
 package com.wswensw.woolbox.record.reminder
 
-import com.wswensw.woolbox.record.model.DailyPlan
-import com.wswensw.woolbox.record.model.DailyPlanState
+import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyFocusState
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -12,17 +12,17 @@ class DailyReminderSchedulerTest {
     private val today = LocalDate.of(2026, 8, 18)
 
     @Test
-    fun activePlanProducesRevisionBoundReminder() {
+    fun activeFocusProducesRevisionBoundReminder() {
         assertEquals(
             DailyReminderSpec(today.toString(), 7, 3_600_000),
-            dailyReminderSpec(plan(), today),
+            dailyReminderSpec(focus(), today),
         )
     }
 
     @Test
     fun inactiveOrDifferentDayHasNoReminder() {
-        assertNull(dailyReminderSpec(plan().copy(state = DailyPlanState.PAUSED, nextReviewAt = null), today))
-        assertNull(dailyReminderSpec(plan().copy(localDate = today.minusDays(1)), today))
+        assertNull(dailyReminderSpec(focus().copy(state = DailyFocusState.PAUSED, nextReviewAt = null), today))
+        assertNull(dailyReminderSpec(focus().copy(localDate = today.minusDays(1)), today))
     }
 
     @Test
@@ -34,13 +34,15 @@ class DailyReminderSchedulerTest {
         assertNotEquals(spec.deliveryToken(), spec.copy(nextReviewAt = 7_200_000).deliveryToken())
     }
 
-    private fun plan() = DailyPlan(
+    private fun focus() = DailyFocus(
         id = 1,
         localDate = today,
         firstMove = "Go to the library",
         firstMoveCompletedAt = 0,
-        currentCommitmentId = 1,
-        state = DailyPlanState.ACTIVE,
+        primaryTaskId = 1,
+        secondaryTaskId = null,
+        currentTaskId = 1,
+        state = DailyFocusState.ACTIVE,
         pauseReason = null,
         completedRounds = 0,
         nextReviewAt = 3_600_000,
@@ -48,6 +50,5 @@ class DailyReminderSchedulerTest {
         endedAt = null,
         createdAt = 0,
         updatedAt = 0,
-        commitments = emptyList(),
     )
 }

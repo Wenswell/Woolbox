@@ -3,6 +3,7 @@ package com.wswensw.woolbox.record.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,8 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.model.TodayCommitment
-import com.wswensw.woolbox.record.model.TodayCommitmentStep
+import com.wswensw.woolbox.record.model.TodayTask
+import com.wswensw.woolbox.record.model.TodayTaskStep
 import com.wswensw.woolbox.ui.AppStyle
 import java.time.Instant
 import java.time.ZoneId
@@ -39,75 +40,87 @@ import java.time.format.FormatStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CommitmentProgressSheet(
-    commitment: TodayCommitment,
+fun TodayTaskProgressSheet(
+    task: TodayTask,
     onDismiss: () -> Unit,
-    onToggleStep: (TodayCommitmentStep, Boolean, (String?) -> Unit) -> Unit,
+    onToggleTask: (Boolean, (String?) -> Unit) -> Unit,
+    onToggleStep: (TodayTaskStep, Boolean, (String?) -> Unit) -> Unit,
 ) {
-    var changingStepId by rememberSaveable(commitment.id) { mutableStateOf<Long?>(null) }
-    var errorMessage by rememberSaveable(commitment.id) { mutableStateOf<String?>(null) }
-    val completed = commitment.completedStepCount
-    val progress = completed.toFloat() / commitment.steps.size.toFloat()
+    var changing by rememberSaveable(task.id, task.revision) { mutableStateOf(false) }
+    var errorMessage by rememberSaveable(task.id, task.revision) { mutableStateOf<String?>(null) }
+    val progress = if (task.steps.isEmpty()) 0f else task.completedStepCount.toFloat() / task.steps.size
     val reduceMotion = prefersReducedMotion()
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
-        label = "CommitmentSheetProgress",
+        label = "TodayTaskProgress",
     )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = AppStyle.spacing.pageHorizontal)
                 .padding(bottom = 28.dp),
         ) {
-            Text(
-                text = commitment.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(
-                    R.string.commitment_steps_progress,
-                    completed,
-                    commitment.steps.size,
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelLarge,
-            )
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-            Spacer(Modifier.height(16.dp))
-            LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                items(commitment.steps, key = TodayCommitmentStep::id) { step ->
-                    CommitmentProgressRow(
-                        step = step,
-                        enabled = changingStepId == null,
-                        onToggle = { checked ->
-                            changingStepId = step.id
-                            errorMessage = null
-                            onToggleStep(step, checked) { result ->
-                                changingStepId = null
-                                errorMessage = result
-                            }
-                        },
-                    )
-                    if (step.id != commitment.steps.last().id) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = task.isCompleted,
+                    onCheckedChange = { completed ->
+                        changing = true
+                        errorMessage = null
+                        onToggleTask(completed) { result ->
+                            changing = false
+                            errorMessage = result
+                        }
+                    },
+                    enabled = !changing,
+                )
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (task.steps.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.task_steps_progress, task.completedStepCount, task.steps.size),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp),
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
+                )
+                Spacer(Modifier.height(16.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                    items(task.steps, key = TodayTaskStep::id) { step ->
+                        TodayTaskStepRow(
+                            step = step,
+                            enabled = !changing,
+                            onToggle = { completed ->
+                                changing = true
+                                errorMessage = null
+                                onToggleStep(step, completed) { result ->
+                                    changing = false
+                                    errorMessage = result
+                                }
+                            },
+                        )
+                        if (step.id != task.steps.last().id) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
                     }
                 }
             }
             errorMessage?.let { message ->
                 Text(
-                    text = message,
+                    message,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp),
@@ -118,19 +131,19 @@ fun CommitmentProgressSheet(
 }
 
 @Composable
-private fun CommitmentProgressRow(
-    step: TodayCommitmentStep,
+private fun TodayTaskStepRow(
+    step: TodayTaskStep,
     enabled: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(checked = step.isCompleted, onCheckedChange = onToggle, enabled = enabled)
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = step.title,
+                step.title,
                 color = if (step.isCompleted) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
@@ -143,7 +156,7 @@ private fun CommitmentProgressRow(
             )
             step.completedAt?.let { completedAt ->
                 Text(
-                    text = commitmentCompletedAtLabel(completedAt),
+                    todayTaskCompletedAtLabel(completedAt),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp),
@@ -153,6 +166,6 @@ private fun CommitmentProgressRow(
     }
 }
 
-internal fun commitmentCompletedAtLabel(epochMillis: Long): String = DateTimeFormatter
+internal fun todayTaskCompletedAtLabel(epochMillis: Long): String = DateTimeFormatter
     .ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
     .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))

@@ -73,7 +73,7 @@ fun TemplateEditorScreen(
         mutableStateOf(template?.cadence?.name ?: TemplateCadence.MANUAL.name)
     }
     var stepTitles by rememberSaveable(template?.id) {
-        mutableStateOf(template?.steps?.map { it.title } ?: listOf(""))
+        mutableStateOf(template?.steps?.map { it.title }.orEmpty())
     }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -182,17 +182,17 @@ fun TemplateEditorScreen(
                                 contentDescription = stringResource(R.string.move_template_step_down, index + 1),
                             )
                         }
-                        FilledTonalIconButton(
-                            onClick = {
-                                stepTitles = stepTitles.filterIndexed { itemIndex, _ -> itemIndex != index }
-                            },
-                            enabled = !saving,
-                        ) {
-                            Icon(
-                                Icons.Rounded.Delete,
-                                contentDescription = stringResource(R.string.remove_template_step, index + 1),
-                            )
-                        }
+                    }
+                    FilledTonalIconButton(
+                        onClick = {
+                            stepTitles = stepTitles.filterIndexed { itemIndex, _ -> itemIndex != index }
+                        },
+                        enabled = !saving,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Delete,
+                            contentDescription = stringResource(R.string.remove_template_step, index + 1),
+                        )
                     }
                 }
             }

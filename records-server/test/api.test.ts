@@ -162,6 +162,16 @@ describe("Records API", () => {
     expect(focus).toMatchObject({ state: "ACTIVE", currentTaskId: 1, completedRounds: 0, revision: 4 });
   });
 
+  it("requires every selected Focus task to remain open before starting", async () => {
+    await createTask({ title: "Core", steps: [] });
+    await createTask({ title: "Backup", steps: [] });
+    await createFocus(1, 2);
+    await setTask(2, true, 0, 1_000);
+
+    expect((await focusTransition("start", { expectedRevision: 0, occurredAt: 2_000 })).statusCode).toBe(409);
+    expect((await getToday()).dailyFocus).toMatchObject({ state: "READY", revision: 0 });
+  });
+
   it("rejects invalid input and stale Focus commands without partial writes", async () => {
     expect((await createTemplate({ title: " ", steps: [] })).statusCode).toBe(400);
     expect((await createTemplate({ title: "Task", steps: [" "] })).statusCode).toBe(400);

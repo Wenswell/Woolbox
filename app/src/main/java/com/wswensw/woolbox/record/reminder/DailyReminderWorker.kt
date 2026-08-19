@@ -22,12 +22,12 @@ class DailyReminderWorker(
         if (expected.revision < 0 || expected.nextReviewAt < 0) return Result.failure()
         if (localDate != LocalDate.now()) return Result.success()
 
-        val plan = try {
-            RecordRepository(applicationContext).getDailyPlan(localDate)
+        val focus = try {
+            RecordRepository(applicationContext).getDailyFocus(localDate)
         } catch (_: Exception) {
             return Result.retry()
         }
-        if (dailyReminderSpec(plan, localDate) != expected) return Result.success()
+        if (dailyReminderSpec(focus, localDate) != expected) return Result.success()
         if (!DailyReminderNotifications.areEnabled(applicationContext)) return Result.success()
 
         val deliveryStore = DailyReminderDeliveryStore(applicationContext)
