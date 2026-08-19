@@ -26,7 +26,14 @@ for attempt in {1..20}; do
 const response = await fetch("http://127.0.0.1:4320/api/overview?startDate=2000-01-01&endDate=2000-01-01&planDate=2000-01-01").catch(() => null);
 if (!response?.ok) process.exit(1);
 const overview = await response.json();
-if (!Array.isArray(overview.items) || !Array.isArray(overview.templates) || overview.dailyPlan !== null) process.exit(1);
+if (
+  !Array.isArray(overview.items)
+  || !Array.isArray(overview.templates)
+  || !Array.isArray(overview.todayTasks)
+  || !Array.isArray(overview.dailySuggestions)
+  || !Array.isArray(overview.unfinishedTasks)
+  || overview.dailyFocus !== null
+) process.exit(1);
 if (!overview.templates.every(
   (template) =>
     template.archived === false
@@ -55,19 +62,19 @@ for (const table of [
   "record_entries",
   "task_templates",
   "task_template_steps",
-  "daily_plans",
-  "today_commitments",
-  "today_commitment_steps",
+  "today_tasks",
+  "today_task_steps",
+  "daily_focus",
   "record_audit_logs",
 ]) {
   if (!tables.includes(table)) throw new Error(\`Database is missing \${table}.\`);
 }
-for (const table of ["todo_tasks", "todo_steps", "todo_step_completions", "record_windows", "todo_step_windows"]) {
+for (const table of ["todo_tasks", "todo_steps", "todo_step_completions", "record_windows", "todo_step_windows", "daily_plans", "today_commitments", "today_commitment_steps"]) {
   if (tables.includes(table)) throw new Error(\`Removed table still exists: \${table}.\`);
 }
-const planColumns = database.prepare("SELECT name FROM pragma_table_info('daily_plans')").all().map(({ name }) => name);
-for (const column of ["current_commitment_id", "pause_reason", "completed_rounds", "revision"]) {
-  if (!planColumns.includes(column)) throw new Error(\`Daily plan column is missing: \${column}.\`);
+const focusColumns = database.prepare("SELECT name FROM pragma_table_info('daily_focus')").all().map(({ name }) => name);
+for (const column of ["primary_task_id", "secondary_task_id", "current_task_id", "pause_reason", "completed_rounds", "revision"]) {
+  if (!focusColumns.includes(column)) throw new Error(\`Daily Focus column is missing: \${column}.\`);
 }
 console.log("Database schema verified.");
 NODE

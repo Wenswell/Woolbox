@@ -5,12 +5,11 @@ import { openRecordsDatabase } from "./database.js";
 import {
   ApiError,
   parseArchived,
-  parseCommitmentStepCompletionInput,
-  parseDailyPlanAddCommitmentInput,
-  parseDailyPlanCreateInput,
-  parseDailyPlanReviewInput,
-  parseDailyPlanTransitionInput,
-  parseDailyPlanUpdateInput,
+  parseDailyFocusCreateInput,
+  parseDailyFocusReviewInput,
+  parseDailyFocusSelectionInput,
+  parseDailyFocusTransitionInput,
+  parseDailyFocusUpdateInput,
   parseEntryInput,
   parseId,
   parseIds,
@@ -19,6 +18,10 @@ import {
   parseOptionalId,
   parseOptionalRecordMode,
   parseTemplateWriteInput,
+  parseTodayTaskCompletionInput,
+  parseTodayTaskCreateInput,
+  parseTodayTaskFromTaskInput,
+  parseTodayTaskFromTemplateInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
 
@@ -111,78 +114,106 @@ export function buildApp(options: BuildAppOptions) {
     );
   });
 
-  app.get("/api/daily-plans/:localDate", (request) => ({
-    dailyPlan: records.getDailyPlan(
+  app.get("/api/today/:localDate", (request) => ({
+    today: records.getToday(
       parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
     ),
   }));
 
-  app.post("/api/daily-plans", (request, reply) => {
-    const dailyPlan = records.createDailyPlan(parseDailyPlanCreateInput(request.body));
-    return reply.status(201).send({ dailyPlan });
+  app.post("/api/today-tasks", (request, reply) => {
+    const today = records.createTodayTask(parseTodayTaskCreateInput(request.body));
+    return reply.status(201).send({ today });
   });
 
-  app.put("/api/daily-plans/:localDate", (request) => ({
-    dailyPlan: records.updateDailyPlan(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanUpdateInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-plans/:localDate/start", (request) => ({
-    dailyPlan: records.startDailyPlan(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanTransitionInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-plans/:localDate/review", (request) => ({
-    dailyPlan: records.reviewDailyPlan(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanReviewInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-plans/:localDate/review-now", (request) => ({
-    dailyPlan: records.reviewDailyPlanNow(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanReviewInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-plans/:localDate/switch", (request) => ({
-    dailyPlan: records.switchDailyPlanCommitment(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanReviewInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-plans/:localDate/continue", (request) => ({
-    dailyPlan: records.continueDailyPlan(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanReviewInput(request.body),
-    ),
-  }));
-
-  app.post("/api/daily-plans/:localDate/commitments", (request, reply) => {
-    const dailyPlan = records.addDailyPlanCommitment(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanAddCommitmentInput(request.body),
-    );
-    return reply.status(201).send({ dailyPlan });
+  app.post("/api/today-tasks/from-template", (request, reply) => {
+    const today = records.createTodayTaskFromTemplate(parseTodayTaskFromTemplateInput(request.body));
+    return reply.status(201).send({ today });
   });
 
-  app.put("/api/daily-plans/:localDate/end", (request) => ({
-    dailyPlan: records.endDailyPlan(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanTransitionInput(request.body),
+  app.post("/api/today-tasks/from-task", (request, reply) => {
+    const today = records.createTodayTaskFromTask(parseTodayTaskFromTaskInput(request.body));
+    return reply.status(201).send({ today });
+  });
+
+  app.put("/api/today-tasks/:id/completion", (request) => ({
+    today: records.setTodayTaskCompleted(
+      parseId((request.params as { id?: unknown }).id, "Today task ID"),
+      parseTodayTaskCompletionInput(request.body),
     ),
   }));
 
-  app.put("/api/daily-plans/:localDate/reset", (request) => ({
-    dailyPlan: records.resetDailyPlan(
+  app.put("/api/today-task-steps/:id/completion", (request) => ({
+    today: records.setTodayTaskStepCompleted(
+      parseId((request.params as { id?: unknown }).id, "Today task step ID"),
+      parseTodayTaskCompletionInput(request.body),
+    ),
+  }));
+
+  app.post("/api/daily-focus", (request, reply) => {
+    const focus = records.createDailyFocus(parseDailyFocusCreateInput(request.body));
+    return reply.status(201).send({ dailyFocus: focus });
+  });
+
+  app.put("/api/daily-focus/:localDate", (request) => ({
+    dailyFocus: records.updateDailyFocus(
       parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyPlanTransitionInput(request.body),
+      parseDailyFocusUpdateInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/start", (request) => ({
+    dailyFocus: records.startDailyFocus(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusTransitionInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/review", (request) => ({
+    dailyFocus: records.reviewDailyFocus(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusReviewInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/review-now", (request) => ({
+    dailyFocus: records.reviewDailyFocusNow(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusReviewInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/switch", (request) => ({
+    dailyFocus: records.switchDailyFocusTask(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusReviewInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/refocus", (request) => ({
+    dailyFocus: records.refocusDailyFocus(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusSelectionInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/continue", (request) => ({
+    dailyFocus: records.continueDailyFocus(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusSelectionInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/end", (request) => ({
+    dailyFocus: records.endDailyFocus(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusTransitionInput(request.body),
+    ),
+  }));
+
+  app.put("/api/daily-focus/:localDate/reset", (request) => ({
+    dailyFocus: records.resetDailyFocus(
+      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
+      parseDailyFocusTransitionInput(request.body),
     ),
   }));
 
@@ -208,16 +239,6 @@ export function buildApp(options: BuildAppOptions) {
       parseId((request.params as { id?: unknown }).id, "Template ID"),
     );
     return { template };
-  });
-
-  app.put("/api/commitment-steps/:id/completion", (request) => {
-    const input = parseCommitmentStepCompletionInput(request.body);
-    return {
-      dailyPlan: records.setCommitmentStepCompleted(
-        parseId((request.params as { id?: unknown }).id, "Commitment step ID"),
-        input,
-      ),
-    };
   });
 
   app.get("/api/audit-logs", (request) => {

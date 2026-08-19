@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const recordItems = sqliteTable(
   "record_items",
@@ -74,16 +74,60 @@ export const taskTemplateSteps = sqliteTable(
   ],
 );
 
-export const dailyPlans = sqliteTable(
-  "daily_plans",
+export const todayTasks = sqliteTable(
+  "today_tasks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    localDate: text("local_date").notNull(),
+    templateId: integer("template_id")
+      .references(() => taskTemplates.id, { onDelete: "set null" }),
+    sourceTaskId: integer("source_task_id")
+      .references((): AnySQLiteColumn => todayTasks.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    position: integer("position").notNull(),
+    completedAt: integer("completed_at"),
+    revision: integer("revision").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("today_tasks_date_position_index").on(table.localDate, table.position),
+    uniqueIndex("today_tasks_date_source_unique").on(table.localDate, table.sourceTaskId),
+  ],
+);
+
+export const todayTaskSteps = sqliteTable(
+  "today_task_steps",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => todayTasks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    position: integer("position").notNull(),
+    completedAt: integer("completed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [index("today_task_steps_task_position_index").on(table.taskId, table.position)],
+);
+
+export const dailyFocus = sqliteTable(
+  "daily_focus",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     localDate: text("local_date").notNull(),
     firstMove: text("first_move").notNull(),
     firstMoveCompletedAt: integer("first_move_completed_at"),
-    currentCommitmentId: integer("current_commitment_id"),
+    primaryTaskId: integer("primary_task_id")
+      .notNull()
+      .references(() => todayTasks.id, { onDelete: "restrict" }),
+    secondaryTaskId: integer("secondary_task_id")
+      .references(() => todayTasks.id, { onDelete: "restrict" }),
+    currentTaskId: integer("current_task_id")
+      .references(() => todayTasks.id, { onDelete: "restrict" }),
     state: text("state", { enum: ["READY", "ACTIVE", "PAUSED", "ENDED"] }).notNull(),
-    pauseReason: text("pause_reason", { enum: ["COMMITMENTS_COMPLETED", "TARGET_REACHED"] }),
+    pauseReason: text("pause_reason", { enum: ["FOCUS_CLEARED", "TARGET_REACHED"] }),
     completedRounds: integer("completed_rounds").notNull(),
     nextReviewAt: integer("next_review_at"),
     revision: integer("revision").notNull(),
@@ -91,42 +135,7 @@ export const dailyPlans = sqliteTable(
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [uniqueIndex("daily_plans_local_date_unique").on(table.localDate)],
-);
-
-export const todayCommitments = sqliteTable(
-  "today_commitments",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    planId: integer("plan_id")
-      .notNull()
-      .references(() => dailyPlans.id, { onDelete: "cascade" }),
-    templateId: integer("template_id")
-      .references(() => taskTemplates.id, { onDelete: "set null" }),
-    role: text("role", { enum: ["PRIMARY", "SECONDARY", "ADDITIONAL"] }).notNull(),
-    position: integer("position").notNull(),
-    title: text("title").notNull(),
-    cadence: text("cadence", { enum: ["MANUAL", "DAILY"] }).notNull(),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [index("today_commitments_plan_position_index").on(table.planId, table.position)],
-);
-
-export const todayCommitmentSteps = sqliteTable(
-  "today_commitment_steps",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    commitmentId: integer("commitment_id")
-      .notNull()
-      .references(() => todayCommitments.id, { onDelete: "cascade" }),
-    title: text("title").notNull(),
-    position: integer("position").notNull(),
-    completedAt: integer("completed_at"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [index("today_commitment_steps_commitment_position_index").on(table.commitmentId, table.position)],
+  (table) => [uniqueIndex("daily_focus_local_date_unique").on(table.localDate)],
 );
 
 export const recordAuditLogs = sqliteTable(
@@ -134,7 +143,7 @@ export const recordAuditLogs = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     action: text("action").notNull(),
-    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "TEMPLATE", "TEMPLATE_STEP", "COMMITMENT", "COMMITMENT_STEP", "DAILY_PLAN"] }).notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "FOCUS"] }).notNull(),
     entityId: integer("entity_id").notNull(),
     beforeJson: text("before_json"),
     afterJson: text("after_json"),

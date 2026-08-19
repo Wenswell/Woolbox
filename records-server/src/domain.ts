@@ -2,15 +2,15 @@ export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
-export const DAILY_PLAN_STATES = ["READY", "ACTIVE", "PAUSED", "ENDED"] as const;
-export const DAILY_PLAN_PAUSE_REASONS = ["COMMITMENTS_COMPLETED", "TARGET_REACHED"] as const;
+export const DAILY_FOCUS_STATES = ["READY", "ACTIVE", "PAUSED", "ENDED"] as const;
+export const DAILY_FOCUS_PAUSE_REASONS = ["FOCUS_CLEARED", "TARGET_REACHED"] as const;
 export const TEMPLATE_CADENCES = ["MANUAL", "DAILY"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
-export type DailyPlanState = (typeof DAILY_PLAN_STATES)[number];
-export type DailyPlanPauseReason = (typeof DAILY_PLAN_PAUSE_REASONS)[number];
+export type DailyFocusState = (typeof DAILY_FOCUS_STATES)[number];
+export type DailyFocusPauseReason = (typeof DAILY_FOCUS_PAUSE_REASONS)[number];
 export type TemplateCadence = (typeof TEMPLATE_CADENCES)[number];
 
 export interface RecordItemInput {
@@ -46,38 +46,55 @@ export interface TemplateWriteInput {
   steps: StepTitleInput[];
 }
 
-export interface CommitmentStepCompletionInput {
+export interface TodayTaskCompletionInput {
   completed: boolean;
   expectedRevision: number;
   occurredAt: number;
 }
 
-export interface DailyPlanCreateInput {
+export interface TodayTaskCreateInput {
+  localDate: string;
+  title: string;
+  steps: StepTitleInput[];
+}
+
+export interface TodayTaskFromTemplateInput {
+  localDate: string;
+  templateId: number;
+}
+
+export interface TodayTaskFromTaskInput {
+  localDate: string;
+  sourceTaskId: number;
+}
+
+export interface DailyFocusCreateInput {
   localDate: string;
   firstMove: string;
-  primaryTemplateId: number;
-  secondaryTemplateId: number | null;
+  primaryTaskId: number;
+  secondaryTaskId: number | null;
 }
 
-export interface DailyPlanUpdateInput {
+export interface DailyFocusUpdateInput {
   firstMove: string;
-  primaryTemplateId: number;
-  secondaryTemplateId: number | null;
+  primaryTaskId: number;
+  secondaryTaskId: number | null;
   expectedRevision: number;
   occurredAt: number;
 }
 
-export interface DailyPlanTransitionInput {
+export interface DailyFocusTransitionInput {
   expectedRevision: number;
   occurredAt: number;
 }
 
-export interface DailyPlanReviewInput extends DailyPlanTransitionInput {
-  currentCommitmentId: number;
+export interface DailyFocusReviewInput extends DailyFocusTransitionInput {
+  currentTaskId: number;
 }
 
-export interface DailyPlanAddCommitmentInput extends DailyPlanTransitionInput {
-  templateId: number;
+export interface DailyFocusSelectionInput extends DailyFocusTransitionInput {
+  primaryTaskId: number;
+  secondaryTaskId: number | null;
 }
 
 export class ApiError extends Error {
@@ -164,12 +181,12 @@ export function parseTemplateWriteInput(value: unknown): TemplateWriteInput {
   const input = objectInput(value);
   const title = requiredTrimmedString(input, "title", "Title is required.");
   const cadence = enumField(input, "cadence", TEMPLATE_CADENCES);
-  requireRule(Array.isArray(input.steps) && input.steps.length > 0, "At least one subtask is required.");
+  requireRule(Array.isArray(input.steps), "Steps must be an array.");
   const steps = input.steps.map(parseStepTitleInput);
   return { title, cadence, steps };
 }
 
-export function parseCommitmentStepCompletionInput(value: unknown): CommitmentStepCompletionInput {
+export function parseTodayTaskCompletionInput(value: unknown): TodayTaskCompletionInput {
   const input = objectInput(value);
   requireRule(typeof input.completed === "boolean", "Completed must be a boolean.");
   return {
@@ -179,32 +196,58 @@ export function parseCommitmentStepCompletionInput(value: unknown): CommitmentSt
   };
 }
 
-export function parseDailyPlanCreateInput(value: unknown): DailyPlanCreateInput {
+export function parseTodayTaskCreateInput(value: unknown): TodayTaskCreateInput {
+  const input = objectInput(value);
+  requireRule(Array.isArray(input.steps), "Steps must be an array.");
+  return {
+    localDate: parseIsoDate(input.localDate, "Local date"),
+    title: requiredTrimmedString(input, "title", "Title is required."),
+    steps: input.steps.map(parseStepTitleInput),
+  };
+}
+
+export function parseTodayTaskFromTemplateInput(value: unknown): TodayTaskFromTemplateInput {
+  const input = objectInput(value);
+  return {
+    localDate: parseIsoDate(input.localDate, "Local date"),
+    templateId: positiveIntegerField(input, "templateId"),
+  };
+}
+
+export function parseTodayTaskFromTaskInput(value: unknown): TodayTaskFromTaskInput {
+  const input = objectInput(value);
+  return {
+    localDate: parseIsoDate(input.localDate, "Local date"),
+    sourceTaskId: positiveIntegerField(input, "sourceTaskId"),
+  };
+}
+
+export function parseDailyFocusCreateInput(value: unknown): DailyFocusCreateInput {
   const input = objectInput(value);
   const result = {
     localDate: parseIsoDate(input.localDate, "Local date"),
     firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
-    primaryTemplateId: positiveIntegerField(input, "primaryTemplateId"),
-    secondaryTemplateId: nullablePositiveIntegerField(input, "secondaryTemplateId"),
+    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
+    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
   };
-  requireRule(result.primaryTemplateId !== result.secondaryTemplateId, "Primary and secondary templates must be different.");
+  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary Focus tasks must be different.");
   return result;
 }
 
-export function parseDailyPlanUpdateInput(value: unknown): DailyPlanUpdateInput {
+export function parseDailyFocusUpdateInput(value: unknown): DailyFocusUpdateInput {
   const input = objectInput(value);
   const result = {
     firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
-    primaryTemplateId: positiveIntegerField(input, "primaryTemplateId"),
-    secondaryTemplateId: nullablePositiveIntegerField(input, "secondaryTemplateId"),
+    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
+    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
     expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
     occurredAt: nonNegativeIntegerField(input, "occurredAt"),
   };
-  requireRule(result.primaryTemplateId !== result.secondaryTemplateId, "Primary and secondary templates must be different.");
+  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary Focus tasks must be different.");
   return result;
 }
 
-export function parseDailyPlanTransitionInput(value: unknown): DailyPlanTransitionInput {
+export function parseDailyFocusTransitionInput(value: unknown): DailyFocusTransitionInput {
   const input = objectInput(value);
   return {
     expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
@@ -212,20 +255,23 @@ export function parseDailyPlanTransitionInput(value: unknown): DailyPlanTransiti
   };
 }
 
-export function parseDailyPlanReviewInput(value: unknown): DailyPlanReviewInput {
+export function parseDailyFocusReviewInput(value: unknown): DailyFocusReviewInput {
   const input = objectInput(value);
   return {
-    ...parseDailyPlanTransitionInput(input),
-    currentCommitmentId: positiveIntegerField(input, "currentCommitmentId"),
+    ...parseDailyFocusTransitionInput(input),
+    currentTaskId: positiveIntegerField(input, "currentTaskId"),
   };
 }
 
-export function parseDailyPlanAddCommitmentInput(value: unknown): DailyPlanAddCommitmentInput {
+export function parseDailyFocusSelectionInput(value: unknown): DailyFocusSelectionInput {
   const input = objectInput(value);
-  return {
-    ...parseDailyPlanTransitionInput(input),
-    templateId: positiveIntegerField(input, "templateId"),
+  const result = {
+    ...parseDailyFocusTransitionInput(input),
+    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
+    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
   };
+  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary Focus tasks must be different.");
+  return result;
 }
 
 export function parseOptionalRecordMode(value: unknown): RecordMode | undefined {

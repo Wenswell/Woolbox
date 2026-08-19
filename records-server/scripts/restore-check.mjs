@@ -28,9 +28,9 @@ try {
       "record_entries",
       "task_templates",
       "task_template_steps",
-      "daily_plans",
-      "today_commitments",
-      "today_commitment_steps",
+      "today_tasks",
+      "today_task_steps",
+      "daily_focus",
       "record_audit_logs",
     ]) {
       if (!tables.includes(table)) throw new Error(`Restored database is missing ${table}.`);

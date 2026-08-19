@@ -127,6 +127,13 @@
       "when": 1787064637440,
       "tag": "0017_template_today_instances",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1787100352615,
+      "tag": "0018_today_tasks_focus",
+      "breakpoints": true
     }
   ]
 }

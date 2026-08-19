@@ -42,7 +42,7 @@ pnpm deploy
 
 `pnpm deploy` runs type checking, API and Web tests, production build, release synchronization, production dependency installation, service restart, migration-schema verification, and a local API health check that waits up to 20 seconds. It targets the `cloud` SSH host and `/home/ravvss/records` release path.
 
-Deploy a server contract change before distributing an Android APK that depends on it. The deployment check validates the eight Records business tables, confirms the removed `todo_*` tables are absent, and verifies the active `templates` plus `dailyPlan` overview contract.
+Deploy a server contract change before distributing an Android APK that depends on it. The deployment check validates the eight Records business tables, confirms the removed planning tables are absent, and verifies the active templates, Today tasks, candidates, and `dailyFocus` overview contract.
 
 ## Verify
 
