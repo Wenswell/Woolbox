@@ -28,6 +28,7 @@ if (!response?.ok) process.exit(1);
 const overview = await response.json();
 if (
   !Array.isArray(overview.items)
+  || !Array.isArray(overview.goals)
   || !Array.isArray(overview.templates)
   || !Array.isArray(overview.todayTasks)
   || !Array.isArray(overview.dailySuggestions)
@@ -60,6 +61,9 @@ const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'ta
 for (const table of [
   "record_items",
   "record_entries",
+  "goals",
+  "goal_subgoals",
+  "goal_entries",
   "task_templates",
   "task_template_steps",
   "today_tasks",
