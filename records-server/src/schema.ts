@@ -44,6 +44,61 @@ export const recordEntries = sqliteTable(
   ],
 );
 
+export const goals = sqliteTable(
+  "goals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    unit: text("unit").notNull(),
+    defaultValue: real("default_value"),
+    stepValue: real("step_value").notNull(),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date").notNull(),
+    archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+);
+
+export const goalSubgoals = sqliteTable(
+  "goal_subgoals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    goalId: integer("goal_id")
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    targetValue: real("target_value").notNull(),
+    position: integer("position").notNull(),
+    completedAt: integer("completed_at"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("goal_subgoals_goal_position_index").on(table.goalId, table.position),
+  ],
+);
+
+export const goalEntries = sqliteTable(
+  "goal_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    goalId: integer("goal_id")
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    occurredAt: integer("occurred_at").notNull(),
+    localDate: text("local_date").notNull(),
+    localMinute: integer("local_minute").notNull(),
+    value: real("value").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("goal_entries_goal_occurred_at_index").on(table.goalId, table.occurredAt),
+    index("goal_entries_local_date_minute_index").on(table.localDate, table.localMinute),
+  ],
+);
+
 export const taskTemplates = sqliteTable(
   "task_templates",
   {
@@ -143,7 +198,7 @@ export const recordAuditLogs = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     action: text("action").notNull(),
-    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "FOCUS"] }).notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "GOAL", "GOAL_ENTRY", "GOAL_SUBGOAL", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "FOCUS"] }).notNull(),
     entityId: integer("entity_id").notNull(),
     beforeJson: text("before_json"),
     afterJson: text("after_json"),

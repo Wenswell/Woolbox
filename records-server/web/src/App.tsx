@@ -1,28 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, CalendarCheck, ClipboardList, LayoutDashboard, ListTodo, RefreshCw, Ruler, Sigma } from "lucide-react";
+import { Activity, CalendarCheck, ClipboardList, LayoutDashboard, ListTodo, RefreshCw, Ruler, Sigma, Target } from "lucide-react";
 import { api } from "./api";
 import { Toast } from "./components/Toast";
 import { localToday, message, shiftLocalDate } from "./lib/format";
-import type { RecordAuditLog, RecordEntry, RecordItem, TaskTemplate, TodayState } from "./types";
+import type { Goal, RecordAuditLog, RecordEntry, RecordItem, TaskTemplate, TodayState } from "./types";
 import { AuditLogView } from "./views/AuditLogView";
 import { EntriesView, type EntryFilters } from "./views/EntriesView";
+import { GoalsView } from "./views/GoalsView";
 import { OverviewView } from "./views/OverviewView";
 import { RecordItemsView } from "./views/RecordItemsView";
 import { TemplatesView } from "./views/TemplatesView";
 import { TodayView } from "./views/TodayView";
 
-type View = "overview" | "today" | "templates" | "accumulate" | "measurement" | "entries" | "activity";
+type View = "overview" | "today" | "templates" | "goals" | "accumulate" | "measurement" | "entries" | "activity";
 const VIEWS: Record<View, { label: string; description: string }> = {
   overview: { label: "Overview", description: "Records status and recent work" },
   today: { label: "Today", description: "Daily tasks and focused hourly review" },
   templates: { label: "Templates", description: "Reusable task definitions and daily recommendations" },
+  goals: { label: "Goals", description: "Non-periodic shared progress and subgoals" },
   accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },
   measurement: { label: "Measurement", description: "Bounded numerical measurements" },
   entries: { label: "Entries", description: "Recorded values across every tracker" },
   activity: { label: "Activity", description: "Immutable audit history for every change" },
 };
 const NAVIGATION = [
-  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "today" as const, icon: CalendarCheck }, { id: "templates" as const, icon: ListTodo }] },
+  { title: "Workspace", items: [{ id: "overview" as const, icon: LayoutDashboard }, { id: "today" as const, icon: CalendarCheck }, { id: "templates" as const, icon: ListTodo }, { id: "goals" as const, icon: Target }] },
   { title: "Records", items: [{ id: "accumulate" as const, icon: Sigma }, { id: "measurement" as const, icon: Ruler }, { id: "entries" as const, icon: ClipboardList }] },
   { title: "System", items: [{ id: "activity" as const, icon: Activity }] },
 ];
@@ -33,6 +35,8 @@ export function App() {
   const [archivedItems, setArchivedItems] = useState<RecordItem[]>([]);
   const [activeTemplates, setActiveTemplates] = useState<TaskTemplate[]>([]);
   const [archivedTemplates, setArchivedTemplates] = useState<TaskTemplate[]>([]);
+  const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
+  const [archivedGoals, setArchivedGoals] = useState<Goal[]>([]);
   const [todayDate, setTodayDate] = useState(localToday);
   const [todayState, setTodayState] = useState<TodayState | null>(null);
   const [entries, setEntries] = useState<RecordEntry[]>([]);
@@ -58,11 +62,13 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const [active, archived, activeTemplateList, archivedTemplateList, plan, entryList, auditPage] = await Promise.all([
+      const [active, archived, activeTemplateList, archivedTemplateList, activeGoalList, archivedGoalList, plan, entryList, auditPage] = await Promise.all([
         api.items(false),
         api.items(true),
         api.templates(false),
         api.templates(true),
+        api.goals(false),
+        api.goals(true),
         api.today(todayDate),
         api.entries(filters.startDate, filters.endDate, filters.itemId, filters.mode || undefined),
         api.auditLogs(),
@@ -71,6 +77,8 @@ export function App() {
       setArchivedItems(archived);
       setActiveTemplates(activeTemplateList);
       setArchivedTemplates(archivedTemplateList);
+      setActiveGoals(activeGoalList);
+      setArchivedGoals(archivedGoalList);
       setTodayState(plan);
       setEntries(entryList);
       setLogs(auditPage.logs);
@@ -136,6 +144,7 @@ export function App() {
           {view === "overview" && <OverviewView templates={activeTemplates} items={allItems} entries={entries} logs={logs} loading={loading} onNavigate={setView} />}
           {view === "today" && <TodayView localDate={todayDate} today={todayState} templates={activeTemplates} loading={loading} onDateChange={changeTodayDate} onChanged={changed} onRefresh={refresh} />}
           {view === "templates" && <TemplatesView templates={allTemplates} loading={loading} onChanged={changed} onError={setError} />}
+          {view === "goals" && <GoalsView goals={[...activeGoals, ...archivedGoals]} loading={loading} onChanged={changed} onError={setError} />}
           {view === "accumulate" && <RecordItemsView mode="ACCUMULATE" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "measurement" && <RecordItemsView mode="MEASUREMENT" items={allItems} loading={loading} onChanged={changed} onError={setError} />}
           {view === "entries" && <EntriesView entries={entries} items={allItems} filters={filters} loading={loading} onFilters={setFilters} onChanged={changed} onError={setError} />}

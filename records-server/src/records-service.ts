@@ -6,6 +6,9 @@ import type {
   DailyFocusSelectionInput,
   DailyFocusTransitionInput,
   DailyFocusUpdateInput,
+  GoalEntryInput,
+  GoalInput,
+  GoalSubgoalCompletionInput,
   RecordEntryInput,
   RecordItemInput,
   RecordMode,
@@ -19,6 +22,9 @@ import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
   dailyFocus,
+  goalEntries,
+  goals,
+  goalSubgoals,
   recordAuditLogs,
   recordEntries,
   recordItems,
@@ -34,6 +40,9 @@ const TargetRounds = 4;
 
 type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
+type GoalRow = typeof goals.$inferSelect;
+type GoalSubgoalRow = typeof goalSubgoals.$inferSelect;
+type GoalEntryRow = typeof goalEntries.$inferSelect;
 type TemplateRow = typeof taskTemplates.$inferSelect;
 type TodayTaskRow = typeof todayTasks.$inferSelect;
 type TodayTaskStepRow = typeof todayTaskSteps.$inferSelect;
@@ -49,6 +58,11 @@ interface TodayTaskResponse extends TodayTaskRow {
   steps: TodayTaskStepRow[];
 }
 
+interface GoalResponse extends GoalRow {
+  currentValue: number;
+  subgoals: GoalSubgoalRow[];
+}
+
 type DailyFocusResponse = DailyFocusRow;
 
 type AuditAction =
@@ -59,6 +73,14 @@ type AuditAction =
   | "ITEM_DELETED"
   | "ENTRY_CREATED"
   | "ENTRY_DELETED"
+  | "GOAL_CREATED"
+  | "GOAL_UPDATED"
+  | "GOAL_ARCHIVED"
+  | "GOAL_RESTORED"
+  | "GOAL_DELETED"
+  | "GOAL_ENTRY_CREATED"
+  | "GOAL_SUBGOAL_COMPLETED"
+  | "GOAL_SUBGOAL_REOPENED"
   | "TEMPLATE_CREATED"
   | "TEMPLATE_UPDATED"
   | "TEMPLATE_ARCHIVED"
@@ -75,7 +97,7 @@ type AuditAction =
 
 interface AuditWrite {
   action: AuditAction;
-  entityType: "ITEM" | "ENTRY" | "TEMPLATE" | "TODAY_TASK" | "TODAY_TASK_STEP" | "FOCUS";
+  entityType: "ITEM" | "ENTRY" | "GOAL" | "GOAL_ENTRY" | "GOAL_SUBGOAL" | "TEMPLATE" | "TODAY_TASK" | "TODAY_TASK_STEP" | "FOCUS";
   entityId: number;
   before?: unknown;
   after?: unknown;
@@ -101,11 +123,182 @@ export class RecordsService {
     if (startDate > endDate) throw new ApiError(400, "Start date must not be after end date.");
     return {
       items: this.listItems(false),
+      goals: this.listGoals(false),
       templates: this.listTemplates(false),
       ...this.getToday(planDate),
       accumulateEntries: this.listEntries(startDate, endDate, undefined, "ACCUMULATE"),
       latestMeasurementEntries: this.listLatestEntries(),
     };
+  }
+
+  listGoals(archived: boolean) {
+    const rows = this.db.select().from(goals)
+      .where(eq(goals.archived, archived))
+      .orderBy(asc(goals.endDate), sql`${goals.title} COLLATE NOCASE`).all();
+    return this.attachGoalState(this.db, rows);
+  }
+
+  getGoal(id: number) {
+    const row = this.db.select().from(goals).where(eq(goals.id, id)).get();
+    if (!row) throw new ApiError(404, "Goal not found.");
+    return this.attachGoalState(this.db, [row])[0]!;
+  }
+
+  createGoal(input: GoalInput) {
+    const id = this.db.transaction((tx) => {
+      const now = this.now();
+      const { subgoals: inputs, ...fields } = input;
+      const created = tx.insert(goals).values({ ...fields, archived: false, createdAt: now, updatedAt: now })
+        .returning({ id: goals.id }).get();
+      tx.insert(goalSubgoals).values(inputs.map((subgoal, position) => ({
+        goalId: created.id,
+        title: subgoal.title,
+        targetValue: subgoal.targetValue,
+        position,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      }))).run();
+      const response = this.attachGoalState(tx, [{ id: created.id, ...fields, archived: false, createdAt: now, updatedAt: now }])[0]!;
+      this.writeAudit(tx, { action: "GOAL_CREATED", entityType: "GOAL", entityId: created.id, after: goalSnapshot(response), createdAt: now });
+      return created.id;
+    });
+    return this.getGoal(id);
+  }
+
+  updateGoal(id: number, input: GoalInput) {
+    this.db.transaction((tx) => {
+      const current = tx.select().from(goals).where(eq(goals.id, id)).get();
+      if (!current) throw new ApiError(404, "Goal not found.");
+      const before = this.attachGoalState(tx, [current])[0]!;
+      const entryCount = tx.select({ value: count() }).from(goalEntries).where(eq(goalEntries.goalId, id)).get()!.value;
+      if (entryCount > 0) {
+        const sameDefinition = current.unit === input.unit
+          && current.stepValue === input.stepValue
+          && current.startDate === input.startDate
+          && current.endDate === input.endDate
+          && isDeepStrictEqual(
+            before.subgoals.map((subgoal) => ({ id: subgoal.id, title: subgoal.title, targetValue: subgoal.targetValue })),
+            input.subgoals,
+          );
+        if (!sameDefinition) throw new ApiError(400, "Goal dates, unit, step, and subgoals cannot change after progress is recorded.");
+      } else {
+        const currentIds = new Set(before.subgoals.map((subgoal) => subgoal.id));
+        if (input.subgoals.some((subgoal) => subgoal.id !== null && !currentIds.has(subgoal.id))) {
+          throw new ApiError(400, "Subgoal does not belong to this goal.");
+        }
+      }
+      const { subgoals: inputs, ...fields } = input;
+      const now = this.now();
+      tx.update(goals).set({ ...fields, updatedAt: now }).where(eq(goals.id, id)).run();
+      if (entryCount === 0) {
+        tx.delete(goalSubgoals).where(eq(goalSubgoals.goalId, id)).run();
+        tx.insert(goalSubgoals).values(inputs.map((subgoal, position) => ({
+          goalId: id,
+          title: subgoal.title,
+          targetValue: subgoal.targetValue,
+          position,
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        }))).run();
+      }
+      const after = this.attachGoalState(tx, [{ ...current, ...fields, updatedAt: now }])[0]!;
+      if (!isDeepStrictEqual(goalSnapshot(before), goalSnapshot(after))) {
+        this.writeAudit(tx, { action: "GOAL_UPDATED", entityType: "GOAL", entityId: id, before: goalSnapshot(before), after: goalSnapshot(after), createdAt: now });
+      }
+    });
+    return this.getGoal(id);
+  }
+
+  setGoalsArchived(ids: number[], archived: boolean) {
+    this.db.transaction((tx) => {
+      const existing = tx.select().from(goals).where(inArray(goals.id, ids)).all();
+      if (existing.length !== ids.length) throw new ApiError(404, "Goal not found.");
+      const changed = existing.filter((goal) => goal.archived !== archived);
+      if (changed.length === 0) return;
+      const now = this.now();
+      tx.update(goals).set({ archived, updatedAt: now }).where(inArray(goals.id, changed.map((goal) => goal.id))).run();
+      for (const goal of changed) {
+        const before = this.attachGoalState(tx, [goal])[0]!;
+        this.writeAudit(tx, {
+          action: archived ? "GOAL_ARCHIVED" : "GOAL_RESTORED",
+          entityType: "GOAL",
+          entityId: goal.id,
+          before: goalSnapshot(before),
+          after: goalSnapshot({ ...before, archived }),
+          createdAt: now,
+        });
+      }
+    });
+    return ids.map((id) => this.getGoal(id));
+  }
+
+  deleteArchivedGoal(id: number) {
+    return this.db.transaction((tx) => {
+      const current = tx.select().from(goals).where(eq(goals.id, id)).get();
+      if (!current) throw new ApiError(404, "Goal not found.");
+      if (!current.archived) throw new ApiError(400, "Archive the goal before deleting it.");
+      const response = this.attachGoalState(tx, [current])[0]!;
+      this.writeAudit(tx, { action: "GOAL_DELETED", entityType: "GOAL", entityId: id, before: goalSnapshot(response), createdAt: this.now() });
+      tx.delete(goals).where(eq(goals.id, id)).run();
+      return response;
+    });
+  }
+
+  createGoalEntry(input: GoalEntryInput) {
+    const id = this.db.transaction((tx) => {
+      const goal = tx.select().from(goals).where(eq(goals.id, input.goalId)).get();
+      if (!goal) throw new ApiError(404, "Goal not found.");
+      if (goal.archived) throw new ApiError(400, "Archived goals cannot record progress.");
+      const subgoals = tx.select().from(goalSubgoals).where(eq(goalSubgoals.goalId, goal.id)).all();
+      if (subgoals.length > 0 && subgoals.every((subgoal) => subgoal.completedAt !== null)) {
+        throw new ApiError(400, "Completed goals cannot record progress.");
+      }
+      if (input.localDate < goal.startDate || input.localDate > goal.endDate) {
+        throw new ApiError(400, "Progress date must be within the goal date range.");
+      }
+      const now = this.now();
+      const created = tx.insert(goalEntries).values({ ...input, createdAt: now }).returning({ id: goalEntries.id }).get();
+      this.writeAudit(tx, { action: "GOAL_ENTRY_CREATED", entityType: "GOAL_ENTRY", entityId: created.id, after: { id: created.id, ...input }, createdAt: now });
+      return created.id;
+    });
+    return this.db.select().from(goalEntries).where(eq(goalEntries.id, id)).get()!;
+  }
+
+  setGoalSubgoalCompleted(id: number, input: GoalSubgoalCompletionInput) {
+    const goalId = this.db.transaction((tx) => {
+      const subgoal = tx.select().from(goalSubgoals).where(eq(goalSubgoals.id, id)).get();
+      if (!subgoal) throw new ApiError(404, "Subgoal not found.");
+      const goal = tx.select().from(goals).where(eq(goals.id, subgoal.goalId)).get();
+      if (!goal) throw new ApiError(404, "Goal not found.");
+      if (goal.archived) throw new ApiError(400, "Archived goals cannot be changed.");
+      const siblings = tx.select().from(goalSubgoals).where(eq(goalSubgoals.goalId, goal.id)).all();
+      if (siblings.length > 0 && siblings.every((candidate) => candidate.completedAt !== null)) {
+        throw new ApiError(400, "Completed goals cannot be changed.");
+      }
+      if (input.localDate < goal.startDate || input.localDate > goal.endDate) {
+        throw new ApiError(400, "Subgoals can only be changed within the goal date range.");
+      }
+      if ((subgoal.completedAt !== null) === input.completed) return goal.id;
+      const currentValue = this.goalCurrentValue(tx, goal.id);
+      if (input.completed && currentValue < subgoal.targetValue) {
+        throw new ApiError(409, "Shared progress has not reached this subgoal target.");
+      }
+      const completedAt = input.completed ? input.occurredAt : null;
+      const now = this.now();
+      tx.update(goalSubgoals).set({ completedAt, updatedAt: now }).where(eq(goalSubgoals.id, id)).run();
+      this.writeAudit(tx, {
+        action: input.completed ? "GOAL_SUBGOAL_COMPLETED" : "GOAL_SUBGOAL_REOPENED",
+        entityType: "GOAL_SUBGOAL",
+        entityId: id,
+        before: subgoal,
+        after: { ...subgoal, completedAt, updatedAt: now },
+        createdAt: now,
+      });
+      return goal.id;
+    });
+    return this.getGoal(goalId);
   }
 
   getItem(id: number) {
@@ -958,6 +1151,25 @@ export class RecordsService {
     }).from(recordEntries).innerJoin(recordItems, eq(recordItems.id, recordEntries.itemId));
   }
 
+  private attachGoalState(reader: RecordsReader, rows: GoalRow[]): GoalResponse[] {
+    if (rows.length === 0) return [];
+    const ids = rows.map((goal) => goal.id);
+    const children = reader.select().from(goalSubgoals)
+      .where(inArray(goalSubgoals.goalId, ids))
+      .orderBy(asc(goalSubgoals.position), asc(goalSubgoals.id)).all();
+    return rows.map((goal) => ({
+      ...goal,
+      currentValue: this.goalCurrentValue(reader, goal.id),
+      subgoals: children.filter((subgoal) => subgoal.goalId === goal.id),
+    }));
+  }
+
+  private goalCurrentValue(reader: RecordsReader, goalId: number): number {
+    const result = reader.select({ value: sql<number>`coalesce(sum(${goalEntries.value}), 0)` })
+      .from(goalEntries).where(eq(goalEntries.goalId, goalId)).get();
+    return Number(result?.value ?? 0);
+  }
+
   private writeAudit(tx: RecordsTransaction, audit: AuditWrite) {
     tx.insert(recordAuditLogs).values({
       action: audit.action,
@@ -994,6 +1206,28 @@ function itemSnapshot(
   item: Pick<RecordItemRow, "id" | "name" | "description" | "mode" | "valueType" | "defaultValue" | "minValue" | "maxValue" | "stepValue" | "unit" | "goalValue" | "goalPeriod" | "priority" | "archived">,
 ) {
   return item;
+}
+
+function goalSnapshot(goal: GoalResponse) {
+  return {
+    id: goal.id,
+    title: goal.title,
+    description: goal.description,
+    unit: goal.unit,
+    defaultValue: goal.defaultValue,
+    stepValue: goal.stepValue,
+    startDate: goal.startDate,
+    endDate: goal.endDate,
+    archived: goal.archived,
+    currentValue: goal.currentValue,
+    subgoals: goal.subgoals.map((subgoal) => ({
+      id: subgoal.id,
+      title: subgoal.title,
+      targetValue: subgoal.targetValue,
+      position: subgoal.position,
+      completedAt: subgoal.completedAt,
+    })),
+  };
 }
 
 function entrySnapshot(entry: RecordEntryRow, itemName: string) {

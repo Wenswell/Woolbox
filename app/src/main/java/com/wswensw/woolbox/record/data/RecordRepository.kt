@@ -5,6 +5,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.wswensw.woolbox.record.model.GoalPeriod
+import com.wswensw.woolbox.record.model.GoalPool
+import com.wswensw.woolbox.record.model.GoalPoolDraft
+import com.wswensw.woolbox.record.model.GoalSubgoal
 import com.wswensw.woolbox.record.model.DailyFocus
 import com.wswensw.woolbox.record.model.DailyFocusPauseReason
 import com.wswensw.woolbox.record.model.DailyFocusState
@@ -59,6 +62,7 @@ data class TemplateStepDraft(
 
 data class RecordsSnapshot(
     val activeItems: List<RecordItem>,
+    val goals: List<GoalPool>,
     val entries: List<RecordEntry>,
     val latestEntries: Map<Long, RecordEntry>,
     val templates: List<TaskTemplate>,
@@ -95,6 +99,7 @@ class RecordRepository(context: Context) {
         val todayEntries = rangeEntries.filter { it.localDate == localDate }
         _snapshot.value = RecordsSnapshot(
             activeItems = activeItems,
+            goals = overview.getJSONArray("goals").mapObjects(::parseGoal),
             entries = todayEntries,
             latestEntries = overview.getJSONArray("latestMeasurementEntries")
             .mapObjects(::parseEntry)
@@ -149,6 +154,60 @@ class RecordRepository(context: Context) {
                 .put("localMinute", local.hour * 60 + local.minute)
                 .put("value", value)
             request("POST", "entries", body = body).getJSONObject("entry").getLong("id")
+        }
+
+    suspend fun saveGoal(goalId: Long?, input: GoalPoolDraft): Long = withContext(Dispatchers.IO) {
+        val draft = input.validated()
+        val body = JSONObject().apply {
+            put("title", draft.title)
+            put("description", draft.description)
+            put("unit", draft.unit)
+            putNullable("defaultValue", draft.defaultValue)
+            put("stepValue", draft.stepValue)
+            put("startDate", draft.startDate.toString())
+            put("endDate", draft.endDate.toString())
+            put("subgoals", JSONArray(draft.subgoals.map { subgoal ->
+                JSONObject().apply {
+                    putNullable("id", subgoal.id)
+                    put("title", subgoal.title)
+                    put("targetValue", subgoal.targetValue)
+                }
+            }))
+        }
+        request(
+            method = if (goalId == null) "POST" else "PUT",
+            path = if (goalId == null) "goals" else "goals/$goalId",
+            body = body,
+        ).getJSONObject("goal").getLong("id")
+    }
+
+    suspend fun createGoalEntry(goal: GoalPool, value: Double, occurredAt: Long): Long =
+        withContext(Dispatchers.IO) {
+            require(value.isFinite() && value > 0) { "Value must be a positive number." }
+            val local = Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault())
+            request(
+                "POST",
+                "goal-entries",
+                body = JSONObject()
+                    .put("goalId", goal.id)
+                    .put("occurredAt", occurredAt)
+                    .put("localDate", local.toLocalDate().toString())
+                    .put("localMinute", local.hour * 60 + local.minute)
+                    .put("value", value),
+            ).getJSONObject("entry").getLong("id")
+        }
+
+    suspend fun setGoalSubgoalCompleted(subgoalId: Long, completed: Boolean, occurredAt: Long) =
+        withContext(Dispatchers.IO) {
+            request(
+                "PUT",
+                "goal-subgoals/$subgoalId/completion",
+                body = JSONObject()
+                    .put("completed", completed)
+                    .put("occurredAt", occurredAt)
+                    .put("localDate", Instant.ofEpochMilli(occurredAt).atZone(ZoneId.systemDefault()).toLocalDate().toString()),
+            )
+            Unit
         }
 
     suspend fun entriesForItem(itemId: Long, startDate: String, endDate: String): List<RecordEntry> =
@@ -446,6 +505,29 @@ private fun parseItem(value: JSONObject): RecordItem {
     }
     return item
 }
+
+private fun parseGoal(value: JSONObject) = GoalPool(
+    id = value.getLong("id"),
+    title = value.getString("title"),
+    description = value.getString("description"),
+    unit = value.getString("unit"),
+    defaultValue = value.nullableDouble("defaultValue"),
+    stepValue = value.getDouble("stepValue"),
+    startDate = LocalDate.parse(value.getString("startDate")),
+    endDate = LocalDate.parse(value.getString("endDate")),
+    archived = value.getBoolean("archived"),
+    currentValue = value.getDouble("currentValue"),
+    subgoals = value.getJSONArray("subgoals").mapObjects(::parseGoalSubgoal),
+)
+
+private fun parseGoalSubgoal(value: JSONObject) = GoalSubgoal(
+    id = value.getLong("id"),
+    goalId = value.getLong("goalId"),
+    title = value.getString("title"),
+    targetValue = value.getDouble("targetValue"),
+    position = value.getInt("position"),
+    completedAt = value.nullableLong("completedAt"),
+)
 
 private fun parseEntry(value: JSONObject) = RecordEntry(
     id = value.getLong("id"),

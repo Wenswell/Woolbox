@@ -36,6 +36,37 @@ export interface RecordEntryInput {
   value: number;
 }
 
+export interface GoalSubgoalInput {
+  id: number | null;
+  title: string;
+  targetValue: number;
+}
+
+export interface GoalInput {
+  title: string;
+  description: string;
+  unit: string;
+  defaultValue: number | null;
+  stepValue: number;
+  startDate: string;
+  endDate: string;
+  subgoals: GoalSubgoalInput[];
+}
+
+export interface GoalEntryInput {
+  goalId: number;
+  occurredAt: number;
+  localDate: string;
+  localMinute: number;
+  value: number;
+}
+
+export interface GoalSubgoalCompletionInput {
+  completed: boolean;
+  occurredAt: number;
+  localDate: string;
+}
+
 export interface StepTitleInput {
   title: string;
 }
@@ -167,6 +198,59 @@ export function parseEntryInput(value: unknown): RecordEntryInput {
   requireRule(/^\d{4}-\d{2}-\d{2}$/.test(entry.localDate) && isRealDate(entry.localDate), "Local date is invalid.");
   requireRule(entry.localMinute >= 0 && entry.localMinute <= 1439, "Local minute is invalid.");
   return entry;
+}
+
+export function parseGoalInput(value: unknown): GoalInput {
+  const input = objectInput(value);
+  const title = requiredTrimmedString(input, "title", "Title is required.");
+  const description = stringField(input, "description").trim();
+  const unit = requiredTrimmedString(input, "unit", "Unit is required.");
+  const defaultValue = nullableNumberField(input, "defaultValue");
+  const stepValue = numberField(input, "stepValue");
+  const startDate = parseIsoDate(input.startDate, "Start date");
+  const endDate = parseIsoDate(input.endDate, "End date");
+  requirePositive(defaultValue, "Default value");
+  requirePositive(stepValue, "Step");
+  requireRule(startDate <= endDate, "Start date must not be after end date.");
+  requireRule(Array.isArray(input.subgoals) && input.subgoals.length > 0, "Subgoals must be a non-empty array.");
+  const subgoals = input.subgoals.map((candidate) => {
+    const subgoal = objectInput(candidate);
+    const id = subgoal.id === null ? null : parseId(subgoal.id, "Subgoal ID");
+    const targetValue = numberField(subgoal, "targetValue");
+    requirePositive(targetValue, "Subgoal target");
+    return {
+      id,
+      title: requiredTrimmedString(subgoal, "title", "Subgoal title is required."),
+      targetValue,
+    };
+  });
+  const ids = subgoals.flatMap((subgoal) => subgoal.id === null ? [] : [subgoal.id]);
+  requireRule(new Set(ids).size === ids.length, "Subgoal IDs must be unique.");
+  return { title, description, unit, defaultValue, stepValue, startDate, endDate, subgoals };
+}
+
+export function parseGoalEntryInput(value: unknown): GoalEntryInput {
+  const input = objectInput(value);
+  const entry = {
+    goalId: positiveIntegerField(input, "goalId"),
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
+    localDate: parseIsoDate(input.localDate, "Local date"),
+    localMinute: integerField(input, "localMinute"),
+    value: numberField(input, "value"),
+  };
+  requireRule(entry.localMinute >= 0 && entry.localMinute <= 1439, "Local minute is invalid.");
+  requirePositive(entry.value, "Value");
+  return entry;
+}
+
+export function parseGoalSubgoalCompletionInput(value: unknown): GoalSubgoalCompletionInput {
+  const input = objectInput(value);
+  requireRule(typeof input.completed === "boolean", "Completed must be a boolean.");
+  return {
+    completed: input.completed,
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
+    localDate: parseIsoDate(input.localDate, "Local date"),
+  };
 }
 
 export function parseStepTitleInput(value: unknown): StepTitleInput {

@@ -62,6 +62,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.ui.ManageTemplatesScreen
+import com.wswensw.woolbox.record.ui.ManageGoalsScreen
 import com.wswensw.woolbox.record.ui.ManageRecordsScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
 import com.wswensw.woolbox.record.model.RecordItem
@@ -70,6 +71,8 @@ import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
 import com.wswensw.woolbox.record.ui.AddTodayTaskSheet
 import com.wswensw.woolbox.record.ui.DailyFocusScreen
+import com.wswensw.woolbox.record.ui.GoalEditorScreen
+import com.wswensw.woolbox.record.ui.GoalPoolSheet
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
 import com.wswensw.woolbox.record.ui.MotionMode
@@ -143,6 +146,7 @@ fun WoolboxApp(
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
     var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var goalSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var todayTaskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showAddTodayTask by rememberSaveable { mutableStateOf(false) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -286,6 +290,7 @@ fun WoolboxApp(
                                 selectedTab = tab
                                 if (tab != MainTab.RECORDS) {
                                     recordSheetItemId = null
+                                    goalSheetId = null
                                     todayTaskSheetId = null
                                     showAddTodayTask = false
                                     measurementSheetItemId = null
@@ -329,6 +334,10 @@ fun WoolboxApp(
                                     todayTaskSheetId = null
                                     navController.navigate(AppRoutes.MANAGE_TEMPLATES)
                                 },
+                                onManageGoals = {
+                                    goalSheetId = null
+                                    navController.navigate(AppRoutes.MANAGE_GOALS)
+                                },
                                 onManageAccumulates = {
                                     recordSheetItemId = null
                                     navController.navigate(AppRoutes.MANAGE_ACCUMULATES)
@@ -342,6 +351,7 @@ fun WoolboxApp(
                                 },
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
+                                onOpenGoal = { goalSheetId = it.id },
                                 onToggleTask = { task, completed, onResult ->
                                     recordsViewModel.setTodayTaskCompleted(task, completed) { error ->
                                         onResult(error)
@@ -534,6 +544,15 @@ fun WoolboxApp(
                     onEdit = { templateId -> navController.navigate(AppRoutes.templateEdit(templateId)) },
                 )
             }
+            composable(AppRoutes.MANAGE_GOALS) {
+                ManageGoalsScreen(
+                    state = recordsState,
+                    onBack = { navController.popBackStack() },
+                    onNew = { navController.navigate(AppRoutes.GOAL_NEW) },
+                    onEdit = { goalId -> navController.navigate(AppRoutes.goalEdit(goalId)) },
+                    onRetry = { goalId -> navController.navigate(AppRoutes.goalRetry(goalId)) },
+                )
+            }
             composable(AppRoutes.MANAGE_ACCUMULATES) {
                 ManageRecordsScreen(
                     state = recordsState,
@@ -642,6 +661,57 @@ fun WoolboxApp(
                     },
                 )
             }
+            composable(AppRoutes.GOAL_NEW) {
+                GoalEditorScreen(
+                    goal = null,
+                    editing = false,
+                    loading = false,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveGoal(null, draft) { error ->
+                            onResult(error)
+                            if (error == null) navController.popBackStack()
+                        }
+                    },
+                )
+            }
+            composable(
+                route = AppRoutes.GOAL_EDIT,
+                arguments = listOf(navArgument(AppRoutes.GOAL_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val goalId = entry.arguments?.getLong(AppRoutes.GOAL_ID) ?: return@composable
+                GoalEditorScreen(
+                    goal = recordsState.findGoal(goalId),
+                    editing = true,
+                    loading = recordsState.isLoading,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveGoal(goalId, draft) { error ->
+                            onResult(error)
+                            if (error == null) navController.popBackStack()
+                        }
+                    },
+                )
+            }
+            composable(
+                route = AppRoutes.GOAL_RETRY,
+                arguments = listOf(navArgument(AppRoutes.GOAL_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val sourceId = entry.arguments?.getLong(AppRoutes.GOAL_ID) ?: return@composable
+                GoalEditorScreen(
+                    goal = null,
+                    source = recordsState.findGoal(sourceId),
+                    editing = false,
+                    loading = recordsState.isLoading,
+                    onBack = { navController.popBackStack() },
+                    onSave = { draft, onResult ->
+                        recordsViewModel.saveGoal(null, draft) { error ->
+                            onResult(error)
+                            if (error == null) navController.popBackStack()
+                        }
+                    },
+                )
+            }
             composable(AppRoutes.RECORD_ITEM_ACCUMULATE_NEW) {
                 AccumulateItemFormScreen(
                     item = null,
@@ -730,6 +800,17 @@ fun WoolboxApp(
                             ?: recordsState.entries.filter { it.itemId == itemId }.sumOf { it.value },
                         onDismiss = { recordSheetItemId = null },
                         onRecord = recordValue,
+                    )
+                }
+            }
+
+            goalSheetId?.let { goalId ->
+                recordsState.findGoal(goalId)?.let { goal ->
+                    GoalPoolSheet(
+                        goal = goal,
+                        onDismiss = { goalSheetId = null },
+                        onRecord = { value, onResult -> recordsViewModel.createGoalEntry(goal, value, onResult) },
+                        onToggleSubgoal = recordsViewModel::setGoalSubgoalCompleted,
                     )
                 }
             }
@@ -926,11 +1007,16 @@ private object AppRoutes {
 
     fun copyHistoryEdit(historyId: Long) = "global-copy/history/$historyId"
     const val MANAGE_TEMPLATES = "manage-templates"
+    const val MANAGE_GOALS = "manage-goals"
     const val MANAGE_ACCUMULATES = "manage-accumulates"
     const val MANAGE_MEASUREMENTS = "manage-measurements"
     const val RECORDS_CONNECTION = "records-connection"
     const val TEMPLATE_NEW = "template/new"
     const val DAILY_FOCUS = "records/focus"
+    const val GOAL_NEW = "goal/new"
+    const val GOAL_ID = "goalId"
+    const val GOAL_EDIT = "goal/{$GOAL_ID}"
+    const val GOAL_RETRY = "goal/retry/{$GOAL_ID}"
     const val TEMPLATE_ID = "templateId"
     const val TEMPLATE_EDIT = "template/{$TEMPLATE_ID}"
     const val RECORD_ITEM_ID = "recordItemId"
@@ -944,6 +1030,8 @@ private object AppRoutes {
     fun measurementItemNew() = RECORD_ITEM_MEASUREMENT_NEW
     fun measurementItemEdit(itemId: Long) = "record-item/measurement/$itemId"
     fun templateEdit(templateId: Long) = "template/$templateId"
+    fun goalEdit(goalId: Long) = "goal/$goalId"
+    fun goalRetry(goalId: Long) = "goal/retry/$goalId"
 }
 
 private const val PageTransitionMillis = 220

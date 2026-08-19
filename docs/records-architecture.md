@@ -4,7 +4,7 @@
 
 `records-server` 使用 Fastify、Drizzle ORM 和 SQLite。生产数据库为 `/srv/records/records.sqlite`，服务监听 `127.0.0.1:4320`，由 Caddy 在 `/apps/records` 提供 HTTPS 和 Basic Auth。Android 由 `RecordRepository` 使用进程级 `OkHttpClient` 访问，凭据由 Keystore 加密保存。
 
-`GET /api/overview` 接受记录起止日期和 `planDate`，返回活跃模板、Daily 建议、昨日未完成候选、该日期 Today tasks/DailyFocus、范围内累计流水和最新 Measurement 流水。ViewModel 串行根页读写；成功写入后刷新，刷新失败不回滚已完成写入。
+`GET /api/overview` 接受记录起止日期和 `planDate`，返回活跃模板、Goal 及其派生共享进度、Daily 建议、昨日未完成候选、该日期 Today tasks/DailyFocus、范围内累计流水和最新 Measurement 流水。ViewModel 串行根页读写；成功写入后刷新，刷新失败不回滚已完成写入。
 
 ## 数据表
 
@@ -12,12 +12,15 @@
 | --- | --- |
 | `record_items` | `NOCASE` 唯一名称、模式、计量配置、目标、优先级、归档状态和时间戳。 |
 | `record_entries` | 发生时刻、固化本地日期/分钟和值；随父项级联删除。 |
+| `goals` | 通用共享进度目标的标题、描述、单位、默认值、步进、起止日期、归档状态和时间戳。 |
+| `goal_subgoals` | Goal 的一级子目标、目标值、固定位序和完成时间；随父目标级联删除。 |
+| `goal_entries` | Goal 共享进度的发生时刻、固化本地日期/分钟和值；随父目标级联删除。 |
 | `task_templates` | 标题、`MANUAL/DAILY`、归档状态和时间戳；没有完成状态。 |
 | `task_template_steps` | 模板步骤与固定位序；模板更新时整体替换。 |
 | `today_tasks` | 日期、可空模板/昨日任务来源、标题快照、位序、完成时刻和 revision。 |
 | `today_task_steps` | 任务步骤快照、固定位序和完成时刻；随任务级联删除。 |
 | `daily_focus` | 唯一日期、主/次/当前任务引用、第一步、状态、暂停原因、轮次、下一回顾时刻和 revision。 |
-| `record_audit_logs` | `ITEM/ENTRY/TEMPLATE/TODAY_TASK/TODAY_TASK_STEP/FOCUS` 的动作及前后 JSON 快照。 |
+| `record_audit_logs` | 记录项、Goal、模板、Today task 与 Focus 的动作及前后 JSON 快照。 |
 
 累计流水必须为有限正数；Measurement 流水必须位于闭区间且符合步进。记录项已有流水后，模式、计量类型、单位和 Measurement 范围不可变；归档项不能新增流水，永久删除只接受归档项。写请求携带未定义的 `windows` 字段时明确拒绝。记录项更新先比较规范化快照，无变化或失败时不写业务数据和审计。
 
@@ -41,6 +44,17 @@
 所有写入由服务端事务校验日期、状态、引用和 revision；失败请求不产生业务数据或审计。任务创建、完成、重开及 Focus 状态转换写入审计。轮次只由 `review/review-now` 增加。
 
 模板写入允许零步骤。Today task 从模板创建后独立；模板删除只清空其外键。昨日来源使用唯一约束防止同一天重复续做。
+
+## Goals API
+
+| 方法与路径 | 作用 |
+| --- | --- |
+| `GET/POST /api/goals`、`PUT/DELETE /api/goals/:id` | 查询、新建、更新及删除已归档 Goal；响应内含子目标和 `currentValue`。 |
+| `POST /api/goals/batch-archive` | 批量归档或恢复 Goal。 |
+| `POST /api/goal-entries` | 在 Goal 日期范围内增加一条正数共享进度。 |
+| `PUT /api/goal-subgoals/:id/completion` | 达到子目标值后确认完成；全部完成或日期范围外拒绝变更。 |
+
+Goal、子目标、共享进度流水及完成操作均写入审计。服务端按流水求和派生 `currentValue`；子目标完成不修改流水。存在流水后更新事务锁定单位、步进、日期与完整子目标定义；全部子目标完成或日期过期后拒绝新增进度和完成状态变更。
 
 ## Focus 协调
 

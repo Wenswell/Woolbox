@@ -11,6 +11,9 @@ import {
   parseDailyFocusTransitionInput,
   parseDailyFocusUpdateInput,
   parseEntryInput,
+  parseGoalEntryInput,
+  parseGoalInput,
+  parseGoalSubgoalCompletionInput,
   parseId,
   parseIds,
   parseIsoDate,
@@ -94,6 +97,45 @@ export function buildApp(options: BuildAppOptions) {
     const item = records.deleteArchivedItem(parseId((request.params as { id?: unknown }).id));
     return { item };
   });
+
+  app.get("/api/goals", (request) => {
+    const query = request.query as Record<string, unknown>;
+    const archived = query.archived === undefined ? false : query.archived === "true"
+      ? true
+      : query.archived === "false"
+        ? false
+        : invalidBoolean();
+    return { goals: records.listGoals(archived) };
+  });
+
+  app.post("/api/goals", (request, reply) => {
+    const goal = records.createGoal(parseGoalInput(request.body));
+    return reply.status(201).send({ goal });
+  });
+
+  app.put("/api/goals/:id", (request) => ({
+    goal: records.updateGoal(parseId((request.params as { id?: unknown }).id, "Goal ID"), parseGoalInput(request.body)),
+  }));
+
+  app.post("/api/goals/batch-archive", (request) => ({
+    goals: records.setGoalsArchived(parseIds(request.body), parseArchived(request.body)),
+  }));
+
+  app.delete("/api/goals/:id", (request) => ({
+    goal: records.deleteArchivedGoal(parseId((request.params as { id?: unknown }).id, "Goal ID")),
+  }));
+
+  app.post("/api/goal-entries", (request, reply) => {
+    const entry = records.createGoalEntry(parseGoalEntryInput(request.body));
+    return reply.status(201).send({ entry });
+  });
+
+  app.put("/api/goal-subgoals/:id/completion", (request) => ({
+    goal: records.setGoalSubgoalCompleted(
+      parseId((request.params as { id?: unknown }).id, "Subgoal ID"),
+      parseGoalSubgoalCompletionInput(request.body),
+    ),
+  }));
 
   app.get("/api/templates", (request) => {
     const query = request.query as Record<string, unknown>;

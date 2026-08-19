@@ -53,6 +53,7 @@ import com.wswensw.woolbox.record.model.DailyFocus
 import com.wswensw.woolbox.record.model.DailyFocusPauseReason
 import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.GoalPeriod
+import com.wswensw.woolbox.record.model.GoalPool
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
@@ -68,11 +69,13 @@ fun RecordsScreen(
     onPlanFocus: () -> Unit,
     onAddTask: () -> Unit,
     onManageTemplates: () -> Unit,
+    onManageGoals: () -> Unit,
     onManageAccumulates: () -> Unit,
     onManageMeasurements: () -> Unit,
     onConfigureConnection: () -> Unit,
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
+    onOpenGoal: (GoalPool) -> Unit,
     onToggleTask: (TodayTask, Boolean, (String?) -> Unit) -> Unit,
     onOpenTask: (TodayTask) -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
@@ -84,6 +87,9 @@ fun RecordsScreen(
     modifier: Modifier = Modifier,
 ) {
     val accumulateItems = orderedRecordItems(state.activeItems).filter { it.mode == RecordMode.ACCUMULATE }
+    val goals = state.goals
+        .filter { !it.completed && !it.expired() }
+        .sortedWith(compareBy<GoalPool> { it.endDate }.thenBy { it.title })
     val measurementItems = state.activeItems
         .filter { it.mode == RecordMode.MEASUREMENT }
         .sortedBy { it.name.lowercase(Locale.ROOT) }
@@ -182,6 +188,27 @@ fun RecordsScreen(
                         title = stringResource(R.string.records_templates),
                         subtitle = stringResource(R.string.templates_count, state.templates.size),
                         onClick = onManageTemplates,
+                    )
+                }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    SectionLink(
+                        title = stringResource(R.string.records_goals),
+                        subtitle = stringResource(R.string.goals_count, goals.size),
+                        onClick = onManageGoals,
+                    )
+                }
+                items(goals, key = { "goal-${it.id}" }) { goal ->
+                    RecordHomeRow(
+                        title = goal.title,
+                        value = stringResource(
+                            R.string.goal_home_value,
+                            formatValue(goal.currentValue),
+                            goal.unit,
+                            goal.subgoals.count { it.completedAt != null },
+                            goal.subgoals.size,
+                        ),
+                        onClick = { onOpenGoal(goal) },
                     )
                 }
                 item {

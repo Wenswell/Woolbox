@@ -2,7 +2,7 @@
 
 ## 页面结构
 
-Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates → Accumulate → Measurement**。Today 分开呈现 Focus 与 Tasks；其余 section 使用 `titleSmall` 标题、数量和 chevron 进入管理页。
+Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates → Goals → Accumulate → Measurement**。Today 分开呈现 Focus 与 Tasks；其余 section 使用 `titleSmall` 标题、数量和 chevron 进入管理页。
 
 | 区域 | 职责 |
 | --- | --- |
@@ -11,6 +11,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates
 | `Plan/Edit Focus` | 第一步、未完成主任务和可空次任务；第一步只在创建或 `READY` 可编辑，暂停后只重新选择 Focus。顶栏 Check 保存。 |
 | Add task Sheet | `Recommended / Templates / New task` 三个 tabs；推荐包含未采用 Daily 模板和昨日未完成候选；新任务允许可选清单。 |
 | `Templates` | 根页只显示活跃数量。管理页 Daily 优先；表单整体保存标题、周期与可选步骤，模板没有 checkbox。 |
+| `Goals` | 根页只列进行中的 Goal，显示共享进度和子目标完成数。详情 Sheet 录入正数进度，并仅对已达到目标值的子目标开放确认。管理页保留完成和到期结果。 |
 | `Accumulate` | 显示名称与今日累计，进入累计记录 Sheet，不显示任务或 Focus 状态。 |
 | `Measurement` | 显示名称与最新值，进入 24 小时预览和离散 Slider。 |
 
@@ -25,16 +26,17 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates
 - 回顾到期由分钟时钟触发，不显示倒计时或精确工时。通知不可用时只替换 Focus 内容，Tasks 不受影响。
 - Today task progress Sheet 显示任务主 checkbox、可选步骤 checkbox 和完成时间。模板修改不影响任务快照。
 - Accumulate 与 Measurement 只突出当前数值；累计写入和刚达标沿用记录 Sheet 的触觉、Snackbar 与 `Undo`。
+- Goal 详情明确区分“达到目标值”和“已确认完成”；完成或到期时禁用录入和 checkbox，只提供创建独立新目标的“再次挑战”，不提供继续、延期或重开旧目标。
 
 ## 管理页
 
-`Manage accumulates` 与 `Manage measurements` 使用相同路由骨架，只列出对应模式并提供新建入口。累计表单固定 `ACCUMULATE`，包含数值类型、默认值、目标和优先级；测量表单固定 `MEASUREMENT + Number`，包含范围、步进、单位和优先级，不显示默认值、目标或时间段。Measurement 预览使用原始 24 小时数据和离散 Slider。
+`Manage goals` 保留进行中、完成和到期 Goal；表单使用通用单位、默认值、步进、必填起止日期和一层子目标。产生进度后，固定字段与子目标只读。`Manage accumulates` 与 `Manage measurements` 使用相同路由骨架，只列出对应模式并提供新建入口。累计表单固定 `ACCUMULATE`；测量表单固定 `MEASUREMENT + Number`。Measurement 预览使用原始 24 小时数据和离散 Slider。
 
 Setting 的 `Records connection` 使用 `AppSection`：Server 明文地址、用户名、密码和全宽连接按钮。连接时禁用凭据输入；用户名键盘动作移到密码，密码使用 Password 键盘并通过 `Done` 提交合法表单；保存成功后返回。
 
 PC 使用响应式 App shell：桌面固定窄侧栏，窄屏为可横向滚动顶部导航。Today 顶部提供日期切换，内部按 Focus 与 Tasks 分区；Tasks 始终可操作，Focus 区提供状态、revision、提前回顾、即时切换、重置与结束。
 
-Templates 使用 Active/Archived 分段、搜索和表格；Accumulate 与 Measurement 使用固定模式表单；Entries 提供日期、模式与记录项筛选；Activity 只读显示对象、动作和变更摘要。
+Templates 使用 Active/Archived 分段、搜索和表格；Goals 使用表格与 Modal 管理共享进度、子目标和归档；Accumulate 与 Measurement 使用固定模式表单；Entries 提供日期、模式与记录项筛选；Activity 只读显示对象、动作和变更摘要。
 
 ## 修改检查
 

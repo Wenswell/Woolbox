@@ -4,7 +4,7 @@
 
 Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。首次使用在 Setting 的 `Records connection` 配置 Basic Auth 凭据；Android 使用 Keystore 加密保存。
 
-根列表固定为 **Today → Templates → Accumulate → Measurement**。Today 内固定为 Focus 和 Tasks；Accumulate 与 Measurement 不参与任务或 Focus 判断。PC 管理页固定为 `Overview`、`Today`、`Templates`、`Accumulate`、`Measurement`、`Entries`、`Activity`。
+根列表固定为 **Today → Templates → Goals → Accumulate → Measurement**。Today 内固定为 Focus 和 Tasks；Goals、Accumulate 与 Measurement 不参与任务或 Focus 判断。PC 管理页固定为 `Overview`、`Today`、`Templates`、`Goals`、`Accumulate`、`Measurement`、`Entries`、`Activity`。
 
 当前不提供离线队列、日历视图、每日以外的模板周期、任务统计、连续天数、标签、协作、多级步骤、精确闹钟或可配置图表。
 
@@ -48,6 +48,15 @@ Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依
 - 测量发生时间固定为提交时的设备时间。24 小时图使用原始时间点，不补零、聚合或平滑；只有成功提交后的短时 `Undo` 可删除流水。
 - 服务端统一校验记录项、归档和数值规则。客户端只缓存当前进程最近一次成功快照；刷新失败保留已有内容并显示重试入口。
 
+## Goals
+
+- Goal 是非周期的一次性共享进度池，保存标题、描述、单位、默认值、正步进、必填起止日期和一层子目标；每个子目标保存标题与正目标值。
+- 共享进度为日期范围内全部正数流水之和，不按日或周重置。录入不会分配给某个子目标，也不会因完成子目标而扣减。
+- 共享进度达到某个子目标值时，该子目标具备完成条件，但不会自动完成；用户必须单独确认。全部子目标确认后 Goal 立即完成并只读。
+- 截止日期结束时仍有未完成子目标，Goal 进入到期未完成并只读。完成和到期 Goal 从根页隐藏，在管理页保留。
+- 首条进度产生后，单位、步进、日期范围及子目标定义固定；标题、描述和默认录入值仍可编辑。完成或到期记录提供“再次挑战”，复制定义并按原时长生成可调整的新日期范围，不修改旧结果。
+- 本类型不支持进度消耗、子目标独立流水、子目标独立日期、多层嵌套或其他汇总规则。
+
 ## 验收
 
 - 无 Focus 时可以新增、完成和重开标题任务与清单任务；部分清单进度、整体完成和整体重开正确。
@@ -57,3 +66,4 @@ Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依
 - 暂停或结束 Focus 后，任务 checkbox 与添加入口仍可用；重开任务不自动恢复 Focus。
 - 模板允许零步骤且没有完成入口；模板修改不改变既有任务快照。
 - Android 与 PC 刷新后读取相同状态；PC 可按任意日期管理任务和 Focus。
+- Android 与 PC 可创建 Goal、录入共享进度，并且只有达到目标值的子目标可手动完成；完成不扣减共享进度，全部完成或到期后不可再写入。

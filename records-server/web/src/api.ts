@@ -1,6 +1,8 @@
 import type {
   AuditLogPage,
   DailyFocus,
+  Goal,
+  GoalInput,
   ItemInput,
   RecordEntry,
   RecordItem,
@@ -38,6 +40,47 @@ export const api = {
 
   async deleteItem(id: number) {
     return request<{ item: RecordItem }>(`items/${id}`, { method: "DELETE" });
+  },
+
+  async goals(archived: boolean): Promise<Goal[]> {
+    return (await request<{ goals: Goal[] }>(`goals?archived=${archived}`)).goals;
+  },
+
+  async saveGoal(input: GoalInput, id?: number) {
+    return request<{ goal: Goal }>(id ? `goals/${id}` : "goals", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  async archiveGoals(ids: number[], archived: boolean) {
+    return request("goals/batch-archive", { method: "POST", body: JSON.stringify({ ids, archived }) });
+  },
+
+  async deleteGoal(id: number) {
+    return request(`goals/${id}`, { method: "DELETE" });
+  },
+
+  async createGoalEntry(goalId: number, value: number) {
+    const now = new Date();
+    return request("goal-entries", {
+      method: "POST",
+      body: JSON.stringify({
+        goalId,
+        occurredAt: now.getTime(),
+        localDate: localDate(now),
+        localMinute: now.getHours() * 60 + now.getMinutes(),
+        value,
+      }),
+    });
+  },
+
+  async setGoalSubgoalCompleted(id: number, completed: boolean) {
+    const now = new Date();
+    return request<{ goal: Goal }>(`goal-subgoals/${id}/completion`, {
+      method: "PUT",
+      body: JSON.stringify({ completed, occurredAt: now.getTime(), localDate: localDate(now) }),
+    });
   },
 
   async templates(archived: boolean): Promise<TaskTemplate[]> {
@@ -145,6 +188,13 @@ export const api = {
     return request("entries/batch-delete", { method: "POST", body: JSON.stringify({ ids }) });
   },
 };
+
+function localDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function dailyFocusTransition(
   focus: DailyFocus,

@@ -134,6 +134,13 @@
       "when": 1787100352615,
       "tag": "0018_today_tasks_focus",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1787104000000,
+      "tag": "0019_pool_goals",
+      "breakpoints": true
     }
   ]
 }

@@ -56,6 +56,71 @@ describe("Records API", () => {
     expect(await getEntries()).toHaveLength(2);
   });
 
+  it("tracks a shared goal pool without consuming progress", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/goals",
+      payload: goalInput(),
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().goal).toMatchObject({
+      title: "Build the kit",
+      currentValue: 0,
+      subgoals: [
+        { title: "Phone", targetValue: 5_000, completedAt: null },
+        { title: "Bike", targetValue: 8_000, completedAt: null },
+      ],
+    });
+
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/goal-entries",
+      payload: { goalId: 1, occurredAt: 10, localDate: TestDate, localMinute: 600, value: 6_000 },
+    })).statusCode).toBe(201);
+    expect((await app.inject({
+      method: "PUT",
+      url: "/api/goal-subgoals/2/completion",
+      payload: { completed: true, occurredAt: 20, localDate: TestDate },
+    })).statusCode).toBe(409);
+    const completed = await app.inject({
+      method: "PUT",
+      url: "/api/goal-subgoals/1/completion",
+      payload: { completed: true, occurredAt: 20, localDate: TestDate },
+    });
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json().goal).toMatchObject({ currentValue: 6_000, subgoals: [{ completedAt: 20 }, { completedAt: null }] });
+    expect((await getOverview()).goals[0]).toMatchObject({
+      currentValue: 6_000,
+      subgoals: [{ completedAt: 20 }, { completedAt: null }],
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/goal-entries",
+      payload: { goalId: 1, occurredAt: 25, localDate: TestDate, localMinute: 601, value: 2_000 },
+    });
+    expect((await app.inject({
+      method: "PUT",
+      url: "/api/goal-subgoals/2/completion",
+      payload: { completed: true, occurredAt: 30, localDate: TestDate },
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/goal-entries",
+      payload: { goalId: 1, occurredAt: 31, localDate: TestDate, localMinute: 602, value: 1 },
+    })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/goals", payload: goalInput() })).statusCode).toBe(201);
+    expect((await app.inject({
+      method: "PUT",
+      url: "/api/goal-subgoals/2/completion",
+      payload: { completed: false, occurredAt: 32, localDate: TestDate },
+    })).statusCode).toBe(400);
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/goal-entries",
+      payload: { goalId: 1, occurredAt: 30, localDate: Yesterday, localMinute: 600, value: 1 },
+    })).statusCode).toBe(400);
+  });
+
   it("returns Today tasks, manual recommendations, and immutable template snapshots", async () => {
     await createItem(itemInput());
     await createEntry(entryInput({ value: 2 }));
@@ -269,4 +334,21 @@ function itemInput(patch: Record<string, unknown> = {}) {
 
 function entryInput(patch: Record<string, unknown> = {}) {
   return { itemId: 1, occurredAt: 10, localDate: TestDate, localMinute: 600, value: 1, ...patch };
+}
+
+function goalInput(patch: Record<string, unknown> = {}) {
+  return {
+    title: "Build the kit",
+    description: "",
+    unit: "points",
+    defaultValue: 100,
+    stepValue: 100,
+    startDate: TestDate,
+    endDate: "2027-07-20",
+    subgoals: [
+      { id: null, title: "Phone", targetValue: 5_000 },
+      { id: null, title: "Bike", targetValue: 8_000 },
+    ],
+    ...patch,
+  };
 }

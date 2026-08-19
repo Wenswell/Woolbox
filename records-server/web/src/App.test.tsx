@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { localToday, shiftLocalDate } from "./lib/format";
-import type { DailyFocus, TodayState } from "./types";
+import type { DailyFocus, TaskTemplate, TodayState } from "./types";
 
 const activeItem = {
   id: 1, name: "Water", description: "Daily hydration", mode: "ACCUMULATE", valueType: "NUMBER",
@@ -12,11 +12,11 @@ const activeItem = {
 };
 const measurementItem = { ...activeItem, id: 2, name: "Temperature", mode: "MEASUREMENT", defaultValue: null, minValue: 35, maxValue: 42, stepValue: 0.1, unit: "C", goalValue: null, goalPeriod: null };
 const archivedItem = { ...activeItem, id: 3, name: "Reading", unit: "pages", archived: true };
-const template = {
+const template: TaskTemplate = {
   id: 10, title: "Prepare launch", cadence: "DAILY", archived: false, createdAt: 1, updatedAt: 1,
   steps: [{ id: 11, templateId: 10, title: "Pack bag", position: 0, createdAt: 1, updatedAt: 1 }, { id: 12, templateId: 10, title: "Check route", position: 1, createdAt: 1, updatedAt: 1 }],
 };
-const secondaryTemplate = { id: 20, title: "Write notes", cadence: "MANUAL", archived: false, createdAt: 2, updatedAt: 2, steps: [] };
+const secondaryTemplate: TaskTemplate = { id: 20, title: "Write notes", cadence: "MANUAL", archived: false, createdAt: 2, updatedAt: 2, steps: [] };
 const tasks = [
   {
     id: 101, localDate: localToday(), templateId: 10, sourceTaskId: null, title: "Prepare launch", position: 0, completedAt: null, revision: 2, createdAt: 1, updatedAt: 1,
@@ -52,6 +52,7 @@ describe("Records administration", () => {
       }
       if (url === "api/templates?archived=false") return response({ templates: [template, secondaryTemplate] });
       if (url === "api/templates?archived=true") return response({ templates: [] });
+      if (url.startsWith("api/goals?")) return response({ goals: [] });
       if (url.startsWith("api/today/")) return response({ today: url.endsWith(localToday()) ? todayState : { todayTasks: [], dailySuggestions: [template], unfinishedTasks: [], dailyFocus: null } });
       if (url.includes("audit-logs")) return response({ logs: [auditLog], nextBeforeId: null });
       if (url.includes("items?archived=true")) return response({ items: [archivedItem] });
@@ -64,7 +65,7 @@ describe("Records administration", () => {
   it("loads the seven management areas with template inventory", async () => {
     render(<App />);
     expect(await screen.findByText("Prepare launch")).toBeTruthy();
-    for (const label of ["Overview", "Today", "Templates", "Accumulate", "Measurement", "Entries", "Activity"]) expect(screen.getByRole("button", { name: label })).toBeTruthy();
+    for (const label of ["Overview", "Today", "Templates", "Goals", "Accumulate", "Measurement", "Entries", "Activity"]) expect(screen.getByRole("button", { name: label })).toBeTruthy();
     expect(screen.getByText("Daily templates")).toBeTruthy();
   });
 

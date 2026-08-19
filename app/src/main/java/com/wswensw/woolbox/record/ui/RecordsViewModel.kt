@@ -12,6 +12,8 @@ import com.wswensw.woolbox.record.data.RecordsSnapshot
 import com.wswensw.woolbox.record.data.RecordsConnection
 import com.wswensw.woolbox.record.data.TemplateStepDraft
 import com.wswensw.woolbox.record.model.RecordEntry
+import com.wswensw.woolbox.record.model.GoalPool
+import com.wswensw.woolbox.record.model.GoalPoolDraft
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.DailyFocus
@@ -37,6 +39,7 @@ data class RecordsUiState(
     val isLoading: Boolean = true,
     val hasSnapshot: Boolean = false,
     val activeItems: List<RecordItem> = emptyList(),
+    val goals: List<GoalPool> = emptyList(),
     val entries: List<RecordEntry> = emptyList(),
     val latestEntries: Map<Long, RecordEntry> = emptyMap(),
     val templates: List<TaskTemplate> = emptyList(),
@@ -50,6 +53,8 @@ data class RecordsUiState(
     val connection: RecordsConnection = RecordsConnection(isConfigured = false, username = ""),
 ) {
     fun findItem(id: Long): RecordItem? = activeItems.firstOrNull { it.id == id }
+
+    fun findGoal(id: Long): GoalPool? = goals.firstOrNull { it.id == id }
 
     fun findTemplate(id: Long): TaskTemplate? = templates.firstOrNull { it.id == id }
 }
@@ -134,6 +139,7 @@ class RecordsViewModel(
         RecordsUiState(
             hasSnapshot = true,
             activeItems = activeItems,
+            goals = goals,
             entries = entries,
             latestEntries = latestEntries,
             templates = templates,
@@ -207,6 +213,31 @@ class RecordsViewModel(
                 onResult(null, failure.localizedFailure(R.string.record_save_failed))
             }
         }
+    }
+
+    fun saveGoal(goalId: Long?, draft: GoalPoolDraft, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            writeAndRefresh(
+                action = { repository.saveGoal(goalId, draft) },
+                onWritten = { onResult(null) },
+            ).onFailure { failure ->
+                onResult(failure.localizedFailure(R.string.goal_save_failed))
+            }
+        }
+    }
+
+    fun createGoalEntry(goal: GoalPool, value: Double, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.goal_progress_save_failed) {
+            repository.createGoalEntry(goal, value, System.currentTimeMillis())
+            Unit
+        }
+
+    fun setGoalSubgoalCompleted(
+        subgoalId: Long,
+        completed: Boolean,
+        onResult: (String?) -> Unit,
+    ) = runRecordsAction(onResult, R.string.goal_subgoal_update_failed) {
+        repository.setGoalSubgoalCompleted(subgoalId, completed, System.currentTimeMillis())
     }
 
     fun deleteEntry(entryId: Long, onError: (String) -> Unit = {}) {

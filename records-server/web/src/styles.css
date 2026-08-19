@@ -209,6 +209,9 @@ button.table-link:hover strong { color: var(--accent); text-decoration: underlin
 .field-hint { margin: -6px 0 0; color: var(--text-muted); font-size: 11px; }
 .inline-form-action { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
 .step-editor-list { display: flex; flex-direction: column; gap: 7px; }
+.goal-editor-list, .goal-subgoal-list { display: flex; flex-direction: column; gap: 7px; }
+.goal-edit-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 34px; gap: 7px; }
+.goal-subgoal-list label { display: flex; align-items: center; gap: 7px; font-size: 12px; }
 .step-edit-row { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(4, 34px); align-items: center; gap: 5px; }
 .template-step-row { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(3, 34px); align-items: center; gap: 5px; }
 .step-index { width: 28px; color: var(--text-muted); text-align: center; font-size: 11px; }
