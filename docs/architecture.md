@@ -45,8 +45,8 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布包含活跃模板、当日计划及其实例、活跃记录项、今天流水、最新测量值和近 7 日累计的 overview 快照；凭据由 Keystore 加密保存。分钟时钟只负责回顾到期显示和跨日刷新。 |
-| `DailyReminderScheduler` / `DailyReminderWorker` | 以唯一一次性 WorkManager 任务调度 `nextReviewAt`。Worker 联网重读计划并核对本地日期、revision 和时间后发布通知；非活动、跨日或已替换任务直接结束。 |
+| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布 TaskTemplate、TodayTask、DailyFocus、量化记录和候选组成的 overview 快照；凭据由 Keystore 加密保存。分钟时钟只负责回顾到期显示和跨日刷新。 |
+| `DailyReminderScheduler` / `DailyReminderWorker` | 以唯一一次性 WorkManager 任务调度 `nextReviewAt`。Worker 联网重读 DailyFocus 并核对本地日期、revision、状态和时间；不匹配时结束。 |
 
 ## 命令状态机
 
@@ -131,30 +131,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 ## Records 数据
 
-`records-server` 使用 Drizzle ORM 管理服务端 SQLite 迁移；生产数据库固定为 `/srv/records/records.sqlite`，服务监听 `127.0.0.1:4320`，由 Caddy 在 `/apps/records` 路由提供 HTTPS 和 Basic Auth。数据不放入发布目录。
-
-| 表 | 关键字段与约束 |
-| --- | --- |
-| `record_items` | 名称使用 `NOCASE` 唯一索引；保存模式（`ACCUMULATE`/`MEASUREMENT`）、计量类型、默认值或 Measurement 最小值/最大值、步进、单位、目标、优先级、归档状态和时间戳。 |
-| `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
-| `task_templates` | 保存模板标题、`MANUAL/DAILY` 周期、归档状态和时间戳；模板没有完成状态。 |
-| `task_template_steps` | 保存模板步骤与固定位序；随模板级联删除。模板更新时步骤在同一事务整体替换。 |
-| `today_tasks` | 保存日期、可空模板/昨日任务来源、标题快照、位序、完成时刻和 revision；任务独立于 Focus。 |
-| `today_task_steps` | 保存任务步骤快照、固定位序和完成时刻；随 Today task 级联删除。 |
-| `daily_focus` | `local_date` 唯一；引用主/次/当前 Today task，保存第一步、`READY/ACTIVE/PAUSED/ENDED`、暂停原因、完成轮次、下一回顾时刻和 revision。 |
-| `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TEMPLATE`、`TODAY_TASK`、`TODAY_TASK_STEP`、`FOCUS` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表。 |
-
-服务端在事务内校验并写入记录项。累计记录使用正数流水和可选目标；测量记录固定为数字，要求有限的最小值、最大值和正步进，且只接受闭区间内的步进值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型、单位和 Measurement 范围必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。记录项更新先比较规范化快照，无变化时不写表或审计；其他成功写操作在同一事务插入一条审计日志。手动时间段不属于服务端 schema 或 API，写请求携带 `windows` 会被明确拒绝。日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。
-
-新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，返回活跃模板、Daily 建议、昨日未完成候选、该日期 Today tasks/DailyFocus、范围内累计流水和最新 Measurement 流水。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
-
-模板创建与更新在一个事务内写入定义和零个或多个步骤；`DAILY` 只产生当日建议。Today task 可内联创建、从模板复制，或从昨日未完成任务复制尚未完成的步骤；原任务进度不变，同一天同一昨日来源由唯一约束防止重复。归档模板不允许创建新实例；删除已归档模板只清空既有任务的外键引用。
-
-DailyFocus 由 `POST /api/daily-focus` 创建，`PUT /api/daily-focus/:localDate` 只在 `READY` 更新第一步和选择。`start`、`review`、`refocus`、`continue` 与 `end` 执行用户流程；PC 另用 `review-now`、`switch` 和 `reset`。第四次及后续回顾写入 `PAUSED + TARGET_REACHED`；所选 Focus tasks 全部完成写入 `PAUSED + FOCUS_CLEARED`。两种暂停均可从任意未完成 Today task 重新选择并恢复，恢复不增加轮次；任务重开不自动恢复。`ENDED` 只结束 Focus。任务和 Focus 写请求携带 `expectedRevision` 与 `occurredAt`，服务端事务校验状态、引用和 revision。
-
-Android 每次刷新后按服务端 DailyFocus 覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始或恢复 Focus；进入 `PAUSED`、`ENDED` 或跨日时取消任务和可见通知。
-
-服务端还提供 PC 管理页静态资源；Today 按所选 ISO 本地日期读取 Today tasks 与 DailyFocus，Templates 独立管理活跃与归档定义。Overview 固定读取浏览器真实今天，不受 Today 日期选择影响。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和八张 Records 业务表。
+Records 的表、Today task/Focus API、事务协调、提醒和部署边界归 [Records 数据与接口](records-architecture.md)。
 
 ## App 更新
 

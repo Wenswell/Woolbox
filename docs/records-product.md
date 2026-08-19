@@ -1,0 +1,59 @@
+# Records 产品规则
+
+## 范围与入口
+
+Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。首次使用在 Setting 的 `Records connection` 配置 Basic Auth 凭据；Android 使用 Keystore 加密保存。
+
+根列表固定为 **Today → Templates → Accumulate → Measurement**。Today 内固定为 Focus 和 Tasks；Accumulate 与 Measurement 不参与任务或 Focus 判断。PC 管理页固定为 `Overview`、`Today`、`Templates`、`Accumulate`、`Measurement`、`Entries`、`Activity`。
+
+当前不提供离线队列、日历视图、每日以外的模板周期、任务统计、连续天数、标签、协作、多级步骤、精确闹钟或可配置图表。
+
+## Today task
+
+- Today task 有日期、标题、可空模板来源、可空昨日任务来源、完成时间、revision 和零个或多个有序步骤。
+- 无步骤任务的主 checkbox 直接完成或重开任务。有步骤任务可逐项操作；全部步骤完成时任务完成；主 checkbox 一次完成或重开全部步骤。
+- 任务不依赖 Focus。无 Focus、Focus 暂停或 Focus 结束后，任务仍可新增、完成和重开。
+- Daily 模板只作为当日建议；用户确认后才创建 Today task，不自动加入或午夜重置。
+- 昨日未完成任务只作为次日候选，不自动顺延。续做时只复制尚未完成的步骤；同一天同一昨日来源只能生成一次，原日期进度不变。
+- 完成、重开和完成时间进入审计历史；本轮不提供任务统计页面。
+
+## DailyFocus
+
+- 每个 ISO 本地日期至多一个 DailyFocus，引用当天一个未完成主任务和至多一个不同的未完成次任务。
+- 状态为 `READY`、`ACTIVE`、`PAUSED` 或 `ENDED`。暂停原因只有 `FOCUS_CLEARED` 与 `TARGET_REACHED`；回顾到期由 `ACTIVE + nextReviewAt` 派生。
+- 用户填写 `firstMove` 并选择 Focus。开始时主、次任务都必须仍属于当天且未完成；完成第一步后进入第一轮并从操作时刻计算约 60 分钟。
+- 到期回顾不记录总结，只能继续当前 Focus、切换到另一项已选且未完成的 Focus，或结束 Focus。PC 允许提前回顾和不增加轮次的即时切换。
+- 只有回顾增加轮次。第四次及后续回顾进入 `PAUSED + TARGET_REACHED`，即“今天已足够”；普通任务数量和完成率不参与判断。
+- `TARGET_REACHED` 可从任意未完成 Today task 选择下一轮 Focus。继续本身不增加轮次，下一次回顾再增加。
+- 当前 Focus 完成后自动切换到另一项已选且未完成的 Focus；所选项全部完成进入 `PAUSED + FOCUS_CLEARED`，可从任意未完成 Today task 重新选择。
+- `FOCUS_CLEARED` 在首次回顾前发生时，不显示“已完成 0 轮”；页面只说明所选 Focus 已完成。重开任务不自动恢复 Focus。
+- `ENDED` 只结束 Focus，Today tasks 仍可操作，Focus 不再恢复。`Reset to Ready` 只重置 Focus 执行字段，不改变 Today tasks。
+- 开始或暂停后恢复 Focus 要求通知可用；添加或完成普通任务不要求通知。
+
+## 模板
+
+- 模板保存标题、`MANUAL/DAILY` 周期、归档状态和零个或多个有固定位序的一级步骤。
+- 标题和已有步骤保存前去除首尾空白且不能为空；步骤随表单整体替换。
+- 模板不保存完成状态、日期、优先级或标签。编辑、归档或删除模板不改变既有 Today task 快照。
+- 归档模板不进入 Today 候选；永久删除只接受已归档模板，既有任务的 `templateId` 可变为空。
+
+## 量化记录
+
+| 模式 | 规则 | 页面行为 |
+| --- | --- | --- |
+| `ACCUMULATE` | 支持 `Number` 或 `Duration`；流水、默认值、步进和目标均为有限正数，可设置日/7 日目标。 | 显示今日累计，通过记录 Sheet 写入当前时刻流水。 |
+| `MEASUREMENT` | 固定为 `Number`；最小值、最大值和正步进必填，区间必须被步进整除；不支持默认值和目标。 | 显示最新值，通过 24 小时预览 Sheet 的离散 Slider 录入。 |
+
+- 名称必填并在全部记录项中忽略大小写唯一。已有流水后，模式、数值类型和单位不可变；Measurement 的范围和步进也不可变。
+- 测量发生时间固定为提交时的设备时间。24 小时图使用原始时间点，不补零、聚合或平滑；只有成功提交后的短时 `Undo` 可删除流水。
+- 服务端统一校验记录项、归档和数值规则。客户端只缓存当前进程最近一次成功快照；刷新失败保留已有内容并显示重试入口。
+
+## 验收
+
+- 无 Focus 时可以新增、完成和重开标题任务与清单任务；部分清单进度、整体完成和整体重开正确。
+- Daily 模板和昨日未完成项只作为候选；昨日续做只复制未完成步骤且不能重复加入。
+- Focus 开始前验证 1+1 任务仍未完成；所选任务完成后正确自动切换或进入 `FOCUS_CLEARED`。
+- 第四次回顾稳定进入 `TARGET_REACHED`，即使仍有普通任务；首次回顾前完成不显示“已完成 0 轮”。
+- 暂停或结束 Focus 后，任务 checkbox 与添加入口仍可用；重开任务不自动恢复 Focus。
+- 模板允许零步骤且没有完成入口；模板修改不改变既有任务快照。
+- Android 与 PC 刷新后读取相同状态；PC 可按任意日期管理任务和 Focus。

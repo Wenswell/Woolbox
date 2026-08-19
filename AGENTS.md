@@ -13,10 +13,10 @@
 按任务读取对应文档：
 
 1. 始终先读 `README.md`，确认项目基线和文档入口。
-2. 功能行为、入口或状态变更：读 `docs/product.md`。
-3. 服务、窗口、覆盖层、数据或存储变更：读 `docs/architecture.md`。
-4. 页面、组件或样式变更：读 `docs/design-system.md`。
-5. 构建、测试或设备问题：读 `docs/development.md`。
+2. Records 行为或状态变更：读 `docs/records-product.md`；其他产品行为读 `docs/product.md`。
+3. Records 服务、数据或存储变更：读 `docs/records-architecture.md`；其他架构变更读 `docs/architecture.md`。
+4. Records 页面变更：读 `docs/records-design.md`；通用组件、工具页面或样式变更读 `docs/design-system.md`。
+5. 环境、构建、交付或排障：读 `docs/development.md`；测试或设备验收读 `docs/testing.md`。
 6. 文档修改：读 `docs/documentation.md`。
 
 参考旧应用 `/Users/wswensw/Documents/repos/playground/app0603` 时，必须同时提取业务规则和系统能力边界，包括 Context、`WindowManager`、窗口类型、触发时机与生命周期。旧页面只作为场景参考，当前应用使用 Compose 重新设计。
@@ -26,7 +26,7 @@
 - 默认使用 Kotlin、Jetpack Compose 和 Material 3。
 - 保持工程轻量；新增依赖前先确认 Compose、AndroidX 或本地 vector 无法满足需求。
 - 应用页面通用组件归属 `app/src/main/java/com/wswensw/woolbox/ui/AppComponents.kt`。
-- 量化记录的领域规则、Room 数据层和页面归属 `app/src/main/java/com/wswensw/woolbox/record/`。
+- Records 领域模型、网络数据层和页面归属 `app/src/main/java/com/wswensw/woolbox/record/`。
 - 无障碍覆盖层及其 Compose UI 归属 `app/src/main/java/com/wswensw/woolbox/tool/overlay/`。
 - 页面通过稳定组件组合，不在页面内重复样式细节。
 - 卡片只用于单个内容块或设置分组；页面 section 保持全宽布局。
@@ -59,7 +59,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 git diff --check
 ```
 
-涉及无障碍窗口、页面退后台、Tile 或覆盖层时，还需按 `docs/development.md` 完成真机验收。JVM 测试不能替代系统窗口验收。
+涉及无障碍窗口、页面退后台、Tile 或覆盖层时，还需按 `docs/testing.md` 完成真机验收。JVM 测试不能替代系统窗口验收。
 
 涉及 App 更新、发布脚本或 release 构建时，还需执行 `:app:assembleRelease` 和 `pnpm run publish:<debug|release>` 对应的验证步骤。
 

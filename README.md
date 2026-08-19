@@ -29,7 +29,7 @@ Android Compose 工具应用，提供跨应用无障碍工具与在线 Records�
 
 从 `Records` 进入后，同一页按 Today、Templates、Accumulate、Measurement 展示。Today tasks 可临时新建，也可手动采用 Daily 模板建议或续做昨日未完成项；它们始终可完成和重开。Focus 从未完成的 Today tasks 中选择一个主任务和可选次任务，只负责第一步、约 60 分钟一次的回顾与四轮目标；第四次回顾后显示“今天已足够”，与普通任务完成率无关。首次使用先在 `Setting` 配置服务端 Basic Auth 凭据。
 
-完整业务规则、状态语义和操作流程见 [产品说明](docs/product.md)。
+Records 的业务规则、状态语义和操作流程见 [Records 产品规则](docs/records-product.md)；应用共享规则见 [产品说明](docs/product.md)。
 
 ## 工程基线
 
@@ -100,15 +100,19 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 ./gradlew :app:installDebug
 ```
 
-环境、源码地图、设备验收和故障定位见 [开发指南](docs/development.md)。
+环境、源码地图、构建交付和故障定位见 [开发指南](docs/development.md)；可执行验证见 [测试与设备验收](docs/testing.md)。
 
 ## 文档
 
 | 文档 | 内容 |
 | --- | --- |
-| [产品说明](docs/product.md) | 当前范围、功能规则、用户流程、状态和验收。 |
-| [系统架构](docs/architecture.md) | 命令状态机、目标窗口、覆盖层、数据与存储契约。 |
-| [设计系统](docs/design-system.md) | 页面结构、组件职责、视觉和交互规则。 |
-| [开发指南](docs/development.md) | 环境、源码路径、验证、设备验收和排障。 |
+| [产品说明](docs/product.md) | 应用共享范围、工具规则、状态和验收。 |
+| [Records 产品规则](docs/records-product.md) | Today task、DailyFocus、模板与量化记录规则。 |
+| [系统架构](docs/architecture.md) | 命令状态机、目标窗口、覆盖层与工具存储契约。 |
+| [Records 数据与接口](docs/records-architecture.md) | Records 表、API、事务、提醒和部署边界。 |
+| [设计系统](docs/design-system.md) | 共享组件、工具页面、视觉和交互规则。 |
+| [Records 界面规则](docs/records-design.md) | Records 页面结构、状态呈现和管理端规则。 |
+| [开发指南](docs/development.md) | 环境、源码路径、构建交付、发布和排障。 |
+| [测试与设备验收](docs/testing.md) | 自动测试覆盖、真机场景和诊断命令。 |
 | [文档维护](docs/documentation.md) | 文档分工、同步触发条件和质量标准。 |
 | `records-server/deploy/README.md` | 服务端构建、systemd、备份和恢复检查。 |

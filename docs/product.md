@@ -110,52 +110,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 
 ## Records
 
-### 用户流程
-
-1. 首次使用在 Setting 的 `Records connection` 配置 Basic Auth 用户名和密码；凭据使用 Android Keystore 加密保存。
-2. 根列表固定为 **Today → Templates → Accumulate → Measurement**。Today 内固定为 Focus 和 Tasks；Accumulate 与 Measurement 不参与任务或 Focus 判断。
-3. Tasks 可直接新建，也可手动采用 Daily 模板建议或续做昨日未完成项。任务标题和可选清单保存为当天快照；任务不依赖 Focus，Focus 暂停或结束后仍可完成和重开。
-4. Focus 从未完成的 Today tasks 中选择一个主任务和可选的不同次任务，并填写 `firstMove`。完成第一步后开始第一轮，约 60 分钟后只确认继续当前 Focus、切换所选 Focus 或结束 Focus。
-5. 第四次及后续回顾进入“今天已足够”；普通任务数量和完成率不参与判断。用户仍可继续 Focus，Today tasks 也始终可操作。
-6. Templates 保存标题、零个或多个步骤和 `MANUAL/DAILY` 周期，没有完成状态。`DAILY` 只提供每日建议，用户确认后才创建 Today task。
-7. Accumulate 显示今日累计并通过记录 Sheet 写入；Measurement 显示最新值并通过 24 小时预览 Sheet 的离散 Slider 录入。成功写入仍提供短时 `Undo`。
-8. PC 管理页固定为 `Overview`、`Today`、`Templates`、`Accumulate`、`Measurement`、`Entries`、`Activity`；Today 可切换任意日期并管理任务、Focus、提前回顾、即时切换和重置。
-
-### Today task 与 Focus 规则
-
-- Today task 有日期、标题、可空模板来源、可空昨日任务来源、完成时间、revision 和零个或多个有序步骤。无步骤任务直接完成；清单任务可逐项操作，全部步骤完成时任务完成；主 checkbox 一次完成或重开全部步骤。
-- 昨日未完成任务只作为次日候选，不自动顺延。续做时只复制尚未完成的步骤；同一天同一昨日来源只能生成一次，原日期进度不变。
-- 每个 ISO 本地日期至多一个 DailyFocus，状态为 `READY`、`ACTIVE`、`PAUSED` 或 `ENDED`。暂停原因只有 `FOCUS_CLEARED` 与 `TARGET_REACHED`；回顾到期由 `ACTIVE + nextReviewAt` 派生。
-- Focus 引用当天一个未完成主任务和至多一个不同的未完成次任务。当前 Focus 完成后自动切换到另一项；所选项全部完成则进入 `PAUSED + FOCUS_CLEARED`，可从任意未完成 Today task 重新选择。
-- 只有回顾增加轮次。第四次及后续回顾进入 `PAUSED + TARGET_REACHED`；继续 Focus 不增加轮次，下一次回顾再增加。重开任务不自动恢复 Focus。
-- `ENDED` 只结束 Focus，Today tasks 仍可操作。Focus 与任务写操作携带当前 revision；过期或非法状态请求明确失败。开始和暂停后恢复 Focus 要求通知可用，添加或完成普通任务不要求通知。
-- PC 可提前完成当前轮，或不增加轮次地即时切换所选未完成任务。`Reset to Ready` 只重置 Focus 执行字段，不改变 Today tasks。
-
-### 模板规则
-
-- 模板保存标题、`MANUAL/DAILY` 周期、归档状态和零个或多个有固定位序的一级步骤。标题和已有步骤保存前去除首尾空白且不能为空；步骤随表单整体替换。
-- 模板不保存完成状态、日期、优先级或标签。`DAILY` 只进入当日建议，不触发自动加入、补做或午夜重置。
-- 归档模板不进入 Today 候选；永久删除只接受已归档模板。既有 Today task 保留快照，模板删除后其 `templateId` 可为空。
-
-### Record items
-
-记录项有 `ACCUMULATE` 与 `MEASUREMENT` 两种模式。
-
-| 模式 | 规则 | 页面行为 |
-| --- | --- | --- |
-| `ACCUMULATE` | 支持 `Number` 或 `Duration`；流水、默认值、步进和目标均为有限正数。可设置日/7 日目标。 | 显示今日累计并通过记录 Sheet 写入当前时刻的流水。 |
-| `MEASUREMENT` | 固定为 `Number`；单位、最小值、最大值和步进必填，边界为有限数且最小值小于最大值。区间必须被步进整除，流水只能是闭区间内的步进值；不支持默认值和目标。 | 显示最新值和时间；点卡在预览 Sheet 显示近 24 小时原始时间序列、流水和滑块录入。 |
-
-- 名称、描述和单位保存前去除首尾空白；名称必填并在全部记录项中忽略大小写唯一。已有流水后，模式、数值类型和单位不可变；Measurement 的最小值、最大值和步进也不可变。
-- Android 端累计表单固定 `ACCUMULATE`（含数值类型、默认值、目标和优先级）；测量表单固定 `MEASUREMENT` + `Number`（含最小值、最大值、步进、单位和优先级，无默认值与目标）。两类表单都不配置时间段。标题为 `New/Edit accumulate` 与 `New/Edit measurement`。
-- 测量发生时间固定为提交时的当前设备时间。客户端提交 `occurredAt`、`localDate`、`localMinute` 与滑块值；预览只显示最近 24 小时，图表使用真实发生时间和原始数据点，不补零、聚合或平滑。点位标记显示发生时间和值；只有成功提交后的短时 `Undo` 可以删除该条流水。
-### 在线数据规则
-
-- 服务端的记录项、TaskTemplate、TodayTask、DailyFocus 及审计表是唯一事实来源；App 与 PC 管理页均通过 HTTPS API 读写。
-- App 只在当前进程保存最近一次成功的根页快照，不写入本地记录数据库。首次加载显示 loading；底栏切换立即显示快照；恢复前台时刷新，成功写入后串行获取新快照。写入结果与刷新结果独立：写入成功后立即返回成功；刷新失败时保留已有快照并显示重试入口。
-- 服务端统一执行名称忽略大小写唯一、记录模式和值规则、Measurement 闭区间步进、归档项不可新增流水、已有流水后模式/数值类型/单位/Measurement 范围不可变、永久删除仅归档项等规则。手动时间段字段不属于 API，携带该字段的写请求会被拒绝。
-- 每次实际创建、修改、归档、恢复或删除记录项与模板，创建或删除流水，创建、完成或重开 Today task/步骤，以及创建、调整、切换、重置或结束 Focus，均在同一事务写入审计日志。无变化写入和失败请求不产生业务数据或日志。
-- 流水查询支持日期范围、记录项和模式筛选并按记录时间倒序；另提供测量记录的最新流水。服务端不依赖自身时区，客户端提交的 `occurredAt`、`localDate` 和 `localMinute` 原样保存。
+Today tasks、DailyFocus、模板与量化记录的完整行为和验收归 [Records 产品规则](records-product.md)。本文件只保留整个应用共享的范围、入口和系统工具规则。
 
 ## 共同关闭规则
 
@@ -183,12 +138,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - Copy History 每行显示目标应用图标和名称，不显示目标包名；应用不可用时使用不可用状态名称和通用图标。
 - OLED shield 的默认配置、按应用记录、应用图标、删除、定向启用、长按面板、实时调整、保存和关闭符合上述规则。
 - OLED 的无障碍覆盖层从完整显示区域左上角计算尺寸；顶部遮罩覆盖状态栏和显示刘海区域。
-- Records 配置凭据后可从空库创建并编辑服务端记录项；无网络时显示可重试错误且不产生本地记录数据。
-- 无 Focus 时也可新增、完成和重开 Today task；Daily 模板和昨日未完成项只作为候选，用户确认后才创建今天实例。
-- Focus 强制一个未完成主任务和最多一个不同的未完成次任务；第一步完成前不启动回顾；第四轮进入 `TARGET_REACHED`，与普通任务是否完成无关。
-- 所选 Focus 全部完成进入 `FOCUS_CLEARED`；重新选择或继续 Focus 都不增加轮次，重开任务不会自动恢复 Focus。结束 Focus 后任务仍可操作。
-- 模板没有完成入口且允许零步骤；模板修改不改变既有 Today task 快照。
-- Android 与 PC 刷新后读取同一 Today 和模板状态；PC Today 可按任意日期管理任务与 Focus。Accumulate 与 Measurement 不影响 Today 状态。
+- Records 行为按 [Records 产品规则](records-product.md#验收) 验收。
 - Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
 - Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。
