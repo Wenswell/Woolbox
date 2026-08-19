@@ -30,7 +30,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates
 
 ## 管理页
 
-`Manage goals` 保留进行中、完成和到期 Goal；表单使用通用单位、默认值、步进、必填起止日期和一层子目标。产生进度后，固定字段与子目标只读。`Manage accumulates` 与 `Manage measurements` 使用相同路由骨架，只列出对应模式并提供新建入口。累计表单固定 `ACCUMULATE`；测量表单固定 `MEASUREMENT + Number`。Measurement 预览使用原始 24 小时数据和离散 Slider。
+`Manage goals` 保留进行中、完成和到期 Goal；表单使用通用单位、默认值、步进、必填起止日期和一层子目标。产生进度后，固定字段与子目标只读。目标管理卡片、编辑页预览块和表单字段沿用 Accumulate 的页面水平边距、`formField()` 垂直间距、卡片身份区和顶栏 `FilledTonalIconButton` 保存入口。目标详情 Sheet 复用 Records 数值录入控件，提供相同的减号、数值框、加号、步进提示和全宽主操作；完成、未开始或到期时整体禁用录入。`Manage accumulates` 与 `Manage measurements` 使用相同路由骨架，只列出对应模式并提供新建入口。累计表单固定 `ACCUMULATE`；测量表单固定 `MEASUREMENT + Number`。Measurement 预览使用原始 24 小时数据和离散 Slider。
 
 Setting 的 `Records connection` 使用 `AppSection`：Server 明文地址、用户名、密码和全宽连接按钮。连接时禁用凭据输入；用户名键盘动作移到密码，密码使用 Password 键盘并通过 `Done` 提交合法表单；保存成功后返回。
 

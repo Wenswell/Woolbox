@@ -79,8 +79,9 @@ fun RecordSheet(
                 cumulative = cumulative,
             )
             Spacer(Modifier.height(20.dp))
-            ValueInput(
-                item = item,
+            RecordValueInput(
+                unit = item.unit,
+                stepValue = item.stepValue,
                 valueText = valueText,
                 saving = saving,
                 canConfirm = canConfirm,
@@ -230,16 +231,18 @@ private fun RecordSheetIdentity(
 }
 
 @Composable
-private fun ValueInput(
-    item: RecordItem,
+internal fun RecordValueInput(
+    unit: String,
+    stepValue: Double,
     valueText: String,
+    enabled: Boolean = true,
     saving: Boolean,
     canConfirm: Boolean,
     errorMessage: String?,
     onValueChange: (String) -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val editable = !saving
+    val editable = enabled && !saving
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -247,11 +250,11 @@ private fun ValueInput(
     ) {
         FilledTonalIconButton(
             enabled = editable,
-            onClick = { onValueChange(stepRecordValue(valueText, item.stepValue, -1)) },
+            onClick = { onValueChange(stepRecordValue(valueText, stepValue, -1)) },
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_remove_24),
-                contentDescription = stringResource(R.string.decrease_by, formatValue(item.stepValue)),
+                contentDescription = stringResource(R.string.decrease_by, formatValue(stepValue)),
             )
         }
         OutlinedTextField(
@@ -260,7 +263,7 @@ private fun ValueInput(
             enabled = editable,
             isError = errorMessage != null,
             label = { Text(stringResource(R.string.field_value)) },
-            suffix = { Text(item.unit) },
+            suffix = { Text(unit) },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
                 imeAction = ImeAction.Done,
@@ -273,16 +276,16 @@ private fun ValueInput(
         )
         FilledTonalIconButton(
             enabled = editable,
-            onClick = { onValueChange(stepRecordValue(valueText, item.stepValue, 1)) },
+            onClick = { onValueChange(stepRecordValue(valueText, stepValue, 1)) },
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_add_24),
-                contentDescription = stringResource(R.string.increase_by, formatValue(item.stepValue)),
+                contentDescription = stringResource(R.string.increase_by, formatValue(stepValue)),
             )
         }
     }
     Text(
-        text = stringResource(R.string.step_value_unit, formatValue(item.stepValue), item.unit),
+        text = stringResource(R.string.step_value_unit, formatValue(stepValue), unit),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
         textAlign = TextAlign.Center,

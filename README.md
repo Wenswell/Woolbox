@@ -44,7 +44,7 @@ Records 的业务规则、状态语义和操作流程见 [Records 产品规则](
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.42` (`versionCode 43`) |
+| 版本 | `0.1.43` (`versionCode 44`) |
 
 ## 目录
 
@@ -89,7 +89,7 @@ pnpm run publish:debug
 
 | 构建类型 | 当前发布版本 |
 | --- | --- |
-| debug | `0.1.42` (`versionCode 43`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `woolbox-0.1.42-debug.apk`，远端 `content-length` `71,311,930`，SHA-256 `a45ceba07f90f43e7d77a23facd2978be7a7a3d74ee38264e2a6b567bb1f024d`。 |
+| debug | `0.1.43` (`versionCode 44`)；[latest.json](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK 与远端校验结果在本次发布后更新。 |
 | release | 尚未发布。 |
 
 安装到已连接设备：

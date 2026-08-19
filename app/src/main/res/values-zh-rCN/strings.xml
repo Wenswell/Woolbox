@@ -274,6 +274,7 @@
     <string name="goal_date_range">日期范围</string>
     <string name="goal_start_date">开始日期</string>
     <string name="goal_end_date">截止日期</string>
+    <string name="goal_date_order_error">开始日期不能晚于截止日期。</string>
     <string name="goal_subgoal_name">子目标</string>
     <string name="add_goal_subgoal">添加子目标</string>
     <string name="remove_goal_subgoal">删除子目标</string>

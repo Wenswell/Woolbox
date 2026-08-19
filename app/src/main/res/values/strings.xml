@@ -276,6 +276,7 @@
     <string name="goal_date_range">Date range</string>
     <string name="goal_start_date">Start date</string>
     <string name="goal_end_date">End date</string>
+    <string name="goal_date_order_error">Start date must not be after end date.</string>
     <string name="goal_subgoal_name">Subgoal</string>
     <string name="add_goal_subgoal">Add subgoal</string>
     <string name="remove_goal_subgoal">Remove subgoal</string>
