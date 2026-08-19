@@ -212,6 +212,12 @@ button.table-link:hover strong { color: var(--accent); text-decoration: underlin
 .goal-editor-list, .goal-subgoal-list { display: flex; flex-direction: column; gap: 7px; }
 .goal-edit-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 34px; gap: 7px; }
 .goal-subgoal-list label { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.goal-value-input { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 8px; align-items: end; }
+.goal-value-input .icon-button { width: 36px; height: 36px; margin-bottom: 1px; }
+.input-suffix { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); }
+.input-suffix:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.input-suffix input { min-width: 0; border: 0; border-radius: 0; box-shadow: none; }
+.input-suffix span { padding: 0 10px; color: var(--text-secondary); font-size: 12px; }
 .step-edit-row { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(4, 34px); align-items: center; gap: 5px; }
 .template-step-row { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) repeat(3, 34px); align-items: center; gap: 5px; }
 .step-index { width: 28px; color: var(--text-muted); text-align: center; font-size: 11px; }
@@ -290,6 +296,7 @@ button.toast-close:hover:not(:disabled) { color: #ffffff; background: rgb(255 25
   .metric-card { min-height: 105px; }
   .activity-item { min-height: 96px; border-right: 0; }
   .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+  .goal-edit-row { grid-template-columns: minmax(0, 1fr) minmax(96px, 0.65fr) 34px; }
   .today-status-bar, .today-focus-heading { align-items: flex-start; flex-direction: column; }
   .today-status-bar .row-actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .today-status-bar .row-actions button { width: 100%; min-width: 0; white-space: normal; }

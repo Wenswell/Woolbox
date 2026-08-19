@@ -1,6 +1,9 @@
 import type {
   DailyFocusAuditSnapshot,
   EntryAuditSnapshot,
+  GoalAuditSnapshot,
+  GoalEntryAuditSnapshot,
+  GoalSubgoalAuditSnapshot,
   ItemAuditSnapshot,
   RecordAuditLog,
   TemplateAuditSnapshot,
@@ -14,6 +17,9 @@ export function auditSubject(log: RecordAuditLog): string {
   if (!snapshot) return `${log.entityType} #${log.entityId}`;
   if (log.entityType === "ITEM" && isItemSnapshot(snapshot)) return `Record item: ${snapshot.name}`;
   if (log.entityType === "ENTRY" && isEntrySnapshot(snapshot)) return `Entry: ${snapshot.itemName}`;
+  if (log.entityType === "GOAL" && isGoalSnapshot(snapshot)) return `Goal: ${snapshot.title}`;
+  if (log.entityType === "GOAL_ENTRY" && isGoalEntrySnapshot(snapshot)) return `Goal progress: Goal #${snapshot.goalId}`;
+  if (log.entityType === "GOAL_SUBGOAL" && isGoalSubgoalSnapshot(snapshot)) return `Subgoal: ${snapshot.title}`;
   if (log.entityType === "TEMPLATE" && isTemplateSnapshot(snapshot)) return `Template: ${snapshot.title}`;
   if (log.entityType === "TODAY_TASK" && isTodayTaskSnapshot(snapshot)) return `Today task: ${snapshot.title}`;
   if (log.entityType === "TODAY_TASK_STEP" && isTodayTaskStepSnapshot(snapshot)) return `Step: ${snapshot.taskTitle}`;
@@ -72,6 +78,30 @@ export function auditChanges(log: RecordAuditLog): string {
   }
   if ((log.action === "ENTRY_CREATED" || log.action === "ENTRY_DELETED") && isEntrySnapshot(after ?? before)) {
     return entryDescription((after ?? before) as EntryAuditSnapshot);
+  }
+  if ((log.action === "GOAL_CREATED" || log.action === "GOAL_DELETED") && isGoalSnapshot(after ?? before)) {
+    return goalDescription((after ?? before) as GoalAuditSnapshot);
+  }
+  if (log.action === "GOAL_UPDATED" && isGoalSnapshot(before) && isGoalSnapshot(after)) {
+    return [
+      fieldChange("Title", before.title, after.title),
+      fieldChange("Description", before.description, after.description),
+      fieldChange("Unit", before.unit, after.unit),
+      fieldChange("Default", before.defaultValue, after.defaultValue),
+      fieldChange("Step", before.stepValue, after.stepValue),
+      fieldChange("Start date", before.startDate, after.startDate),
+      fieldChange("End date", before.endDate, after.endDate),
+      fieldChange("Subgoals", goalSubgoals(before), goalSubgoals(after)),
+    ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
+  }
+  if (log.action === "GOAL_ARCHIVED") return "Status: Active to Archived";
+  if (log.action === "GOAL_RESTORED") return "Status: Archived to Active";
+  if (log.action === "GOAL_ENTRY_CREATED" && isGoalEntrySnapshot(after)) {
+    return `${after.localDate} ${minute(after.localMinute)}; +${after.value}`;
+  }
+  if ((log.action === "GOAL_SUBGOAL_COMPLETED" || log.action === "GOAL_SUBGOAL_REOPENED") && isGoalSubgoalSnapshot(after ?? before)) {
+    const subgoal = (after ?? before) as GoalSubgoalAuditSnapshot;
+    return `${subgoal.title}; target ${subgoal.targetValue}; ${subgoal.completedAt === null ? "Open" : "Completed"}`;
   }
   if ((log.action === "TEMPLATE_CREATED" || log.action === "TEMPLATE_DELETED") && isTemplateSnapshot(after ?? before)) {
     return templateDescription((after ?? before) as TemplateAuditSnapshot);
@@ -135,6 +165,14 @@ function entryDescription(entry: EntryAuditSnapshot): string {
   return `${entry.itemName}; ${entry.localDate} ${minute(entry.localMinute)}; ${entry.value}`;
 }
 
+function goalDescription(goal: GoalAuditSnapshot): string {
+  return `${goal.title}; ${goal.startDate} to ${goal.endDate}; ${goal.subgoals.length} subgoals`;
+}
+
+function goalSubgoals(goal: GoalAuditSnapshot): string {
+  return goal.subgoals.map((subgoal) => `${subgoal.title}: ${subgoal.targetValue}`).join(" · ");
+}
+
 function templateDescription(template: TemplateAuditSnapshot): string {
   return `${template.title}; ${template.cadence === "DAILY" ? "Daily" : "Manual"}; ${template.steps.length} steps`;
 }
@@ -149,6 +187,18 @@ function isItemSnapshot(snapshot: unknown): snapshot is ItemAuditSnapshot {
 
 function isEntrySnapshot(snapshot: unknown): snapshot is EntryAuditSnapshot {
   return isObject(snapshot) && "itemName" in snapshot;
+}
+
+function isGoalSnapshot(snapshot: unknown): snapshot is GoalAuditSnapshot {
+  return isObject(snapshot) && "title" in snapshot && "startDate" in snapshot && "endDate" in snapshot && "subgoals" in snapshot;
+}
+
+function isGoalEntrySnapshot(snapshot: unknown): snapshot is GoalEntryAuditSnapshot {
+  return isObject(snapshot) && "goalId" in snapshot && "localDate" in snapshot && "localMinute" in snapshot && "value" in snapshot && !("title" in snapshot);
+}
+
+function isGoalSubgoalSnapshot(snapshot: unknown): snapshot is GoalSubgoalAuditSnapshot {
+  return isObject(snapshot) && "goalId" in snapshot && "title" in snapshot && "targetValue" in snapshot && "completedAt" in snapshot;
 }
 
 function isTemplateSnapshot(snapshot: unknown): snapshot is TemplateAuditSnapshot {

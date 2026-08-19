@@ -36,7 +36,7 @@ Setting 的 `Records connection` 使用 `AppSection`：Server 明文地址、用
 
 PC 使用响应式 App shell：桌面固定窄侧栏，窄屏为可横向滚动顶部导航。Today 顶部提供日期切换，内部按 Focus 与 Tasks 分区；Tasks 始终可操作，Focus 区提供状态、revision、提前回顾、即时切换、重置与结束。
 
-Templates 使用 Active/Archived 分段、搜索和表格；Goals 使用表格与 Modal 管理共享进度、子目标和归档；Accumulate 与 Measurement 使用固定模式表单；Entries 提供日期、模式与记录项筛选；Activity 只读显示对象、动作和变更摘要。
+Templates 使用 Active/Archived 分段、搜索和表格；Goals 使用 Active/Archived/All 分段、目标与子目标搜索和表格，进度 Modal 提供单位、减号、加号与建议步进，编辑 Modal 管理定义并联动校验起止日期。Accumulate 与 Measurement 使用固定模式表单；Entries 提供日期、模式与记录项筛选。Activity 可按 Goal、Goal progress 和 Goal subgoal 筛选，并显示目标名称、进度值与子目标状态变化。
 
 ## 修改检查
 

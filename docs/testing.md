@@ -8,13 +8,13 @@
 | `CopyHistoryMappingTest` | 历史摘要、文本块、选择、草稿和顺序映射。 |
 | `OledShieldConfigTest` / `OledShieldConfigRepositoryTest` | OLED 参数归一化与 profile 存储。 |
 | `ForegroundTargetSelectorTest` / `ToolCommandPolicyTest` | 目标窗口选择和工具切换。 |
-| `RecordRulesTest` | 记录项、累计/测量值、目标与十进制步进。 |
+| `RecordRulesTest` / `GoalModelsTest` | 记录项、累计/测量值、周期目标、共享进度目标校验及完成/到期状态。 |
 | `TodayTaskTest` / `DailyFocusTest` | 任务步骤、当前 Focus、未完成选择与回顾边界。 |
 | `DailyReminderSchedulerTest` | 活动当日 Focus 的 revision 绑定提醒。 |
 | `RecordsScreenTest` / `RecordsOperationCoordinatorTest` | 排序、累计、目标跨越和读写串行。 |
 | `AppUpdateClientTest` | APK 大小/SHA-256、包名、构建类型和 host 限制。 |
-| `records-server/test/api.test.ts` | 迁移、Today task 快照/续做、Focus 状态、revision、overview 与审计。 |
-| `records-server/web/src/App.test.tsx` | PC 导航、Today 日期、Tasks/Focus、模板与记录管理。 |
+| `records-server/test/api.test.ts` | Goal 生命周期与定义锁定、迁移、Today task 快照/续做、Focus 状态、revision、overview 与审计。 |
+| `records-server/web/src/App.test.tsx` | PC 导航、Today 日期、Tasks/Focus、Goal 管理与审计、模板及记录管理。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试不能替代公网 HTTPS、systemd 和备份恢复验收。
 
@@ -43,8 +43,9 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 19. Focus 暂停或结束后仍可新增、完成和重开任务；跨日停止旧提醒。
 20. 编辑模板后既有任务快照不变；模板允许零步骤且没有完成入口。
 21. Accumulate 验证今日值、记录 Sheet 和 Undo；Measurement 验证范围、离散 Slider、24 小时图与 Undo。
-22. 发布后由低版本同通道 APK 验证检查、下载校验、安装来源授权和系统确认。
-23. 依次切换 English、简体中文、Follow system，确认 Activity、覆盖层和 Tile 文案与持久化。
+22. PC Goals 验证 Active/Archived/All、搜索、新建/编辑、步进录入、子目标确认、再次挑战、归档/恢复/删除，以及 Activity 的三类 Goal 筛选和摘要。
+23. 发布后由低版本同通道 APK 验证检查、下载校验、安装来源授权和系统确认。
+24. 依次切换 English、简体中文、Follow system，确认 Activity、覆盖层和 Tile 文案与持久化。
 
 ## 设备诊断
 

@@ -1,10 +1,13 @@
-import { useState } from "react";
-import { Archive, ArchiveRestore, Edit3, Plus, Repeat2, Save, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Archive, ArchiveRestore, Edit3, Minus, Plus, Repeat2, Save, Search, Trash2 } from "lucide-react";
 import { api } from "../api";
+import { Badge } from "../components/Badge";
 import { Modal } from "../components/Modal";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { localToday, message } from "../lib/format";
 import type { Goal, GoalInput } from "../types";
+
+type StatusFilter = "active" | "archived" | "all";
 
 export function GoalsView({ goals, loading, onChanged, onError }: {
   goals: Goal[];
@@ -18,6 +21,14 @@ export function GoalsView({ goals, loading, onChanged, onError }: {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<{ goal: Goal; action: "archive" | "restore" | "delete" } | null>(null);
+  const [status, setStatus] = useState<StatusFilter>("active");
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase();
+    return goals
+      .filter((goal) => status === "all" || goal.archived === (status === "archived"))
+      .filter((goal) => !normalized || `${goal.title} ${goal.description} ${goal.unit} ${goal.subgoals.map((subgoal) => subgoal.title).join(" ")}`.toLocaleLowerCase().includes(normalized));
+  }, [goals, query, status]);
 
   async function record() {
     if (!recording) return;
@@ -64,16 +75,22 @@ export function GoalsView({ goals, loading, onChanged, onError }: {
   return (
     <section className="view-stack">
       <div className="filter-bar">
-        <span className="result-count">{loading ? "Loading…" : `${goals.length} goals`}</span>
+        <div className="segmented" role="group" aria-label="Goal status">
+          {(["active", "archived", "all"] as const).map((value) => (
+            <button key={value} type="button" className={status === value ? "active" : undefined} onClick={() => setStatus(value)}>{capitalize(value)}</button>
+          ))}
+        </div>
+        <label className="search-field"><Search size={16} /><input aria-label="Search goals" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search goals and subgoals" /></label>
+        <span className="result-count">{loading ? "Loading…" : `${filtered.length} goals`}</span>
         <div className="toolbar-spacer" />
         <button type="button" onClick={() => setEditing("new")}><Plus size={16} />New goal</button>
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Goal</th><th>Shared progress</th><th>Subgoals</th><th>Date range</th><th /></tr></thead>
+          <thead><tr><th>Goal</th><th>Shared progress</th><th>Subgoals</th><th>Date range</th><th>Status</th><th /></tr></thead>
           <tbody>
-            {!loading && goals.length === 0 && <tr><td className="empty" colSpan={5}>No goals yet.</td></tr>}
-            {goals.map((goal) => (
+            {!loading && filtered.length === 0 && <tr><td className="empty" colSpan={6}>No goals match this view.</td></tr>}
+            {filtered.map((goal) => (
               (() => {
                 const expired = !goal.subgoals.every((subgoal) => subgoal.completedAt !== null) && localToday() > goal.endDate;
                 const completed = goal.subgoals.length > 0 && goal.subgoals.every((subgoal) => subgoal.completedAt !== null);
@@ -94,6 +111,7 @@ export function GoalsView({ goals, loading, onChanged, onError }: {
                   </div>
                 </td>
                 <td>{goal.startDate} – {goal.endDate}</td>
+                <td><Badge tone={goal.archived ? "muted" : completed ? "accent" : expired ? "warning" : "neutral"}>{goal.archived ? "Archived" : completed ? "Completed" : pending ? "Pending" : expired ? "Expired" : "Active"}</Badge></td>
                 <td><div className="row-actions">
                   {!goal.archived && !completed && !expired && <button type="button" className="icon-button" aria-label={`Edit ${goal.title}`} title="Edit" onClick={() => setEditing(goal)}><Edit3 size={16} /></button>}
                   {(completed || expired) && <button type="button" className="icon-button" aria-label={`Try ${goal.title} again`} title="Try again" onClick={() => setRetrying(goal)}><Repeat2 size={16} /></button>}
@@ -112,8 +130,12 @@ export function GoalsView({ goals, loading, onChanged, onError }: {
       {recording && (
         <Modal title={`Record ${recording.title}`} onClose={() => setRecording(null)}>
           <form className="item-form" onSubmit={(event) => { event.preventDefault(); void record(); }}>
-            <label>Value<input autoFocus type="number" min="0.000001" step="any" value={value} onChange={(event) => setValue(event.target.value)} /></label>
-            <p className="field-hint">Shared progress is currently {recording.currentValue} {recording.unit}.</p>
+            <div className="goal-value-input">
+              <button type="button" className="secondary icon-button" aria-label={`Decrease by ${recording.stepValue}`} onClick={() => setValue(stepGoalValue(value, recording.stepValue, -1))}><Minus size={16} /></button>
+              <label htmlFor={`goal-progress-value-${recording.id}`}>Value<div className="input-suffix"><input id={`goal-progress-value-${recording.id}`} aria-label="Value" autoFocus type="number" min="0.000001" step="any" value={value} onChange={(event) => setValue(event.target.value)} /><span>{recording.unit}</span></div></label>
+              <button type="button" className="secondary icon-button" aria-label={`Increase by ${recording.stepValue}`} onClick={() => setValue(stepGoalValue(value, recording.stepValue, 1))}><Plus size={16} /></button>
+            </div>
+            <p className="field-hint">Shared progress is currently {recording.currentValue} {recording.unit}. Suggested step: {recording.stepValue} {recording.unit}.</p>
             <div className="modal-actions"><button type="button" className="secondary" onClick={() => setRecording(null)}>Cancel</button><button disabled={busy || !(Number(value) > 0)}><Plus size={16} />Record</button></div>
           </form>
         </Modal>
@@ -148,8 +170,13 @@ function GoalForm({ goal, source, onClose, onSaved }: { goal?: Goal; source?: Go
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const datesValid = startDate <= endDate;
 
   async function save() {
+    if (!datesValid) {
+      setFormError("Start date must not be after end date.");
+      return;
+    }
     const input: GoalInput = {
       title,
       description,
@@ -178,7 +205,8 @@ function GoalForm({ goal, source, onClose, onSaved }: { goal?: Goal; source?: Go
         <div className="form-grid form-grid-2"><label>Title<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required /></label><label>Unit<input value={unit} disabled={locked} onChange={(event) => setUnit(event.target.value)} required /></label></div>
         <label>Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
         <div className="form-grid form-grid-2"><label>Default value<input type="number" min="0.000001" step="any" value={defaultValue} onChange={(event) => setDefaultValue(event.target.value)} /></label><label>Step<input type="number" min="0.000001" step="any" disabled={locked} value={stepValue} onChange={(event) => setStepValue(event.target.value)} required /></label></div>
-        <div className="form-grid form-grid-2"><label>Start date<input type="date" disabled={locked} value={startDate} onChange={(event) => setStartDate(event.target.value)} required /></label><label>End date<input type="date" disabled={locked} value={endDate} onChange={(event) => setEndDate(event.target.value)} required /></label></div>
+        <div className="form-grid form-grid-2"><label>Start date<input type="date" disabled={locked} max={endDate} value={startDate} onChange={(event) => setStartDate(event.target.value)} required /></label><label>End date<input type="date" disabled={locked} min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} required /></label></div>
+        {!datesValid && <p className="form-error" role="alert">Start date must not be after end date.</p>}
       </section>
       <section className="form-section">
         <div className="section-heading"><h3>Subgoals</h3>{!locked && <button type="button" className="secondary compact" onClick={() => setSubgoals([...subgoals, { id: null, title: "", targetValue: "" }])}><Plus size={14} />Add</button>}</div>
@@ -186,7 +214,7 @@ function GoalForm({ goal, source, onClose, onSaved }: { goal?: Goal; source?: Go
         {locked && <p className="field-hint">Dates, unit, step, and subgoals are fixed after progress is recorded.</p>}
       </section>
       {formError && <p className="form-error" role="alert">{formError}</p>}
-      <div className="modal-actions"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button disabled={saving}><Save size={16} />{saving ? "Saving…" : "Save changes"}</button></div>
+      <div className="modal-actions"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button disabled={saving || !datesValid}><Save size={16} />{saving ? "Saving…" : "Save changes"}</button></div>
     </form>
   </Modal>;
 }
@@ -203,4 +231,15 @@ function retryEndDate(source: Goal): string {
   const result = new Date(`${localToday()}T00:00:00Z`);
   result.setUTCDate(result.getUTCDate() + Math.round((end.getTime() - start.getTime()) / 86_400_000));
   return result.toISOString().slice(0, 10);
+}
+
+function stepGoalValue(value: string, step: number, direction: -1 | 1): string {
+  const current = Number(value);
+  const base = Number.isFinite(current) ? current : 0;
+  const next = Math.max(step, base + step * direction);
+  return Number(next.toFixed(12)).toString();
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

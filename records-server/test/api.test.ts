@@ -121,6 +121,54 @@ describe("Records API", () => {
     })).statusCode).toBe(400);
   });
 
+  it("locks goal definitions after progress and audits goal administration", async () => {
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/goals",
+      payload: goalInput({ startDate: "2027-07-21", endDate: TestDate }),
+    })).statusCode).toBe(400);
+
+    const created = await app.inject({ method: "POST", url: "/api/goals", payload: goalInput() });
+    expect(created.statusCode).toBe(201);
+    const goal = created.json().goal;
+    expect((await app.inject({
+      method: "PUT",
+      url: `/api/goals/${goal.id}`,
+      payload: goalInput({ title: "Updated kit", subgoals: goal.subgoals.map((subgoal: { id: number; title: string; targetValue: number }) => ({ id: subgoal.id, title: subgoal.title, targetValue: subgoal.targetValue })) }),
+    })).statusCode).toBe(200);
+
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/goal-entries",
+      payload: { goalId: goal.id, occurredAt: 10, localDate: TestDate, localMinute: 600, value: 100 },
+    })).statusCode).toBe(201);
+    expect((await app.inject({
+      method: "PUT",
+      url: `/api/goals/${goal.id}`,
+      payload: goalInput({ unit: "credits", subgoals: goal.subgoals.map((subgoal: { id: number; title: string; targetValue: number }) => ({ id: subgoal.id, title: subgoal.title, targetValue: subgoal.targetValue })) }),
+    })).statusCode).toBe(400);
+
+    expect((await app.inject({ method: "DELETE", url: `/api/goals/${goal.id}` })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/goals/batch-archive", payload: { ids: [goal.id], archived: true } })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/goal-entries",
+      payload: { goalId: goal.id, occurredAt: 20, localDate: TestDate, localMinute: 601, value: 100 },
+    })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/goals/batch-archive", payload: { ids: [goal.id], archived: false } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: "/api/goals/batch-archive", payload: { ids: [goal.id], archived: true } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "DELETE", url: `/api/goals/${goal.id}` })).statusCode).toBe(200);
+
+    expect((await getAuditLogs()).map((log) => log.action)).toEqual(expect.arrayContaining([
+      "GOAL_CREATED",
+      "GOAL_UPDATED",
+      "GOAL_ENTRY_CREATED",
+      "GOAL_ARCHIVED",
+      "GOAL_RESTORED",
+      "GOAL_DELETED",
+    ]));
+  });
+
   it("returns Today tasks, manual recommendations, and immutable template snapshots", async () => {
     await createItem(itemInput());
     await createEntry(entryInput({ value: 2 }));

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { localToday, shiftLocalDate } from "./lib/format";
-import type { DailyFocus, TaskTemplate, TodayState } from "./types";
+import type { DailyFocus, Goal, RecordAuditLog, TaskTemplate, TodayState } from "./types";
 
 const activeItem = {
   id: 1, name: "Water", description: "Daily hydration", mode: "ACCUMULATE", valueType: "NUMBER",
@@ -32,12 +32,33 @@ const activeFocus: DailyFocus = {
 };
 const entry = { id: 20, itemId: 1, occurredAt: 1_786_073_400_000, localDate: "2026-08-07", localMinute: 610, value: 250, createdAt: 1_786_073_400_000, itemName: "Water", itemMode: "ACCUMULATE", itemUnit: "ml", itemValueType: "NUMBER" };
 const auditLog = { id: 30, action: "ENTRY_CREATED", entityType: "ENTRY", entityId: 20, before: null, after: { id: 20, itemId: 1, itemName: "Water", occurredAt: entry.occurredAt, localDate: entry.localDate, localMinute: entry.localMinute, value: 250 }, createdAt: entry.occurredAt };
+const activeGoal: Goal = {
+  id: 50, title: "Build the kit", description: "Shared savings", unit: "points", defaultValue: 100,
+  stepValue: 100, startDate: localToday(), endDate: shiftLocalDate(localToday(), 365), archived: false,
+  createdAt: 1, updatedAt: 1, currentValue: 6000,
+  subgoals: [
+    { id: 51, goalId: 50, title: "Phone", targetValue: 5000, position: 0, completedAt: null },
+    { id: 52, goalId: 50, title: "Bike", targetValue: 8000, position: 1, completedAt: null },
+  ],
+};
+const completedGoal: Goal = {
+  ...activeGoal,
+  id: 60,
+  title: "Completed goal",
+  currentValue: 8000,
+  subgoals: activeGoal.subgoals.map((subgoal, index) => ({ ...subgoal, id: 61 + index, goalId: 60, completedAt: 2 })),
+};
+const archivedGoal: Goal = { ...activeGoal, id: 70, title: "Archived goal", archived: true };
 
 describe("Records administration", () => {
   let todayState: TodayState;
+  let goals: Goal[];
+  let auditLogs: RecordAuditLog[];
 
   beforeEach(() => {
     todayState = { todayTasks: tasks.map((task) => ({ ...task, steps: task.steps.map((step) => ({ ...step })) })), dailySuggestions: [template], unfinishedTasks: [], dailyFocus: null };
+    goals = [];
+    auditLogs = [auditLog as RecordAuditLog];
     window.history.replaceState(null, "", window.location.pathname);
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -52,9 +73,10 @@ describe("Records administration", () => {
       }
       if (url === "api/templates?archived=false") return response({ templates: [template, secondaryTemplate] });
       if (url === "api/templates?archived=true") return response({ templates: [] });
-      if (url.startsWith("api/goals?")) return response({ goals: [] });
+      if (url === "api/goals?archived=false") return response({ goals: goals.filter((goal) => !goal.archived) });
+      if (url === "api/goals?archived=true") return response({ goals: goals.filter((goal) => goal.archived) });
       if (url.startsWith("api/today/")) return response({ today: url.endsWith(localToday()) ? todayState : { todayTasks: [], dailySuggestions: [template], unfinishedTasks: [], dailyFocus: null } });
-      if (url.includes("audit-logs")) return response({ logs: [auditLog], nextBeforeId: null });
+      if (url.includes("audit-logs")) return response({ logs: auditLogs, nextBeforeId: null });
       if (url.includes("items?archived=true")) return response({ items: [archivedItem] });
       if (url.includes("items?archived=false")) return response({ items: [activeItem, measurementItem] });
       if (url.includes("entries?")) return response({ entries: [entry] });
@@ -191,6 +213,113 @@ describe("Records administration", () => {
     await user.click(screen.getByRole("button", { name: "Activity" }));
     expect(await screen.findByText("Created entry")).toBeTruthy();
     expect(screen.getByText("Entry: Water")).toBeTruthy();
+  });
+
+  it("creates and edits a shared progress goal", async () => {
+    goals = [activeGoal];
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Goals" }));
+    await user.type(screen.getByLabelText("Search goals"), "Phone");
+    expect(screen.getByText("Build the kit")).toBeTruthy();
+    await user.clear(screen.getByLabelText("Search goals"));
+
+    await user.click(screen.getByRole("button", { name: "New goal" }));
+    const newGoal = await screen.findByRole("dialog", { name: "New goal" });
+    await user.type(within(newGoal).getByLabelText("Title"), "Travel fund");
+    await user.clear(within(newGoal).getByLabelText("Unit"));
+    await user.type(within(newGoal).getByLabelText("Unit"), "credits");
+    await user.type(within(newGoal).getByLabelText("Subgoal 1 title"), "Japan");
+    await user.type(within(newGoal).getByLabelText("Subgoal 1 target"), "3000");
+    fireEvent.change(within(newGoal).getByLabelText("Start date"), { target: { value: shiftLocalDate(localToday(), 400) } });
+    expect((within(newGoal).getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(newGoal).getByLabelText("Start date"), { target: { value: localToday() } });
+    await user.click(within(newGoal).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goals", expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining('"title":"Travel fund"'),
+    })));
+
+    await user.click(screen.getByRole("button", { name: "Edit Build the kit" }));
+    const editGoal = await screen.findByRole("dialog", { name: "Edit goal" });
+    await user.clear(within(editGoal).getByLabelText("Description"));
+    await user.type(within(editGoal).getByLabelText("Description"), "Updated description");
+    await user.click(within(editGoal).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goals/50", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining('"description":"Updated description"'),
+    })));
+  });
+
+  it("records goal progress with step controls and completes an eligible subgoal", async () => {
+    goals = [activeGoal];
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Goals" }));
+    await user.click(screen.getByRole("button", { name: "6000 points" }));
+    const recordGoal = await screen.findByRole("dialog", { name: "Record Build the kit" });
+    await user.click(within(recordGoal).getByRole("button", { name: "Increase by 100" }));
+    expect((within(recordGoal).getByLabelText("Value") as HTMLInputElement).value).toBe("200");
+    await user.click(within(recordGoal).getByRole("button", { name: "Record" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goal-entries", expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining('"value":200'),
+    })));
+
+    await user.click(screen.getByRole("checkbox", { name: "Phone · 5000 points" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goal-subgoals/51/completion", expect.objectContaining({
+      method: "PUT",
+      body: expect.stringContaining('"completed":true'),
+    })));
+  });
+
+  it("retries completed goals and manages archived goals", async () => {
+    goals = [completedGoal, archivedGoal];
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Goals" }));
+
+    await user.click(screen.getByRole("button", { name: "Try Completed goal again" }));
+    const retryGoal = await screen.findByRole("dialog", { name: "New goal" });
+    expect(within(retryGoal).getByDisplayValue("Completed goal")).toBeTruthy();
+    await user.click(within(retryGoal).getByRole("button", { name: "Close" }));
+
+    await user.click(screen.getByRole("button", { name: "Archive Completed goal" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Archive goal" })).getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goals/batch-archive", expect.objectContaining({ method: "POST", body: JSON.stringify({ ids: [60], archived: true }) })));
+
+    await user.click(screen.getByRole("button", { name: "Archived" }));
+    await user.click(screen.getByRole("button", { name: "Restore Archived goal" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Restore goal" })).getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goals/batch-archive", expect.objectContaining({ method: "POST", body: JSON.stringify({ ids: [70], archived: false }) })));
+
+    await user.click(screen.getByRole("button", { name: "Delete Archived goal" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Delete goal" })).getByRole("button", { name: "Delete permanently" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/goals/70", expect.objectContaining({ method: "DELETE" })));
+  });
+
+  it("shows readable goal activity and goal filters", async () => {
+    auditLogs = [{
+      id: 40,
+      action: "GOAL_ENTRY_CREATED",
+      entityType: "GOAL_ENTRY",
+      entityId: 90,
+      before: null,
+      after: { id: 90, goalId: 50, occurredAt: entry.occurredAt, localDate: entry.localDate, localMinute: 610, value: 200 },
+      createdAt: entry.occurredAt,
+    }];
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Prepare launch");
+    await user.click(screen.getByRole("button", { name: "Activity" }));
+    await user.selectOptions(screen.getByLabelText("Activity object"), "GOAL_ENTRY");
+    expect(await screen.findByText("Goal progress: Goal #50")).toBeTruthy();
+    expect(screen.getByText("2026-08-07 10:10; +200")).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Goals" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Goal subgoals" })).toBeTruthy();
   });
 });
 
