@@ -139,22 +139,22 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 | `record_entries` | 保存发生时刻、固化本地日期/分钟和值；索引 `itemId`、`(itemId, occurredAt)` 与 `(localDate, localMinute)`，并随父项级联删除。 |
 | `task_templates` | 保存模板标题、`MANUAL/DAILY` 周期、归档状态和时间戳；模板没有完成状态。 |
 | `task_template_steps` | 保存模板步骤与固定位序；随模板级联删除。模板更新时步骤在同一事务整体替换。 |
-| `daily_plans` | `local_date` 唯一；保存第一步、当前实例、`READY/ACTIVE/PAUSED/ENDED`、暂停原因、完成轮次、下一回顾时刻和 revision。 |
-| `today_commitments` | 保存计划下的 `PRIMARY/SECONDARY/ADDITIONAL` 实例，以及创建时复制的模板 ID、标题和周期；模板删除时 ID 置空，快照内容保留。 |
-| `today_commitment_steps` | 保存实例步骤快照、固定位序和完成时刻；完成状态只属于该实例。 |
-| `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TEMPLATE`、`COMMITMENT`、`COMMITMENT_STEP`、`DAILY_PLAN` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表。 |
+| `today_tasks` | 保存日期、可空模板/昨日任务来源、标题快照、位序、完成时刻和 revision；任务独立于 Focus。 |
+| `today_task_steps` | 保存任务步骤快照、固定位序和完成时刻；随 Today task 级联删除。 |
+| `daily_focus` | `local_date` 唯一；引用主/次/当前 Today task，保存第一步、`READY/ACTIVE/PAUSED/ENDED`、暂停原因、完成轮次、下一回顾时刻和 revision。 |
+| `record_audit_logs` | 保存 `ITEM`、`ENTRY`、`TEMPLATE`、`TODAY_TASK`、`TODAY_TASK_STEP`、`FOCUS` 的对象 ID、动作、变更前后 JSON 快照和记录时间；不关联业务表。 |
 
 服务端在事务内校验并写入记录项。累计记录使用正数流水和可选目标；测量记录固定为数字，要求有限的最小值、最大值和正步进，且只接受闭区间内的步进值。名称在活跃和归档项中忽略大小写唯一；已有流水后，模式、计量类型、单位和 Measurement 范围必须保持不变。归档项不会进入活跃查询，也不能新增流水；永久删除只接受归档项。记录项更新先比较规范化快照，无变化时不写表或审计；其他成功写操作在同一事务插入一条审计日志。手动时间段不属于服务端 schema 或 API，写请求携带 `windows` 会被明确拒绝。日志以 `id` 倒序、每页 `100` 条游标查询。App 不创建 `RecordDatabase`、Room DAO 或本地记录文件。
 
-新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，返回活跃模板、该日期计划及实例、范围内累计流水和最新 Measurement 流水。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
+新增流水由客户端一次性提交 `occurredAt`、`localDate`、`localMinute` 和数值；服务端原样保存。`GET /api/overview` 接受记录起止日期和显式 `planDate`，返回活跃模板、Daily 建议、昨日未完成候选、该日期 Today tasks/DailyFocus、范围内累计流水和最新 Measurement 流水。Android 请求近 7 天用于记录进度，测量预览按需拉取最近 24 小时流水。ViewModel 用同一互斥区串行根页读写；成功写入后刷新 overview，刷新失败不改变已完成写入的结果。
 
-模板创建与更新在一个事务内写入定义和至少一个步骤；`DAILY` 只改变列表排序，不创建执行记录。计划创建或追加承诺时，服务端把模板字段复制到 `today_commitments` 与 `today_commitment_steps`，之后两边独立。归档模板不允许创建新实例；删除已归档模板只清空既有实例的外键引用。
+模板创建与更新在一个事务内写入定义和零个或多个步骤；`DAILY` 只产生当日建议。Today task 可内联创建、从模板复制，或从昨日未完成任务复制尚未完成的步骤；原任务进度不变，同一天同一昨日来源由唯一约束防止重复。归档模板不允许创建新实例；删除已归档模板只清空既有任务的外键引用。
 
-每日计划由 `POST /api/daily-plans` 创建，`PUT /api/daily-plans/:localDate` 只在 `READY` 替换初始实例。`start`、`review`、`continue`、`commitments` 和 `end` 执行用户流程；PC 另用 `review-now`、`switch` 和 `reset`。第四次及后续回顾写入 `PAUSED + TARGET_REACHED`；全部实例完成写入 `PAUSED + COMMITMENTS_COMPLETED`。前者有未完成实例时只允许 `continue`，否则允许追加实例；后者允许追加实例。重新打开完成暂停中的实例时，服务端按第一步状态恢复 `READY` 或 `ACTIVE`。`reset` 保留实例及步骤完成状态，只重置执行字段。轮次仅由回顾增加；所有实例步骤和计划写请求携带 `expectedRevision` 与 `occurredAt`，服务端事务校验状态、引用和 revision。
+DailyFocus 由 `POST /api/daily-focus` 创建，`PUT /api/daily-focus/:localDate` 只在 `READY` 更新第一步和选择。`start`、`review`、`refocus`、`continue` 与 `end` 执行用户流程；PC 另用 `review-now`、`switch` 和 `reset`。第四次及后续回顾写入 `PAUSED + TARGET_REACHED`；所选 Focus tasks 全部完成写入 `PAUSED + FOCUS_CLEARED`。两种暂停均可从任意未完成 Today task 重新选择并恢复，恢复不增加轮次；任务重开不自动恢复。`ENDED` 只结束 Focus。任务和 Focus 写请求携带 `expectedRevision` 与 `occurredAt`，服务端事务校验状态、引用和 revision。
 
-Android 每次刷新后按服务端计划覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始、继续或追加承诺；进入 `PAUSED`、`ENDED` 或跨日时取消任务和可见通知。
+Android 每次刷新后按服务端 DailyFocus 覆盖唯一 WorkManager 任务。Worker 读取失败返回 retry；状态或身份不匹配时成功结束，不从缓存发布通知。通知成功发布后，本地只记录 `(localDate, revision, nextReviewAt)` 送达标识，同一版本不再调度；新 revision 生成新提醒。通知点击以 `MainActivity` extra 返回 Records 根页，并在下一个本地日期开始时自动失效。通知权限不可用时客户端拒绝开始或恢复 Focus；进入 `PAUSED`、`ENDED` 或跨日时取消任务和可见通知。
 
-服务端还提供 PC 管理页静态资源；Today 按所选 ISO 本地日期读取计划实例，Templates 独立管理活跃与归档定义。Overview 固定读取浏览器真实今天，不受 Today 日期选择影响。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和八张 Records 业务表。
+服务端还提供 PC 管理页静态资源；Today 按所选 ISO 本地日期读取 Today tasks 与 DailyFocus，Templates 独立管理活跃与归档定义。Overview 固定读取浏览器真实今天，不受 Today 日期选择影响。备份脚本使用 SQLite 在线备份 API 写入 `/srv/records/backups`，恢复检查验证完整性和八张 Records 业务表。
 
 ## App 更新
 

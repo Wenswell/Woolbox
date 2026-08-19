@@ -24,11 +24,11 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | 路径 | 修改入口 |
 | --- | --- |
 | `MainActivity.kt` | 普通入口退到后台、指定应用启动、`onStop` 命令提交和每日回顾通知入口。 |
-| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records Today/Templates/Routines/Measurement、通知权限和 Sheet 接线。 |
+| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records Today/Templates/Accumulate/Measurement、通知权限和 Sheet 接线。 |
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `res/values*/strings.xml`、`res/xml/locales_config.xml` | 默认英文、简体中文资源与系统应用语言声明；可见文案从资源读取。 |
-| `record/{model,data,ui}/` | 任务模板、Today 实例、量化记录、HTTPS Repository、Keystore 凭据、ViewModel、管理页、Sheet 和表单。 |
+| `record/{model,data,ui}/` | TaskTemplate、TodayTask、DailyFocus、量化记录、HTTPS Repository、Keystore 凭据、ViewModel、管理页、Sheet 和表单。 |
 | `record/reminder/` | 唯一 WorkManager 调度、服务端二次校验、通知权限/Channel 和回顾通知。 |
 | `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
@@ -91,15 +91,14 @@ Android 12/12L 不支持应用内请求添加 Tile，详情页的 `Quick setting
 | `ForegroundTargetSelectorTest` | 活动、焦点、窗口层级和无候选时的目标选择。 |
 | `ToolCommandPolicyTest` | 同类命令匹配与不同工具切换判断。 |
 | `RecordRulesTest` | 记录项规范化、累计/测量值规则、目标累计和十进制步进。 |
-| `TodayCommitmentTest` | 实例步骤完成进度和下一动作派生。 |
-| `DailyPlanTest` | 回顾到期边界、当前实例与未完成实例派生。 |
-| `DailyReminderSchedulerTest` | 仅活动当日计划产生 revision 绑定提醒，送达标识随 revision 或回顾时刻变化。 |
+| `TodayTaskTest` | 任务步骤完成进度和下一步骤派生。 |
+| `DailyFocusTest` | 回顾到期边界、当前任务与所选未完成任务派生。 |
+| `DailyReminderSchedulerTest` | 仅活动当日 Focus 产生 revision 绑定提醒，送达标识随 revision 或回顾时刻变化。 |
 | `RecordsScreenTest` | 记录项排序、今日累计和目标跨越。 |
-| `RecordsTodaySemanticsTest` | Today 无计划、待启动、回顾到期、两类暂停原因、添加承诺、继续一轮和结束状态的可见语义。 |
 | `RecordsOperationCoordinatorTest` | 根页刷新合并，以及写操作等待当前刷新后获取新快照的顺序。 |
 | `AppUpdateClientTest` | 更新 APK 缓存的大小/SHA-256 校验，以及包名、构建类型和下载 host 限制。 |
-| `records-server/test/api.test.ts` | 八表迁移、模板快照隔离、两类暂停原因、承诺重开协调、revision、overview、审计和批量 API。 |
-| `records-server/web/src/App.test.tsx` | PC 七区导航、Today 日期隔离、暂停动作、Active/Archived 模板、记录项、流水和审计日志。 |
+| `records-server/test/api.test.ts` | 八表迁移、Today task 快照/续做、Focus 四轮与暂停语义、revision、overview、审计和批量 API。 |
+| `records-server/web/src/App.test.tsx` | PC 七区导航、Today 日期隔离、Tasks/Focus 操作、Active/Archived 模板、记录项、流水和审计日志。 |
 
 JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试也不能替代 Caddy Basic Auth、公网 HTTPS、systemd 和备份恢复验收。
 
@@ -171,9 +170,9 @@ node --check tools/publish-update.mjs
 12. OLED 遮罩上连续长按，确认只显示一个控制面板；关闭面板后可再次长按打开。
 13. 工具活动时切换应用、重新打开 Woolbox、关闭无障碍服务，确认覆盖层全部释放。
 14. 旋转屏幕或改变显示尺寸，确认 Global Copy 内容保持可操作，OLED 遮罩和面板按比例重算。
-15. 配置 Records 后确认根页顺序为 Today、Templates、Routines、Measurement。新建 Manual 与 Daily 模板，确认模板没有 checkbox 且 Daily 排在前面；从模板建立 1+1 Today，编辑模板后既有实例内容不变，同一模板可再次添加。PC Today 切换日期后可处理实例步骤、提前回顾、即时切换和重置，Android 刷新后状态一致。
-16. Android 13+ 拒绝通知权限时确认计划保持 `READY`，设置入口可恢复权限；授权后开始第一轮，使用 `adb shell dumpsys jobscheduler | rg "com.wswensw.woolbox|records-daily-review"` 确认只有一个调度。到期通知点击后应回到 Records Today；继续或切换后 revision 和下一提醒更新。第四轮有未完成实例时只显示“继续一轮”；实例全部完成时只显示“添加承诺”，首次回顾前完成不显示“完成 0 轮”。暂停、结束和跨日均停止旧提醒。Android 12 直接检查系统通知开关。
-17. 在 Routines 创建累计记录后确认今日值、记录 Sheet、`Undo` 与断网错误行为。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`；确认 24 小时预览、离散 Slider、当前设备时间和短时 `Undo`。
+15. 配置 Records 后确认根页顺序为 Today、Templates、Accumulate、Measurement。无 Focus 时新增标题任务和清单任务，验证完成、部分完成和重开；从 Daily 建议与昨日未完成候选手动加入，确认不自动创建且昨日来源不可重复加入。编辑模板后既有任务快照不变。
+16. 选择 1+1 Focus；Android 13+ 拒绝通知权限时确认保持 `READY`，授权后开始第一轮，并用 `adb shell dumpsys jobscheduler | rg "com.wswensw.woolbox|records-daily-review"` 确认只有一个调度。到期通知点击后返回 Records；继续或切换后 revision 和下一提醒更新。第四次回顾即显示“今天已足够”，即使普通任务仍未完成；所选任务完成进入 `FOCUS_CLEARED`，重开任务不自动恢复。暂停或结束后仍可新增和完成任务，跨日停止旧提醒。Android 12 直接检查系统通知开关。
+17. 在 Accumulate 创建累计记录后确认今日值、记录 Sheet、`Undo` 与断网错误行为。创建 `Temperature` / `°C` Measurement，设置最小值 `-10`、最大值 `10`、步进 `0.5`；确认 24 小时预览、离散 Slider、当前设备时间和短时 `Undo`。
 18. 在 Tools 检查 `Access` 位于工具列表之前；未授权时验证错误色图标和设置入口，授权返回后验证成功色图标，再次点击只显示已启用提示且不跳转。
 19. 打开两个详情页，确认没有重复权限行，`Start Global Copy`/`Show shield` 为列表条目；Android 13 及以上点击 Quick Settings 整行请求添加且无右侧 `Add` 按钮，Android 12/12L 整行不可用并可在系统编辑页手动添加。
 20. 创建一条 Global Copy 历史，确认 Copy History 行显示目标应用图标和名称、块数、时间及预览，不显示目标包名。
