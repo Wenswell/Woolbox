@@ -116,6 +116,9 @@ fun WoolboxApp(
     val recordedItemTemplate = stringResource(R.string.recorded_item)
     val undoLabel = stringResource(R.string.action_undo)
     val accessibilityAlreadyEnabledMessage = stringResource(R.string.accessibility_already_enabled)
+    val batteryOptimizationAlreadyIgnoredMessage = stringResource(
+        R.string.battery_optimization_already_ignored,
+    )
     val copyHistorySavedMessage = stringResource(R.string.copy_history_saved)
     val copyHistoryDeletedMessage = stringResource(R.string.copy_history_deleted)
     val savedAppDeletedMessage = stringResource(R.string.saved_app_deleted)
@@ -127,6 +130,7 @@ fun WoolboxApp(
         factory = RecordsViewModel.Factory(LocalContext.current),
     )
     val toolState by toolViewModel.serviceState.collectAsStateWithLifecycle()
+    val batteryOptimizationIgnored by toolViewModel.batteryOptimizationIgnored.collectAsStateWithLifecycle()
     val defaultOledConfig by toolViewModel.defaultOledConfig.collectAsStateWithLifecycle()
     val oledProfiles by toolViewModel.oledProfiles.collectAsStateWithLifecycle()
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
@@ -302,12 +306,17 @@ fun WoolboxApp(
                         when (tab) {
                             MainTab.TOOLS -> ToolsScreen(
                                 state = toolState,
+                                batteryOptimizationIgnored = batteryOptimizationIgnored,
                                 modifier = Modifier.fillMaxSize(),
                                 onOpenGlobalCopy = { navController.navigate(AppRoutes.GLOBAL_COPY) },
                                 onOpenOledShield = { navController.navigate(AppRoutes.OLED_SHIELD) },
                                 onOpenAccessibilitySettings = toolViewModel::openAccessibilitySettings,
                                 onAccessibilityAlreadyEnabled = {
                                     context.showMessage(accessibilityAlreadyEnabledMessage)
+                                },
+                                onOpenBatteryOptimizationSettings = toolViewModel::openBatteryOptimizationSettings,
+                                onBatteryOptimizationAlreadyIgnored = {
+                                    context.showMessage(batteryOptimizationAlreadyIgnoredMessage)
                                 },
                             )
 

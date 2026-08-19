@@ -96,6 +96,8 @@ AppTheme
 
 ## 工具详情页组合
 
+Tools 根页的 `Access` 分区使用 `AppListItem` 展示 `Accessibility service` 与 `Ignore battery optimization`。两行均使用成功色 `CheckCircle` 或错误色 `Lock` 表示系统状态；未授权整行打开对应系统设置，已授权整行只显示已授权提示。详情页不重复显示这两项权限。
+
 详情页按固定优先级排列：
 
 1. `Actions` 工具操作条目。
@@ -118,9 +120,9 @@ Records 的 Today/Focus/Tasks、管理页和零轮状态呈现归 [Records 界�
 
 ## 状态呈现
 
-页面只显示 [产品说明](product.md#状态语义) 定义的六个状态词，不在不同页面创建同义文案。
+工具运行状态只显示 [产品说明](product.md#状态语义) 定义的六个状态词，不在不同页面创建同义文案；系统权限行使用 `Authorized`/`Not authorized` 表示授权结果。
 
-- 服务授权状态只显示在 Tools 的 `Access` 区域；详情页不重复显示权限行。
+- 服务授权状态和电池优化授权状态只显示在 Tools 的 `Access` 区域；详情页不重复显示权限行。
 - 工具状态显示在 Tools 工具行和对应 Tile 行。
 - `Preparing` 与 `Active` 反映服务状态机，不由页面自行推断。
 - 状态变化不得改变列表行、主操作或 Tile 行的稳定尺寸。

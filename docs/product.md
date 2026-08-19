@@ -18,7 +18,7 @@ Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。
 
 ### Tools
 
-Tools 首个内容区域为 `Access`，显示 `Accessibility service` 的授权状态。系统未启用时点击打开无障碍设置；系统已启用后再次点击只提示服务已启用，不重复跳转。已启用使用成功色图标，未启用使用错误色图标；详情页不重复显示该权限区域。
+Tools 首个内容区域为 `Access`，显示 `Accessibility service` 和 `Ignore battery optimization` 的授权状态。无障碍服务未启用时点击打开无障碍设置；已启用后再次点击只提示服务已启用，不重复跳转。电池优化未忽略时点击打开针对 Woolbox 的系统授权页；已忽略后再次点击只提示已授权，不重复跳转。两项已授权均使用成功色图标，未授权使用错误色图标；详情页不重复显示权限区域。应用从系统设置返回前台时重新读取两项状态。
 
 ### 页面入口
 
@@ -126,7 +126,7 @@ Today tasks、DailyFocus、模板与量化记录的完整行为和验收归 [Rec
 ## 验收标准
 
 - Debug APK 可安装并启动于 Android 12（API 31）设备。
-- Tools 首个区域为 `Access`；未授权时显示错误色图标并可打开设置，授权后显示成功色图标，再次点击只提示已启用且不跳转。
+- Tools 首个区域为 `Access`；无障碍服务和电池优化未授权时显示错误色图标并可打开对应系统设置，授权后显示成功色图标，再次点击只提示已授权且不跳转。
 - Global Copy 与 OLED shield 详情页不显示重复权限栏；顶部 `Start Global Copy`/`Show shield` 使用列表条目，Quick Settings 在支持请求时整行可点击且无右侧 `Add` 按钮。
 - 授权后两个详情页显示 `Connected`，页面主操作可用。
 - 未授权时 OLED 主操作仍可用，可在 Woolbox 内显示、调整和关闭遮罩，不产生应用配置。

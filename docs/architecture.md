@@ -26,6 +26,10 @@ Quick Settings Tiles ───────────────────�
 Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API ──> Records server SQLite
 ```
 
+## 系统权限
+
+Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取无障碍服务开关；`BatteryOptimizationMonitor` 使用 `PowerManager.isIgnoringBatteryOptimizations(packageName)` 读取电池优化豁免。用户点击未授权的电池优化行时，应用通过 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 和当前包名 URI 打开系统授权页，并在 Activity `ON_RESUME` 后重新读取状态；授权页返回后的刷新最多确认 5 次，间隔 `500ms`，不持久化该状态。
+
 一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。工具页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。Records 不提交工具命令，Android 与 PC 管理页共享服务端 SQLite。
 
 ## 模块职责
@@ -42,6 +46,7 @@ Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API
 | `InAppOledShield` | 服务未连接时在 Activity composition 顶层显示 OLED 遮罩，复用遮罩与控制面板 UI。 |
 | `ComposeOverlayWindow` | 把 Compose 内容挂载为 `TYPE_ACCESSIBILITY_OVERLAY` 并管理生命周期。 |
 | `ToolServiceStateStore` | 发布页面和 Tile 需要的持续状态。 |
+| `BatteryOptimizationMonitor` | 读取应用电池优化豁免，并打开针对当前包名的系统授权页。 |
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |

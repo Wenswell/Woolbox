@@ -47,6 +47,7 @@
     <string name="action_cancel">Cancel</string>
 
     <string name="accessibility_already_enabled">Accessibility service is already enabled.</string>
+    <string name="battery_optimization_already_ignored">Battery optimization is already ignored.</string>
     <string name="copy_history_saved">Copy history saved.</string>
     <string name="copy_history_deleted">Copy history deleted.</string>
     <string name="saved_app_deleted">Saved app deleted.</string>
@@ -66,6 +67,7 @@
     <string name="tools_subtitle">Accessibility tools for the active app.</string>
     <string name="tools_access">Access</string>
     <string name="tools_accessibility_service">Accessibility service</string>
+    <string name="tools_ignore_battery_optimization">Ignore battery optimization</string>
     <string name="tools_available">Available</string>
     <string name="section_actions">Actions</string>
     <string name="section_quick_settings">Quick settings</string>
@@ -102,6 +104,8 @@
     <string name="status_connected">Connected</string>
     <string name="status_waiting_for_service">Waiting for service</string>
     <string name="status_not_enabled">Not enabled</string>
+    <string name="status_authorized">Authorized</string>
+    <string name="status_not_authorized">Not authorized</string>
     <string name="status_preparing">Preparing</string>
     <string name="status_active">Active</string>
     <string name="status_ready">Ready</string>

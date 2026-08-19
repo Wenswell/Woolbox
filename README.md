@@ -44,7 +44,7 @@ Records 的业务规则、状态语义和操作流程见 [Records 产品规则](
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.40` (`versionCode 41`) |
+| 版本 | `0.1.41` (`versionCode 42`) |
 
 ## 目录
 

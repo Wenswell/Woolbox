@@ -9,9 +9,12 @@ import androidx.lifecycle.viewModelScope
 import com.wswensw.woolbox.tool.model.OledShieldConfig
 import com.wswensw.woolbox.tool.model.OledShieldProfile
 import com.wswensw.woolbox.tool.service.AccessibilityServiceMonitor
+import com.wswensw.woolbox.tool.service.BatteryOptimizationMonitor
 import com.wswensw.woolbox.tool.service.ToolServiceStateStore
 import com.wswensw.woolbox.tool.storage.OledShieldConfigRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class OledShieldProfileUi(
     val profile: OledShieldProfile,
@@ -31,9 +35,13 @@ data class OledShieldProfileUi(
 class ToolViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = OledShieldConfigRepository(application)
     private val mutableDefaultOledConfig = MutableStateFlow(repository.loadDefault())
+    private val mutableBatteryOptimizationIgnored = MutableStateFlow(false)
     private val profileRefresh = MutableStateFlow(0)
+    private var batteryRefreshJob: Job? = null
+    private var confirmBatteryRefresh = false
 
     val serviceState = ToolServiceStateStore.state
+    val batteryOptimizationIgnored = mutableBatteryOptimizationIgnored.asStateFlow()
     val defaultOledConfig = mutableDefaultOledConfig.asStateFlow()
     val oledProfiles: StateFlow<List<OledShieldProfileUi>> = combine(
         repository.profiles,
@@ -53,7 +61,28 @@ class ToolViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshAccessibilityState() {
         val enabled = AccessibilityServiceMonitor.isEnabled(getApplication())
         ToolServiceStateStore.update { it.copy(isAccessibilityEnabled = enabled) }
+        refreshBatteryOptimization()
         profileRefresh.update(Int::inc)
+    }
+
+    fun openBatteryOptimizationSettings() {
+        if (mutableBatteryOptimizationIgnored.value) return
+        confirmBatteryRefresh = true
+        BatteryOptimizationMonitor.openSettings(getApplication())
+    }
+
+    private fun refreshBatteryOptimization() {
+        batteryRefreshJob?.cancel()
+        val attempts = if (confirmBatteryRefresh) 5 else 1
+        confirmBatteryRefresh = false
+        batteryRefreshJob = viewModelScope.launch {
+            repeat(attempts) { attempt ->
+                val ignored = BatteryOptimizationMonitor.isIgnored(getApplication())
+                mutableBatteryOptimizationIgnored.value = ignored
+                if (ignored || attempt == attempts - 1) return@launch
+                delay(500)
+            }
+        }
     }
 
     fun openAccessibilitySettings() {

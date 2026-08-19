@@ -48,6 +48,7 @@
     <string name="action_cancel">取消</string>
 
     <string name="accessibility_already_enabled">无障碍服务已启用。</string>
+    <string name="battery_optimization_already_ignored">电池优化已忽略。</string>
     <string name="copy_history_saved">复制历史已保存。</string>
     <string name="copy_history_deleted">复制历史已删除。</string>
     <string name="saved_app_deleted">已保存的应用已删除。</string>
@@ -67,6 +68,7 @@
     <string name="tools_subtitle">用于当前应用的无障碍工具。</string>
     <string name="tools_access">权限</string>
     <string name="tools_accessibility_service">无障碍服务</string>
+    <string name="tools_ignore_battery_optimization">忽略电池优化</string>
     <string name="tools_available">可用工具</string>
     <string name="section_actions">操作</string>
     <string name="section_quick_settings">快捷设置</string>
@@ -102,6 +104,8 @@
     <string name="status_connected">已连接</string>
     <string name="status_waiting_for_service">等待服务</string>
     <string name="status_not_enabled">未启用</string>
+    <string name="status_authorized">已授权</string>
+    <string name="status_not_authorized">未授权</string>
     <string name="status_preparing">准备中</string>
     <string name="status_active">使用中</string>
     <string name="status_ready">就绪</string>

@@ -15,10 +15,13 @@ import com.wswensw.woolbox.tool.service.ToolServiceState
 @Composable
 fun ToolsScreen(
     state: ToolServiceState,
+    batteryOptimizationIgnored: Boolean,
     onOpenGlobalCopy: () -> Unit,
     onOpenOledShield: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onAccessibilityAlreadyEnabled: () -> Unit,
+    onOpenBatteryOptimizationSettings: () -> Unit,
+    onBatteryOptimizationAlreadyIgnored: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AppPage(
@@ -49,6 +52,31 @@ fun ToolsScreen(
                     onAccessibilityAlreadyEnabled
                 } else {
                     onOpenAccessibilitySettings
+                },
+            )
+            AppDivider()
+            AppListItem(
+                title = stringResource(R.string.tools_ignore_battery_optimization),
+                subtitle = batteryOptimizationStatus(batteryOptimizationIgnored),
+                leadingContent = {
+                    Icon(
+                        imageVector = if (batteryOptimizationIgnored) {
+                            Icons.Outlined.CheckCircle
+                        } else {
+                            Icons.Outlined.Lock
+                        },
+                        contentDescription = null,
+                        tint = if (batteryOptimizationIgnored) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                },
+                onClick = if (batteryOptimizationIgnored) {
+                    onBatteryOptimizationAlreadyIgnored
+                } else {
+                    onOpenBatteryOptimizationSettings
                 },
             )
         }
@@ -93,4 +121,11 @@ private fun ToolServiceState.accessibilityStatus(): String = when {
     isServiceConnected -> stringResource(R.string.status_connected)
     isAccessibilityEnabled -> stringResource(R.string.status_waiting_for_service)
     else -> stringResource(R.string.status_not_enabled)
+}
+
+@Composable
+private fun batteryOptimizationStatus(ignored: Boolean): String = if (ignored) {
+    stringResource(R.string.status_authorized)
+} else {
+    stringResource(R.string.status_not_authorized)
 }
