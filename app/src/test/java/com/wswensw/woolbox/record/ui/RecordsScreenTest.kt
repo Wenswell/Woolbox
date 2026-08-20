@@ -37,6 +37,24 @@ class RecordsScreenTest {
         assertEquals(false, crossedGoalThreshold(0.0, 1.0, null))
     }
 
+    @Test
+    fun homeProgressUsesGoalPeriodValueAndCapsVisualProgress() {
+        val goalItem = item(1, priority = 0, period = GoalPeriod.DAYS_7)
+
+        assertEquals(12.0, accumulateHomeValue(goalItem, mapOf(1L to 12.0), mapOf(1L to 3.0)), 0.0)
+        assertEquals(1f, homeProgressFraction(12.0, 10.0), 0f)
+        assertEquals("12/10 times", homeProgressValueLabel(12.0, 10.0, "times"))
+    }
+
+    @Test
+    fun targetlessAccumulateUsesTodayValueWithoutProgress() {
+        val targetlessItem = item(1, priority = 0)
+
+        assertEquals(3.0, accumulateHomeValue(targetlessItem, emptyMap(), mapOf(1L to 3.0)), 0.0)
+        assertEquals(0f, homeProgressFraction(3.0, null), 0f)
+        assertEquals("3/-- times", homeProgressValueLabel(3.0, null, "times"))
+    }
+
     private fun item(id: Long, priority: Int, period: GoalPeriod? = null) = RecordItem(
         id = id,
         name = "Item $id",

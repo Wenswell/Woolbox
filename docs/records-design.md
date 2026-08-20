@@ -11,8 +11,8 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates
 | `Plan/Edit Focus` | 第一步、未完成主任务和可空次任务；第一步只在创建或 `READY` 可编辑，暂停后只重新选择 Focus。顶栏 Check 保存。 |
 | Add task Sheet | `Recommended / Templates / New task` 三个 tabs；推荐包含未采用 Daily 模板和昨日未完成候选；新任务允许可选清单。 |
 | `Templates` | 根页只显示活跃数量。管理页 Daily 优先；表单整体保存标题、周期与可选步骤，模板没有 checkbox。 |
-| `Goals` | 根页只列进行中的 Goal，显示共享进度和子目标完成数。详情 Sheet 录入正数进度，并仅对已达到目标值的子目标开放确认。管理页保留完成和到期结果。 |
-| `Accumulate` | 显示名称与今日累计，进入累计记录 Sheet，不显示任务或 Focus 状态。 |
+| `Goals` | 根页只列进行中的 Goal，以最大子目标值为目标显示共享进度；详情 Sheet 录入正数进度，并仅对已达到目标值的子目标开放确认。管理页保留完成和到期结果。 |
+| `Accumulate` | 显示名称与当前周期累计，进入累计记录 Sheet，不显示任务或 Focus 状态；无目标项显示今日累计。 |
 | `Measurement` | 显示名称与最新值，进入 24 小时预览和离散 Slider。 |
 
 首次加载居中显示进度；未配置凭据、首次请求失败或列表为空时显示描边状态块和唯一主操作。已有内容刷新时保留列表；刷新失败在内容前显示带重试的状态块，不用 loading 或错误页替换快照。
@@ -26,6 +26,7 @@ Records 根页无大标题，同一 `LazyColumn` 固定为 **Today → Templates
 - 回顾到期由分钟时钟触发，不显示倒计时或精确工时。通知不可用时只替换 Focus 内容，Tasks 不受影响。
 - Today task progress Sheet 显示任务主 checkbox、可选步骤 checkbox 和完成时间。模板修改不影响任务快照。
 - Accumulate 与 Measurement 只突出当前数值；累计写入和刚达标沿用记录 Sheet 的触觉、Snackbar 与 `Undo`。
+- Goals 与 Accumulate 的根页行统一使用 `8dp` 圆角的两色 45° 斑马纹连续进度背景，标题居左，右侧显示 `当前值/目标值 unit`。Goal 的目标值为最大子目标值；有目标 Accumulate 使用目标周期累计，无目标项显示 `当前值/-- unit` 且不填充进度。进度超出目标后背景封顶为整行。
 - Goal 详情明确区分“达到目标值”和“已确认完成”；完成或到期时禁用录入和 checkbox，只提供创建独立新目标的“再次挑战”，不提供继续、延期或重开旧目标。
 
 ## 管理页
@@ -44,3 +45,4 @@ Templates 使用 Active/Archived 分段、搜索和表格；Goals 使用 Active/
 - 零轮 `FOCUS_CLEARED` 是否避免显示“已完成 0 轮”。
 - 最长中英文按钮和任务标题是否在手机与桌面宽度完整显示。
 - Today task、模板与 Focus 是否使用各自正确控件，没有重复完成入口。
+- Goals 与 Accumulate 的主页斑马纹、右侧进度格式和周期累计来源是否一致，无目标累计是否显示 `当前值/-- unit`。

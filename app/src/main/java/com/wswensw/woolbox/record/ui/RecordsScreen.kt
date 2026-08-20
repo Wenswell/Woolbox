@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -46,6 +47,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
@@ -199,15 +201,11 @@ fun RecordsScreen(
                     )
                 }
                 items(goals, key = { "goal-${it.id}" }) { goal ->
-                    RecordHomeRow(
+                    val target = goal.subgoals.maxOf { it.targetValue }
+                    RecordHomeProgressRow(
                         title = goal.title,
-                        value = stringResource(
-                            R.string.goal_home_value,
-                            formatValue(goal.currentValue),
-                            goal.unit,
-                            goal.subgoals.count { it.completedAt != null },
-                            goal.subgoals.size,
-                        ),
+                        value = homeProgressValueLabel(goal.currentValue, target, goal.unit),
+                        progress = homeProgressFraction(goal.currentValue, target),
                         onClick = { onOpenGoal(goal) },
                     )
                 }
@@ -220,9 +218,11 @@ fun RecordsScreen(
                     )
                 }
                 items(accumulateItems, key = { "accumulate-${it.id}" }) { item ->
-                    RecordHomeRow(
+                    val current = accumulateHomeValue(item, state.goalValues, todayValues)
+                    RecordHomeProgressRow(
                         title = displayRecordName(item.name),
-                        value = "${formatValue(todayValues[item.id] ?: 0.0)} ${item.unit}",
+                        value = homeProgressValueLabel(current, item.goalValue, item.unit),
+                        progress = homeProgressFraction(current, item.goalValue),
                         onClick = { onRecordItem(item) },
                     )
                 }
@@ -541,6 +541,56 @@ private fun RecordHomeRow(title: String, value: String, onClick: () -> Unit) {
 }
 
 @Composable
+private fun RecordHomeProgressRow(
+    title: String,
+    value: String,
+    progress: Float,
+    onClick: () -> Unit,
+) {
+    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLow
+    val stripeColor = MaterialTheme.colorScheme.primaryContainer
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        shape = RecordsCardShape,
+        color = Color.Transparent,
+    ) {
+        Box {
+            ZebraProgressFill(
+                progress = progress,
+                backgroundColor = backgroundColor,
+                stripeColor = stripeColor,
+                modifier = Modifier.matchParentSize(),
+            )
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = value,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.End,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 144.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun RecordsStatusCard(
     message: String,
     actionLabel: String,
@@ -588,3 +638,17 @@ internal fun todayRecordValues(entries: List<RecordEntry>): Map<Long, Double> =
 
 internal fun todayRecordMinutes(entries: List<RecordEntry>): Map<Long, List<Int>> =
     entries.groupBy(RecordEntry::itemId).mapValues { (_, values) -> values.map(RecordEntry::localMinute) }
+
+internal fun accumulateHomeValue(
+    item: RecordItem,
+    goalValues: Map<Long, Double>,
+    todayValues: Map<Long, Double>,
+): Double = if (item.goalValue != null) goalValues[item.id] ?: 0.0 else todayValues[item.id] ?: 0.0
+
+internal fun homeProgressFraction(current: Double, target: Double?): Float =
+    target?.let { goalProgressFraction(current, it) } ?: 0f
+
+internal fun homeProgressValueLabel(current: Double, target: Double?, unit: String): String {
+    val progress = "${formatValue(current)}/${target?.let(::formatValue) ?: "--"}"
+    return if (unit.isBlank()) progress else "$progress $unit"
+}

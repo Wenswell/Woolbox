@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +65,63 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 internal val RecordsCardShape = RoundedCornerShape(8.dp)
+
+@Composable
+internal fun ZebraProgressFill(
+    progress: Float,
+    backgroundColor: Color,
+    stripeColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val reduceMotion = prefersReducedMotion()
+    val target = progress.coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 260),
+        label = "ZebraProgressFillLevel",
+    )
+    val pauseDecorativeMotion = LocalPauseDecorativeMotion.current
+    val animateStripes = target in 0.001f..0.999f && !reduceMotion
+    val stripePhase = remember { Animatable(0f) }
+    LaunchedEffect(animateStripes, pauseDecorativeMotion) {
+        if (!animateStripes) {
+            stripePhase.snapTo(0f)
+            return@LaunchedEffect
+        }
+        if (pauseDecorativeMotion) return@LaunchedEffect
+        while (true) {
+            val remaining = (1f - stripePhase.value).coerceIn(0f, 1f)
+            if (remaining <= 0.0001f) {
+                stripePhase.snapTo(0f)
+                continue
+            }
+            stripePhase.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = (5_600 * remaining).toInt().coerceAtLeast(16),
+                    easing = LinearEasing,
+                ),
+            )
+            stripePhase.snapTo(0f)
+        }
+    }
+    val stripeWidth = 24.dp
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawRect(backgroundColor)
+        if (animatedProgress <= 0.001f) return@Canvas
+        val stripeWidthPx = stripeWidth.toPx()
+        val periodPx = stripeWidthPx * 2f
+        clipRect(right = size.width * animatedProgress) {
+            drawRect(stripeColor)
+            drawDiagonalStripes(
+                stripeColor = backgroundColor,
+                stripeWidthPx = stripeWidthPx,
+                periodPx = periodPx,
+                shiftPx = stripePhase.value * periodPx,
+            )
+        }
+    }
+}
 
 /**
  * Bottom-up liquid progress fill for accumulate cards.
