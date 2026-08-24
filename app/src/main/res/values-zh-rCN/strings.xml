@@ -353,16 +353,6 @@
     <string name="template_save_failed">无法保存模板。</string>
     <string name="today_task_add_failed">无法添加任务。</string>
     <string name="today_task_update_failed">无法更新任务。</string>
-    <string name="daily_focus_save_failed">无法保存专注。</string>
-    <string name="daily_focus_start_failed">无法开始专注。</string>
-    <string name="daily_focus_review_failed">无法更新回顾。</string>
-    <string name="daily_focus_end_failed">无法结束专注。</string>
-    <string name="daily_review_channel">每日回顾</string>
-    <string name="daily_review_notification">确认自己是否仍在推进今天的专注。</string>
-    <string name="notifications_required">需要通知权限</string>
-    <string name="notifications_required_detail">小时回顾需要 Woolbox 通知。</string>
-    <string name="enable_notifications">启用通知</string>
-    <string name="notifications_not_enabled">通知尚未启用。</string>
     <string name="template_archive_failed">无法归档模板。</string>
     <string name="measurements_load_failed">无法加载测量记录。</string>
     <string name="streak_days">连续 %1$d 天</string>

@@ -23,13 +23,13 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 | 路径 | 修改入口 |
 | --- | --- |
-| `MainActivity.kt` | 普通入口退到后台、指定应用启动、`onStop` 命令提交和每日回顾通知入口。 |
-| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records Today/Templates/Goals/Accumulate/Measurement、通知权限和 Sheet 接线。 |
+| `MainActivity.kt` | 普通入口退到后台、指定应用启动、`onStop` 命令提交和整点打卡通知入口。 |
+| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records Today/Templates/Goals/Accumulate/Measurement 和 Sheet 接线。 |
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `res/values*/strings.xml`、`res/xml/locales_config.xml` | 默认英文、简体中文资源与系统应用语言声明；可见文案从资源读取。 |
-| `record/{model,data,ui}/` | TaskTemplate、TodayTask、DailyFocus、Goal、量化记录、HTTPS Repository、Keystore 凭据、ViewModel、管理页、Sheet 和表单。 |
-| `record/reminder/` | 唯一 WorkManager 调度、服务端二次校验、通知权限/Channel 和回顾通知。 |
+| `record/{model,data,ui}/` | TaskTemplate、TodayTask、DailyCheckin、Goal、量化记录、HTTPS Repository、Keystore 凭据、ViewModel、管理页、Sheet 和表单。 |
+| `record/reminder/` | 唯一 WorkManager 调度、服务端二次校验、通知 Channel 和整点打卡通知。 |
 | `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
 | `records-server/web/`、`deploy/` | PC 管理页（`App` shell、`views/`、`components/`、`lib/`）、systemd、备份及恢复验证。 |

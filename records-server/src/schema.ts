@@ -194,38 +194,12 @@ export const hourlyCheckins = sqliteTable(
   ],
 );
 
-export const dailyFocus = sqliteTable(
-  "daily_focus",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    localDate: text("local_date").notNull(),
-    firstMove: text("first_move").notNull(),
-    firstMoveCompletedAt: integer("first_move_completed_at"),
-    primaryTaskId: integer("primary_task_id")
-      .notNull()
-      .references(() => todayTasks.id, { onDelete: "restrict" }),
-    secondaryTaskId: integer("secondary_task_id")
-      .references(() => todayTasks.id, { onDelete: "restrict" }),
-    currentTaskId: integer("current_task_id")
-      .references(() => todayTasks.id, { onDelete: "restrict" }),
-    state: text("state", { enum: ["READY", "ACTIVE", "PAUSED", "ENDED"] }).notNull(),
-    pauseReason: text("pause_reason", { enum: ["FOCUS_CLEARED", "TARGET_REACHED"] }),
-    completedRounds: integer("completed_rounds").notNull(),
-    nextReviewAt: integer("next_review_at"),
-    revision: integer("revision").notNull(),
-    endedAt: integer("ended_at"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [uniqueIndex("daily_focus_local_date_unique").on(table.localDate)],
-);
-
 export const recordAuditLogs = sqliteTable(
   "record_audit_logs",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     action: text("action").notNull(),
-    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "GOAL", "GOAL_ENTRY", "GOAL_SUBGOAL", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "DAILY_CHECKIN", "HOURLY_CHECKIN", "FOCUS"] }).notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "GOAL", "GOAL_ENTRY", "GOAL_SUBGOAL", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "DAILY_CHECKIN", "HOURLY_CHECKIN"] }).notNull(),
     entityId: integer("entity_id").notNull(),
     beforeJson: text("before_json"),
     afterJson: text("after_json"),

@@ -355,16 +355,6 @@
     <string name="template_save_failed">Unable to save template.</string>
     <string name="today_task_add_failed">Unable to add task.</string>
     <string name="today_task_update_failed">Unable to update task.</string>
-    <string name="daily_focus_save_failed">Unable to save Focus.</string>
-    <string name="daily_focus_start_failed">Unable to start Focus.</string>
-    <string name="daily_focus_review_failed">Unable to update the review.</string>
-    <string name="daily_focus_end_failed">Unable to end Focus.</string>
-    <string name="daily_review_channel">Daily reviews</string>
-    <string name="daily_review_notification">Review whether you are still moving today\'s Focus forward.</string>
-    <string name="notifications_required">Notifications required</string>
-    <string name="notifications_required_detail">Hourly reviews need Woolbox notifications.</string>
-    <string name="enable_notifications">Enable notifications</string>
-    <string name="notifications_not_enabled">Notifications are not enabled.</string>
     <string name="template_archive_failed">Unable to archive template.</string>
     <string name="measurements_load_failed">Unable to load measurements.</string>
     <string name="streak_days">%1$d-day streak</string>

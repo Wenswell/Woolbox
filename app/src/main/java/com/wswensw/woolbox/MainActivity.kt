@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import com.wswensw.woolbox.record.reminder.DailyReminderNotifications
+import com.wswensw.woolbox.record.reminder.HourlyCheckinNotifications
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
 import com.wswensw.woolbox.tool.service.ToolServiceController
@@ -19,7 +19,6 @@ import com.wswensw.woolbox.update.AppUpdateManager
 
 class MainActivity : AppCompatActivity() {
     private var pendingToolCommand: ExternalToolCommand? = null
-    private var dailyReviewRequest by mutableIntStateOf(0)
     private var hourlyCheckinRequest by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,7 +37,6 @@ class MainActivity : AppCompatActivity() {
         )
         setContent {
             WoolboxApp(
-                dailyReviewRequest = dailyReviewRequest,
                 hourlyCheckinRequest = hourlyCheckinRequest,
                 onLaunchTool = ::launchTool,
             )
@@ -70,13 +68,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun consumeReminderIntents(intent: Intent?) {
-        if (intent?.getBooleanExtra(DailyReminderNotifications.EXTRA_OPEN_DAILY_REVIEW, false) == true) {
-            dailyReviewRequest += 1
-            intent.removeExtra(DailyReminderNotifications.EXTRA_OPEN_DAILY_REVIEW)
-        }
-        if (intent?.getBooleanExtra(DailyReminderNotifications.EXTRA_OPEN_HOURLY_CHECKIN, false) == true) {
+        if (intent?.getBooleanExtra(HourlyCheckinNotifications.EXTRA_OPEN_HOURLY_CHECKIN, false) == true) {
             hourlyCheckinRequest += 1
-            intent.removeExtra(DailyReminderNotifications.EXTRA_OPEN_HOURLY_CHECKIN)
+            intent.removeExtra(HourlyCheckinNotifications.EXTRA_OPEN_HOURLY_CHECKIN)
         }
     }
 

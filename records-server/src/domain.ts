@@ -2,15 +2,11 @@ export const VALUE_TYPES = ["NUMBER", "DURATION"] as const;
 export const GOAL_PERIODS = ["DAY", "DAYS_7"] as const;
 export const RECORD_MODES = ["ACCUMULATE", "MEASUREMENT"] as const;
 export const DURATION_UNITS = ["秒", "分", "小时"] as const;
-export const DAILY_FOCUS_STATES = ["READY", "ACTIVE", "PAUSED", "ENDED"] as const;
-export const DAILY_FOCUS_PAUSE_REASONS = ["FOCUS_CLEARED", "TARGET_REACHED"] as const;
 export const TEMPLATE_CADENCES = ["MANUAL", "DAILY"] as const;
 
 export type ValueType = (typeof VALUE_TYPES)[number];
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 export type RecordMode = (typeof RECORD_MODES)[number];
-export type DailyFocusState = (typeof DAILY_FOCUS_STATES)[number];
-export type DailyFocusPauseReason = (typeof DAILY_FOCUS_PAUSE_REASONS)[number];
 export type TemplateCadence = (typeof TEMPLATE_CADENCES)[number];
 
 export interface RecordItemInput {
@@ -106,35 +102,6 @@ export interface DailyCheckinWakeInput {
 
 export interface HourlyCheckinInput extends DailyCheckinWakeInput {
   hour: number;
-}
-
-export interface DailyFocusCreateInput {
-  localDate: string;
-  firstMove: string;
-  primaryTaskId: number;
-  secondaryTaskId: number | null;
-}
-
-export interface DailyFocusUpdateInput {
-  firstMove: string;
-  primaryTaskId: number;
-  secondaryTaskId: number | null;
-  expectedRevision: number;
-  occurredAt: number;
-}
-
-export interface DailyFocusTransitionInput {
-  expectedRevision: number;
-  occurredAt: number;
-}
-
-export interface DailyFocusReviewInput extends DailyFocusTransitionInput {
-  currentTaskId: number;
-}
-
-export interface DailyFocusSelectionInput extends DailyFocusTransitionInput {
-  primaryTaskId: number;
-  secondaryTaskId: number | null;
 }
 
 export class ApiError extends Error {
@@ -331,58 +298,6 @@ export function parseTodayTaskFromTaskInput(value: unknown): TodayTaskFromTaskIn
     localDate: parseIsoDate(input.localDate, "Local date"),
     sourceTaskId: positiveIntegerField(input, "sourceTaskId"),
   };
-}
-
-export function parseDailyFocusCreateInput(value: unknown): DailyFocusCreateInput {
-  const input = objectInput(value);
-  const result = {
-    localDate: parseIsoDate(input.localDate, "Local date"),
-    firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
-    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
-    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
-  };
-  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary Focus tasks must be different.");
-  return result;
-}
-
-export function parseDailyFocusUpdateInput(value: unknown): DailyFocusUpdateInput {
-  const input = objectInput(value);
-  const result = {
-    firstMove: requiredTrimmedString(input, "firstMove", "First move is required."),
-    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
-    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
-    expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
-    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
-  };
-  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary Focus tasks must be different.");
-  return result;
-}
-
-export function parseDailyFocusTransitionInput(value: unknown): DailyFocusTransitionInput {
-  const input = objectInput(value);
-  return {
-    expectedRevision: nonNegativeIntegerField(input, "expectedRevision"),
-    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
-  };
-}
-
-export function parseDailyFocusReviewInput(value: unknown): DailyFocusReviewInput {
-  const input = objectInput(value);
-  return {
-    ...parseDailyFocusTransitionInput(input),
-    currentTaskId: positiveIntegerField(input, "currentTaskId"),
-  };
-}
-
-export function parseDailyFocusSelectionInput(value: unknown): DailyFocusSelectionInput {
-  const input = objectInput(value);
-  const result = {
-    ...parseDailyFocusTransitionInput(input),
-    primaryTaskId: positiveIntegerField(input, "primaryTaskId"),
-    secondaryTaskId: nullablePositiveIntegerField(input, "secondaryTaskId"),
-  };
-  requireRule(result.primaryTaskId !== result.secondaryTaskId, "Primary and secondary Focus tasks must be different.");
-  return result;
 }
 
 export function parseOptionalRecordMode(value: unknown): RecordMode | undefined {

@@ -20,7 +20,7 @@ class HourlyCheckinReminderScheduler(context: Context) {
         val nextReminderAt = checkin?.nextReminderAt(now)
         if (nextReminderAt == null) {
             workManager.cancelUniqueWork(UNIQUE_WORK)
-            DailyReminderNotifications.cancelHourlyCheckin(applicationContext)
+            HourlyCheckinNotifications.cancel(applicationContext)
             return
         }
         val request = OneTimeWorkRequestBuilder<HourlyCheckinReminderWorker>()

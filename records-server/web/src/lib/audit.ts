@@ -1,5 +1,5 @@
 import type {
-  DailyFocusAuditSnapshot,
+  DailyCheckinAuditSnapshot,
   EntryAuditSnapshot,
   GoalAuditSnapshot,
   GoalEntryAuditSnapshot,
@@ -23,7 +23,7 @@ export function auditSubject(log: RecordAuditLog): string {
   if (log.entityType === "TEMPLATE" && isTemplateSnapshot(snapshot)) return `Template: ${snapshot.title}`;
   if (log.entityType === "TODAY_TASK" && isTodayTaskSnapshot(snapshot)) return `Today task: ${snapshot.title}`;
   if (log.entityType === "TODAY_TASK_STEP" && isTodayTaskStepSnapshot(snapshot)) return `Step: ${snapshot.taskTitle}`;
-  if (log.entityType === "FOCUS" && isDailyFocusSnapshot(snapshot)) return `Focus: ${snapshot.localDate}`;
+  if ((log.entityType === "DAILY_CHECKIN" || log.entityType === "HOURLY_CHECKIN") && isDailyCheckinSnapshot(snapshot)) return `Check-in: ${snapshot.localDate}`;
   return `${log.entityType} #${log.entityId}`;
 }
 
@@ -54,9 +54,8 @@ export function actionLabel(action: RecordAuditLog["action"]): string {
     TODAY_TASK_REOPENED: "Reopened task",
     TODAY_TASK_STEP_COMPLETED: "Completed step",
     TODAY_TASK_STEP_REOPENED: "Reopened step",
-    FOCUS_CREATED: "Created Focus",
-    FOCUS_UPDATED: "Updated Focus",
-    FOCUS_ENDED: "Ended Focus",
+    DAILY_CHECKIN_WOKE: "Marked awake",
+    HOURLY_CHECKIN_CREATED: "Created hourly check-in",
   }[action];
 }
 
@@ -123,20 +122,7 @@ export function auditChanges(log: RecordAuditLog): string {
     const step = (after ?? before) as TodayTaskStepAuditSnapshot;
     return `${step.taskTitle}; ${step.title}; ${step.completedAt === null ? "Open" : "Completed"}`;
   }
-  if (log.action === "FOCUS_CREATED" && isDailyFocusSnapshot(after)) return dailyFocusDescription(after);
-  if (log.action === "FOCUS_ENDED" && isDailyFocusSnapshot(after)) return `Status: ${after.state}`;
-  if (log.action === "FOCUS_UPDATED" && isDailyFocusSnapshot(before) && isDailyFocusSnapshot(after)) {
-    return [
-      fieldChange("First move", before.firstMove, after.firstMove),
-      fieldChange("Primary task", before.primaryTaskId, after.primaryTaskId),
-      fieldChange("Secondary task", before.secondaryTaskId, after.secondaryTaskId),
-      fieldChange("Current task", before.currentTaskId, after.currentTaskId),
-      fieldChange("Status", before.state, after.state),
-      fieldChange("Pause reason", before.pauseReason, after.pauseReason),
-      fieldChange("Completed rounds", before.completedRounds, after.completedRounds),
-      fieldChange("Next review", before.nextReviewAt, after.nextReviewAt),
-    ].filter((value): value is string => value !== null).join("; ") || "No visible field changes.";
-  }
+  if (isDailyCheckinSnapshot(after ?? before)) return checkinDescription((after ?? before) as DailyCheckinAuditSnapshot);
   if (isItemSnapshot(before) && isItemSnapshot(after)) {
     return [
       fieldChange("Name", before.name, after.name),
@@ -177,8 +163,9 @@ function templateDescription(template: TemplateAuditSnapshot): string {
   return `${template.title}; ${template.cadence === "DAILY" ? "Daily" : "Manual"}; ${template.steps.length} steps`;
 }
 
-function dailyFocusDescription(focus: DailyFocusAuditSnapshot): string {
-  return `${focus.localDate}; first move: ${focus.firstMove}; primary task #${focus.primaryTaskId}`;
+function checkinDescription(checkin: DailyCheckinAuditSnapshot): string {
+  if (checkin.hour !== undefined && checkin.checkedInAt !== undefined) return `${checkin.localDate}; hour ${String(checkin.hour).padStart(2, "0")}:00`;
+  return `${checkin.localDate}; wake-up marked`;
 }
 
 function isItemSnapshot(snapshot: unknown): snapshot is ItemAuditSnapshot {
@@ -213,8 +200,8 @@ function isTodayTaskStepSnapshot(snapshot: unknown): snapshot is TodayTaskStepAu
   return isObject(snapshot) && "taskTitle" in snapshot;
 }
 
-function isDailyFocusSnapshot(snapshot: unknown): snapshot is DailyFocusAuditSnapshot {
-  return isObject(snapshot) && "localDate" in snapshot && "firstMove" in snapshot && "primaryTaskId" in snapshot;
+function isDailyCheckinSnapshot(snapshot: unknown): snapshot is DailyCheckinAuditSnapshot {
+  return isObject(snapshot) && "localDate" in snapshot && ("wokeAt" in snapshot || "hour" in snapshot);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

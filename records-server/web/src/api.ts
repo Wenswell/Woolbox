@@ -1,6 +1,5 @@
 import type {
   AuditLogPage,
-  DailyFocus,
   Goal,
   GoalInput,
   ItemInput,
@@ -136,49 +135,6 @@ export const api = {
     });
   },
 
-  async createDailyFocus(input: { localDate: string; firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {
-    return request<{ dailyFocus: DailyFocus }>("daily-focus", { method: "POST", body: JSON.stringify(input) });
-  },
-
-  async updateDailyFocus(focus: DailyFocus, input: { firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {
-    return request<{ dailyFocus: DailyFocus }>(`daily-focus/${focus.localDate}`, {
-      method: "PUT",
-      body: JSON.stringify({ ...input, expectedRevision: focus.revision, occurredAt: Date.now() }),
-    });
-  },
-
-  async startDailyFocus(focus: DailyFocus) {
-    return dailyFocusTransition(focus, "start");
-  },
-
-  async reviewDailyFocus(focus: DailyFocus, currentTaskId: number) {
-    return dailyFocusTransition(focus, "review", { currentTaskId });
-  },
-
-  async reviewDailyFocusNow(focus: DailyFocus, currentTaskId: number) {
-    return dailyFocusTransition(focus, "review-now", { currentTaskId });
-  },
-
-  async switchDailyFocusTask(focus: DailyFocus, currentTaskId: number) {
-    return dailyFocusTransition(focus, "switch", { currentTaskId });
-  },
-
-  async refocusDailyFocus(focus: DailyFocus, primaryTaskId: number, secondaryTaskId: number | null) {
-    return dailyFocusTransition(focus, "refocus", { primaryTaskId, secondaryTaskId });
-  },
-
-  async continueDailyFocus(focus: DailyFocus, primaryTaskId: number, secondaryTaskId: number | null) {
-    return dailyFocusTransition(focus, "continue", { primaryTaskId, secondaryTaskId });
-  },
-
-  async endDailyFocus(focus: DailyFocus) {
-    return dailyFocusTransition(focus, "end");
-  },
-
-  async resetDailyFocus(focus: DailyFocus) {
-    return dailyFocusTransition(focus, "reset");
-  },
-
   async entries(startDate: string, endDate: string, itemId?: string, mode?: RecordMode): Promise<RecordEntry[]> {
     const params = new URLSearchParams({ startDate, endDate });
     if (itemId) params.set("itemId", itemId);
@@ -204,21 +160,6 @@ function localDate(value: Date): string {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function dailyFocusTransition(
-  focus: DailyFocus,
-  action: "start" | "review" | "review-now" | "switch" | "refocus" | "continue" | "end" | "reset",
-  fields: Record<string, unknown> = {},
-) {
-  return request<{ dailyFocus: DailyFocus }>(`daily-focus/${focus.localDate}/${action}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      expectedRevision: focus.revision,
-      occurredAt: Date.now(),
-      ...fields,
-    }),
-  });
 }
 
 function todayTaskCompletion(path: string, expectedRevision: number, completed: boolean) {

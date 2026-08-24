@@ -8,11 +8,8 @@ import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.GoalPool
 import com.wswensw.woolbox.record.model.GoalPoolDraft
 import com.wswensw.woolbox.record.model.GoalSubgoal
-import com.wswensw.woolbox.record.model.DailyFocus
 import com.wswensw.woolbox.record.model.DailyCheckin
 import com.wswensw.woolbox.record.model.HourlyCheckin
-import com.wswensw.woolbox.record.model.DailyFocusPauseReason
-import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.RecordEntry
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
@@ -29,7 +26,6 @@ import com.wswensw.woolbox.record.model.itemRecentDayValues
 import com.wswensw.woolbox.record.model.isMeasurementValueOnGrid
 import com.wswensw.woolbox.record.model.measurementStepCount
 import com.wswensw.woolbox.record.model.validated
-import com.wswensw.woolbox.record.model.validatedFirstMove
 import com.wswensw.woolbox.record.model.validatedTemplateTitle
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
@@ -71,7 +67,6 @@ data class RecordsSnapshot(
     val dailySuggestions: List<TaskTemplate>,
     val unfinishedTasks: List<TodayTask>,
     val todayTasks: List<TodayTask>,
-    val dailyFocus: DailyFocus?,
     val dailyCheckin: DailyCheckin?,
     val goalValues: Map<Long, Double>,
     val recentDayValues: Map<Long, List<Double>>,
@@ -111,7 +106,6 @@ class RecordRepository(context: Context) {
             dailySuggestions = overview.getJSONArray("dailySuggestions").mapObjects(::parseTemplate),
             unfinishedTasks = overview.getJSONArray("unfinishedTasks").mapObjects(::parseTodayTask),
             todayTasks = overview.getJSONArray("todayTasks").mapObjects(::parseTodayTask),
-            dailyFocus = overview.nullableObject("dailyFocus")?.let(::parseDailyFocus),
             dailyCheckin = overview.nullableObject("dailyCheckin")?.let(::parseDailyCheckin),
             goalValues = goalValues(activeItems, date, todayEntries, rangeEntries),
             recentDayValues = itemRecentDayValues(
@@ -320,108 +314,6 @@ class RecordRepository(context: Context) {
             .nullableObject("dailyCheckin")?.let(::parseDailyCheckin)
     }
 
-    suspend fun createDailyFocus(
-        localDate: LocalDate,
-        firstMove: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-    ) = withContext(Dispatchers.IO) {
-        request(
-            "POST",
-            "daily-focus",
-            body = JSONObject().apply {
-                put("localDate", localDate.toString())
-                put("firstMove", validatedFirstMove(firstMove))
-                put("primaryTaskId", primaryTaskId)
-                putNullable("secondaryTaskId", secondaryTaskId)
-            },
-        )
-        Unit
-    }
-
-    suspend fun getDailyFocus(localDate: LocalDate): DailyFocus? = withContext(Dispatchers.IO) {
-        request("GET", "today/$localDate").getJSONObject("today")
-            .nullableObject("dailyFocus")?.let(::parseDailyFocus)
-    }
-
-    suspend fun updateDailyFocus(
-        focus: DailyFocus,
-        firstMove: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-        occurredAt: Long,
-    ) = dailyFocusWrite(
-        focus = focus,
-        suffix = "",
-        body = JSONObject().apply {
-            put("firstMove", validatedFirstMove(firstMove))
-            put("primaryTaskId", primaryTaskId)
-            putNullable("secondaryTaskId", secondaryTaskId)
-            put("occurredAt", occurredAt)
-        },
-    )
-
-    suspend fun startDailyFocus(focus: DailyFocus, occurredAt: Long) =
-        dailyFocusTransition(focus, "start", occurredAt)
-
-    suspend fun reviewDailyFocus(focus: DailyFocus, currentTaskId: Long, occurredAt: Long) =
-        dailyFocusTransition(focus, "review", occurredAt, JSONObject().put("currentTaskId", currentTaskId))
-
-    suspend fun refocusDailyFocus(
-        focus: DailyFocus,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-        occurredAt: Long,
-    ) = dailyFocusSelection(focus, "refocus", primaryTaskId, secondaryTaskId, occurredAt)
-
-    suspend fun continueDailyFocus(
-        focus: DailyFocus,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-        occurredAt: Long,
-    ) = dailyFocusSelection(focus, "continue", primaryTaskId, secondaryTaskId, occurredAt)
-
-    suspend fun endDailyFocus(focus: DailyFocus, occurredAt: Long) =
-        dailyFocusTransition(focus, "end", occurredAt)
-
-    private suspend fun dailyFocusSelection(
-        focus: DailyFocus,
-        suffix: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-        occurredAt: Long,
-    ) = dailyFocusTransition(
-        focus = focus,
-        suffix = suffix,
-        occurredAt = occurredAt,
-        fields = JSONObject().apply {
-            put("primaryTaskId", primaryTaskId)
-            putNullable("secondaryTaskId", secondaryTaskId)
-        },
-    )
-
-    private suspend fun dailyFocusTransition(
-        focus: DailyFocus,
-        suffix: String,
-        occurredAt: Long,
-        fields: JSONObject = JSONObject(),
-    ) = dailyFocusWrite(
-        focus = focus,
-        suffix = "/$suffix",
-        body = fields.put("occurredAt", occurredAt),
-    )
-
-    private suspend fun dailyFocusWrite(
-        focus: DailyFocus,
-        suffix: String,
-        body: JSONObject,
-    ) =
-        withContext(Dispatchers.IO) {
-            body.put("expectedRevision", focus.revision)
-            request("PUT", "daily-focus/${focus.localDate}$suffix", body = body)
-            Unit
-        }
-
     suspend fun setTodayTaskStepCompleted(
         task: TodayTask,
         stepId: Long,
@@ -578,24 +470,6 @@ private fun parseTemplate(value: JSONObject) = TaskTemplate(
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
     steps = value.getJSONArray("steps").mapObjects(::parseTemplateStep),
-)
-
-internal fun parseDailyFocus(value: JSONObject) = DailyFocus(
-    id = value.getLong("id"),
-    localDate = LocalDate.parse(value.getString("localDate")),
-    firstMove = value.getString("firstMove"),
-    firstMoveCompletedAt = value.nullableLong("firstMoveCompletedAt"),
-    primaryTaskId = value.getLong("primaryTaskId"),
-    secondaryTaskId = value.nullableLong("secondaryTaskId"),
-    currentTaskId = value.nullableLong("currentTaskId"),
-    state = DailyFocusState.valueOf(value.getString("state")),
-    pauseReason = value.nullableString("pauseReason")?.let(DailyFocusPauseReason::valueOf),
-    completedRounds = value.getInt("completedRounds"),
-    nextReviewAt = value.nullableLong("nextReviewAt"),
-    revision = value.getInt("revision"),
-    endedAt = value.nullableLong("endedAt"),
-    createdAt = value.getLong("createdAt"),
-    updatedAt = value.getLong("updatedAt"),
 )
 
 internal fun parseDailyCheckin(value: JSONObject) = DailyCheckin(

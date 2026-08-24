@@ -22,7 +22,7 @@ class HourlyCheckinReminderWorker(
             return Result.retry()
         } ?: return Result.success()
         if (checkin.currentCheckinHour(System.currentTimeMillis()) != null) {
-            DailyReminderNotifications.showHourlyCheckin(applicationContext)
+            HourlyCheckinNotifications.show(applicationContext)
         }
         HourlyCheckinReminderScheduler(applicationContext).reconcile(checkin)
         return Result.success()

@@ -1,11 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { and, asc, count, desc, eq, gte, inArray, lt, lte, ne, sql } from "drizzle-orm";
 import type {
-  DailyFocusCreateInput,
-  DailyFocusReviewInput,
-  DailyFocusSelectionInput,
-  DailyFocusTransitionInput,
-  DailyFocusUpdateInput,
   DailyCheckinWakeInput,
   GoalEntryInput,
   GoalInput,
@@ -23,7 +18,6 @@ import type {
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
-  dailyFocus,
   dailyCheckins,
   goalEntries,
   goals,
@@ -39,9 +33,6 @@ import {
 } from "./schema.js";
 
 const AuditLogPageSize = 100;
-const ReviewIntervalMs = 60 * 60 * 1_000;
-const TargetRounds = 4;
-
 type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
 type GoalRow = typeof goals.$inferSelect;
@@ -50,7 +41,6 @@ type GoalEntryRow = typeof goalEntries.$inferSelect;
 type TemplateRow = typeof taskTemplates.$inferSelect;
 type TodayTaskRow = typeof todayTasks.$inferSelect;
 type TodayTaskStepRow = typeof todayTaskSteps.$inferSelect;
-type DailyFocusRow = typeof dailyFocus.$inferSelect;
 type DailyCheckinRow = typeof dailyCheckins.$inferSelect;
 type HourlyCheckinRow = typeof hourlyCheckins.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
@@ -68,8 +58,6 @@ interface GoalResponse extends GoalRow {
   currentValue: number;
   subgoals: GoalSubgoalRow[];
 }
-
-type DailyFocusResponse = DailyFocusRow;
 
 interface DailyCheckinResponse extends DailyCheckinRow {
   hourlyCheckins: HourlyCheckinRow[];
@@ -102,14 +90,11 @@ type AuditAction =
   | "TODAY_TASK_STEP_COMPLETED"
   | "TODAY_TASK_STEP_REOPENED"
   | "DAILY_CHECKIN_WOKE"
-  | "HOURLY_CHECKIN_CREATED"
-  | "FOCUS_CREATED"
-  | "FOCUS_UPDATED"
-  | "FOCUS_ENDED";
+  | "HOURLY_CHECKIN_CREATED";
 
 interface AuditWrite {
   action: AuditAction;
-  entityType: "ITEM" | "ENTRY" | "GOAL" | "GOAL_ENTRY" | "GOAL_SUBGOAL" | "TEMPLATE" | "TODAY_TASK" | "TODAY_TASK_STEP" | "DAILY_CHECKIN" | "HOURLY_CHECKIN" | "FOCUS";
+  entityType: "ITEM" | "ENTRY" | "GOAL" | "GOAL_ENTRY" | "GOAL_SUBGOAL" | "TEMPLATE" | "TODAY_TASK" | "TODAY_TASK_STEP" | "DAILY_CHECKIN" | "HOURLY_CHECKIN";
   entityId: number;
   before?: unknown;
   after?: unknown;
@@ -663,7 +648,6 @@ export class RecordsService {
       unfinishedTasks: this.listTodayTasks(previousLocalDate(localDate))
         .filter((task) => task.completedAt === null && !copiedSourceIds.has(task.id)),
       dailyCheckin: this.getDailyCheckin(localDate),
-      dailyFocus: this.getDailyFocus(localDate),
     };
   }
 
@@ -672,10 +656,6 @@ export class RecordsService {
       .where(eq(todayTasks.localDate, localDate))
       .orderBy(asc(todayTasks.position), asc(todayTasks.id)).all();
     return this.attachTodayTaskSteps(this.db, rows);
-  }
-
-  getDailyFocus(localDate: string): DailyFocusResponse | null {
-    return this.db.select().from(dailyFocus).where(eq(dailyFocus.localDate, localDate)).get() ?? null;
   }
 
   getDailyCheckin(localDate: string): DailyCheckinResponse | null {
@@ -799,121 +779,10 @@ export class RecordsService {
       });
       if ((before.completedAt !== null) !== (after.completedAt !== null)) {
         this.writeTaskCompletionAudit(tx, before, after, now);
-        this.reconcileFocusAfterTaskCompletion(tx, before, after, now);
       }
       return task.localDate;
     });
     return this.getToday(localDate);
-  }
-
-  createDailyFocus(input: DailyFocusCreateInput) {
-    const id = this.db.transaction((tx) => {
-      if (tx.select({ id: dailyFocus.id }).from(dailyFocus).where(eq(dailyFocus.localDate, input.localDate)).get()) {
-        throw new ApiError(409, "Focus already exists for this date.");
-      }
-      this.requireFocusSelection(tx, input.localDate, input.primaryTaskId, input.secondaryTaskId);
-      const now = this.now();
-      const created = tx.insert(dailyFocus).values({
-        localDate: input.localDate,
-        firstMove: input.firstMove,
-        firstMoveCompletedAt: null,
-        primaryTaskId: input.primaryTaskId,
-        secondaryTaskId: input.secondaryTaskId,
-        currentTaskId: null,
-        state: "READY",
-        pauseReason: null,
-        completedRounds: 0,
-        nextReviewAt: null,
-        revision: 0,
-        endedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      }).returning().get();
-      this.writeAudit(tx, {
-        action: "FOCUS_CREATED",
-        entityType: "FOCUS",
-        entityId: created.id,
-        after: dailyFocusSnapshot(created),
-        createdAt: now,
-      });
-      return created.id;
-    });
-    return this.requireDailyFocusById(id);
-  }
-
-  updateDailyFocus(localDate: string, input: DailyFocusUpdateInput) {
-    return this.transitionDailyFocus(localDate, input, (tx, focus) => {
-      if (focus.state !== "READY") throw new ApiError(409, "Only ready Focus can change its initial tasks.");
-      this.requireFocusSelection(tx, localDate, input.primaryTaskId, input.secondaryTaskId);
-      return { firstMove: input.firstMove, primaryTaskId: input.primaryTaskId, secondaryTaskId: input.secondaryTaskId };
-    });
-  }
-
-  startDailyFocus(localDate: string, input: DailyFocusTransitionInput) {
-    return this.transitionDailyFocus(localDate, input, (tx, focus) => {
-      if (focus.state !== "READY") throw new ApiError(409, "Only ready Focus can start.");
-      this.requireFocusSelection(tx, localDate, focus.primaryTaskId, focus.secondaryTaskId);
-      return {
-        firstMoveCompletedAt: input.occurredAt,
-        currentTaskId: focus.primaryTaskId,
-        state: "ACTIVE" as const,
-        pauseReason: null,
-        nextReviewAt: input.occurredAt + ReviewIntervalMs,
-      };
-    });
-  }
-
-  reviewDailyFocus(localDate: string, input: DailyFocusReviewInput) {
-    return this.completeFocusRound(localDate, input, true);
-  }
-
-  reviewDailyFocusNow(localDate: string, input: DailyFocusReviewInput) {
-    return this.completeFocusRound(localDate, input, false);
-  }
-
-  switchDailyFocusTask(localDate: string, input: DailyFocusReviewInput) {
-    return this.transitionDailyFocus(localDate, input, (tx, focus) => {
-      if (focus.state !== "ACTIVE") throw new ApiError(409, "Only active Focus can switch tasks.");
-      if (input.currentTaskId === focus.currentTaskId) throw new ApiError(409, "Choose another Focus task.");
-      this.requireSelectedOpenFocusTask(tx, focus, input.currentTaskId);
-      return { currentTaskId: input.currentTaskId, nextReviewAt: input.occurredAt + ReviewIntervalMs };
-    });
-  }
-
-  refocusDailyFocus(localDate: string, input: DailyFocusSelectionInput) {
-    return this.resumeDailyFocus(localDate, input, "FOCUS_CLEARED");
-  }
-
-  continueDailyFocus(localDate: string, input: DailyFocusSelectionInput) {
-    return this.resumeDailyFocus(localDate, input, "TARGET_REACHED");
-  }
-
-  resetDailyFocus(localDate: string, input: DailyFocusTransitionInput) {
-    return this.transitionDailyFocus(localDate, input, (_tx, focus) => {
-      if (focus.state === "READY") throw new ApiError(409, "Focus is already ready.");
-      return {
-        firstMoveCompletedAt: null,
-        currentTaskId: null,
-        state: "READY" as const,
-        pauseReason: null,
-        completedRounds: 0,
-        nextReviewAt: null,
-        endedAt: null,
-      };
-    });
-  }
-
-  endDailyFocus(localDate: string, input: DailyFocusTransitionInput) {
-    return this.transitionDailyFocus(localDate, input, (_tx, focus) => {
-      if (focus.state === "ENDED") throw new ApiError(409, "Focus has already ended.");
-      return {
-        currentTaskId: null,
-        state: "ENDED" as const,
-        pauseReason: null,
-        nextReviewAt: null,
-        endedAt: input.occurredAt,
-      };
-    }, "FOCUS_ENDED");
   }
 
   listAuditLogs(beforeId?: number) {
@@ -930,74 +799,6 @@ export class RecordsService {
       })),
       nextBeforeId: rows.length === AuditLogPageSize ? rows.at(-1)!.id : null,
     };
-  }
-
-  private completeFocusRound(localDate: string, input: DailyFocusReviewInput, requireDue: boolean) {
-    return this.transitionDailyFocus(localDate, input, (tx, focus) => {
-      if (focus.state !== "ACTIVE" || focus.nextReviewAt === null) {
-        throw new ApiError(409, "Only active Focus can be reviewed.");
-      }
-      if (requireDue && input.occurredAt < focus.nextReviewAt) throw new ApiError(409, "The next review is not due yet.");
-      this.requireSelectedOpenFocusTask(tx, focus, input.currentTaskId);
-      const completedRounds = focus.completedRounds + 1;
-      const targetReached = completedRounds >= TargetRounds;
-      return {
-        completedRounds,
-        currentTaskId: targetReached ? null : input.currentTaskId,
-        state: targetReached ? "PAUSED" as const : "ACTIVE" as const,
-        pauseReason: targetReached ? "TARGET_REACHED" as const : null,
-        nextReviewAt: targetReached ? null : input.occurredAt + ReviewIntervalMs,
-      };
-    });
-  }
-
-  private resumeDailyFocus(
-    localDate: string,
-    input: DailyFocusSelectionInput,
-    pauseReason: "FOCUS_CLEARED" | "TARGET_REACHED",
-  ) {
-    return this.transitionDailyFocus(localDate, input, (tx, focus) => {
-      if (focus.state !== "PAUSED" || focus.pauseReason !== pauseReason) {
-        throw new ApiError(409, pauseReason === "FOCUS_CLEARED"
-          ? "New Focus can be selected only after the current Focus is cleared."
-          : "Another round is available only after reaching the round target.");
-      }
-      this.requireFocusSelection(tx, localDate, input.primaryTaskId, input.secondaryTaskId);
-      return {
-        primaryTaskId: input.primaryTaskId,
-        secondaryTaskId: input.secondaryTaskId,
-        currentTaskId: input.primaryTaskId,
-        state: "ACTIVE" as const,
-        pauseReason: null,
-        nextReviewAt: input.occurredAt + ReviewIntervalMs,
-      };
-    });
-  }
-
-  private transitionDailyFocus(
-    localDate: string,
-    input: DailyFocusTransitionInput,
-    transition: (tx: RecordsTransaction, focus: DailyFocusRow) => Partial<DailyFocusRow>,
-    action: "FOCUS_UPDATED" | "FOCUS_ENDED" = "FOCUS_UPDATED",
-  ) {
-    this.db.transaction((tx) => {
-      const focus = this.requireDailyFocus(tx, localDate);
-      this.requireFocusRevision(focus, input.expectedRevision);
-      const patch = transition(tx, focus);
-      const now = this.now();
-      const updated = { ...focus, ...patch, revision: focus.revision + 1, updatedAt: now };
-      tx.update(dailyFocus).set({ ...patch, revision: updated.revision, updatedAt: now })
-        .where(eq(dailyFocus.id, focus.id)).run();
-      this.writeAudit(tx, {
-        action,
-        entityType: "FOCUS",
-        entityId: focus.id,
-        before: dailyFocusSnapshot(focus),
-        after: dailyFocusSnapshot(updated),
-        createdAt: now,
-      });
-    });
-    return this.getDailyFocus(localDate)!;
   }
 
   private attachTemplateSteps(reader: RecordsReader, templates: TemplateRow[]): TemplateResponse[] {
@@ -1104,42 +905,6 @@ export class RecordsService {
     return task;
   }
 
-  private requireOpenTodayTask(reader: RecordsReader, localDate: string, id: number) {
-    const task = this.requireTodayTask(reader, id);
-    if (task.localDate !== localDate || task.completedAt !== null) {
-      throw new ApiError(409, "Focus tasks must be unfinished and belong to this date.");
-    }
-    return task;
-  }
-
-  private requireFocusSelection(reader: RecordsReader, localDate: string, primaryTaskId: number, secondaryTaskId: number | null) {
-    this.requireOpenTodayTask(reader, localDate, primaryTaskId);
-    if (secondaryTaskId !== null) this.requireOpenTodayTask(reader, localDate, secondaryTaskId);
-  }
-
-  private requireSelectedOpenFocusTask(reader: RecordsReader, focus: DailyFocusRow, id: number) {
-    if (id !== focus.primaryTaskId && id !== focus.secondaryTaskId) {
-      throw new ApiError(409, "Choose an unfinished task selected for Focus.");
-    }
-    return this.requireOpenTodayTask(reader, focus.localDate, id);
-  }
-
-  private requireDailyFocus(reader: RecordsReader, localDate: string) {
-    const focus = reader.select().from(dailyFocus).where(eq(dailyFocus.localDate, localDate)).get();
-    if (!focus) throw new ApiError(404, "Daily Focus not found.");
-    return focus;
-  }
-
-  private requireDailyFocusById(id: number) {
-    const focus = this.db.select().from(dailyFocus).where(eq(dailyFocus.id, id)).get();
-    if (!focus) throw new ApiError(404, "Daily Focus not found.");
-    return focus;
-  }
-
-  private requireFocusRevision(focus: DailyFocusRow, expectedRevision: number) {
-    if (focus.revision !== expectedRevision) throw new ApiError(409, "Focus has changed. Refresh and try again.");
-  }
-
   private requireTaskRevision(task: TodayTaskRow, expectedRevision: number) {
     if (task.revision !== expectedRevision) throw new ApiError(409, "Today task has changed. Refresh and try again.");
   }
@@ -1156,36 +921,6 @@ export class RecordsService {
       entityId: after.id,
       before: todayTaskSnapshot(before),
       after: todayTaskSnapshot(after),
-      createdAt: now,
-    });
-  }
-
-  private reconcileFocusAfterTaskCompletion(
-    tx: RecordsTransaction,
-    beforeTask: TodayTaskResponse,
-    afterTask: TodayTaskResponse,
-    now: number,
-  ) {
-    if (beforeTask.completedAt !== null || afterTask.completedAt === null) return;
-    const focus = tx.select().from(dailyFocus).where(eq(dailyFocus.localDate, afterTask.localDate)).get();
-    if (!focus || focus.state !== "ACTIVE") return;
-    const selected = [focus.primaryTaskId, focus.secondaryTaskId].filter((id): id is number => id !== null);
-    if (!selected.includes(afterTask.id)) return;
-    const openTaskId = selected.map((id) => tx.select().from(todayTasks).where(eq(todayTasks.id, id)).get())
-      .find((task) => task?.completedAt === null)?.id ?? null;
-    if (focus.currentTaskId !== afterTask.id && openTaskId !== null) return;
-    const patch: Partial<DailyFocusRow> = openTaskId === null
-      ? { currentTaskId: null, state: "PAUSED", pauseReason: "FOCUS_CLEARED", nextReviewAt: null }
-      : { currentTaskId: openTaskId };
-    const updated = { ...focus, ...patch, revision: focus.revision + 1, updatedAt: now };
-    tx.update(dailyFocus).set({ ...patch, revision: updated.revision, updatedAt: now })
-      .where(eq(dailyFocus.id, focus.id)).run();
-    this.writeAudit(tx, {
-      action: "FOCUS_UPDATED",
-      entityType: "FOCUS",
-      entityId: focus.id,
-      before: dailyFocusSnapshot(focus),
-      after: dailyFocusSnapshot(updated),
       createdAt: now,
     });
   }
@@ -1338,21 +1073,6 @@ function todayTaskStepSnapshot(step: TodayTaskStepRow, task: TodayTaskRow) {
     taskTitle: task.title,
     title: step.title,
     completedAt: step.completedAt,
-  };
-}
-
-function dailyFocusSnapshot(focus: DailyFocusResponse) {
-  return {
-    id: focus.id,
-    localDate: focus.localDate,
-    firstMove: focus.firstMove,
-    primaryTaskId: focus.primaryTaskId,
-    secondaryTaskId: focus.secondaryTaskId,
-    currentTaskId: focus.currentTaskId,
-    state: focus.state,
-    pauseReason: focus.pauseReason,
-    completedRounds: focus.completedRounds,
-    nextReviewAt: focus.nextReviewAt,
   };
 }
 

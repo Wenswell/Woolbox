@@ -19,17 +19,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,17 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.model.DailyFocus
 import com.wswensw.woolbox.record.model.DailyCheckin
-import com.wswensw.woolbox.record.model.DailyFocusPauseReason
-import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.GoalPeriod
 import com.wswensw.woolbox.record.model.GoalPool
 import com.wswensw.woolbox.record.model.RecordEntry
@@ -73,8 +65,8 @@ import java.util.Locale
 fun RecordsScreen(
     state: RecordsUiState,
     clock: State<RecordsClock>,
-    onPlanFocus: () -> Unit,
     onAddTask: () -> Unit,
+    onOpenTask: (TodayTask) -> Unit,
     onManageTemplates: () -> Unit,
     onManageGoals: () -> Unit,
     onManageAccumulates: () -> Unit,
@@ -86,11 +78,6 @@ fun RecordsScreen(
     onMarkAwake: ((String?) -> Unit) -> Unit,
     onOpenHourlyCheckin: () -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
-    notificationsEnabled: Boolean,
-    onEnableNotifications: () -> Unit,
-    onStartFocus: (DailyFocus, (String?) -> Unit) -> Unit,
-    onReviewFocus: (DailyFocus, Long, (String?) -> Unit) -> Unit,
-    onEndFocus: (DailyFocus, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val accumulateItems = orderedRecordItems(state.activeItems).filter { it.mode == RecordMode.ACCUMULATE }
@@ -147,18 +134,6 @@ fun RecordsScreen(
                         onMarkAwake = onMarkAwake,
                         onOpenCheckin = onOpenHourlyCheckin,
                     )
-                    Spacer(Modifier.height(8.dp))
-                    FocusCard(
-                        focus = state.dailyFocus,
-                        tasks = state.todayTasks,
-                        now = now,
-                        onPlan = onPlanFocus,
-                        notificationsEnabled = notificationsEnabled,
-                        onEnableNotifications = onEnableNotifications,
-                        onStart = onStartFocus,
-                        onReview = onReviewFocus,
-                        onEnd = onEndFocus,
-                    )
                 }
                 item {
                     Row(
@@ -190,8 +165,7 @@ fun RecordsScreen(
                     items(state.todayTasks, key = { "task-${it.id}" }) { task ->
                         TodayTaskRow(
                             task = task,
-                            current = state.dailyFocus?.currentTaskId == task.id &&
-                                state.dailyFocus.state == DailyFocusState.ACTIVE,
+                            onOpen = { onOpenTask(task) },
                         )
                     }
                 }
@@ -259,192 +233,15 @@ fun RecordsScreen(
 }
 
 @Composable
-private fun FocusCard(
-    focus: DailyFocus?,
-    tasks: List<TodayTask>,
-    now: Long,
-    onPlan: () -> Unit,
-    notificationsEnabled: Boolean,
-    onEnableNotifications: () -> Unit,
-    onStart: (DailyFocus, (String?) -> Unit) -> Unit,
-    onReview: (DailyFocus, Long, (String?) -> Unit) -> Unit,
-    onEnd: (DailyFocus, (String?) -> Unit) -> Unit,
-) {
-    var busy by remember(focus?.revision) { mutableStateOf(false) }
-    var error by remember(focus?.revision) { mutableStateOf<String?>(null) }
-    var choosingReviewTask by remember(focus?.revision) { mutableStateOf(false) }
-    val currentTask = focus?.currentTask(tasks)
-    val selectedOpenTasks = focus?.selectedOpenTasks(tasks).orEmpty()
-    val selectionAvailable = selectedOpenTasks.any { it.id == focus?.primaryTaskId } &&
-        (focus?.secondaryTaskId == null || selectedOpenTasks.any { it.id == focus.secondaryTaskId })
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RecordsCardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when {
-                focus == null -> {
-                    FocusHeader(stringResource(R.string.focus), null)
-                    Text(stringResource(R.string.no_focus_today), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(
-                        onClick = onPlan,
-                        enabled = tasks.any { !it.isCompleted },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.plan_focus)) }
-                }
-                focus.state == DailyFocusState.READY -> {
-                    FocusHeader(stringResource(R.string.first_move), onPlan)
-                    Text(focus.firstMove, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Button(
-                        onClick = {
-                            busy = true
-                            onStart(focus) { result -> busy = false; error = result }
-                        },
-                        enabled = !busy && selectionAvailable,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Rounded.CheckCircle, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.first_move_done))
-                    }
-                    if (!notificationsEnabled) {
-                        OutlinedButton(onClick = onEnableNotifications, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.enable_notifications))
-                        }
-                    }
-                }
-                focus.state == DailyFocusState.ACTIVE && !notificationsEnabled -> {
-                    FocusHeader(stringResource(R.string.notifications_required), null)
-                    Text(
-                        stringResource(R.string.notifications_required_detail),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = onEnableNotifications, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.enable_notifications))
-                    }
-                    EndFocusButton(enabled = !busy) {
-                        busy = true
-                        onEnd(focus) { result -> busy = false; error = result }
-                    }
-                }
-                focus.state == DailyFocusState.ACTIVE && focus.isReviewDue(now) -> {
-                    FocusHeader(stringResource(R.string.hourly_review), null)
-                    Text(stringResource(R.string.still_on_focus), style = MaterialTheme.typography.titleLarge)
-                    currentTask?.let { Text(it.title, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    Button(
-                        onClick = {
-                            val taskId = currentTask?.id ?: return@Button
-                            busy = true
-                            onReview(focus, taskId) { result -> busy = false; error = result }
-                        },
-                        enabled = !busy && currentTask != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.continue_current_focus)) }
-                    if (selectedOpenTasks.any { it.id != currentTask?.id }) {
-                        OutlinedButton(
-                            onClick = { choosingReviewTask = true },
-                            enabled = !busy,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.switch_focus)) }
-                    }
-                    EndFocusButton(enabled = !busy) {
-                        busy = true
-                        onEnd(focus) { result -> busy = false; error = result }
-                    }
-                }
-                focus.state == DailyFocusState.ACTIVE -> {
-                    FocusHeader(stringResource(R.string.round_progress, focus.completedRounds + 1), null)
-                    Text(
-                        currentTask?.title ?: stringResource(R.string.focus_task_unavailable),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        stringResource(R.string.review_around_hour),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                focus.state == DailyFocusState.PAUSED -> {
-                    val targetReached = focus.pauseReason == DailyFocusPauseReason.TARGET_REACHED
-                    FocusHeader(
-                        stringResource(if (targetReached) R.string.enough_for_today else R.string.focus_cleared),
-                        null,
-                    )
-                    Text(
-                        if (targetReached) {
-                            pluralStringResource(
-                                R.plurals.rounds_completed,
-                                focus.completedRounds,
-                                focus.completedRounds,
-                            )
-                        } else {
-                            stringResource(R.string.focus_cleared_detail)
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(
-                        onClick = onPlan,
-                        enabled = tasks.any { !it.isCompleted },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(if (targetReached) R.string.continue_focus else R.string.choose_new_focus))
-                    }
-                    EndFocusButton(enabled = !busy) {
-                        busy = true
-                        onEnd(focus) { result -> busy = false; error = result }
-                    }
-                }
-                else -> {
-                    FocusHeader(stringResource(R.string.focus_ended), null)
-                    Text(stringResource(R.string.focus_ended_detail), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        }
-    }
-
-    if (choosingReviewTask && focus != null) {
-        TodayTaskChoiceDialog(
-            title = stringResource(R.string.switch_focus),
-            tasks = selectedOpenTasks.filter { it.id != currentTask?.id },
-            onDismiss = { choosingReviewTask = false },
-            onSelect = { task ->
-                choosingReviewTask = false
-                busy = true
-                onReview(focus, task.id) { result -> busy = false; error = result }
-            },
-        )
-    }
-}
-
-@Composable
-private fun EndFocusButton(
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text(stringResource(R.string.end_focus)) }
-}
-
-@Composable
 private fun TodayTaskRow(
     task: TodayTask,
-    current: Boolean,
+    onOpen: () -> Unit,
 ) {
     Surface(
+        onClick = onOpen,
         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         shape = RecordsCardShape,
-        color = if (current) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -462,19 +259,11 @@ private fun TodayTaskRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (task.steps.isNotEmpty()) {
-                    Text(
-                        stringResource(R.string.task_steps_progress, task.completedStepCount, task.steps.size),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                } else if (current) {
-                    Text(
-                        stringResource(R.string.current_focus),
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                Text(
+                    stringResource(R.string.task_steps_progress, task.completedStepCount, task.steps.size),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Text(
                     text = task.nextStep?.let { stringResource(R.string.next_subtask, it.title) }
                         ?: stringResource(R.string.all_subtasks_done),
@@ -540,23 +329,6 @@ private fun HourlyCheckinCard(
 
 private fun hourlyCheckinTime(epochMillis: Long): String = DateTimeFormatter.ofPattern("HH:mm")
     .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
-
-@Composable
-private fun FocusHeader(title: String, onEdit: (() -> Unit)?) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-        onEdit?.let {
-            IconButton(onClick = it, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit_focus))
-            }
-        }
-    }
-}
 
 @Composable
 private fun SectionTitle(title: String) {

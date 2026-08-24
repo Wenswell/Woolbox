@@ -36,7 +36,7 @@ Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取�
 
 | 模块 | 职责 |
 | --- | --- |
-| `MainActivity` | 承载 Compose；普通入口退到后台，OLED 已保存应用入口启动指定应用，并在 `onStop` 提交命令；消费每日回顾通知入口。 |
+| `MainActivity` | 承载 Compose；普通入口退到后台，OLED 已保存应用入口启动指定应用，并在 `onStop` 提交命令；消费整点打卡通知入口。 |
 | `ToolServiceController` | 通过弱引用把页面与 Tile 命令交给当前服务实例。 |
 | `ToolAccessibilityService` | 管理连接、命令状态机、目标变化、控制器生命周期和 Tile 刷新。 |
 | `ForegroundWindowResolver` | 从无障碍窗口中选择当前外部 `TYPE_APPLICATION` 目标。 |
@@ -50,8 +50,8 @@ Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取�
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布 TaskTemplate、TodayTask、DailyFocus、量化记录和候选组成的 overview 快照；凭据由 Keystore 加密保存。分钟时钟只负责回顾到期显示和跨日刷新。 |
-| `DailyReminderScheduler` / `DailyReminderWorker` | 以唯一一次性 WorkManager 任务调度 `nextReviewAt`。Worker 联网重读 DailyFocus 并核对本地日期、revision、状态和时间；不匹配时结束。 |
+| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布 TaskTemplate、TodayTask、DailyCheckin、量化记录和候选组成的 overview 快照；凭据由 Keystore 加密保存。分钟时钟负责重算整点打卡入口并在跨日刷新。 |
+| `HourlyCheckinReminderScheduler` / `HourlyCheckinReminderWorker` | 以唯一一次性 WorkManager 任务从下一本地整点开始调度。Worker 联网重读 DailyCheckin；跨日、未起床或当前小时不可打卡时结束，否则通知后续排下一整点。 |
 
 ## 命令状态机
 
@@ -136,7 +136,7 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 
 ## Records 数据
 
-Records 的表、Today task/Focus API、事务协调、提醒和部署边界归 [Records 数据与接口](records-architecture.md)。
+Records 的表、Today task/整点打卡 API、事务协调、提醒和部署边界归 [Records 数据与接口](records-architecture.md)。
 
 ## App 更新
 

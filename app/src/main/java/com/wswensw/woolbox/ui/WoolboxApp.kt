@@ -1,13 +1,10 @@
 package com.wswensw.woolbox.ui
 
 import android.app.Activity
-import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.pm.PackageManager
-import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -15,8 +12,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,7 +43,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -67,10 +61,8 @@ import com.wswensw.woolbox.record.ui.ManageRecordsScreen
 import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
-import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
 import com.wswensw.woolbox.record.ui.AddTodayTaskSheet
-import com.wswensw.woolbox.record.ui.DailyFocusScreen
 import com.wswensw.woolbox.record.ui.GoalEditorScreen
 import com.wswensw.woolbox.record.ui.GoalPoolSheet
 import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
@@ -84,7 +76,7 @@ import com.wswensw.woolbox.record.ui.RecordsScreen
 import com.wswensw.woolbox.record.ui.RecordsViewModel
 import com.wswensw.woolbox.record.ui.TemplateEditorScreen
 import com.wswensw.woolbox.record.ui.HourlyCheckinSheet
-import com.wswensw.woolbox.record.reminder.DailyReminderNotifications
+import com.wswensw.woolbox.record.ui.TodayTaskDetailsSheet
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
 import com.wswensw.woolbox.tool.overlay.InAppOledShield
@@ -110,7 +102,6 @@ private enum class MainTab(
 
 @Composable
 fun WoolboxApp(
-    dailyReviewRequest: Int,
     hourlyCheckinRequest: Int,
     onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult,
 ) {
@@ -125,7 +116,6 @@ fun WoolboxApp(
     val copyHistorySavedMessage = stringResource(R.string.copy_history_saved)
     val copyHistoryDeletedMessage = stringResource(R.string.copy_history_deleted)
     val savedAppDeletedMessage = stringResource(R.string.saved_app_deleted)
-    val notificationsNotEnabledMessage = stringResource(R.string.notifications_not_enabled)
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
     val copyHistoryViewModel: CopyHistoryViewModel = viewModel()
@@ -149,57 +139,16 @@ fun WoolboxApp(
     var goalSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showHourlyCheckin by rememberSaveable { mutableStateOf(false) }
     var showAddTodayTask by rememberSaveable { mutableStateOf(false) }
+    var taskDetailsId by rememberSaveable { mutableStateOf<Long?>(null) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
-    var notificationsEnabled by remember {
-        mutableStateOf(DailyReminderNotifications.areEnabled(context))
-    }
-    var notificationPermissionDenied by rememberSaveable { mutableStateOf(false) }
-    var pendingNotificationAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var pendingNotificationFailure by remember { mutableStateOf<(() -> Unit)?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val hapticFeedback = LocalHapticFeedback.current
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
     val recordsClock = recordsViewModel.clock.collectAsStateWithLifecycle()
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        notificationPermissionDenied = !granted
-        notificationsEnabled = DailyReminderNotifications.areEnabled(context)
-        val action = pendingNotificationAction
-        val failure = pendingNotificationFailure
-        pendingNotificationAction = null
-        pendingNotificationFailure = null
-        if (notificationsEnabled) action?.invoke() else failure?.invoke()
-    }
-    val requireNotifications: (onUnavailable: () -> Unit, action: () -> Unit) -> Unit =
-        { onUnavailable, action ->
-            notificationsEnabled = DailyReminderNotifications.areEnabled(context)
-            when {
-                notificationsEnabled -> action()
-                notificationPermissionDenied -> {
-                    onUnavailable()
-                    DailyReminderNotifications.openSettings(context)
-                }
-                Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS,
-                ) != PackageManager.PERMISSION_GRANTED -> {
-                    pendingNotificationAction = action
-                    pendingNotificationFailure = onUnavailable
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                else -> {
-                    onUnavailable()
-                    DailyReminderNotifications.openSettings(context)
-                }
-            }
-        }
-
-    // Shared by the record Sheet and the focus card so both produce the same
-    // haptics, goal detection and undo.
+    // Shared record-write behavior keeps haptics, goal detection and undo consistent.
     val recordValue: (RecordItem, Double, (String?) -> Unit) -> Unit = { item, value, onResult ->
         val previous = recordsState.goalValues[item.id]
             ?: recordsState.entries.filter { it.itemId == item.id }.sumOf { it.value }
@@ -242,15 +191,6 @@ fun WoolboxApp(
         if (selectedTab == MainTab.SETTING) AppUpdateManager.checkForUpdate()
     }
 
-    LaunchedEffect(dailyReviewRequest) {
-        if (dailyReviewRequest == 0) return@LaunchedEffect
-        selectedTab = MainTab.RECORDS
-        navController.navigate(AppRoutes.ROOT) {
-            popUpTo(AppRoutes.ROOT)
-            launchSingleTop = true
-        }
-    }
-
     LaunchedEffect(hourlyCheckinRequest) {
         if (hourlyCheckinRequest == 0) return@LaunchedEffect
         selectedTab = MainTab.RECORDS
@@ -264,7 +204,6 @@ fun WoolboxApp(
     DisposableEffect(lifecycleOwner, toolViewModel, recordsViewModel, selectedTab) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                notificationsEnabled = DailyReminderNotifications.areEnabled(context)
                 toolViewModel.refreshAccessibilityState()
                 AppUpdateManager.syncInstallPermission()
                 if (selectedTab == MainTab.RECORDS) recordsViewModel.refresh()
@@ -303,6 +242,7 @@ fun WoolboxApp(
                                     goalSheetId = null
                                     showHourlyCheckin = false
                                     showAddTodayTask = false
+                                    taskDetailsId = null
                                     measurementSheetItemId = null
                                 }
                             },
@@ -338,8 +278,8 @@ fun WoolboxApp(
                             MainTab.RECORDS -> RecordsScreen(
                                 state = recordsState,
                                 clock = recordsClock,
-                                onPlanFocus = { navController.navigate(AppRoutes.DAILY_FOCUS) },
                                 onAddTask = { showAddTodayTask = true },
+                                onOpenTask = { taskDetailsId = it.id },
                                 onManageTemplates = {
                                     navController.navigate(AppRoutes.MANAGE_TEMPLATES)
                                 },
@@ -361,36 +301,12 @@ fun WoolboxApp(
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
                                 onOpenGoal = { goalSheetId = it.id },
-                                onMarkAwake = { onResult ->
-                                    requireNotifications(
-                                        { onResult(notificationsNotEnabledMessage) },
-                                        { recordsViewModel.markAwake(onResult) },
-                                    )
-                                },
+                                onMarkAwake = recordsViewModel::markAwake,
                                 onOpenHourlyCheckin = { showHourlyCheckin = true },
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
                                 },
-                                notificationsEnabled = notificationsEnabled,
-                                onEnableNotifications = {
-                                    requireNotifications(
-                                        {
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(notificationsNotEnabledMessage)
-                                            }
-                                        },
-                                        {},
-                                    )
-                                },
-                                onStartFocus = { focus, onResult ->
-                                    requireNotifications(
-                                        { onResult(notificationsNotEnabledMessage) },
-                                        { recordsViewModel.startDailyFocus(focus, onResult) },
-                                    )
-                                },
-                                onReviewFocus = recordsViewModel::reviewDailyFocus,
-                                onEndFocus = recordsViewModel::endDailyFocus,
                                 modifier = Modifier.fillMaxSize(),
                             )
 
@@ -621,47 +537,6 @@ fun WoolboxApp(
                     onArchive = { onResult -> recordsViewModel.archiveTemplate(templateId, onResult) },
                 )
             }
-            composable(AppRoutes.DAILY_FOCUS) {
-                DailyFocusScreen(
-                    focus = recordsState.dailyFocus,
-                    tasks = recordsState.todayTasks,
-                    loading = recordsState.isLoading,
-                    onBack = { navController.popBackStack() },
-                    onSave = { firstMove, primaryTaskId, secondaryTaskId, onResult ->
-                        val save = {
-                            val finish: (String?) -> Unit = { error ->
-                                onResult(error)
-                                if (error == null) navController.popBackStack()
-                            }
-                            val focus = recordsState.dailyFocus
-                            if (focus?.state == DailyFocusState.PAUSED) {
-                                recordsViewModel.resumeDailyFocus(
-                                    focus,
-                                    primaryTaskId,
-                                    secondaryTaskId,
-                                    finish,
-                                )
-                            } else {
-                                recordsViewModel.saveDailyFocus(
-                                    focus,
-                                    firstMove,
-                                    primaryTaskId,
-                                    secondaryTaskId,
-                                    finish,
-                                )
-                            }
-                        }
-                        if (recordsState.dailyFocus?.state == DailyFocusState.PAUSED) {
-                            requireNotifications(
-                                { onResult(notificationsNotEnabledMessage) },
-                                save,
-                            )
-                        } else {
-                            save()
-                        }
-                    },
-                )
-            }
             composable(AppRoutes.GOAL_NEW) {
                 GoalEditorScreen(
                     goal = null,
@@ -842,6 +717,18 @@ fun WoolboxApp(
                 }
             }
 
+            taskDetailsId?.let { taskId ->
+                recordsState.todayTasks.firstOrNull { it.id == taskId }?.let { task ->
+                    TodayTaskDetailsSheet(
+                        task = task,
+                        onDismiss = { taskDetailsId = null },
+                        onToggleStep = { step, completed, onResult ->
+                            recordsViewModel.setTodayTaskStepCompleted(task, step.id, completed, onResult)
+                        },
+                    )
+                }
+            }
+
             measurementSheetItemId?.let { itemId ->
                 recordsState.activeItems.firstOrNull { it.id == itemId }?.let { item ->
                     MeasurementPreviewSheet(
@@ -979,7 +866,6 @@ private object AppRoutes {
     const val MANAGE_MEASUREMENTS = "manage-measurements"
     const val RECORDS_CONNECTION = "records-connection"
     const val TEMPLATE_NEW = "template/new"
-    const val DAILY_FOCUS = "records/focus"
     const val GOAL_NEW = "goal/new"
     const val GOAL_ID = "goalId"
     const val GOAL_EDIT = "goal/{$GOAL_ID}"

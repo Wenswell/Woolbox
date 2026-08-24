@@ -14,7 +14,7 @@ AppTheme
    ├─ root
    │  └─ AppSurface
    │     ├─ Records
-   │     │  ├─ Today ──> Plan / Edit Focus
+   │     │  ├─ Today ──> Task details / Hourly check-in / Add task
    │     │  ├─ Templates ──> Manage templates ──> New / Edit template
    │     │  ├─ Accumulate ──> Record Sheet
    │     │  └─ Measurement ──> Measurement preview Sheet
@@ -116,7 +116,7 @@ Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立
 
 ## Records 组合
 
-Records 的 Today/Focus/Tasks、管理页和零轮状态呈现归 [Records 界面规则](records-design.md)。
+Records 的 Today tasks、整点打卡和管理页状态呈现归 [Records 界面规则](records-design.md)。
 
 ## 状态呈现
 

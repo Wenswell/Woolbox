@@ -191,7 +191,7 @@ fun TemplateEditorScreen(
                         onClick = {
                             stepTitles = stepTitles.filterIndexed { itemIndex, _ -> itemIndex != index }
                         },
-                        enabled = !saving,
+                        enabled = !saving && stepTitles.size > 1,
                     ) {
                         Icon(
                             Icons.Rounded.Delete,

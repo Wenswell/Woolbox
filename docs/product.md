@@ -8,7 +8,7 @@ Woolbox 是 Android 12 及以上的工具应用。当前提供两项跨应用无
 | --- | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，选择并复制到剪贴板。 | `Start Global Copy` | `Global Copy` Quick Settings Tile |
 | `OLED shield` | 在目标应用上方显示可触摸的黑色遮罩。 | `Show shield` | `OLED shield` Quick Settings Tile |
-| `Records` | 管理 Today tasks、每日 Focus 与量化记录；量化记录可累计，也可按指定时间保存测量值。 | `Records` 底栏 | 分区与独立路由 |
+| `Records` | 管理 Today tasks、整点打卡与量化记录；量化记录可累计，也可按指定时间保存测量值。 | `Records` 底栏 | 分区与独立路由 |
 
 Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。
 
@@ -110,7 +110,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 
 ## Records
 
-Today tasks、DailyFocus、模板与量化记录的完整行为和验收归 [Records 产品规则](records-product.md)。本文件只保留整个应用共享的范围、入口和系统工具规则。
+Today tasks、整点打卡、模板与量化记录的完整行为和验收归 [Records 产品规则](records-product.md)。本文件只保留整个应用共享的范围、入口和系统工具规则。
 
 ## 共同关闭规则
 

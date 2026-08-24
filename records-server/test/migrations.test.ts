@@ -76,9 +76,8 @@ describe("Records migrations", () => {
       "task_template_steps",
       "today_tasks",
       "today_task_steps",
-      "daily_focus",
     ]));
-    expect(migrated.prepare("SELECT COUNT(*) AS count FROM daily_focus").get()).toEqual({ count: 0 });
+    expect(tableNames(migrated)).not.toContain("daily_focus");
     expect(migrated.prepare("SELECT name FROM record_items WHERE id = ?").get(itemId)).toEqual({ name: "Water" });
     expect(migrated.prepare("SELECT entity_type FROM record_audit_logs ORDER BY id").all()).toEqual([
       { entity_type: "ITEM" },
@@ -86,7 +85,7 @@ describe("Records migrations", () => {
     migrated.close();
   });
 
-  it("migrates commitment snapshots, Focus references, and audit names", async () => {
+  it("migrates task snapshots and removes retired Focus data", async () => {
     directory = mkdtempSync(join(tmpdir(), "records-focus-migration-test-"));
     const databaseFile = join(directory, "records.sqlite");
     const publishedMigrations = join(directory, "published-migrations");
@@ -121,19 +120,17 @@ describe("Records migrations", () => {
         { id: 1, title: "Core", completedAt: 8, steps: [{ completedAt: 8 }] },
         { id: 2, title: "Branch", completedAt: null, steps: [{ completedAt: null }] },
       ],
-      dailyFocus: { primaryTaskId: 2, secondaryTaskId: 1, currentTaskId: 2, state: "ACTIVE", completedRounds: 2, revision: 3 },
     });
     await app.close();
 
     const migrated = new Database(databaseFile, { readonly: true });
     expect(tableNames(migrated)).not.toEqual(expect.arrayContaining(["daily_plans", "today_commitments", "today_commitment_steps"]));
     const audits = migrated.prepare("SELECT action, entity_type, after_json FROM record_audit_logs ORDER BY id").all() as Array<{ action: string; entity_type: string; after_json: string }>;
+    expect(tableNames(migrated)).not.toContain("daily_focus");
     expect(audits.map(({ action, entity_type }) => ({ action, entity_type }))).toEqual([
       { action: "TODAY_TASK_CREATED", entity_type: "TODAY_TASK" },
-      { action: "FOCUS_UPDATED", entity_type: "FOCUS" },
     ]);
     expect(JSON.parse(audits[0]!.after_json)).toMatchObject({ localDate: "2026-08-18", sourceTaskId: null });
-    expect(JSON.parse(audits[1]!.after_json)).toMatchObject({ primaryTaskId: 2, secondaryTaskId: 1 });
     migrated.close();
   });
 });

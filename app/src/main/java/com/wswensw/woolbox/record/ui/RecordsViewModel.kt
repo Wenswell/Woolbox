@@ -16,15 +16,11 @@ import com.wswensw.woolbox.record.model.GoalPool
 import com.wswensw.woolbox.record.model.GoalPoolDraft
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
-import com.wswensw.woolbox.record.model.DailyFocus
 import com.wswensw.woolbox.record.model.DailyCheckin
-import com.wswensw.woolbox.record.model.DailyFocusPauseReason
-import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.TaskTemplate
 import com.wswensw.woolbox.record.model.TemplateCadence
 import com.wswensw.woolbox.record.model.TodayTask
-import com.wswensw.woolbox.record.reminder.DailyReminderScheduler
 import com.wswensw.woolbox.record.reminder.HourlyCheckinReminderScheduler
 import java.time.LocalDate
 import kotlinx.coroutines.delay
@@ -48,7 +44,6 @@ data class RecordsUiState(
     val dailySuggestions: List<TaskTemplate> = emptyList(),
     val unfinishedTasks: List<TodayTask> = emptyList(),
     val todayTasks: List<TodayTask> = emptyList(),
-    val dailyFocus: DailyFocus? = null,
     val dailyCheckin: DailyCheckin? = null,
     val goalValues: Map<Long, Double> = emptyMap(),
     val recentDayValues: Map<Long, List<Double>> = emptyMap(),
@@ -71,7 +66,6 @@ data class MeasurementPreviewUiState(
 
 class RecordsViewModel(
     private val repository: RecordRepository,
-    private val reminderScheduler: DailyReminderScheduler,
     private val hourlyCheckinReminderScheduler: HourlyCheckinReminderScheduler,
     private val resources: Resources,
 ) : ViewModel() {
@@ -96,7 +90,6 @@ class RecordsViewModel(
         .onEach { tick ->
             val loaded = loadedDate
             if (loaded != null && tick.date != loaded) {
-                reminderScheduler.reconcile(null)
                 refresh()
             }
         }
@@ -135,7 +128,6 @@ class RecordsViewModel(
             .onFailure { error.value = it.localizedFailure(R.string.records_load_failed) }
             .onSuccess {
                 error.value = null
-                reminderScheduler.reconcile(repository.snapshot.value?.dailyFocus)
                 hourlyCheckinReminderScheduler.reconcile(repository.snapshot.value?.dailyCheckin)
             }
     }
@@ -151,7 +143,6 @@ class RecordsViewModel(
             dailySuggestions = dailySuggestions,
             unfinishedTasks = unfinishedTasks,
             todayTasks = todayTasks,
-            dailyFocus = dailyFocus,
             dailyCheckin = dailyCheckin,
             goalValues = goalValues,
             recentDayValues = recentDayValues,
@@ -309,56 +300,6 @@ class RecordsViewModel(
             repository.markHourlyCheckin(LocalDate.now(), hour, System.currentTimeMillis())
         }
 
-    fun saveDailyFocus(
-        existing: DailyFocus?,
-        firstMove: String,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-        onResult: (String?) -> Unit,
-    ) = runRecordsAction(onResult, R.string.daily_focus_save_failed) {
-        when {
-            existing == null -> repository.createDailyFocus(
-                LocalDate.now(), firstMove, primaryTaskId, secondaryTaskId,
-            )
-            existing.state == DailyFocusState.READY -> repository.updateDailyFocus(
-                existing, firstMove, primaryTaskId, secondaryTaskId, System.currentTimeMillis(),
-            )
-            else -> error("Only a ready Focus can be edited.")
-        }
-    }
-
-    fun resumeDailyFocus(
-        focus: DailyFocus,
-        primaryTaskId: Long,
-        secondaryTaskId: Long?,
-        onResult: (String?) -> Unit,
-    ) = runRecordsAction(onResult, R.string.daily_focus_save_failed) {
-        when (focus.pauseReason) {
-            DailyFocusPauseReason.FOCUS_CLEARED -> repository.refocusDailyFocus(
-                focus, primaryTaskId, secondaryTaskId, System.currentTimeMillis(),
-            )
-            DailyFocusPauseReason.TARGET_REACHED -> repository.continueDailyFocus(
-                focus, primaryTaskId, secondaryTaskId, System.currentTimeMillis(),
-            )
-            null -> error("Paused Focus reason is required.")
-        }
-    }
-
-    fun startDailyFocus(focus: DailyFocus, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_focus_start_failed) {
-            repository.startDailyFocus(focus, System.currentTimeMillis())
-        }
-
-    fun reviewDailyFocus(focus: DailyFocus, taskId: Long, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_focus_review_failed) {
-            repository.reviewDailyFocus(focus, taskId, System.currentTimeMillis())
-        }
-
-    fun endDailyFocus(focus: DailyFocus, onResult: (String?) -> Unit) =
-        runRecordsAction(onResult, R.string.daily_focus_end_failed) {
-            repository.endDailyFocus(focus, System.currentTimeMillis())
-        }
-
     fun setTodayTaskStepCompleted(
         task: TodayTask,
         stepId: Long,
@@ -446,7 +387,6 @@ class RecordsViewModel(
             check(modelClass.isAssignableFrom(RecordsViewModel::class.java))
             return RecordsViewModel(
                 repository = RecordRepository(applicationContext),
-                reminderScheduler = DailyReminderScheduler(applicationContext),
                 hourlyCheckinReminderScheduler = HourlyCheckinReminderScheduler(applicationContext),
                 resources = applicationContext.resources,
             ) as T

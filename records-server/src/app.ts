@@ -5,11 +5,6 @@ import { openRecordsDatabase } from "./database.js";
 import {
   ApiError,
   parseArchived,
-  parseDailyFocusCreateInput,
-  parseDailyFocusReviewInput,
-  parseDailyFocusSelectionInput,
-  parseDailyFocusTransitionInput,
-  parseDailyFocusUpdateInput,
   parseDailyCheckinWakeInput,
   parseEntryInput,
   parseGoalEntryInput,
@@ -195,74 +190,6 @@ export function buildApp(options: BuildAppOptions) {
     const today = records.markHourlyCheckin(parseHourlyCheckinInput(request.body));
     return reply.status(201).send({ today });
   });
-
-  app.post("/api/daily-focus", (request, reply) => {
-    const focus = records.createDailyFocus(parseDailyFocusCreateInput(request.body));
-    return reply.status(201).send({ dailyFocus: focus });
-  });
-
-  app.put("/api/daily-focus/:localDate", (request) => ({
-    dailyFocus: records.updateDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusUpdateInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/start", (request) => ({
-    dailyFocus: records.startDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusTransitionInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/review", (request) => ({
-    dailyFocus: records.reviewDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusReviewInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/review-now", (request) => ({
-    dailyFocus: records.reviewDailyFocusNow(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusReviewInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/switch", (request) => ({
-    dailyFocus: records.switchDailyFocusTask(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusReviewInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/refocus", (request) => ({
-    dailyFocus: records.refocusDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusSelectionInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/continue", (request) => ({
-    dailyFocus: records.continueDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusSelectionInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/end", (request) => ({
-    dailyFocus: records.endDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusTransitionInput(request.body),
-    ),
-  }));
-
-  app.put("/api/daily-focus/:localDate/reset", (request) => ({
-    dailyFocus: records.resetDailyFocus(
-      parseIsoDate((request.params as { localDate?: unknown }).localDate, "Local date"),
-      parseDailyFocusTransitionInput(request.body),
-    ),
-  }));
 
   app.post("/api/templates", (request, reply) => {
     const template = records.createTemplate(parseTemplateWriteInput(request.body));

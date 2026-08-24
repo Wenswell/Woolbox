@@ -15,7 +15,7 @@ import { TodayView } from "./views/TodayView";
 type View = "overview" | "today" | "templates" | "goals" | "accumulate" | "measurement" | "entries" | "activity";
 const VIEWS: Record<View, { label: string; description: string }> = {
   overview: { label: "Overview", description: "Records status and recent work" },
-  today: { label: "Today", description: "Daily tasks and focused hourly review" },
+  today: { label: "Today", description: "Daily tasks and hourly check-ins" },
   templates: { label: "Templates", description: "Reusable task definitions and daily recommendations" },
   goals: { label: "Goals", description: "Non-periodic shared progress and subgoals" },
   accumulate: { label: "Accumulate", description: "Counters, durations and rolling goals" },

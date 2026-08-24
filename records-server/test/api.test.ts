@@ -182,7 +182,6 @@ describe("Records API", () => {
       todayTasks: [],
       dailySuggestions: [{ title: "Exercise" }],
       unfinishedTasks: [],
-      dailyFocus: null,
       accumulateEntries: [{ value: 2 }],
     });
 
@@ -239,6 +238,7 @@ describe("Records API", () => {
     });
     expect(hourly.statusCode).toBe(201);
     expect(hourly.json().today.dailyCheckin.hourlyCheckins).toMatchObject([{ hour: 8, checkedInAt: 1_001 }]);
+    expect(hourly.json().today.todayTasks).toEqual([]);
     expect((await app.inject({
       method: "POST",
       url: "/api/daily-checkins/hourly",
@@ -264,68 +264,13 @@ describe("Records API", () => {
     expect((await app.inject({ method: "POST", url: "/api/today-tasks/from-task", payload: { localDate: TestDate, sourceTaskId: source.id } })).statusCode).toBe(409);
   });
 
-  it("counts only Focus reviews and reaches enough with unrelated tasks still open", async () => {
-    await createTask({ title: "Core", steps: ["Start"] });
-    await createTask({ title: "Backup", steps: ["Start"] });
-    await createTask({ title: "Laundry", steps: ["Start"] });
-    let focus = await createFocus(1, 2);
-    focus = (await focusTransition("start", { expectedRevision: 0, occurredAt: 1_000 })).json().dailyFocus;
-    expect(focus).toMatchObject({ state: "ACTIVE", currentTaskId: 1, completedRounds: 0, revision: 1 });
-
-    const sideResult = await setTask(3, true, 0, 2_000);
-    expect(sideResult.json().today.dailyFocus).toMatchObject({ state: "ACTIVE", currentTaskId: 1, revision: 1 });
-    await createTask({ title: "Errand", steps: ["Start"] });
-
-    for (let round = 1; round <= 4; round += 1) {
-      const response = await focusTransition("review-now", { expectedRevision: focus.revision, occurredAt: 3_000 + round, currentTaskId: 1 });
-      expect(response.statusCode).toBe(200);
-      focus = response.json().dailyFocus;
-      expect(focus.completedRounds).toBe(round);
-    }
-    expect(focus).toMatchObject({ state: "PAUSED", pauseReason: "TARGET_REACHED", currentTaskId: null, revision: 5 });
-    expect((await getToday()).todayTasks.find((task: { title: string }) => task.title === "Errand").completedAt).toBeNull();
-
-    focus = (await focusTransition("continue", { expectedRevision: 5, occurredAt: 9_000, primaryTaskId: 4, secondaryTaskId: null })).json().dailyFocus;
-    expect(focus).toMatchObject({ state: "ACTIVE", primaryTaskId: 4, currentTaskId: 4, completedRounds: 4, revision: 6 });
-  });
-
-  it("pauses when selected Focus is cleared and never resumes from task reopening", async () => {
-    await createTask({ title: "Core", steps: ["Start"] });
-    await createTask({ title: "Backup", steps: ["Start"] });
-    let focus = await createFocus(1, 2);
-    focus = (await focusTransition("start", { expectedRevision: 0, occurredAt: 1_000 })).json().dailyFocus;
-
-    let today = (await setTask(1, true, 0, 2_000)).json().today;
-    expect(today.dailyFocus).toMatchObject({ state: "ACTIVE", currentTaskId: 2, revision: 2 });
-    today = (await setTask(2, true, 0, 3_000)).json().today;
-    expect(today.dailyFocus).toMatchObject({ state: "PAUSED", pauseReason: "FOCUS_CLEARED", currentTaskId: null, revision: 3 });
-
-    today = (await setTask(1, false, 1, 4_000)).json().today;
-    expect(today.dailyFocus).toMatchObject({ state: "PAUSED", pauseReason: "FOCUS_CLEARED", revision: 3 });
-    focus = (await focusTransition("refocus", { expectedRevision: 3, occurredAt: 5_000, primaryTaskId: 1, secondaryTaskId: null })).json().dailyFocus;
-    expect(focus).toMatchObject({ state: "ACTIVE", currentTaskId: 1, completedRounds: 0, revision: 4 });
-  });
-
-  it("requires every selected Focus task to remain open before starting", async () => {
-    await createTask({ title: "Core", steps: ["Start"] });
-    await createTask({ title: "Backup", steps: ["Start"] });
-    await createFocus(1, 2);
-    await setTask(2, true, 0, 1_000);
-
-    expect((await focusTransition("start", { expectedRevision: 0, occurredAt: 2_000 })).statusCode).toBe(409);
-    expect((await getToday()).dailyFocus).toMatchObject({ state: "READY", revision: 0 });
-  });
-
-  it("rejects invalid input and stale Focus commands without partial writes", async () => {
+  it("rejects empty task definitions and does not expose Focus routes", async () => {
     expect((await createTemplate({ title: " ", steps: ["Step"] })).statusCode).toBe(400);
     expect((await createTemplate({ title: "Task", steps: [" "] })).statusCode).toBe(400);
     expect((await createTemplate({ title: "Task", steps: [] })).statusCode).toBe(400);
     expect((await createTask({ title: " ", steps: ["Step"] })).statusCode).toBe(400);
     expect((await createTask({ title: "Task", steps: [] })).statusCode).toBe(400);
-    await createTask({ title: "Core", steps: ["Start"] });
-    await createFocus(1, null);
-    expect((await focusTransition("start", { expectedRevision: 1, occurredAt: 1_000 })).statusCode).toBe(409);
-    expect((await getToday()).dailyFocus).toMatchObject({ state: "READY", revision: 0 });
+    expect((await app.inject({ method: "POST", url: "/api/daily-focus", payload: {} })).statusCode).toBe(404);
   });
 
   async function createItem(payload: Record<string, unknown>) {
@@ -396,16 +341,6 @@ describe("Records API", () => {
 
   async function setTaskStep(id: number, completed: boolean, expectedRevision: number, occurredAt: number) {
     return app.inject({ method: "PUT", url: `/api/today-task-steps/${id}/completion`, payload: { completed, expectedRevision, occurredAt } });
-  }
-
-  async function createFocus(primaryTaskId: number, secondaryTaskId: number | null) {
-    const response = await app.inject({ method: "POST", url: "/api/daily-focus", payload: { localDate: TestDate, firstMove: "Open the work", primaryTaskId, secondaryTaskId } });
-    expect(response.statusCode).toBe(201);
-    return response.json().dailyFocus;
-  }
-
-  async function focusTransition(command: string, payload: Record<string, unknown>) {
-    return app.inject({ method: "PUT", url: `/api/daily-focus/${TestDate}/${command}`, payload });
   }
 
   async function getAuditLogs(): Promise<Array<Record<string, unknown>>> {
