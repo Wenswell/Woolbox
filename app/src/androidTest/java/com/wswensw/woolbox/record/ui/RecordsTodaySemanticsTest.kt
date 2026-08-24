@@ -25,6 +25,7 @@ class RecordsTodaySemanticsTest {
     fun todayShowsHourlyCheckinAndTaskProgress() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val date = LocalDate.of(2026, 8, 18)
+        val clock = mutableStateOf(RecordsClock(date, 12 * 60))
         val task = TodayTask(
             id = 1,
             localDate = date,
@@ -50,7 +51,7 @@ class RecordsTodaySemanticsTest {
                         hasSnapshot = true,
                         todayTasks = listOf(task),
                     ),
-                    clock = mutableStateOf(RecordsClock(date, 12 * 60)),
+                    clock = clock,
                     onAddTask = {},
                     onOpenTask = {},
                     onManageTemplates = {},
