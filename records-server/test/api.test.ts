@@ -172,13 +172,13 @@ describe("Records API", () => {
   it("returns Today tasks, manual recommendations, and immutable template snapshots", async () => {
     await createItem(itemInput());
     await createEntry(entryInput({ value: 2 }));
-    await createTemplate({ title: "Exercise", cadence: "DAILY", steps: [] });
+    await createTemplate({ title: "Exercise", cadence: "DAILY", steps: ["Run"] });
     await createTemplate({ title: "Laundry", cadence: "MANUAL", steps: ["Wash", "Dry"] });
 
     let overview = await getOverview();
     expect(overview).toMatchObject({
       items: [{ name: "Water" }],
-      templates: [{ title: "Exercise", steps: [] }, { title: "Laundry" }],
+      templates: [{ title: "Exercise", steps: [{ title: "Run" }] }, { title: "Laundry" }],
       todayTasks: [],
       dailySuggestions: [{ title: "Exercise" }],
       unfinishedTasks: [],
@@ -210,13 +210,44 @@ describe("Records API", () => {
     expect((await setTaskStep(task.steps[0].id, false, 0, 3_000)).statusCode).toBe(409);
 
     today = (await setTask(task.id, false, 2, 4_000)).json().today;
-    expect(today.todayTasks[0]).toMatchObject({ completedAt: null, revision: 3, steps: [{ completedAt: null }, { completedAt: null }] });
-    today = (await createTask({ title: "Call", steps: [] })).json().today;
+    expect(today.todayTasks[0]).toMatchObject({ completedAt: null, revision: 4, steps: [{ completedAt: null }, { completedAt: null }] });
+    today = (await createTask({ title: "Call", steps: ["Dial"] })).json().today;
     const titleTask = today.todayTasks[1];
     expect((await setTask(titleTask.id, true, 0, 5_000)).json().today.todayTasks[1]).toMatchObject({ completedAt: 5_000, revision: 1 });
 
     const actions = (await getAuditLogs()).map((log) => log.action);
-    expect(actions).toEqual(expect.arrayContaining(["TODAY_TASK_CREATED", "TODAY_TASK_COMPLETED", "TODAY_TASK_REOPENED", "TODAY_TASK_STEP_COMPLETED"]));
+    expect(actions).toEqual(expect.arrayContaining(["TODAY_TASK_CREATED", "TODAY_TASK_STEP_COMPLETED", "TODAY_TASK_STEP_REOPENED"]));
+  });
+
+  it("starts hourly check-ins after wake-up and accepts each hour once", async () => {
+    const wake = await app.inject({
+      method: "POST",
+      url: "/api/daily-checkins/wake",
+      payload: { localDate: TestDate, occurredAt: 1_000 },
+    });
+    expect(wake.statusCode).toBe(201);
+    expect(wake.json().today.dailyCheckin).toMatchObject({ wokeAt: 1_000, hourlyCheckins: [] });
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/daily-checkins/hourly",
+      payload: { localDate: TestDate, hour: 8, occurredAt: 999 },
+    })).statusCode).toBe(409);
+    const hourly = await app.inject({
+      method: "POST",
+      url: "/api/daily-checkins/hourly",
+      payload: { localDate: TestDate, hour: 8, occurredAt: 1_001 },
+    });
+    expect(hourly.statusCode).toBe(201);
+    expect(hourly.json().today.dailyCheckin.hourlyCheckins).toMatchObject([{ hour: 8, checkedInAt: 1_001 }]);
+    expect((await app.inject({
+      method: "POST",
+      url: "/api/daily-checkins/hourly",
+      payload: { localDate: TestDate, hour: 8, occurredAt: 1_002 },
+    })).statusCode).toBe(409);
+    expect((await getAuditLogs()).map((log) => log.action)).toEqual(expect.arrayContaining([
+      "DAILY_CHECKIN_WOKE",
+      "HOURLY_CHECKIN_CREATED",
+    ]));
   });
 
   it("offers yesterday's unfinished task once and copies only remaining checklist steps", async () => {
@@ -234,16 +265,16 @@ describe("Records API", () => {
   });
 
   it("counts only Focus reviews and reaches enough with unrelated tasks still open", async () => {
-    await createTask({ title: "Core", steps: [] });
-    await createTask({ title: "Backup", steps: [] });
-    await createTask({ title: "Laundry", steps: [] });
+    await createTask({ title: "Core", steps: ["Start"] });
+    await createTask({ title: "Backup", steps: ["Start"] });
+    await createTask({ title: "Laundry", steps: ["Start"] });
     let focus = await createFocus(1, 2);
     focus = (await focusTransition("start", { expectedRevision: 0, occurredAt: 1_000 })).json().dailyFocus;
     expect(focus).toMatchObject({ state: "ACTIVE", currentTaskId: 1, completedRounds: 0, revision: 1 });
 
     const sideResult = await setTask(3, true, 0, 2_000);
     expect(sideResult.json().today.dailyFocus).toMatchObject({ state: "ACTIVE", currentTaskId: 1, revision: 1 });
-    await createTask({ title: "Errand", steps: [] });
+    await createTask({ title: "Errand", steps: ["Start"] });
 
     for (let round = 1; round <= 4; round += 1) {
       const response = await focusTransition("review-now", { expectedRevision: focus.revision, occurredAt: 3_000 + round, currentTaskId: 1 });
@@ -259,8 +290,8 @@ describe("Records API", () => {
   });
 
   it("pauses when selected Focus is cleared and never resumes from task reopening", async () => {
-    await createTask({ title: "Core", steps: [] });
-    await createTask({ title: "Backup", steps: [] });
+    await createTask({ title: "Core", steps: ["Start"] });
+    await createTask({ title: "Backup", steps: ["Start"] });
     let focus = await createFocus(1, 2);
     focus = (await focusTransition("start", { expectedRevision: 0, occurredAt: 1_000 })).json().dailyFocus;
 
@@ -276,8 +307,8 @@ describe("Records API", () => {
   });
 
   it("requires every selected Focus task to remain open before starting", async () => {
-    await createTask({ title: "Core", steps: [] });
-    await createTask({ title: "Backup", steps: [] });
+    await createTask({ title: "Core", steps: ["Start"] });
+    await createTask({ title: "Backup", steps: ["Start"] });
     await createFocus(1, 2);
     await setTask(2, true, 0, 1_000);
 
@@ -286,10 +317,12 @@ describe("Records API", () => {
   });
 
   it("rejects invalid input and stale Focus commands without partial writes", async () => {
-    expect((await createTemplate({ title: " ", steps: [] })).statusCode).toBe(400);
+    expect((await createTemplate({ title: " ", steps: ["Step"] })).statusCode).toBe(400);
     expect((await createTemplate({ title: "Task", steps: [" "] })).statusCode).toBe(400);
-    expect((await createTask({ title: " ", steps: [] })).statusCode).toBe(400);
-    await createTask({ title: "Core", steps: [] });
+    expect((await createTemplate({ title: "Task", steps: [] })).statusCode).toBe(400);
+    expect((await createTask({ title: " ", steps: ["Step"] })).statusCode).toBe(400);
+    expect((await createTask({ title: "Task", steps: [] })).statusCode).toBe(400);
+    await createTask({ title: "Core", steps: ["Start"] });
     await createFocus(1, null);
     expect((await focusTransition("start", { expectedRevision: 1, occurredAt: 1_000 })).statusCode).toBe(409);
     expect((await getToday()).dailyFocus).toMatchObject({ state: "READY", revision: 0 });
@@ -344,7 +377,21 @@ describe("Records API", () => {
   }
 
   async function setTask(id: number, completed: boolean, expectedRevision: number, occurredAt: number) {
-    return app.inject({ method: "PUT", url: `/api/today-tasks/${id}/completion`, payload: { completed, expectedRevision, occurredAt } });
+    const task = (await getToday()).todayTasks.find((candidate: { id: number }) => candidate.id === id);
+    if (!task) throw new Error(`Task ${id} not found.`);
+    const steps = completed
+      ? task.steps.filter((step: { completedAt: number | null }) => step.completedAt === null)
+      : task.steps.filter((step: { completedAt: number | null }) => step.completedAt !== null).reverse();
+    let response = await app.inject({ method: "GET", url: `/api/today/${TestDate}` });
+    for (const [index, step] of steps.entries()) {
+      response = await app.inject({
+        method: "PUT",
+        url: `/api/today-task-steps/${step.id}/completion`,
+        payload: { completed, expectedRevision: expectedRevision + index, occurredAt: occurredAt + index },
+      });
+      if (response.statusCode >= 400) return response;
+    }
+    return response;
   }
 
   async function setTaskStep(id: number, completed: boolean, expectedRevision: number, occurredAt: number) {
@@ -367,12 +414,12 @@ describe("Records API", () => {
 });
 
 function templateInput(patch: Record<string, unknown> = {}) {
-  const input = { title: "Template", cadence: "MANUAL", steps: [] as unknown[], ...patch };
+  const input = { title: "Template", cadence: "MANUAL", steps: ["Step"] as unknown[], ...patch };
   return { ...input, steps: Array.isArray(input.steps) ? input.steps.map((step) => typeof step === "string" ? { title: step } : step) : input.steps };
 }
 
 function taskInput(patch: Record<string, unknown> = {}) {
-  const input = { localDate: TestDate, title: "Task", steps: [] as unknown[], ...patch };
+  const input = { localDate: TestDate, title: "Task", steps: ["Step"] as unknown[], ...patch };
   return { ...input, steps: Array.isArray(input.steps) ? input.steps.map((step) => typeof step === "string" ? { title: step } : step) : input.steps };
 }
 

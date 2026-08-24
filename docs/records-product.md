@@ -4,14 +4,22 @@
 
 Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。首次使用在 Setting 的 `Records connection` 配置 Basic Auth 凭据；Android 使用 Keystore 加密保存。
 
-根列表固定为 **Today → Templates → Goals → Accumulate → Measurement**。Today 内固定为 Focus 和 Tasks；Goals、Accumulate 与 Measurement 不参与任务或 Focus 判断。PC 管理页固定为 `Overview`、`Today`、`Templates`、`Goals`、`Accumulate`、`Measurement`、`Entries`、`Activity`。
+根列表固定为 **Today → Templates → Goals → Accumulate → Measurement**。Today 内固定为 Hourly check-in、Focus 和 Tasks；Goals、Accumulate 与 Measurement 不参与任务、打卡或 Focus 判断。PC 管理页固定为 `Overview`、`Today`、`Templates`、`Goals`、`Accumulate`、`Measurement`、`Entries`、`Activity`。
 
-当前不提供离线队列、日历视图、每日以外的模板周期、任务统计、连续天数、标签、协作、多级步骤、精确闹钟或可配置图表。
+当前不提供离线队列、日历视图、每日以外的模板周期、任务统计、连续天数、标签、协作、多级步骤、精确闹钟或可配置图表。整点提醒使用 WorkManager，系统可延后投递。
+
+## Hourly check-in
+
+- 每个 ISO 本地日期至多一次起床标记。标记后从下一个本地整点开始进入每小时打卡；不补记已错过的小时。
+- 一个小时最多打卡一次。打卡记录实际操作时间和所属本地小时；当天结束后不再提醒或接受打卡。
+- 打卡没有文字总结或任务归属。其目的是在确认前查看 Today 中各任务的下一个未完成子任务，并由用户逐项勾选确认进展。
+- 起床后 Android 使用通知权限和 WorkManager 尽量在每个整点提醒；通知点击直接打开当前小时的打卡 Sheet。通知不保证严格准点。
+- 未标记起床前不安排提醒。当天起床和打卡记录只读展示，不提供撤销、补记或跨日操作。
 
 ## Today task
 
-- Today task 有日期、标题、可空模板来源、可空昨日任务来源、完成时间、revision 和零个或多个有序步骤。
-- 无步骤任务的主 checkbox 直接完成或重开任务。有步骤任务可逐项操作；全部步骤完成时任务完成；主 checkbox 一次完成或重开全部步骤。
+- Today task 有日期、标题、可空模板来源、可空昨日任务来源、完成时间、revision 和一个或多个有序步骤。
+- 任务父级没有 checkbox；只能逐项完成或重开子任务。全部子任务完成时任务自动完成，重开任一子任务时任务自动重开。
 - 任务不依赖 Focus。无 Focus、Focus 暂停或 Focus 结束后，任务仍可新增、完成和重开。
 - Daily 模板只作为当日建议；用户确认后才创建 Today task，不自动加入或午夜重置。
 - 昨日未完成任务只作为次日候选，不自动顺延。续做时只复制尚未完成的步骤；同一天同一昨日来源只能生成一次，原日期进度不变。
@@ -32,7 +40,7 @@ Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依
 
 ## 模板
 
-- 模板保存标题、`MANUAL/DAILY` 周期、归档状态和零个或多个有固定位序的一级步骤。
+- 模板保存标题、`MANUAL/DAILY` 周期、归档状态和一个或多个有固定位序的一级步骤。
 - 标题和已有步骤保存前去除首尾空白且不能为空；步骤随表单整体替换。
 - 模板不保存完成状态、日期、优先级或标签。编辑、归档或删除模板不改变既有 Today task 快照。
 - 归档模板不进入 Today 候选；永久删除只接受已归档模板，既有任务的 `templateId` 可变为空。
@@ -59,11 +67,12 @@ Records 是单人在线能力，通过 HTTPS API 访问服务端 SQLite，不依
 
 ## 验收
 
-- 无 Focus 时可以新增、完成和重开标题任务与清单任务；部分清单进度、整体完成和整体重开正确。
+- 无 Focus 时可以新增、完成和重开子任务；部分清单进度、整体自动完成和自动重开正确。
 - Daily 模板和昨日未完成项只作为候选；昨日续做只复制未完成步骤且不能重复加入。
 - Focus 开始前验证 1+1 任务仍未完成；所选任务完成后正确自动切换或进入 `FOCUS_CLEARED`。
 - 第四次回顾稳定进入 `TARGET_REACHED`，即使仍有普通任务；首次回顾前完成不显示“已完成 0 轮”。
-- 暂停或结束 Focus 后，任务 checkbox 与添加入口仍可用；重开任务不自动恢复 Focus。
-- 模板允许零步骤且没有完成入口；模板修改不改变既有任务快照。
+- 暂停或结束 Focus 后，子任务 checkbox 与添加入口仍可用；重开子任务不自动恢复 Focus。
+- 模板和临时 Today task 都拒绝空步骤；模板修改不改变既有任务快照。
+- 起床后下一个整点出现打卡入口；完成任意子任务后，任务行和打卡 Sheet 都显示下一个未完成子任务；打卡成功后同一小时不能再次打卡。
 - Android 与 PC 刷新后读取相同状态；PC 可按任意日期管理任务和 Focus。
 - Android 与 PC 可创建 Goal、录入共享进度，并且只有达到目标值的子目标可手动完成；完成不扣减共享进度，全部完成或到期后不可再写入。

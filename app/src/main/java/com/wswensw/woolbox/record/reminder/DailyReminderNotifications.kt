@@ -20,6 +20,7 @@ import java.time.ZonedDateTime
 
 object DailyReminderNotifications {
     const val EXTRA_OPEN_DAILY_REVIEW = "open_daily_review"
+    const val EXTRA_OPEN_HOURLY_CHECKIN = "open_hourly_checkin"
 
     fun areEnabled(context: Context): Boolean {
         val permissionGranted = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
@@ -39,6 +40,10 @@ object DailyReminderNotifications {
 
     fun cancelReview(context: Context) {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+    }
+
+    fun cancelHourlyCheckin(context: Context) {
+        NotificationManagerCompat.from(context).cancel(HOURLY_CHECKIN_NOTIFICATION_ID)
     }
 
     @SuppressLint("MissingPermission")
@@ -81,7 +86,44 @@ object DailyReminderNotifications {
         return true
     }
 
+    @SuppressLint("MissingPermission")
+    fun showHourlyCheckin(context: Context): Boolean {
+        if (!areEnabled(context)) return false
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                HOURLY_CHECKIN_CHANNEL_ID,
+                context.getString(R.string.hourly_checkin_channel),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ),
+        )
+        val intent = Intent(context, MainActivity::class.java)
+            .putExtra(EXTRA_OPEN_HOURLY_CHECKIN, true)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            HOURLY_CHECKIN_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        NotificationManagerCompat.from(context).notify(
+            HOURLY_CHECKIN_NOTIFICATION_ID,
+            NotificationCompat.Builder(context, HOURLY_CHECKIN_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_records_24)
+                .setContentTitle(context.getString(R.string.hourly_checkin))
+                .setContentText(context.getString(R.string.hourly_checkin_notification))
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .build(),
+        )
+        return true
+    }
+
     private const val CHANNEL_ID = "records_daily_review"
     private const val NOTIFICATION_ID = 29_001
     private const val REQUEST_CODE = 29_001
+    private const val HOURLY_CHECKIN_CHANNEL_ID = "records_hourly_checkin"
+    private const val HOURLY_CHECKIN_NOTIFICATION_ID = 29_002
+    private const val HOURLY_CHECKIN_REQUEST_CODE = 29_002
 }

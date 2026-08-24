@@ -17,6 +17,7 @@ import com.wswensw.woolbox.record.model.GoalPoolDraft
 import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordItemDraft
 import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyCheckin
 import com.wswensw.woolbox.record.model.DailyFocusPauseReason
 import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.RecordsClock
@@ -24,6 +25,7 @@ import com.wswensw.woolbox.record.model.TaskTemplate
 import com.wswensw.woolbox.record.model.TemplateCadence
 import com.wswensw.woolbox.record.model.TodayTask
 import com.wswensw.woolbox.record.reminder.DailyReminderScheduler
+import com.wswensw.woolbox.record.reminder.HourlyCheckinReminderScheduler
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
@@ -47,6 +49,7 @@ data class RecordsUiState(
     val unfinishedTasks: List<TodayTask> = emptyList(),
     val todayTasks: List<TodayTask> = emptyList(),
     val dailyFocus: DailyFocus? = null,
+    val dailyCheckin: DailyCheckin? = null,
     val goalValues: Map<Long, Double> = emptyMap(),
     val recentDayValues: Map<Long, List<Double>> = emptyMap(),
     val error: String? = null,
@@ -69,6 +72,7 @@ data class MeasurementPreviewUiState(
 class RecordsViewModel(
     private val repository: RecordRepository,
     private val reminderScheduler: DailyReminderScheduler,
+    private val hourlyCheckinReminderScheduler: HourlyCheckinReminderScheduler,
     private val resources: Resources,
 ) : ViewModel() {
     private val error = MutableStateFlow<String?>(null)
@@ -132,6 +136,7 @@ class RecordsViewModel(
             .onSuccess {
                 error.value = null
                 reminderScheduler.reconcile(repository.snapshot.value?.dailyFocus)
+                hourlyCheckinReminderScheduler.reconcile(repository.snapshot.value?.dailyCheckin)
             }
     }
 
@@ -147,6 +152,7 @@ class RecordsViewModel(
             unfinishedTasks = unfinishedTasks,
             todayTasks = todayTasks,
             dailyFocus = dailyFocus,
+            dailyCheckin = dailyCheckin,
             goalValues = goalValues,
             recentDayValues = recentDayValues,
         )
@@ -294,6 +300,15 @@ class RecordsViewModel(
             repository.createTodayTaskFromTask(LocalDate.now(), sourceTaskId)
         }
 
+    fun markAwake(onResult: (String?) -> Unit) = runRecordsAction(onResult, R.string.hourly_checkin_save_failed) {
+        repository.markAwake(LocalDate.now(), System.currentTimeMillis())
+    }
+
+    fun markHourlyCheckin(hour: Int, onResult: (String?) -> Unit) =
+        runRecordsAction(onResult, R.string.hourly_checkin_save_failed) {
+            repository.markHourlyCheckin(LocalDate.now(), hour, System.currentTimeMillis())
+        }
+
     fun saveDailyFocus(
         existing: DailyFocus?,
         firstMove: String,
@@ -343,14 +358,6 @@ class RecordsViewModel(
         runRecordsAction(onResult, R.string.daily_focus_end_failed) {
             repository.endDailyFocus(focus, System.currentTimeMillis())
         }
-
-    fun setTodayTaskCompleted(
-        task: TodayTask,
-        completed: Boolean,
-        onResult: (String?) -> Unit,
-    ) = runRecordsAction(onResult, R.string.today_task_update_failed) {
-        repository.setTodayTaskCompleted(task, completed, System.currentTimeMillis())
-    }
 
     fun setTodayTaskStepCompleted(
         task: TodayTask,
@@ -440,6 +447,7 @@ class RecordsViewModel(
             return RecordsViewModel(
                 repository = RecordRepository(applicationContext),
                 reminderScheduler = DailyReminderScheduler(applicationContext),
+                hourlyCheckinReminderScheduler = HourlyCheckinReminderScheduler(applicationContext),
                 resources = applicationContext.resources,
             ) as T
         }

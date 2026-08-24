@@ -193,6 +193,13 @@
     <string name="primary_task_required">A primary task is required.</string>
     <string name="focus_tasks_must_differ">Primary and secondary Focus tasks must be different.</string>
     <string name="hourly_review">Hourly review</string>
+    <string name="hourly_checkin">Hourly check-in</string>
+    <string name="mark_awake">Mark awake</string>
+    <string name="next_checkin">Next check-in %1$s</string>
+    <string name="check_in_now">Check in</string>
+    <string name="hourly_checkin_channel">Hourly check-ins</string>
+    <string name="hourly_checkin_notification">Review your next subtasks and check in for this hour.</string>
+    <string name="hourly_checkin_save_failed">Unable to save hourly check-in.</string>
     <string name="still_on_focus">Still moving the Focus forward?</string>
     <string name="continue_current_focus">Continue current Focus</string>
     <string name="switch_focus">Switch Focus</string>
@@ -223,6 +230,8 @@
         <item quantity="other">%d rounds completed</item>
     </plurals>
     <string name="task_steps_progress">%1$d / %2$d steps</string>
+    <string name="next_subtask">Next: %1$s</string>
+    <string name="all_subtasks_done">All subtasks complete</string>
     <string name="template_not_found">Template not found.</string>
     <string name="template_title">Template</string>
     <string name="template_cadence">Cadence</string>

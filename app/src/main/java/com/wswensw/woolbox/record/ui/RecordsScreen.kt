@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyCheckin
 import com.wswensw.woolbox.record.model.DailyFocusPauseReason
 import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.GoalPeriod
@@ -61,7 +61,12 @@ import com.wswensw.woolbox.record.model.RecordItem
 import com.wswensw.woolbox.record.model.RecordMode
 import com.wswensw.woolbox.record.model.RecordsClock
 import com.wswensw.woolbox.record.model.TodayTask
+import com.wswensw.woolbox.record.model.currentCheckinHour
+import com.wswensw.woolbox.record.model.nextReminderAt
 import com.wswensw.woolbox.ui.AppStyle
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
@@ -78,8 +83,8 @@ fun RecordsScreen(
     onRetry: () -> Unit,
     onRecordItem: (RecordItem) -> Unit,
     onOpenGoal: (GoalPool) -> Unit,
-    onToggleTask: (TodayTask, Boolean, (String?) -> Unit) -> Unit,
-    onOpenTask: (TodayTask) -> Unit,
+    onMarkAwake: ((String?) -> Unit) -> Unit,
+    onOpenHourlyCheckin: () -> Unit,
     onOpenMeasurement: (RecordItem) -> Unit,
     notificationsEnabled: Boolean,
     onEnableNotifications: () -> Unit,
@@ -96,6 +101,7 @@ fun RecordsScreen(
         .filter { it.mode == RecordMode.MEASUREMENT }
         .sortedBy { it.name.lowercase(Locale.ROOT) }
     val todayValues = todayRecordValues(state.entries)
+    val now = System.currentTimeMillis()
     clock.value
 
     LazyColumn(
@@ -135,10 +141,17 @@ fun RecordsScreen(
                 }
                 item {
                     SectionTitle(stringResource(R.string.today))
+                    HourlyCheckinCard(
+                        checkin = state.dailyCheckin,
+                        now = now,
+                        onMarkAwake = onMarkAwake,
+                        onOpenCheckin = onOpenHourlyCheckin,
+                    )
+                    Spacer(Modifier.height(8.dp))
                     FocusCard(
                         focus = state.dailyFocus,
                         tasks = state.todayTasks,
-                        now = System.currentTimeMillis(),
+                        now = now,
                         onPlan = onPlanFocus,
                         notificationsEnabled = notificationsEnabled,
                         onEnableNotifications = onEnableNotifications,
@@ -179,8 +192,6 @@ fun RecordsScreen(
                             task = task,
                             current = state.dailyFocus?.currentTaskId == task.id &&
                                 state.dailyFocus.state == DailyFocusState.ACTIVE,
-                            onToggle = { completed, onResult -> onToggleTask(task, completed, onResult) },
-                            onClick = { onOpenTask(task) },
                         )
                     }
                 }
@@ -429,28 +440,16 @@ private fun EndFocusButton(
 private fun TodayTaskRow(
     task: TodayTask,
     current: Boolean,
-    onToggle: (Boolean, (String?) -> Unit) -> Unit,
-    onClick: () -> Unit,
 ) {
-    var busy by remember(task.revision) { mutableStateOf(false) }
     Surface(
-        onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         shape = RecordsCardShape,
         color = if (current) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(end = 12.dp, top = 4.dp, bottom = 4.dp),
+        ) {
+            Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Checkbox(
-                checked = task.isCompleted,
-                onCheckedChange = { completed ->
-                    busy = true
-                    onToggle(completed) { busy = false }
-                },
-                enabled = !busy,
-            )
             Column(Modifier.weight(1f)) {
                 Text(
                     task.title,
@@ -476,11 +475,71 @@ private fun TodayTaskRow(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                Text(
+                    text = task.nextStep?.let { stringResource(R.string.next_subtask, it.title) }
+                        ?: stringResource(R.string.all_subtasks_done),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null)
         }
     }
 }
+
+@Composable
+private fun HourlyCheckinCard(
+    checkin: DailyCheckin?,
+    now: Long,
+    onMarkAwake: ((String?) -> Unit) -> Unit,
+    onOpenCheckin: () -> Unit,
+) {
+    var busy by remember(checkin?.wokeAt) { mutableStateOf(false) }
+    var error by remember(checkin?.wokeAt) { mutableStateOf<String?>(null) }
+    val dueHour = checkin?.currentCheckinHour(now)
+    val nextReminder = checkin?.nextReminderAt(now)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RecordsCardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(R.string.hourly_checkin),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            when {
+                checkin == null -> Button(
+                    onClick = {
+                        busy = true
+                        error = null
+                        onMarkAwake { result -> busy = false; error = result }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.mark_awake)) }
+                dueHour != null -> Button(
+                    onClick = onOpenCheckin,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.check_in_now)) }
+                nextReminder != null -> Text(
+                    stringResource(R.string.next_checkin, hourlyCheckinTime(nextReminder)),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+private fun hourlyCheckinTime(epochMillis: Long): String = DateTimeFormatter.ofPattern("HH:mm")
+    .format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
 
 @Composable
 private fun FocusHeader(title: String, onEdit: (() -> Unit)?) {

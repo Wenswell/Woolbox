@@ -5,7 +5,7 @@ import { Badge } from "../components/Badge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Modal } from "../components/Modal";
 import { localToday, message, shiftLocalDate } from "../lib/format";
-import type { DailyFocus, TaskTemplate, TodayState, TodayTask } from "../types";
+import type { DailyCheckin, DailyFocus, TaskTemplate, TodayState, TodayTask } from "../types";
 
 export function TodayView({
   localDate,
@@ -33,10 +33,9 @@ export function TodayView({
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    if (today?.dailyFocus?.state !== "ACTIVE") return;
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
-  }, [today?.dailyFocus?.state]);
+  }, []);
 
   useEffect(() => {
     setAddingTask(false);
@@ -64,7 +63,7 @@ export function TodayView({
     return <section className="view-stack"><DateNavigator localDate={localDate} onChange={onDateChange} /><p className="empty-state">Loading selected date...</p></section>;
   }
 
-  const state = today ?? { todayTasks: [], dailySuggestions: [], unfinishedTasks: [], dailyFocus: null };
+  const state = today ?? { todayTasks: [], dailySuggestions: [], unfinishedTasks: [], dailyFocus: null, dailyCheckin: null };
   const focus = state.dailyFocus;
   const openTasks = state.todayTasks.filter((task) => task.completedAt === null);
 
@@ -75,6 +74,17 @@ export function TodayView({
         <div><p className="eyebrow">{formatLocalDate(localDate)}</p><div className="today-title"><h2>Today</h2><Badge tone="neutral">{state.todayTasks.length} tasks</Badge></div></div>
         <button type="button" onClick={() => setAddingTask(true)} disabled={busy !== null}><CirclePlus size={17} />Add task</button>
       </div>
+
+      <HourlyCheckinSection
+        checkin={state.dailyCheckin}
+        tasks={state.todayTasks}
+        localDate={localDate}
+        now={now}
+        busy={busy !== null}
+        onMarkAwake={() => run("mark-awake", () => api.markAwake(localDate), "Wake-up marked")}
+        onToggleStep={(task, stepId, completed) => run(`task-step-${stepId}`, () => api.setTodayTaskStepCompleted(stepId, task.revision, completed), completed ? "Subtask completed" : "Subtask reopened")}
+        onCheckIn={(hour) => run(`hourly-checkin-${hour}`, () => api.markHourlyCheckin(localDate, hour), "Hourly check-in saved")}
+      />
 
       <FocusSection
         focus={focus}
@@ -96,8 +106,6 @@ export function TodayView({
         tasks={state.todayTasks}
         focus={focus}
         busy={busy !== null}
-        onToggleTask={(task, completed) => run(`task-${task.id}`, () => api.setTodayTaskCompleted(task.id, task.revision, completed), completed ? "Task completed" : "Task reopened")}
-        onToggleStep={(task, stepId, completed) => run(`task-step-${stepId}`, () => api.setTodayTaskStepCompleted(stepId, task.revision, completed), completed ? "Step completed" : "Step reopened")}
       />
 
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -204,12 +212,35 @@ function FocusSection({ focus, tasks, now, busy, onPlan, onEdit, onRefocus, onCo
   );
 }
 
-function TasksSection({ tasks, focus, busy, onToggleTask, onToggleStep }: {
+function HourlyCheckinSection({ checkin, tasks, localDate, now, busy, onMarkAwake, onToggleStep, onCheckIn }: {
+  checkin: DailyCheckin | null;
+  tasks: TodayTask[];
+  localDate: string;
+  now: number;
+  busy: boolean;
+  onMarkAwake: () => Promise<unknown>;
+  onToggleStep: (task: TodayTask, stepId: number, completed: boolean) => Promise<unknown>;
+  onCheckIn: (hour: number) => Promise<unknown>;
+}) {
+  const isToday = localDate === localToday();
+  if (!checkin) return <section className="today-focus"><p className="eyebrow">Hourly check-in</p><h3>Not awake yet</h3><button type="button" disabled={!isToday || busy} onClick={() => void onMarkAwake()}><Check size={16} />Mark awake</button></section>;
+  const current = new Date(now);
+  const firstCheckin = new Date(checkin.wokeAt);
+  firstCheckin.setMinutes(0, 0, 0);
+  firstCheckin.setHours(firstCheckin.getHours() + 1);
+  const hour = current.getHours();
+  const due = isToday && now >= firstCheckin.getTime() && !checkin.hourlyCheckins.some((entry) => entry.hour === hour);
+  const next = new Date(now);
+  next.setMinutes(0, 0, 0);
+  next.setHours(next.getHours() + 1);
+  return <section className="today-focus"><div className="today-focus-heading"><div><p className="eyebrow">Hourly check-in</p><h3>{due ? "Check in now" : `Next check-in ${next.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</h3></div><Badge tone="neutral">{checkin.hourlyCheckins.length} hours</Badge></div>
+    {due && <><div className="today-step-list">{tasks.flatMap((task) => task.steps.map((step) => ({ task, step }))).map(({ task, step }) => <label key={step.id} className={step.completedAt === null ? "today-step" : "today-step completed"}><input type="checkbox" checked={step.completedAt !== null} disabled={busy} onChange={(event) => void onToggleStep(task, step.id, event.target.checked)} /><span><strong>{task.title}</strong> · {step.title}</span></label>)}</div><button type="button" disabled={busy} onClick={() => void onCheckIn(hour)}><Check size={16} />Check in</button></>}
+  </section>;
+}
+
+function TasksSection({ tasks, focus }: {
   tasks: TodayTask[];
   focus: DailyFocus | null;
-  busy: boolean;
-  onToggleTask: (task: TodayTask, completed: boolean) => Promise<unknown>;
-  onToggleStep: (task: TodayTask, stepId: number, completed: boolean) => Promise<unknown>;
 }) {
   return (
     <section className="today-tasks">
@@ -218,14 +249,13 @@ function TasksSection({ tasks, focus, busy, onToggleTask, onToggleStep }: {
         const current = task.id === focus?.currentTaskId;
         const focusRole = task.id === focus?.primaryTaskId ? "Primary Focus" : task.id === focus?.secondaryTaskId ? "Secondary Focus" : null;
         const completedSteps = task.steps.filter((step) => step.completedAt !== null).length;
+        const nextStep = task.steps.find((step) => step.completedAt === null);
         return <div className={current ? "task-row current" : "task-row"} key={task.id}>
           <div className="task-heading">
-            <input type="checkbox" aria-label={`${task.completedAt === null ? "Complete" : "Reopen"} ${task.title}`} checked={task.completedAt !== null} disabled={busy} onChange={(event) => void onToggleTask(task, event.target.checked)} />
             <span className="step-index">{index + 1}</span>
-            <div><strong className={task.completedAt === null ? undefined : "completed-text"}>{task.title}</strong><span>{task.steps.length === 0 ? "Direct task" : `${completedSteps} / ${task.steps.length} steps`}{focusRole ? ` · ${focusRole}` : ""}</span></div>
+            <div><strong className={task.completedAt === null ? undefined : "completed-text"}>{task.title}</strong><span>{`${completedSteps} / ${task.steps.length} steps`}{focusRole ? ` · ${focusRole}` : ""}{nextStep ? ` · Next: ${nextStep.title}` : " · All subtasks complete"}</span></div>
             {task.completedAt !== null ? <Badge tone="muted">Completed {formatTime(task.completedAt)}</Badge> : current ? <Badge tone="accent">Current</Badge> : focusRole ? <Badge tone="neutral">Focus</Badge> : <Badge tone="neutral">Open</Badge>}
           </div>
-          {task.steps.length > 0 && <div className="today-step-list">{task.steps.map((step) => <label key={step.id} className={step.completedAt === null ? "today-step" : "today-step completed"}><input type="checkbox" checked={step.completedAt !== null} disabled={busy} onChange={(event) => void onToggleStep(task, step.id, event.target.checked)} /><span>{step.title}</span>{step.completedAt !== null && <time>{formatTime(step.completedAt)}</time>}</label>)}</div>}
         </div>;
       })}</div>}
     </section>
@@ -244,7 +274,7 @@ function AddTaskDialog({ localDate, today, templates, busy, onClose, onAdd }: {
 }) {
   const [mode, setMode] = useState<AddMode>(today.dailySuggestions.length > 0 || today.unfinishedTasks.length > 0 ? "RECOMMENDED" : "NEW");
   const [title, setTitle] = useState("");
-  const [steps, setSteps] = useState<string[]>([]);
+  const [steps, setSteps] = useState<string[]>([""]);
   const recommended = [...today.dailySuggestions.map((template) => ({ key: `template-${template.id}`, title: template.title, detail: "Daily template", action: () => api.createTodayTaskFromTemplate(localDate, template.id) })), ...today.unfinishedTasks.map((task) => ({ key: `task-${task.id}`, title: task.title, detail: "Unfinished yesterday", action: () => api.createTodayTaskFromTask(localDate, task.id) }))];
 
   return (
@@ -252,7 +282,7 @@ function AddTaskDialog({ localDate, today, templates, busy, onClose, onAdd }: {
       <div className="segmented" role="group" aria-label="Task source"><button type="button" className={mode === "RECOMMENDED" ? "active" : undefined} onClick={() => setMode("RECOMMENDED")}>Recommended</button><button type="button" className={mode === "TEMPLATES" ? "active" : undefined} onClick={() => setMode("TEMPLATES")}>Templates</button><button type="button" className={mode === "NEW" ? "active" : undefined} onClick={() => setMode("NEW")}>New task</button></div>
       {mode === "RECOMMENDED" && <div className="task-source-list">{recommended.length === 0 ? <p className="empty-state">No recommendations for this date.</p> : recommended.map((item) => <button type="button" className="task-source-row" key={item.key} disabled={busy} onClick={() => void onAdd(`add-${item.key}`, item.action)}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ListPlus size={17} /></button>)}</div>}
       {mode === "TEMPLATES" && <div className="task-source-list">{templates.length === 0 ? <p className="empty-state">No active templates.</p> : templates.map((template) => <button type="button" className="task-source-row" key={template.id} disabled={busy} onClick={() => void onAdd(`add-template-${template.id}`, () => api.createTodayTaskFromTemplate(localDate, template.id))}><span><strong>{template.title}</strong><small>{template.cadence === "DAILY" ? "Daily recommendation" : "Manual"} · {template.steps.length} steps</small></span><ListPlus size={17} /></button>)}</div>}
-      {mode === "NEW" && <form className="item-form" onSubmit={(event) => { event.preventDefault(); if (title.trim() && steps.every((step) => step.trim())) void onAdd("add-new", () => api.createTodayTask({ localDate, title, steps: steps.map((step) => ({ title: step })) })); }}><label>Title<input autoFocus required value={title} disabled={busy} onChange={(event) => setTitle(event.target.value)} /></label><section className="form-section"><div className="section-heading"><div><p className="eyebrow">Optional</p><h3>Checklist</h3></div><button type="button" className="secondary compact" disabled={busy} onClick={() => setSteps((current) => [...current, ""])}><CirclePlus size={15} />Add step</button></div><div className="step-editor-list">{steps.map((step, index) => <div className="template-step-row" key={index}><span className="step-index">{index + 1}</span><input aria-label={`Task step ${index + 1}`} required value={step} onChange={(event) => setSteps((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} /><button type="button" className="icon-button danger-icon" aria-label={`Remove task step ${index + 1}`} onClick={() => setSteps((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></div>)}</div></section><div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button><button disabled={busy || !title.trim() || steps.some((step) => !step.trim())}><Save size={16} />Add task</button></div></form>}
+      {mode === "NEW" && <form className="item-form" onSubmit={(event) => { event.preventDefault(); if (title.trim() && steps.length > 0 && steps.every((step) => step.trim())) void onAdd("add-new", () => api.createTodayTask({ localDate, title, steps: steps.map((step) => ({ title: step })) })); }}><label>Title<input autoFocus required value={title} disabled={busy} onChange={(event) => setTitle(event.target.value)} /></label><section className="form-section"><div className="section-heading"><div><p className="eyebrow">Subtasks</p><h3>Checklist</h3></div><button type="button" className="secondary compact" disabled={busy} onClick={() => setSteps((current) => [...current, ""])}><CirclePlus size={15} />Add step</button></div><div className="step-editor-list">{steps.map((step, index) => <div className="template-step-row" key={index}><span className="step-index">{index + 1}</span><input aria-label={`Task step ${index + 1}`} required value={step} onChange={(event) => setSteps((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} /><button type="button" className="icon-button danger-icon" disabled={steps.length === 1} aria-label={`Remove task step ${index + 1}`} onClick={() => setSteps((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></div>)}</div></section><div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>Cancel</button><button disabled={busy || !title.trim() || steps.length === 0 || steps.some((step) => !step.trim())}><Save size={16} />Add task</button></div></form>}
     </Modal>
   );
 }

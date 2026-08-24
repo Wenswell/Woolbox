@@ -20,11 +20,12 @@ import com.wswensw.woolbox.update.AppUpdateManager
 class MainActivity : AppCompatActivity() {
     private var pendingToolCommand: ExternalToolCommand? = null
     private var dailyReviewRequest by mutableIntStateOf(0)
+    private var hourlyCheckinRequest by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppUpdateManager.initialize(applicationContext)
-        consumeDailyReviewIntent(intent)
+        consumeReminderIntents(intent)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 lightScrim = android.graphics.Color.TRANSPARENT,
@@ -38,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         setContent {
             WoolboxApp(
                 dailyReviewRequest = dailyReviewRequest,
+                hourlyCheckinRequest = hourlyCheckinRequest,
                 onLaunchTool = ::launchTool,
             )
         }
@@ -46,7 +48,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        consumeDailyReviewIntent(intent)
+        consumeReminderIntents(intent)
     }
 
     override fun onStop() {
@@ -67,10 +69,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun consumeDailyReviewIntent(intent: Intent?) {
+    private fun consumeReminderIntents(intent: Intent?) {
         if (intent?.getBooleanExtra(DailyReminderNotifications.EXTRA_OPEN_DAILY_REVIEW, false) == true) {
             dailyReviewRequest += 1
             intent.removeExtra(DailyReminderNotifications.EXTRA_OPEN_DAILY_REVIEW)
+        }
+        if (intent?.getBooleanExtra(DailyReminderNotifications.EXTRA_OPEN_HOURLY_CHECKIN, false) == true) {
+            hourlyCheckinRequest += 1
+            intent.removeExtra(DailyReminderNotifications.EXTRA_OPEN_HOURLY_CHECKIN)
         }
     }
 

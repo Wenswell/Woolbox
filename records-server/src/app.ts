@@ -10,6 +10,7 @@ import {
   parseDailyFocusSelectionInput,
   parseDailyFocusTransitionInput,
   parseDailyFocusUpdateInput,
+  parseDailyCheckinWakeInput,
   parseEntryInput,
   parseGoalEntryInput,
   parseGoalInput,
@@ -25,6 +26,7 @@ import {
   parseTodayTaskCreateInput,
   parseTodayTaskFromTaskInput,
   parseTodayTaskFromTemplateInput,
+  parseHourlyCheckinInput,
 } from "./domain.js";
 import { RecordsService } from "./records-service.js";
 
@@ -177,19 +179,22 @@ export function buildApp(options: BuildAppOptions) {
     return reply.status(201).send({ today });
   });
 
-  app.put("/api/today-tasks/:id/completion", (request) => ({
-    today: records.setTodayTaskCompleted(
-      parseId((request.params as { id?: unknown }).id, "Today task ID"),
-      parseTodayTaskCompletionInput(request.body),
-    ),
-  }));
-
   app.put("/api/today-task-steps/:id/completion", (request) => ({
     today: records.setTodayTaskStepCompleted(
       parseId((request.params as { id?: unknown }).id, "Today task step ID"),
       parseTodayTaskCompletionInput(request.body),
     ),
   }));
+
+  app.post("/api/daily-checkins/wake", (request, reply) => {
+    const today = records.markAwake(parseDailyCheckinWakeInput(request.body));
+    return reply.status(201).send({ today });
+  });
+
+  app.post("/api/daily-checkins/hourly", (request, reply) => {
+    const today = records.markHourlyCheckin(parseHourlyCheckinInput(request.body));
+    return reply.status(201).send({ today });
+  });
 
   app.post("/api/daily-focus", (request, reply) => {
     const focus = records.createDailyFocus(parseDailyFocusCreateInput(request.body));

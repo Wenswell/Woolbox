@@ -6,6 +6,7 @@ import type {
   DailyFocusSelectionInput,
   DailyFocusTransitionInput,
   DailyFocusUpdateInput,
+  DailyCheckinWakeInput,
   GoalEntryInput,
   GoalInput,
   GoalSubgoalCompletionInput,
@@ -17,14 +18,17 @@ import type {
   TodayTaskCreateInput,
   TodayTaskFromTaskInput,
   TodayTaskFromTemplateInput,
+  HourlyCheckinInput,
 } from "./domain.js";
 import { ApiError, isMeasurementValueOnGrid } from "./domain.js";
 import type { RecordsDatabase } from "./database.js";
 import {
   dailyFocus,
+  dailyCheckins,
   goalEntries,
   goals,
   goalSubgoals,
+  hourlyCheckins,
   recordAuditLogs,
   recordEntries,
   recordItems,
@@ -47,6 +51,8 @@ type TemplateRow = typeof taskTemplates.$inferSelect;
 type TodayTaskRow = typeof todayTasks.$inferSelect;
 type TodayTaskStepRow = typeof todayTaskSteps.$inferSelect;
 type DailyFocusRow = typeof dailyFocus.$inferSelect;
+type DailyCheckinRow = typeof dailyCheckins.$inferSelect;
+type HourlyCheckinRow = typeof hourlyCheckins.$inferSelect;
 type RecordsTransaction = Parameters<Parameters<RecordsDatabase["transaction"]>[0]>[0];
 type RecordsReader = Pick<RecordsTransaction, "select">;
 
@@ -64,6 +70,10 @@ interface GoalResponse extends GoalRow {
 }
 
 type DailyFocusResponse = DailyFocusRow;
+
+interface DailyCheckinResponse extends DailyCheckinRow {
+  hourlyCheckins: HourlyCheckinRow[];
+}
 
 type AuditAction =
   | "ITEM_CREATED"
@@ -91,13 +101,15 @@ type AuditAction =
   | "TODAY_TASK_REOPENED"
   | "TODAY_TASK_STEP_COMPLETED"
   | "TODAY_TASK_STEP_REOPENED"
+  | "DAILY_CHECKIN_WOKE"
+  | "HOURLY_CHECKIN_CREATED"
   | "FOCUS_CREATED"
   | "FOCUS_UPDATED"
   | "FOCUS_ENDED";
 
 interface AuditWrite {
   action: AuditAction;
-  entityType: "ITEM" | "ENTRY" | "GOAL" | "GOAL_ENTRY" | "GOAL_SUBGOAL" | "TEMPLATE" | "TODAY_TASK" | "TODAY_TASK_STEP" | "FOCUS";
+  entityType: "ITEM" | "ENTRY" | "GOAL" | "GOAL_ENTRY" | "GOAL_SUBGOAL" | "TEMPLATE" | "TODAY_TASK" | "TODAY_TASK_STEP" | "DAILY_CHECKIN" | "HOURLY_CHECKIN" | "FOCUS";
   entityId: number;
   before?: unknown;
   after?: unknown;
@@ -650,6 +662,7 @@ export class RecordsService {
         .filter((template) => template.cadence === "DAILY" && !usedTemplateIds.has(template.id)),
       unfinishedTasks: this.listTodayTasks(previousLocalDate(localDate))
         .filter((task) => task.completedAt === null && !copiedSourceIds.has(task.id)),
+      dailyCheckin: this.getDailyCheckin(localDate),
       dailyFocus: this.getDailyFocus(localDate),
     };
   }
@@ -665,6 +678,62 @@ export class RecordsService {
     return this.db.select().from(dailyFocus).where(eq(dailyFocus.localDate, localDate)).get() ?? null;
   }
 
+  getDailyCheckin(localDate: string): DailyCheckinResponse | null {
+    const checkin = this.db.select().from(dailyCheckins)
+      .where(eq(dailyCheckins.localDate, localDate)).get();
+    return checkin === undefined ? null : this.attachHourlyCheckins(this.db, [checkin])[0]!;
+  }
+
+  markAwake(input: DailyCheckinWakeInput) {
+    this.db.transaction((tx) => {
+      const existing = tx.select().from(dailyCheckins)
+        .where(eq(dailyCheckins.localDate, input.localDate)).get();
+      if (existing) throw new ApiError(409, "Wake-up has already been marked today.");
+      const createdAt = this.now();
+      const checkin = tx.insert(dailyCheckins).values({
+        localDate: input.localDate,
+        wokeAt: input.occurredAt,
+        createdAt,
+      }).returning().get();
+      this.writeAudit(tx, {
+        action: "DAILY_CHECKIN_WOKE",
+        entityType: "DAILY_CHECKIN",
+        entityId: checkin.id,
+        after: dailyCheckinSnapshot({ ...checkin, hourlyCheckins: [] }),
+        createdAt,
+      });
+    });
+    return this.getToday(input.localDate);
+  }
+
+  markHourlyCheckin(input: HourlyCheckinInput) {
+    this.db.transaction((tx) => {
+      const daily = tx.select().from(dailyCheckins)
+        .where(eq(dailyCheckins.localDate, input.localDate)).get();
+      if (!daily) throw new ApiError(409, "Mark wake-up before checking in.");
+      if (input.occurredAt <= daily.wokeAt) throw new ApiError(409, "The first check-in must follow wake-up.");
+      if (tx.select({ id: hourlyCheckins.id }).from(hourlyCheckins)
+        .where(and(eq(hourlyCheckins.dailyCheckinId, daily.id), eq(hourlyCheckins.hour, input.hour))).get()) {
+        throw new ApiError(409, "This hour has already been checked in.");
+      }
+      const createdAt = this.now();
+      const created = tx.insert(hourlyCheckins).values({
+        dailyCheckinId: daily.id,
+        hour: input.hour,
+        checkedInAt: input.occurredAt,
+        createdAt,
+      }).returning().get();
+      this.writeAudit(tx, {
+        action: "HOURLY_CHECKIN_CREATED",
+        entityType: "HOURLY_CHECKIN",
+        entityId: created.id,
+        after: { localDate: input.localDate, hour: created.hour, checkedInAt: created.checkedInAt },
+        createdAt,
+      });
+    });
+    return this.getToday(input.localDate);
+  }
+
   createTodayTask(input: TodayTaskCreateInput) {
     this.db.transaction((tx) => {
       this.createTodayTaskSnapshot(tx, input.localDate, null, null, input.title, input.steps, this.now());
@@ -677,6 +746,7 @@ export class RecordsService {
       const template = this.requireActiveTemplate(tx, input.templateId);
       const steps = tx.select().from(taskTemplateSteps).where(eq(taskTemplateSteps.templateId, template.id))
         .orderBy(asc(taskTemplateSteps.position), asc(taskTemplateSteps.id)).all();
+      if (steps.length === 0) throw new ApiError(400, "Templates must contain at least one subtask.");
       this.createTodayTaskSnapshot(tx, input.localDate, template.id, null, template.title, steps, this.now());
     });
     return this.getToday(input.localDate);
@@ -694,39 +764,10 @@ export class RecordsService {
       }
       const steps = this.attachTodayTaskSteps(tx, [source])[0]!.steps
         .filter((step) => step.completedAt === null);
+      if (steps.length === 0) throw new ApiError(400, "Today tasks must contain at least one subtask.");
       this.createTodayTaskSnapshot(tx, input.localDate, source.templateId, source.id, source.title, steps, this.now());
     });
     return this.getToday(input.localDate);
-  }
-
-  setTodayTaskCompleted(id: number, input: TodayTaskCompletionInput) {
-    const localDate = this.db.transaction((tx) => {
-      const task = this.requireTodayTask(tx, id);
-      this.requireTaskRevision(task, input.expectedRevision);
-      if ((task.completedAt !== null) === input.completed) return task.localDate;
-      const before = this.attachTodayTaskSteps(tx, [task])[0]!;
-      const now = this.now();
-      const completedAt = input.completed ? input.occurredAt : null;
-      for (const step of before.steps.filter((candidate) => (candidate.completedAt !== null) !== input.completed)) {
-        tx.update(todayTaskSteps).set({ completedAt, updatedAt: now }).where(eq(todayTaskSteps.id, step.id)).run();
-        this.writeAudit(tx, {
-          action: input.completed ? "TODAY_TASK_STEP_COMPLETED" : "TODAY_TASK_STEP_REOPENED",
-          entityType: "TODAY_TASK_STEP",
-          entityId: step.id,
-          before: todayTaskStepSnapshot(step, task),
-          after: todayTaskStepSnapshot({ ...step, completedAt }, task),
-          createdAt: now,
-        });
-      }
-      const updated = { ...task, completedAt, revision: task.revision + 1, updatedAt: now };
-      tx.update(todayTasks).set({ completedAt, revision: updated.revision, updatedAt: now })
-        .where(eq(todayTasks.id, task.id)).run();
-      const after = this.attachTodayTaskSteps(tx, [updated])[0]!;
-      this.writeTaskCompletionAudit(tx, before, after, now);
-      this.reconcileFocusAfterTaskCompletion(tx, before, after, now);
-      return task.localDate;
-    });
-    return this.getToday(localDate);
   }
 
   setTodayTaskStepCompleted(id: number, input: TodayTaskCompletionInput) {
@@ -972,6 +1013,20 @@ export class RecordsService {
       byTemplate.set(step.templateId, values);
     }
     return templates.map((template) => ({ ...template, steps: byTemplate.get(template.id) ?? [] }));
+  }
+
+  private attachHourlyCheckins(reader: RecordsReader, checkins: DailyCheckinRow[]): DailyCheckinResponse[] {
+    if (checkins.length === 0) return [];
+    const rows = reader.select().from(hourlyCheckins)
+      .where(inArray(hourlyCheckins.dailyCheckinId, checkins.map((checkin) => checkin.id)))
+      .orderBy(asc(hourlyCheckins.hour), asc(hourlyCheckins.id)).all();
+    const byCheckin = new Map<number, HourlyCheckinRow[]>();
+    for (const row of rows) {
+      const values = byCheckin.get(row.dailyCheckinId) ?? [];
+      values.push(row);
+      byCheckin.set(row.dailyCheckinId, values);
+    }
+    return checkins.map((checkin) => ({ ...checkin, hourlyCheckins: byCheckin.get(checkin.id) ?? [] }));
   }
 
   private attachTodayTaskSteps(reader: RecordsReader, tasks: TodayTaskRow[]): TodayTaskResponse[] {
@@ -1226,6 +1281,17 @@ function goalSnapshot(goal: GoalResponse) {
       targetValue: subgoal.targetValue,
       position: subgoal.position,
       completedAt: subgoal.completedAt,
+    })),
+  };
+}
+
+function dailyCheckinSnapshot(checkin: DailyCheckinResponse) {
+  return {
+    localDate: checkin.localDate,
+    wokeAt: checkin.wokeAt,
+    hourlyCheckins: checkin.hourlyCheckins.map((hourly) => ({
+      hour: hourly.hour,
+      checkedInAt: hourly.checkedInAt,
     })),
   };
 }

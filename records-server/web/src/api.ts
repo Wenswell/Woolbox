@@ -118,12 +118,22 @@ export const api = {
     return request<{ today: TodayState }>("today-tasks/from-task", { method: "POST", body: JSON.stringify({ localDate, sourceTaskId }) });
   },
 
-  async setTodayTaskCompleted(taskId: number, expectedRevision: number, completed: boolean) {
-    return todayTaskCompletion(`today-tasks/${taskId}/completion`, expectedRevision, completed);
-  },
-
   async setTodayTaskStepCompleted(stepId: number, expectedRevision: number, completed: boolean) {
     return todayTaskCompletion(`today-task-steps/${stepId}/completion`, expectedRevision, completed);
+  },
+
+  async markAwake(localDate: string) {
+    return request<{ today: TodayState }>("daily-checkins/wake", {
+      method: "POST",
+      body: JSON.stringify({ localDate, occurredAt: Date.now() }),
+    });
+  },
+
+  async markHourlyCheckin(localDate: string, hour: number) {
+    return request<{ today: TodayState }>("daily-checkins/hourly", {
+      method: "POST",
+      body: JSON.stringify({ localDate, hour, occurredAt: Date.now() }),
+    });
   },
 
   async createDailyFocus(input: { localDate: string; firstMove: string; primaryTaskId: number; secondaryTaskId: number | null }) {

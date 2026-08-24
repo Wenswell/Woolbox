@@ -41,7 +41,7 @@ JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输
 17. 到期通知返回 Records；继续或切换后 revision 与提醒更新。第四次回顾显示“今天已足够”，普通任务仍可操作。
 18. 首次回顾前完成全部所选 Focus 时进入 `FOCUS_CLEARED`，不显示“已完成 0 轮”；重开任务不自动恢复。
 19. Focus 暂停或结束后仍可新增、完成和重开任务；跨日停止旧提醒。
-20. 编辑模板后既有任务快照不变；模板允许零步骤且没有完成入口。
+20. 编辑模板后既有任务快照不变；模板和 Today task 都要求至少一个子任务，父任务没有完成入口。
 21. Goals 与 Accumulate 主页行验证两色斑马纹、`当前值/目标值 unit`、目标周期累计和无目标 `当前值/-- unit`；再验证 Accumulate 记录 Sheet 与 Undo，以及 Measurement 范围、离散 Slider、24 小时图与 Undo。
 22. PC Goals 验证 Active/Archived/All、搜索、新建/编辑、步进录入、子目标确认、再次挑战、归档/恢复/删除，以及 Activity 的三类 Goal 筛选和摘要。
 23. 发布后由低版本同通道 APK 验证检查、下载校验、安装来源授权和系统确认。

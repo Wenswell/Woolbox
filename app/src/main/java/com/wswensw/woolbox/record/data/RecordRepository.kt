@@ -9,6 +9,8 @@ import com.wswensw.woolbox.record.model.GoalPool
 import com.wswensw.woolbox.record.model.GoalPoolDraft
 import com.wswensw.woolbox.record.model.GoalSubgoal
 import com.wswensw.woolbox.record.model.DailyFocus
+import com.wswensw.woolbox.record.model.DailyCheckin
+import com.wswensw.woolbox.record.model.HourlyCheckin
 import com.wswensw.woolbox.record.model.DailyFocusPauseReason
 import com.wswensw.woolbox.record.model.DailyFocusState
 import com.wswensw.woolbox.record.model.RecordEntry
@@ -70,6 +72,7 @@ data class RecordsSnapshot(
     val unfinishedTasks: List<TodayTask>,
     val todayTasks: List<TodayTask>,
     val dailyFocus: DailyFocus?,
+    val dailyCheckin: DailyCheckin?,
     val goalValues: Map<Long, Double>,
     val recentDayValues: Map<Long, List<Double>>,
 )
@@ -109,6 +112,7 @@ class RecordRepository(context: Context) {
             unfinishedTasks = overview.getJSONArray("unfinishedTasks").mapObjects(::parseTodayTask),
             todayTasks = overview.getJSONArray("todayTasks").mapObjects(::parseTodayTask),
             dailyFocus = overview.nullableObject("dailyFocus")?.let(::parseDailyFocus),
+            dailyCheckin = overview.nullableObject("dailyCheckin")?.let(::parseDailyCheckin),
             goalValues = goalValues(activeItems, date, todayEntries, rangeEntries),
             recentDayValues = itemRecentDayValues(
                 itemIds = activeItems
@@ -290,6 +294,32 @@ class RecordRepository(context: Context) {
             Unit
         }
 
+    suspend fun markAwake(localDate: LocalDate, occurredAt: Long) = withContext(Dispatchers.IO) {
+        request(
+            "POST",
+            "daily-checkins/wake",
+            body = JSONObject().put("localDate", localDate.toString()).put("occurredAt", occurredAt),
+        )
+        Unit
+    }
+
+    suspend fun markHourlyCheckin(localDate: LocalDate, hour: Int, occurredAt: Long) = withContext(Dispatchers.IO) {
+        request(
+            "POST",
+            "daily-checkins/hourly",
+            body = JSONObject()
+                .put("localDate", localDate.toString())
+                .put("hour", hour)
+                .put("occurredAt", occurredAt),
+        )
+        Unit
+    }
+
+    suspend fun getDailyCheckin(localDate: LocalDate): DailyCheckin? = withContext(Dispatchers.IO) {
+        request("GET", "today/$localDate").getJSONObject("today")
+            .nullableObject("dailyCheckin")?.let(::parseDailyCheckin)
+    }
+
     suspend fun createDailyFocus(
         localDate: LocalDate,
         firstMove: String,
@@ -391,12 +421,6 @@ class RecordRepository(context: Context) {
             request("PUT", "daily-focus/${focus.localDate}$suffix", body = body)
             Unit
         }
-
-    suspend fun setTodayTaskCompleted(
-        task: TodayTask,
-        completed: Boolean,
-        occurredAt: Long,
-    ) = todayTaskCompletion("today-tasks/${task.id}/completion", task, completed, occurredAt)
 
     suspend fun setTodayTaskStepCompleted(
         task: TodayTask,
@@ -572,6 +596,17 @@ internal fun parseDailyFocus(value: JSONObject) = DailyFocus(
     endedAt = value.nullableLong("endedAt"),
     createdAt = value.getLong("createdAt"),
     updatedAt = value.getLong("updatedAt"),
+)
+
+internal fun parseDailyCheckin(value: JSONObject) = DailyCheckin(
+    localDate = LocalDate.parse(value.getString("localDate")),
+    wokeAt = value.getLong("wokeAt"),
+    hourlyCheckins = value.getJSONArray("hourlyCheckins").mapObjects { hourly ->
+        HourlyCheckin(
+            hour = hourly.getInt("hour"),
+            checkedInAt = hourly.getLong("checkedInAt"),
+        )
+    },
 )
 
 private fun parseTemplateStep(value: JSONObject) = TaskTemplateStep(

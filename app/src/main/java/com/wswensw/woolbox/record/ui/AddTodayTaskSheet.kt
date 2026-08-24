@@ -210,7 +210,7 @@ private fun NewTodayTaskForm(
     onCreate: (String, List<TemplateStepDraft>) -> Unit,
 ) {
     var title by rememberSaveable { mutableStateOf("") }
-    var steps by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var steps by rememberSaveable { mutableStateOf(listOf("")) }
     var validationError by rememberSaveable { mutableStateOf<String?>(null) }
     val stepError = stringResource(R.string.each_template_step_title)
 
@@ -266,9 +266,13 @@ private fun NewTodayTaskForm(
                     validationError = stepError
                     return@Button
                 }
+                if (drafts.isEmpty()) {
+                    validationError = stepError
+                    return@Button
+                }
                 onCreate(normalizedTitle, drafts)
             },
-            enabled = enabled && title.isNotBlank() && steps.all(String::isNotBlank),
+            enabled = enabled && title.isNotBlank() && steps.isNotEmpty() && steps.all(String::isNotBlank),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.add_task))

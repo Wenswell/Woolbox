@@ -73,7 +73,7 @@ fun TemplateEditorScreen(
         mutableStateOf(template?.cadence?.name ?: TemplateCadence.MANUAL.name)
     }
     var stepTitles by rememberSaveable(template?.id) {
-        mutableStateOf(template?.steps?.map { it.title }.orEmpty())
+        mutableStateOf(template?.steps?.map { it.title }?.ifEmpty { listOf("") } ?: listOf(""))
     }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -88,6 +88,10 @@ fun TemplateEditorScreen(
         val steps = runCatching {
             stepTitles.map { TemplateStepDraft(validatedTemplateTitle(it)) }
         }.getOrElse {
+            error = invalidSteps
+            return
+        }
+        if (steps.isEmpty()) {
             error = invalidSteps
             return
         }
@@ -111,7 +115,7 @@ fun TemplateEditorScreen(
             }
             FilledTonalIconButton(
                 onClick = ::submit,
-                enabled = !saving && title.isNotBlank() && stepTitles.all(String::isNotBlank),
+                enabled = !saving && title.isNotBlank() && stepTitles.isNotEmpty() && stepTitles.all(String::isNotBlank),
             ) {
                 Icon(
                     Icons.Rounded.Check,
@@ -158,7 +162,7 @@ fun TemplateEditorScreen(
                             }
                             error = null
                         },
-                        enabled = !saving,
+                        enabled = !saving && stepTitles.size > 1,
                         label = { Text(stringResource(R.string.template_step_number, index + 1)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),

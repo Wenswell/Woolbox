@@ -192,6 +192,13 @@
     <string name="primary_task_required">必须选择主任务。</string>
     <string name="focus_tasks_must_differ">主专注和次专注不能选择同一任务。</string>
     <string name="hourly_review">小时回顾</string>
+    <string name="hourly_checkin">整点打卡</string>
+    <string name="mark_awake">标记起床</string>
+    <string name="next_checkin">下次打卡 %1$s</string>
+    <string name="check_in_now">现在打卡</string>
+    <string name="hourly_checkin_channel">整点打卡</string>
+    <string name="hourly_checkin_notification">查看下一个子任务并完成本小时打卡。</string>
+    <string name="hourly_checkin_save_failed">无法保存整点打卡。</string>
     <string name="still_on_focus">仍在推进当前专注吗？</string>
     <string name="continue_current_focus">继续当前专注</string>
     <string name="switch_focus">切换专注</string>
@@ -221,6 +228,8 @@
         <item quantity="other">已完成 %d 轮</item>
     </plurals>
     <string name="task_steps_progress">已完成 %1$d / %2$d 步</string>
+    <string name="next_subtask">下一步：%1$s</string>
+    <string name="all_subtasks_done">所有子任务已完成</string>
     <string name="template_not_found">未找到模板。</string>
     <string name="template_title">任务模板</string>
     <string name="template_cadence">周期</string>

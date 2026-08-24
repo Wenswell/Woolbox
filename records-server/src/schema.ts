@@ -167,6 +167,33 @@ export const todayTaskSteps = sqliteTable(
   (table) => [index("today_task_steps_task_position_index").on(table.taskId, table.position)],
 );
 
+export const dailyCheckins = sqliteTable(
+  "daily_checkins",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    localDate: text("local_date").notNull(),
+    wokeAt: integer("woke_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("daily_checkins_local_date_unique").on(table.localDate)],
+);
+
+export const hourlyCheckins = sqliteTable(
+  "hourly_checkins",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    dailyCheckinId: integer("daily_checkin_id")
+      .notNull()
+      .references(() => dailyCheckins.id, { onDelete: "cascade" }),
+    hour: integer("hour").notNull(),
+    checkedInAt: integer("checked_in_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("hourly_checkins_date_hour_unique").on(table.dailyCheckinId, table.hour),
+  ],
+);
+
 export const dailyFocus = sqliteTable(
   "daily_focus",
   {
@@ -198,7 +225,7 @@ export const recordAuditLogs = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     action: text("action").notNull(),
-    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "GOAL", "GOAL_ENTRY", "GOAL_SUBGOAL", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "FOCUS"] }).notNull(),
+    entityType: text("entity_type", { enum: ["ITEM", "ENTRY", "GOAL", "GOAL_ENTRY", "GOAL_SUBGOAL", "TEMPLATE", "TEMPLATE_STEP", "TODAY_TASK", "TODAY_TASK_STEP", "DAILY_CHECKIN", "HOURLY_CHECKIN", "FOCUS"] }).notNull(),
     entityId: integer("entity_id").notNull(),
     beforeJson: text("before_json"),
     afterJson: text("after_json"),

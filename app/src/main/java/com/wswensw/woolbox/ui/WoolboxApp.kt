@@ -83,7 +83,7 @@ import com.wswensw.woolbox.record.ui.RecordsConnectionScreen
 import com.wswensw.woolbox.record.ui.RecordsScreen
 import com.wswensw.woolbox.record.ui.RecordsViewModel
 import com.wswensw.woolbox.record.ui.TemplateEditorScreen
-import com.wswensw.woolbox.record.ui.TodayTaskProgressSheet
+import com.wswensw.woolbox.record.ui.HourlyCheckinSheet
 import com.wswensw.woolbox.record.reminder.DailyReminderNotifications
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
@@ -111,10 +111,10 @@ private enum class MainTab(
 @Composable
 fun WoolboxApp(
     dailyReviewRequest: Int,
+    hourlyCheckinRequest: Int,
     onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult,
 ) {
     val context = LocalContext.current
-    val taskDoneTemplate = stringResource(R.string.task_done)
     val goalReachedTemplate = stringResource(R.string.goal_reached)
     val recordedItemTemplate = stringResource(R.string.recorded_item)
     val undoLabel = stringResource(R.string.action_undo)
@@ -147,7 +147,7 @@ fun WoolboxApp(
     var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
     var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var goalSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var todayTaskSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showHourlyCheckin by rememberSaveable { mutableStateOf(false) }
     var showAddTodayTask by rememberSaveable { mutableStateOf(false) }
     var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
@@ -251,6 +251,16 @@ fun WoolboxApp(
         }
     }
 
+    LaunchedEffect(hourlyCheckinRequest) {
+        if (hourlyCheckinRequest == 0) return@LaunchedEffect
+        selectedTab = MainTab.RECORDS
+        navController.navigate(AppRoutes.ROOT) {
+            popUpTo(AppRoutes.ROOT)
+            launchSingleTop = true
+        }
+        showHourlyCheckin = true
+    }
+
     DisposableEffect(lifecycleOwner, toolViewModel, recordsViewModel, selectedTab) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -291,7 +301,7 @@ fun WoolboxApp(
                                 if (tab != MainTab.RECORDS) {
                                     recordSheetItemId = null
                                     goalSheetId = null
-                                    todayTaskSheetId = null
+                                    showHourlyCheckin = false
                                     showAddTodayTask = false
                                     measurementSheetItemId = null
                                 }
@@ -331,7 +341,6 @@ fun WoolboxApp(
                                 onPlanFocus = { navController.navigate(AppRoutes.DAILY_FOCUS) },
                                 onAddTask = { showAddTodayTask = true },
                                 onManageTemplates = {
-                                    todayTaskSheetId = null
                                     navController.navigate(AppRoutes.MANAGE_TEMPLATES)
                                 },
                                 onManageGoals = {
@@ -352,21 +361,13 @@ fun WoolboxApp(
                                 onRetry = recordsViewModel::refresh,
                                 onRecordItem = { recordSheetItemId = it.id },
                                 onOpenGoal = { goalSheetId = it.id },
-                                onToggleTask = { task, completed, onResult ->
-                                    recordsViewModel.setTodayTaskCompleted(task, completed) { error ->
-                                        onResult(error)
-                                        if (error == null && completed) {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(
-                                                    message = taskDoneTemplate.formatLocalized(task.title),
-                                                    duration = SnackbarDuration.Short,
-                                                )
-                                            }
-                                        }
-                                    }
+                                onMarkAwake = { onResult ->
+                                    requireNotifications(
+                                        { onResult(notificationsNotEnabledMessage) },
+                                        { recordsViewModel.markAwake(onResult) },
+                                    )
                                 },
-                                onOpenTask = { todayTaskSheetId = it.id },
+                                onOpenHourlyCheckin = { showHourlyCheckin = true },
                                 onOpenMeasurement = { item ->
                                     measurementSheetItemId = item.id
                                     recordsViewModel.loadMeasurementPreview(item.id)
@@ -827,50 +828,16 @@ fun WoolboxApp(
                 )
             }
 
-            todayTaskSheetId?.let { taskId ->
-                recordsState.todayTasks.firstOrNull { it.id == taskId }?.let { task ->
-                    TodayTaskProgressSheet(
-                        task = task,
-                        onDismiss = { todayTaskSheetId = null },
-                        onToggleTask = { completed, onResult ->
-                            recordsViewModel.setTodayTaskCompleted(task, completed) { error ->
-                                onResult(error)
-                                if (error == null && completed) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = taskDoneTemplate.formatLocalized(task.title),
-                                            duration = SnackbarDuration.Short,
-                                        )
-                                    }
-                                }
-                            }
+            if (showHourlyCheckin) {
+                recordsState.dailyCheckin?.let { checkin ->
+                    HourlyCheckinSheet(
+                        checkin = checkin,
+                        tasks = recordsState.todayTasks,
+                        onDismiss = { showHourlyCheckin = false },
+                        onToggleStep = { task, step, completed, onResult ->
+                            recordsViewModel.setTodayTaskStepCompleted(task, step.id, completed, onResult)
                         },
-                        onToggleStep = { step, completed, onResult ->
-                            val completing = completed && !step.isCompleted
-                            val taskCompleting = completing &&
-                                task.steps.all { it.id == step.id || it.isCompleted }
-                            recordsViewModel.setTodayTaskStepCompleted(task, step.id, completed) { error ->
-                                onResult(error)
-                                if (error == null && completing) {
-                                    hapticFeedback.performHapticFeedback(
-                                        if (taskCompleting) {
-                                            HapticFeedbackType.LongPress
-                                        } else {
-                                            HapticFeedbackType.ContextClick
-                                        },
-                                    )
-                                    if (taskCompleting) {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = taskDoneTemplate.formatLocalized(task.title),
-                                                duration = SnackbarDuration.Short,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        },
+                        onCheckIn = recordsViewModel::markHourlyCheckin,
                     )
                 }
             }

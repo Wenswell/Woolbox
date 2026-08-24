@@ -99,6 +99,15 @@ export interface TodayTaskFromTaskInput {
   sourceTaskId: number;
 }
 
+export interface DailyCheckinWakeInput {
+  localDate: string;
+  occurredAt: number;
+}
+
+export interface HourlyCheckinInput extends DailyCheckinWakeInput {
+  hour: number;
+}
+
 export interface DailyFocusCreateInput {
   localDate: string;
   firstMove: string;
@@ -267,6 +276,7 @@ export function parseTemplateWriteInput(value: unknown): TemplateWriteInput {
   const cadence = enumField(input, "cadence", TEMPLATE_CADENCES);
   requireRule(Array.isArray(input.steps), "Steps must be an array.");
   const steps = input.steps.map(parseStepTitleInput);
+  requireRule(steps.length > 0, "At least one subtask is required.");
   return { title, cadence, steps };
 }
 
@@ -283,11 +293,28 @@ export function parseTodayTaskCompletionInput(value: unknown): TodayTaskCompleti
 export function parseTodayTaskCreateInput(value: unknown): TodayTaskCreateInput {
   const input = objectInput(value);
   requireRule(Array.isArray(input.steps), "Steps must be an array.");
+  const steps = input.steps.map(parseStepTitleInput);
+  requireRule(steps.length > 0, "At least one subtask is required.");
   return {
     localDate: parseIsoDate(input.localDate, "Local date"),
     title: requiredTrimmedString(input, "title", "Title is required."),
-    steps: input.steps.map(parseStepTitleInput),
+    steps,
   };
+}
+
+export function parseDailyCheckinWakeInput(value: unknown): DailyCheckinWakeInput {
+  const input = objectInput(value);
+  return {
+    localDate: parseIsoDate(input.localDate, "Local date"),
+    occurredAt: nonNegativeIntegerField(input, "occurredAt"),
+  };
+}
+
+export function parseHourlyCheckinInput(value: unknown): HourlyCheckinInput {
+  const input = objectInput(value);
+  const hour = integerField(input, "hour");
+  requireRule(hour >= 0 && hour <= 23, "Hour must be between 0 and 23.");
+  return { ...parseDailyCheckinWakeInput(input), hour };
 }
 
 export function parseTodayTaskFromTemplateInput(value: unknown): TodayTaskFromTemplateInput {

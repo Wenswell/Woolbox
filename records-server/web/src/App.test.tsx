@@ -56,7 +56,7 @@ describe("Records administration", () => {
   let auditLogs: RecordAuditLog[];
 
   beforeEach(() => {
-    todayState = { todayTasks: tasks.map((task) => ({ ...task, steps: task.steps.map((step) => ({ ...step })) })), dailySuggestions: [template], unfinishedTasks: [], dailyFocus: null };
+    todayState = { todayTasks: tasks.map((task) => ({ ...task, steps: task.steps.map((step) => ({ ...step })) })), dailySuggestions: [template], unfinishedTasks: [], dailyFocus: null, dailyCheckin: null };
     goals = [];
     auditLogs = [auditLog as RecordAuditLog];
     window.history.replaceState(null, "", window.location.pathname);
@@ -116,7 +116,7 @@ describe("Records administration", () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/today-tasks/from-template", expect.objectContaining({ method: "POST", body: JSON.stringify({ localDate: localToday(), templateId: 10 }) })));
   });
 
-  it("creates an ad hoc Today task with an optional checklist", async () => {
+  it("creates an ad hoc Today task with a required subtask", async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText("Prepare launch");
@@ -125,7 +125,6 @@ describe("Records administration", () => {
     const dialog = await screen.findByRole("dialog", { name: "Add task" });
     await user.click(within(dialog).getByRole("button", { name: "New task" }));
     await user.type(within(dialog).getByLabelText("Title"), "Hang laundry");
-    await user.click(within(dialog).getByRole("button", { name: "Add step" }));
     await user.type(within(dialog).getByLabelText("Task step 1"), "Take clothes out");
     await user.click(within(dialog).getByRole("button", { name: "Add task" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/today-tasks", expect.objectContaining({ method: "POST", body: JSON.stringify({ localDate: localToday(), title: "Hang laundry", steps: [{ title: "Take clothes out" }] }) })));
@@ -146,13 +145,14 @@ describe("Records administration", () => {
 
   it("manages task progress and active Focus by Today task ID", async () => {
     todayState.dailyFocus = activeFocus;
+    todayState.dailyCheckin = { id: 1, localDate: localToday(), wokeAt: Date.now() - 2 * 60 * 60 * 1_000, createdAt: 1, hourlyCheckins: [] };
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText("Prepare launch");
     await user.click(screen.getByRole("button", { name: "Today" }));
     expect(await screen.findByText("Review due")).toBeTruthy();
 
-    await user.click(screen.getByRole("checkbox", { name: "Pack bag" }));
+    await user.click(screen.getByRole("checkbox", { name: /Pack bag/ }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith("api/today-task-steps/111/completion", expect.objectContaining({ method: "PUT", body: expect.stringContaining('"expectedRevision":2') })));
     await user.click(screen.getByRole("button", { name: "Complete review" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(`api/daily-focus/${localToday()}/review-now`, expect.objectContaining({ method: "PUT", body: expect.stringContaining('"currentTaskId":101') })));
