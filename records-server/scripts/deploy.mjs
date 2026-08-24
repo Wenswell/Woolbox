@@ -33,7 +33,7 @@ if (
   || !Array.isArray(overview.todayTasks)
   || !Array.isArray(overview.dailySuggestions)
   || !Array.isArray(overview.unfinishedTasks)
-  || overview.dailyFocus !== null
+  || !Object.hasOwn(overview, "dailyCheckin")
 ) process.exit(1);
 if (!overview.templates.every(
   (template) =>
@@ -68,17 +68,14 @@ for (const table of [
   "task_template_steps",
   "today_tasks",
   "today_task_steps",
-  "daily_focus",
+  "daily_checkins",
+  "hourly_checkins",
   "record_audit_logs",
 ]) {
   if (!tables.includes(table)) throw new Error(\`Database is missing \${table}.\`);
 }
-for (const table of ["todo_tasks", "todo_steps", "todo_step_completions", "record_windows", "todo_step_windows", "daily_plans", "today_commitments", "today_commitment_steps"]) {
+for (const table of ["todo_tasks", "todo_steps", "todo_step_completions", "record_windows", "todo_step_windows", "daily_plans", "today_commitments", "today_commitment_steps", "daily_focus"]) {
   if (tables.includes(table)) throw new Error(\`Removed table still exists: \${table}.\`);
-}
-const focusColumns = database.prepare("SELECT name FROM pragma_table_info('daily_focus')").all().map(({ name }) => name);
-for (const column of ["primary_task_id", "secondary_task_id", "current_task_id", "pause_reason", "completed_rounds", "revision"]) {
-  if (!focusColumns.includes(column)) throw new Error(\`Daily Focus column is missing: \${column}.\`);
 }
 console.log("Database schema verified.");
 NODE

@@ -30,11 +30,13 @@ try {
       "task_template_steps",
       "today_tasks",
       "today_task_steps",
-      "daily_focus",
+      "daily_checkins",
+      "hourly_checkins",
       "record_audit_logs",
     ]) {
       if (!tables.includes(table)) throw new Error(`Restored database is missing ${table}.`);
     }
+    if (tables.includes("daily_focus")) throw new Error("Restored database still contains daily_focus.");
   } finally {
     restored.close();
   }
