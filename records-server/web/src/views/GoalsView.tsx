@@ -47,7 +47,7 @@ export function GoalsView({ goals, loading, onChanged, onError }: {
     }
   }
 
-  async function toggle(goal: Goal, subgoalId: number, completed: boolean) {
+  async function toggle(subgoalId: number, completed: boolean) {
     try {
       await api.setGoalSubgoalCompleted(subgoalId, completed);
       await onChanged(completed ? "Subgoal completed" : "Subgoal reopened");
@@ -104,7 +104,7 @@ export function GoalsView({ goals, loading, onChanged, onError }: {
                     {goal.subgoals.map((subgoal) => {
                       const eligible = goal.currentValue >= subgoal.targetValue;
                       return <label key={subgoal.id} title={eligible ? "Ready to complete" : `${subgoal.targetValue - goal.currentValue} ${goal.unit} remaining`}>
-                        <input type="checkbox" checked={subgoal.completedAt !== null} disabled={goal.archived || completed || pending || expired || (!eligible && subgoal.completedAt === null)} onChange={(event) => void toggle(goal, subgoal.id, event.target.checked)} />
+                        <input type="checkbox" checked={subgoal.completedAt !== null} disabled={goal.archived || completed || pending || expired || (!eligible && subgoal.completedAt === null)} onChange={(event) => void toggle(subgoal.id, event.target.checked)} />
                         <span>{subgoal.title} · {subgoal.targetValue} {goal.unit}</span>
                       </label>;
                     })}

@@ -44,6 +44,12 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `tool/ui/` | 历史页、工具 ViewModel、应用名称和图标解析；`AppDisplayInfo.kt` 统一提供应用展示信息。 |
 | `tool/trigger/` | Tile Service、Tile 状态刷新和添加请求。 |
 
+## 代码熵审计复盘
+
+2026-08-30 对 Android 客户端与 `records-server` 做消费者、动态入口、迁移和历史依据检查后，仅收敛了已证实的残留：服务端两个无消费者类型/辅助函数、Web 一个无效参数，以及 Android 工具页重复的状态文案实现。请求校验、服务端值域检查、Android Repository/ViewModel 分层、覆盖层生命周期和迁移文件均保留，因为它们分别承担信任边界、状态所有权或持久化契约。
+
+后续同类清理先运行 TypeScript `noUnusedLocals` 作为候选扫描，再对每个符号搜索生产消费者和动态入口；没有证据证明无负载时不删除。保留的验证命令与范围见[测试与设备验收](testing.md)。
+
 通用行为与架构分别查 [产品说明](product.md) 和 [系统架构](architecture.md)；Records 查 [产品规则](records-product.md) 与 [数据和接口](records-architecture.md)；验证场景查 [测试与设备验收](testing.md)。
 
 ## 常用命令

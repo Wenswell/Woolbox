@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wswensw.woolbox.R
 import com.wswensw.woolbox.tool.model.OledShieldConfig
-import com.wswensw.woolbox.tool.service.ToolActivity
 import com.wswensw.woolbox.tool.service.ToolServiceState
 import com.wswensw.woolbox.tool.ui.OledShieldProfileUi
 import java.time.Instant
@@ -361,27 +360,6 @@ private fun OledDefaultSlider(
             valueRange = OledShieldConfig.MIN_PERCENT.toFloat()..OledShieldConfig.MAX_PERCENT.toFloat(),
         )
     }
-}
-
-@Composable
-private fun ToolServiceState.accessibilityStatus(): String = when {
-    isServiceConnected -> stringResource(R.string.status_connected)
-    isAccessibilityEnabled -> stringResource(R.string.status_waiting_for_service)
-    else -> stringResource(R.string.status_not_enabled)
-}
-
-@Composable
-private fun ToolServiceState.globalCopyStatus(): String = when (activeTool) {
-    ToolActivity.COPY_PREPARING -> stringResource(R.string.status_preparing)
-    ToolActivity.COPY_ACTIVE -> stringResource(R.string.status_active)
-    else -> stringResource(R.string.status_ready)
-}
-
-@Composable
-private fun ToolServiceState.oledStatus(): String = when (activeTool) {
-    ToolActivity.OLED_PREPARING -> stringResource(R.string.status_preparing)
-    ToolActivity.OLED_ACTIVE -> stringResource(R.string.status_active)
-    else -> stringResource(R.string.status_ready)
 }
 
 private fun formatProfileTime(epochMillis: Long): String = DateTimeFormatter

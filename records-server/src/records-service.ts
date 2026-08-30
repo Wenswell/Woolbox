@@ -37,7 +37,6 @@ type RecordItemRow = typeof recordItems.$inferSelect;
 type RecordEntryRow = typeof recordEntries.$inferSelect;
 type GoalRow = typeof goals.$inferSelect;
 type GoalSubgoalRow = typeof goalSubgoals.$inferSelect;
-type GoalEntryRow = typeof goalEntries.$inferSelect;
 type TemplateRow = typeof taskTemplates.$inferSelect;
 type TodayTaskRow = typeof todayTasks.$inferSelect;
 type TodayTaskStepRow = typeof todayTaskSteps.$inferSelect;

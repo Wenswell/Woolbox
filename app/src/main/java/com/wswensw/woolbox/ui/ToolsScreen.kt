@@ -103,21 +103,21 @@ fun ToolsScreen(
 }
 
 @Composable
-private fun ToolServiceState.globalCopyStatus(): String = when (activeTool) {
+internal fun ToolServiceState.globalCopyStatus(): String = when (activeTool) {
     ToolActivity.COPY_PREPARING -> stringResource(R.string.status_preparing)
     ToolActivity.COPY_ACTIVE -> stringResource(R.string.status_active)
     else -> stringResource(R.string.status_ready)
 }
 
 @Composable
-private fun ToolServiceState.oledStatus(): String = when (activeTool) {
+internal fun ToolServiceState.oledStatus(): String = when (activeTool) {
     ToolActivity.OLED_PREPARING -> stringResource(R.string.status_preparing)
     ToolActivity.OLED_ACTIVE -> stringResource(R.string.status_active)
     else -> stringResource(R.string.status_ready)
 }
 
 @Composable
-private fun ToolServiceState.accessibilityStatus(): String = when {
+internal fun ToolServiceState.accessibilityStatus(): String = when {
     isServiceConnected -> stringResource(R.string.status_connected)
     isAccessibilityEnabled -> stringResource(R.string.status_waiting_for_service)
     else -> stringResource(R.string.status_not_enabled)

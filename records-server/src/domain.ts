@@ -370,10 +370,6 @@ function nonNegativeIntegerField(input: Record<string, unknown>, field: string):
   return value;
 }
 
-function nullablePositiveIntegerField(input: Record<string, unknown>, field: string): number | null {
-  return input[field] === null ? null : positiveIntegerField(input, field);
-}
-
 function requiredTrimmedString(input: Record<string, unknown>, field: string, message: string): string {
   const value = stringField(input, field).trim();
   requireRule(value.length > 0, message);
