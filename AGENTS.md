@@ -6,15 +6,16 @@
 
 ## 项目定位
 
-Android Compose 工具应用。当前调整范围见 `docs/tools-plan.md`。
+Android Compose 工具应用，包含扫一扫、Global Copy 和 OLED 遮罩。底栏为扫一扫、Tools、Setting。
 
 ## 开始前
 
 按任务读取对应文档：
 
 1. 始终先读 `README.md`，确认项目基线和文档入口。
-5. 环境、构建、交付或排障：读 `docs/development.md`；测试或设备验收读 `docs/testing.md`。
-6. 文档修改：读 `docs/documentation.md`。
+2. 产品行为读 `docs/product.md`，架构读 `docs/architecture.md`，页面样式读 `docs/design-system.md`。
+3. 环境、构建、交付或排障：读 `docs/development.md`；测试或设备验收读 `docs/testing.md`。
+4. 文档修改：读 `docs/documentation.md`。
 
 参考旧应用 `/Users/wswensw/Documents/repos/playground/app0603` 时，必须同时提取业务规则和系统能力边界，包括 Context、`WindowManager`、窗口类型、触发时机与生命周期。旧页面只作为场景参考，当前应用使用 Compose 重新设计。
 

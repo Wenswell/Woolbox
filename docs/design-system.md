@@ -13,6 +13,7 @@ AppTheme
 └─ NavHost
    ├─ root
    │  └─ AppSurface
+   │     ├─ 扫一扫（默认）
    │     ├─ Tools
    │     │  ├─ Access / Accessibility service entry
    │     │  └─ Available
@@ -34,7 +35,7 @@ AppTheme
       └─ saved apps
 ```
 
-工具详情页和记录管理页不显示底栏，使用顶部返回栏和独立滚动内容。
+工具详情页和历史管理页不显示底栏，使用顶部返回栏和独立滚动内容。
 
 ## 页面骨架
 
@@ -42,7 +43,7 @@ AppTheme
 | --- | --- | --- |
 | `AppSurface` | 根页面 | `Scaffold` 处理 safe drawing 及底栏。 |
 | `AppPage` | Tools、Setting | 标题、说明、纵向滚动内容和底部留白。 |
-| `AppRouteScaffold` | 工具详情、记录管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线；输入法展开时用 IME Insets 约束滚动视口，聚焦输入框自动滚动到输入法上方，页面末尾仍可手动滚动访问。 |
+| `AppRouteScaffold` | 工具详情、历史管理与表单 | 顶部栏、返回、可选右侧动作（右内边距与页面 `16dp` 对齐）和滚动内容；滚动超过 `8px` 显示分隔线；输入法展开时用 IME Insets 约束滚动视口，聚焦输入框自动滚动到输入法上方，页面末尾仍可手动滚动访问。 |
 | `AppLazyRouteScaffold` | 无上限记录列表 | 与详情页共用顶部栏，正文使用 `LazyColumn`。 |
 | `ComposeOverlayWindow` | 跨应用工具 | 独立 Compose composition 与生命周期，不嵌入应用页面。 |
 
@@ -98,9 +99,9 @@ Tools 根页的 `Access` 分区使用 `AppListItem` 展示 `Accessibility servic
 
 Quick Settings 行在 Android 13 及以上整行执行系统添加请求，不再显示右侧 `Add` 按钮；Android 12/12L 整行禁用，由系统快捷设置编辑页负责添加。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
-Setting 的 `Appearance` 区域提供 Language、Theme 和 Motion。Language 使用单选 Dialog，选项为 `Follow system`、`English`、`简体中文`；语言名称使用自身语言显示。`Updates` 区域使用标准 `AppListItem`：`Current version` 的副文案显示构建类型和版本号，并触发对应通道的检查；发现更新后显示一个包含构建类型和版本号的动作行，下载与安装阶段在副文案呈现状态。下载动作先用标准确认 Dialog 显示版本与文件大小；完成下载后同一动作行进入安装。等待来源安装授权时动作行进入系统设置。检查、下载和安装期间禁用重复操作。
+Setting 的 `Appearance` 区域提供 Language 和 Theme。Language 使用单选 Dialog，选项为 `Follow system`、`English`、`简体中文`；语言名称使用自身语言显示。`Updates` 区域使用标准 `AppListItem`：`Current version` 的副文案显示构建类型和版本号，并触发对应通道的检查；发现更新后显示一个包含构建类型和版本号的动作行，下载与安装阶段在副文案呈现状态。下载动作先用标准确认 Dialog 显示版本与文件大小；完成下载后同一动作行进入安装。等待来源安装授权时动作行进入系统设置。检查、下载和安装期间禁用重复操作。
 
-用户可见文案从 Android 资源读取，默认英文位于 `values/strings.xml`，简体中文位于 `values-zh-rCN/strings.xml`。数量使用 `plurals`，日期、时间和数值使用当前 Locale；用户输入与服务端返回正文不翻译。后台更新状态使用 `UiText.Resource` 保存资源与参数，切换语言后按新配置重新解析。
+用户可见文案从 Android 资源读取，默认英文位于 `values/strings.xml`，简体中文位于 `values-zh-rCN/strings.xml`。数量使用 `plurals`，日期、时间和数值使用当前 Locale；采集原文不翻译。后台更新状态使用 `UiText.Resource` 保存资源与参数，切换语言后按新配置重新解析。
 
 Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，复用 `AppListItem`：40dp 应用图标、名称、状态/参数/时间副文案、Enable/Delete 图标操作；无服务时副文案提示 `Accessibility required`，应用不可用时提示 `Unavailable`。
 
@@ -136,3 +137,7 @@ OLED 遮罩本身拦截触摸，长按打开控制面板。控制面板标题区
 - 文本是否满足标题/说明行数限制，按钮最长文案是否完整显示。
 - 主操作、Tile 添加、滑块和二元设置是否使用合适控件。
 - 页面、深色模式和覆盖层状态是否需要真机检查。
+
+## 新工具与日志
+
+底栏顺序为扫一扫、Tools、Setting。扫一扫提供相机与相册入口、结果原文及复制/打开动作；各工具详情与 Setting 提供日志入口。日志列表显示工具、动作、时间及摘要，点击查看完整原文，顶部导出全部日志。滚动采集使用底部紧凑操作栏，中间区域留给目标应用操作。

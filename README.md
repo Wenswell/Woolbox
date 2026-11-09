@@ -1,11 +1,12 @@
 # Woolbox
 
-Android Compose 工具应用，提供 Global Copy 和 OLED 遮罩。
+Android Compose 工具应用，提供扫一扫、Global Copy 和 OLED 遮罩。
 
 ## 当前能力
 
 | 工具 | 用途 | 启动方式 |
 | --- | --- | --- |
+| 扫一扫 | 相机或相册识别二维码，复制原文或打开 HTTP(S) 链接。 | 默认首页。 |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，生成可编辑草稿，并保存可再次编辑、复制或删除的采集历史。 | 详情页 `Start Global Copy`；Quick Settings Tile。 |
 | `OLED shield` | 显示可触摸黑色遮罩；无无障碍服务时作用于 Woolbox，有服务时作用于目标应用并覆盖系统栏。 | 详情页 `Show shield`；Quick Settings Tile；已保存应用列表。 |
 
@@ -40,7 +41,7 @@ Android Compose 工具应用，提供 Global Copy 和 OLED 遮罩。
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.49` (`versionCode 50`) |
+| 版本 | `0.1.50` (`versionCode 51`) |
 
 ## 目录
 
@@ -76,7 +77,7 @@ pnpm run publish:debug
 
 `pnpm run publish:debug` 不依赖当前 shell 的 Java/Android 环境，一次完成 debug APK 构建、`latest.json` 生成、版本化 APK 上传和远端校验。release 使用 `pnpm run publish:release`，只处理 release 包。远端校验要求见 [开发指南](docs/development.md)。
 
-功能交付顺序为开发、测试、提交、服务迁移（涉及服务端契约时）、对应通道 APK 发布和真机验收；完整命令与边界见[开发指南](docs/development.md#功能交付)。
+功能交付顺序为开发、测试、提交、对应通道 APK 发布和真机验收；完整命令与边界见[开发指南](docs/development.md#功能交付)。
 
 ## 更新版本
 
@@ -106,6 +107,8 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 | [测试与设备验收](docs/testing.md) | 自动测试覆盖、真机场景和诊断命令。 |
 | [文档维护](docs/documentation.md) | 文档分工、同步触发条件和质量标准。 |
 
-## 当前调整
+## 工具日志
 
-Records 客户端和服务端已删除。当前底栏为 Tools、Setting；扫一扫、滚动采集及共享日志按 [实施计划](docs/tools-plan.md) 接入，尚未发布。
+底栏为扫一扫、Tools、Setting，默认扫一扫。三个工具均提供日志查看入口，Setting 可查看全部日志；最近 200 条可查看详情，导出包含该工具全部事件的 JSONL。日志保留结果原文和复制采样，不自动清理，不上传。
+
+Global Copy 的编辑页可进入滚动采集：手动滚动，停稳后采样，返回编辑后复制。去重规则与限制见 [产品说明](docs/product.md)。

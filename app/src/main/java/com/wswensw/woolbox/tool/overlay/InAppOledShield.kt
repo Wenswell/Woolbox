@@ -27,6 +27,13 @@ fun InAppOledShield(
     onSave: () -> Unit,
     onHide: () -> Unit,
 ) {
+    val logContext = androidx.compose.ui.platform.LocalContext.current
+    val logSession = androidx.compose.runtime.remember { com.wswensw.woolbox.log.ToolLogs.session() }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        com.wswensw.woolbox.log.ToolLogs.record(logContext, "oled", logSession, "start", "in_app $config")
+        onDispose { com.wswensw.woolbox.log.ToolLogs.record(logContext, "oled", logSession, "end", "in_app_dismissed") }
+    }
+    LaunchedEffect(config) { com.wswensw.woolbox.log.ToolLogs.record(logContext, "oled", logSession, "config", config.toString()) }
     var isPanelVisible by rememberSaveable { mutableStateOf(false) }
     var displaySize by remember { mutableStateOf(IntSize.Zero) }
     var panelSize by remember { mutableStateOf(IntSize.Zero) }
@@ -75,9 +82,9 @@ fun InAppOledShield(
                         ).normalized(),
                     )
                 },
-                onSave = onSave,
+                onSave = { com.wswensw.woolbox.log.ToolLogs.record(logContext, "oled", logSession, "save", config.toString()); onSave() },
                 onClosePanel = { isPanelVisible = false },
-                onHideShield = onHide,
+                onHideShield = { com.wswensw.woolbox.log.ToolLogs.record(logContext, "oled", logSession, "hide", "user_hide"); onHide() },
                 modifier = Modifier
                     .offset { panelOffset }
                     .onSizeChanged { panelSize = it },

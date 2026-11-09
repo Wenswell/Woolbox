@@ -53,19 +53,16 @@ Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取�
 ## 命令状态机
 
 ### 页面触发
-
 1. Global Copy 只在 `isServiceConnected` 时启用主操作；OLED 主操作始终可用。
 2. OLED 在服务未连接时直接更新应用内遮罩状态，不提交 `ExternalToolCommand`。
 3. 服务连接时，普通入口保存命令并调用 `moveTaskToBack(true)`；OLED 已保存应用入口通过包管理器的 launcher Intent 启动指定包名。
 4. Activity 收到 `onStop` 后提交命令，避免本应用窗口参与目标选择。
 
 ### Tile 触发
-
 1. Tile 在服务已连接时直接提交命令；未连接时打开应用。
 2. 服务提交 `GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE`，等待 System UI 退出前台。
 
 ### 共同执行
-
 1. 服务关闭现有工具，把状态设为对应的 `*_PREPARING`。
 2. 首次等待 `120ms`，随后每 `120ms` 解析一次前台窗口。
 3. 普通命令只保存工具类型和两秒截止时间；OLED 已保存应用命令还携带包名、配置和五秒截止时间。
@@ -81,7 +78,6 @@ Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取�
 候选只包含具有 root 和包名的 `TYPE_APPLICATION` 窗口，并排除 `com.android.systemui` 与 `com.wswensw.woolbox`。
 
 选择顺序：
-
 1. 存在 `isActive` 候选时，只在活动候选中选择。
 2. 否则存在 `isFocused` 候选时，只在焦点候选中选择。
 3. 再按 `isActive`、`isFocused`、`layer` 降序取首项。
@@ -116,7 +112,6 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS`。遮罩尺寸仍按完整显示指标计算，使顶部遮罩能布局到状态栏和显示刘海区域；控制面板不使用越界布局。
 
 ## Global Copy 数据管线
-
 1. 遍历目标包名的全部应用窗口；活动 root 尚未包含时补充遍历一次。
 2. 节点必须可见、非密码、边界非空。
 3. 每个节点按 `text`、`contentDescription`、`hintText`、`stateDescription`、`error`、`tooltipText`、`paneTitle` 顺序取首个非空值；Android 14 及以上在这些值均为空时再读取 `containerTitle`。
@@ -146,3 +141,11 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 页面通过 `MAIN` + `LAUNCHER` 包可见性查询当前应用名称、图标和可启动状态，不持久化图标副本。`Enable` 把列表中的包名与配置写入定向命令；服务等待该包名成为前台后才显示遮罩。
 
 遮罩尺寸按显示区域百分比计算并固定在左上角。面板宽度为 `360dp` 且不超过屏幕，估算高度为 `420dp`；拖动位置限制在显示区域内，再保存为可移动范围的相对比例。
+
+## 扫码、滚动与日志
+
+扫码使用 CameraX 生命周期绑定和 ML Kit 内置二维码模型。分析采用 KEEP_ONLY_LATEST，识别结束关闭 ImageProxy，页面销毁解绑自身 use cases 并关闭 scanner；相册通过系统 GetContent 读取 URI。参考 [ML Kit 官方文档](https://developers.google.com/ml-kit/vision/barcode-scanning/android)。
+
+滚动模式使用底部 WRAP_CONTENT、NOT_FOCUSABLE / NOT_TOUCH_MODAL 无障碍窗口；编辑模式恢复全屏可聚焦窗口。服务对目标滚动和内容变化事件做 500ms debounce，执行时再次检查控制器状态与目标。ScrollCapture 按首次出现顺序去重；跨屏几何纵向偏移防止阅读排序混合不同屏幕。历史更新在事务内替换文本块，并由服务串行写入。
+
+ToolLogs 使用独立 Room 数据库 tool_logs.db；同进程写入顺序串行，原文仅保存在应用私有存储。界面观察最近 200 条；导出等待已排队写入并按 ID 每批 200 条流式写入 JSONL。持久化错误在日志页显示。

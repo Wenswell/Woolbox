@@ -38,12 +38,6 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `tool/ui/` | 历史页、工具 ViewModel、应用名称和图标解析；`AppDisplayInfo.kt` 统一提供应用展示信息。 |
 | `tool/trigger/` | Tile Service、Tile 状态刷新和添加请求。 |
 
-## 代码熵审计复盘
-
-请求校验、服务端值域检查、Android Repository/ViewModel 分层、覆盖层生命周期和迁移文件均保留，因为它们分别承担信任边界、状态所有权或持久化契约。
-
-后续同类清理先运行 TypeScript `noUnusedLocals` 作为候选扫描，再对每个符号搜索生产消费者和动态入口；没有证据证明无负载时不删除。保留的验证命令与范围见[测试与设备验收](testing.md)。
-
 ## 常用命令
 
 定向编译：
@@ -68,7 +62,7 @@ adb shell am start -n com.wswensw.woolbox/.MainActivity
 
 ## 验证边界
 
-自动测试覆盖、真机场景和诊断命令统一见 [测试与设备验收](testing.md)。JVM 和服务端测试不能替代 Android 系统窗口、厂商行为或公开服务验收。
+自动测试覆盖、真机场景和诊断命令统一见 [测试与设备验收](testing.md)。JVM 测试不能替代 Android 系统窗口、厂商行为或公开服务验收。
 
 ## 功能交付
 
@@ -76,9 +70,9 @@ adb shell am start -n com.wswensw.woolbox/.MainActivity
 
 1. 开发并运行与改动相称的本地测试。
 2. 创建本地 commit；APK 内容变更已在该提交中递增版本并核对 `output-metadata.json`。
-4. 发布与待测 APK 相同的通道：`pnpm run publish:debug` 或 `pnpm run publish:release`。发布脚本必须通过远端 manifest、APK `200` 与 `content-length` 校验。
-5. 将构建类型、版本、manifest URL 和 APK 大小校验结果写入 README，提交发布记录。
-6. 用户使用已发布 APK 完成[真机验收](testing.md#真机验收)。
+3. 发布与待测 APK 相同的通道：`pnpm run publish:debug` 或 `pnpm run publish:release`。发布脚本必须通过远端 manifest、APK `200` 与 `content-length` 校验。
+4. 将构建类型、版本、manifest URL 和 APK 大小校验结果写入 README，提交发布记录。
+5. 用户使用已发布 APK 完成[真机验收](testing.md#真机验收)。
 
 
 ## 版本与发布
@@ -118,7 +112,7 @@ node --check tools/publish-update.mjs
 | 现象 | 优先检查 | 正确边界 |
 | --- | --- | --- |
 | 页面持续 `Waiting for service` | `dumpsys accessibility` 的 `Binding`/`Crashed services`，再查 crash buffer。 | 页面状态不能代替系统绑定状态。 |
-| 点击工具后服务崩溃 | 栈是否指向 `ComposeOverlayWindow` 或 `WindowManager.addView`。 | 直接使用 `AccessibilityService` 的 `WindowManager` 与资源指标；不要从无 Display 的服务 Context 直接调用 `createWindowContext()`。 |
+| 点击工具后服务崩溃 | 栈是否指向 `ComposeOverlayWindow` 或 `WindowManager.addView`。 | 直接使用 `AccessibilityService` 的 `WindowManager` 与 currentWindowMetrics；不要从无 Display 的服务 Context 直接调用 `createWindowContext()`。 |
 | Global Copy 列表持续滑动卡顿 | 挂载后的 `ComposeView.isHardwareAccelerated` 是否为 `true`。 | `ComposeOverlayWindow` 必须在 `addView` 前统一设置 `FLAG_HARDWARE_ACCELERATED`。 |
 | Tile 长时间 `Preparing` | 当前 root 是否仍为 System UI，是否存在外部 `TYPE_APPLICATION` 窗口。 | 目标在面板收起后实时解析，命令两秒超时。 |
 | Global Copy 没有会话 | 节点是否有效，或 `copy_history.db` 写入是否失败。 | 空快照直接结束；非空快照保存成功后才显示会话。 |

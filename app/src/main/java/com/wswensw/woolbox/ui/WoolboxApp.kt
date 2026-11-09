@@ -73,6 +73,7 @@ private enum class MainTab(
     val labelRes: Int,
     val iconRes: Int,
 ) {
+    SCAN(R.string.scan_title, R.drawable.ic_scan_24),
     TOOLS(R.string.tab_tools, R.drawable.ic_tools_24),
     SETTING(R.string.tab_setting, R.drawable.ic_settings_24),
 }
@@ -99,7 +100,7 @@ fun WoolboxApp(
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
     val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
-    var selectedTab by rememberSaveable { mutableStateOf(MainTab.TOOLS) }
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.SCAN) }
     var languageMode by rememberSaveable { mutableStateOf(LanguageMode.current()) }
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
@@ -160,6 +161,7 @@ fun WoolboxApp(
                         label = "MainTabContent",
                     ) { tab ->
                         when (tab) {
+                            MainTab.SCAN -> com.wswensw.woolbox.qr.ScanScreen(onLogs = { navController.navigate("logs/scan") })
                             MainTab.TOOLS -> ToolsScreen(
                                 state = toolState,
                                 batteryOptimizationIgnored = batteryOptimizationIgnored,
@@ -177,6 +179,7 @@ fun WoolboxApp(
                             )
 
                             MainTab.SETTING -> SettingScreen(
+                                onLogs = { navController.navigate("logs/all") },
                                 languageMode = languageMode,
                                 onLanguageModeChange = {
                                     languageMode = it
@@ -194,11 +197,15 @@ fun WoolboxApp(
                     }
                 }
             }
+            composable("logs/{tool}") { entry ->
+                com.wswensw.woolbox.log.ToolLogsScreen(entry.arguments?.getString("tool").orEmpty().let { if (it == "all") "" else it }, onBack = { navController.popBackStack() })
+            }
             composable(AppRoutes.GLOBAL_COPY) {
                 val context = LocalContext.current
                 GlobalCopyRoute(
                     state = toolState,
                     historyCount = copyHistory.size,
+                    onLogs = { navController.navigate("logs/copy") },
                     onBack = { navController.popBackStack() },
                     onLaunchTool = {
                         context.showToolLaunchResult(onLaunchTool(ExternalToolCommand.GLOBAL_COPY))
@@ -255,6 +262,7 @@ fun WoolboxApp(
                         }
                     },
                     onCopy = { text ->
+                        com.wswensw.woolbox.log.ToolLogs.record(context, "copy", "history-$historyId", "copy", text)
                         context.copyToClipboard(text)
                         copyHistoryViewModel.closeEditor()
                         navController.popBackStack()
@@ -276,6 +284,7 @@ fun WoolboxApp(
                     state = toolState,
                     defaultConfig = defaultOledConfig,
                     profiles = oledProfiles,
+                    onLogs = { navController.navigate("logs/oled") },
                     onBack = { navController.popBackStack() },
                     onLaunchTool = {
                         if (toolState.isServiceConnected) {

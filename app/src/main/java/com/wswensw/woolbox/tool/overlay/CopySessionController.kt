@@ -74,22 +74,80 @@ import kotlinx.coroutines.flow.update
 
 class CopySessionController(
     private val service: AccessibilityService,
+    private val saveSession: (Long, CopySessionUiState) -> Unit,
     private val onActiveChanged: (active: Boolean, packageName: String?) -> Unit,
 ) {
     private val mutableUiState = MutableStateFlow(CopySessionUiState())
     private val uiState = mutableUiState.asStateFlow()
     private var overlayWindow: ComposeOverlayWindow? = null
 
-    fun show(snapshot: TextSnapshot) {
+    private var historyId = 0L
+    private var session = ""
+    private var capture: com.wswensw.woolbox.tool.model.ScrollCapture? = null
+    var isCapturing = false
+        private set
+    val packageName: String get() = mutableUiState.value.packageName
+
+    private fun log(action: String, details: String = "") =
+        com.wswensw.woolbox.log.ToolLogs.record(service, "copy", session, action, details)
+
+    private var lastCaptureEvent = ""
+    fun captureEvent(type: Int, from: Int, to: Int, scrollY: Int) {
+        lastCaptureEvent = "type=$type from=$from to=$to scrollY=$scrollY"
+    }
+
+    fun sample(snapshot: TextSnapshot) {
+        if (!isCapturing || snapshot.packageName != packageName) return
+        log("settled", lastCaptureEvent)
+        val decisions = requireNotNull(capture).append(snapshot.blocks)
+        log("sample", org.json.JSONArray().apply {
+            decisions.forEach { decision -> put(org.json.JSONObject()
+                .put("text", decision.block.text).put("source", decision.block.source)
+                .put("bounds", decision.block.bounds.toString()).put("key", decision.key)
+                .put("decision", if (decision.added) "added" else "duplicate_source_normalized_text")) }
+        }.toString())
+        val blocks = requireNotNull(capture).blocks
+        if (decisions.any { it.added }) {
+            mutableUiState.value = TextSnapshot(packageName, blocks).initialCopySessionUiState()
+            saveSession(historyId, mutableUiState.value)
+            log("merged", mutableUiState.value.currentDraftText)
+        }
+    }
+
+    private fun setCapture(enabled: Boolean) {
+        isCapturing = enabled
+        log(if (enabled) "scroll_start" else "scroll_end")
+        overlayWindow?.dismiss()
+        showWindow()
+    }
+
+    fun show(snapshot: TextSnapshot, historyId: Long) {
         dismissOverlay(notify = false)
-        mutableUiState.value = snapshot.initialCopySessionUiState()
+        this.historyId = historyId
+        session = com.wswensw.woolbox.log.ToolLogs.session()
+        capture = com.wswensw.woolbox.tool.model.ScrollCapture(snapshot.blocks)
+        mutableUiState.value = TextSnapshot(snapshot.packageName, requireNotNull(capture).blocks).initialCopySessionUiState()
+        saveSession(historyId, mutableUiState.value)
+        log("start", snapshot.toString())
+        showWindow()
+        onActiveChanged(true, snapshot.packageName)
+    }
+
+    private fun showWindow() {
 
         val host = ComposeOverlayWindow(service)
         overlayWindow = host
         host.show(copyOverlayLayoutParams()) {
             AppTheme(useDynamicColor = false) {
                 val state by uiState.collectAsState()
-                CopySessionPanel(
+                if (isCapturing) {
+                    Surface { Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.copy_scroll_count, state.blocks.size), Modifier.weight(1f))
+                        OutlinedButton(onClick = { setCapture(false) }) { Text(stringResource(R.string.copy_finish_scroll)) }
+                        IconButton(onClick = { close() }) { Icon(painterResource(R.drawable.ic_close_24), stringResource(R.string.action_close)) }
+                    } }
+                } else CopySessionPanel(
+                    onScrollCapture = { setCapture(true) },
                     state = state,
                     onToggle = ::toggle,
                     onToggleAll = ::toggleAll,
@@ -98,14 +156,17 @@ class CopySessionController(
                     onDraftChange = ::updateDraft,
                     onReadingOrderChange = ::setReadingOrder,
                     onBack = ::backToEditor,
-                    onClose = ::close,
+                    onClose = { close() },
                 )
             }
         }
-        onActiveChanged(true, snapshot.packageName)
     }
 
-    fun close(notify: Boolean = true) {
+    fun close(notify: Boolean = true, reason: String = "user_close") {
+        if (packageName.isNotBlank()) {
+            log("end", reason)
+            saveSession(historyId, mutableUiState.value)
+        }
         dismissOverlay(notify = notify)
     }
 
@@ -113,6 +174,8 @@ class CopySessionController(
         val packageName = mutableUiState.value.packageName.takeIf(String::isNotBlank)
         overlayWindow?.dismiss()
         overlayWindow = null
+        isCapturing = false
+        capture = null
         mutableUiState.value = CopySessionUiState()
         if (notify && packageName != null) {
             onActiveChanged(false, packageName)
@@ -150,18 +213,19 @@ class CopySessionController(
         val clipboard = service.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText(service.getString(R.string.global_copy_tile_label), text))
         Toast.makeText(service, service.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
-        close()
+        log("copy", text)
+        close(reason = "copied")
     }
 
     @Suppress("DEPRECATION")
     private fun copyOverlayLayoutParams(): WindowManager.LayoutParams = WindowManager.LayoutParams(
         WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.MATCH_PARENT,
+        if (isCapturing) WindowManager.LayoutParams.WRAP_CONTENT else WindowManager.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+        if (isCapturing) WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL else WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
         PixelFormat.TRANSLUCENT,
     ).apply {
-        gravity = Gravity.TOP or Gravity.START
+        gravity = (if (isCapturing) Gravity.BOTTOM else Gravity.TOP) or Gravity.START
         softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     }
 }
@@ -178,6 +242,7 @@ internal fun CopySessionPanel(
     onReadingOrderChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onClose: () -> Unit,
+    onScrollCapture: (() -> Unit)? = null,
     onSave: (() -> Unit)? = null,
     saveEnabled: Boolean = true,
     onDelete: (() -> Unit)? = null,
@@ -317,6 +382,7 @@ internal fun CopySessionPanel(
                         ) {
                             Text(stringResource(R.string.copy_select_text_count, selectedCount))
                         }
+                        if (onScrollCapture != null) OutlinedButton(onClick = onScrollCapture, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.copy_scroll)) }
                         OutlinedTextField(
                             value = state.currentDraftText,
                             onValueChange = onDraftChange,

@@ -25,6 +25,7 @@ import java.util.Locale
 
 @Composable
 fun SettingScreen(
+    onLogs: () -> Unit,
     languageMode: LanguageMode,
     onLanguageModeChange: (LanguageMode) -> Unit,
     themeMode: ThemeMode,
@@ -75,6 +76,7 @@ fun SettingScreen(
             )
         }
 
+        AppListItem(title = stringResource(R.string.tool_logs), subtitle = "", onClick = onLogs, navigate = true)
         AppSection(title = stringResource(R.string.setting_about)) {
             AppListItem(
                 title = stringResource(R.string.setting_version),

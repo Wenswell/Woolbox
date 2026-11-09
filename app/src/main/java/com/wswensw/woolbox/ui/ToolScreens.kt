@@ -49,6 +49,7 @@ import kotlin.math.roundToInt
 @Composable
 fun GlobalCopyRoute(
     state: ToolServiceState,
+    onLogs: () -> Unit,
     historyCount: Int,
     onBack: () -> Unit,
     onLaunchTool: () -> Unit,
@@ -60,6 +61,7 @@ fun GlobalCopyRoute(
         title = stringResource(R.string.global_copy_tile_label),
         onBack = onBack,
     ) {
+        AppListItem(title = stringResource(R.string.tool_logs), subtitle = "", onClick = onLogs, navigate = true)
         AppSection(title = stringResource(R.string.section_actions)) {
             AppListItem(
                 title = stringResource(R.string.global_copy_start),
@@ -121,6 +123,7 @@ fun GlobalCopyRoute(
 @Composable
 fun OledShieldRoute(
     state: ToolServiceState,
+    onLogs: () -> Unit,
     defaultConfig: OledShieldConfig,
     profiles: List<OledShieldProfileUi>,
     onBack: () -> Unit,
@@ -138,6 +141,7 @@ fun OledShieldRoute(
         title = stringResource(R.string.oled_shield_tile_label),
         onBack = onBack,
     ) {
+        AppListItem(title = stringResource(R.string.tool_logs), subtitle = "", onClick = onLogs, navigate = true)
         AppSection(title = stringResource(R.string.section_actions)) {
             AppListItem(
                 title = stringResource(R.string.oled_show_shield),

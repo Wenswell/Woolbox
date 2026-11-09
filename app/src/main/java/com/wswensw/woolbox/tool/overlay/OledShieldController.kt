@@ -62,6 +62,8 @@ class OledShieldController(
     private var panelWindow: ComposeOverlayWindow? = null
     private var shieldLayoutParams: WindowManager.LayoutParams? = null
     private var panelLayoutParams: WindowManager.LayoutParams? = null
+    private var logSession = ""
+    private fun log(action: String, details: String = "") = com.wswensw.woolbox.log.ToolLogs.record(service, "oled", logSession, action, details)
     private var targetPackageName: String? = null
 
     fun isActive(): Boolean = shieldWindow?.isShowing == true
@@ -90,6 +92,7 @@ class OledShieldController(
     ) {
         dismissOverlays(notify = false)
         val normalizedConfig = config.normalized()
+        logSession = com.wswensw.woolbox.log.ToolLogs.session()
         targetPackageName = packageName
         mutableUiState.value = OledOverlayUiState(config = normalizedConfig)
 
@@ -108,14 +111,16 @@ class OledShieldController(
         }
         val profile = repository.recordUse(packageName, normalizedConfig)
         targetPackageName = profile.packageName
+        log("start", "$packageName $normalizedConfig")
         onStateChanged(true, profile.packageName, profile.config)
     }
 
-    fun hide(notify: Boolean = true) {
-        dismissOverlays(notify = notify)
+    fun hide(notify: Boolean = true, reason: String = "user_hide") {
+        dismissOverlays(notify = notify, reason = reason)
     }
 
-    private fun dismissOverlays(notify: Boolean) {
+    private fun dismissOverlays(notify: Boolean, reason: String = "replaced") {
+        if (targetPackageName != null) log("end", "$reason $targetPackageName ${mutableUiState.value.config}")
         val packageName = targetPackageName
         panelWindow?.dismiss()
         panelWindow = null
@@ -167,6 +172,7 @@ class OledShieldController(
             shieldLayoutParams = shieldLayoutParams(host, updated)
             host.updateLayout(requireNotNull(shieldLayoutParams))
         }
+        log("config", updated.toString())
         onStateChanged(true, targetPackageName, updated)
     }
 
@@ -192,10 +198,12 @@ class OledShieldController(
             panelYPercent = current.y.toFloat() / maxY,
         ).normalized()
         mutableUiState.update { it.copy(config = updated) }
+        log("config", updated.toString())
         onStateChanged(true, targetPackageName, updated)
     }
 
     private fun save() {
+        log("save", mutableUiState.value.config.toString())
         targetPackageName?.let { packageName ->
             repository.saveForPackage(packageName, mutableUiState.value.config)
         }

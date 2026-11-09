@@ -10,7 +10,7 @@
 | `ForegroundTargetSelectorTest` / `ToolCommandPolicyTest` | 目标窗口选择和工具切换。 |
 | `AppUpdateClientTest` | APK 大小/SHA-256、包名、构建类型和 host 限制。 |
 
-JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为；服务端测试不能替代公网 HTTPS、systemd 和备份恢复验收。
+JVM 测试不能验证 Android HTTPS、Keystore、窗口、无障碍服务、输入法或厂商系统行为。
 
 ## 真机验收
 
@@ -42,3 +42,12 @@ adb shell dumpsys activity activities \
 
 adb exec-out uiautomator dump /dev/tty
 ```
+
+## 本次新增验收
+
+- ScrollCaptureTest 验证跨屏重叠、往返滚动、归一化、来源区分与阅读顺序。
+- 默认进入扫一扫；相机/相册识别二维码，复制原文、打开链接，拒绝权限、无二维码、离开页面释放相机。
+- 长页面手动滚动停稳后追加文本，回滚不重复；退出和切换应用停止采样，历史保存同一条完整会话。
+- 三个工具日志可查看完整详情并导出；JSONL 包含扫码原文、复制采样及去重明细、OLED 参数与启停原因。
+- 无障碍 OLED 与应用内 OLED 均记录日志。
+- 当前未连接 Android 设备；上述相机、窗口和系统文件选择器场景待真机验证。

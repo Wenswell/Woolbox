@@ -47,10 +47,8 @@ class CopyHistoryRepository(
                     useReadingOrder = state.useReadingOrder,
                 ) == 1,
             ) { "Copy history entry $historyId does not exist." }
-            dao.clearSelection(historyId)
-            if (state.selectedIds.isNotEmpty()) {
-                dao.selectBlocks(historyId, state.selectedIds)
-            }
+            dao.deleteBlocks(historyId)
+            dao.insertBlocks(state.toBlockEntities(historyId))
         }
     }
 

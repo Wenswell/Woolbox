@@ -137,6 +137,9 @@ internal interface CopyHistoryDao {
     )
     suspend fun selectBlocks(historyId: Long, selectedIds: Set<String>)
 
+    @Query("DELETE FROM copy_history_blocks WHERE historyId = :historyId")
+    suspend fun deleteBlocks(historyId: Long)
+
     @Query("DELETE FROM copy_history_entries WHERE id = :historyId")
     suspend fun delete(historyId: Long): Int
 }
