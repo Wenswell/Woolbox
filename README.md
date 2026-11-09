@@ -83,7 +83,7 @@ pnpm run publish:debug
 
 | 构建类型 | 当前发布版本 |
 | --- | --- |
-| debug | `0.1.46` (`versionCode 47`)；已发布，[manifest](https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json)，APK `200` / `69,268,200` bytes。 |
+| debug | `0.1.51` (`versionCode 52`)；已发布，[manifest](https://github.com/Wenswell/Woolbox/releases/download/debug/latest.json)，APK `200` / `92,370,023` bytes。 |
 | release | 尚未发布。 |
 
 安装到已连接设备：
