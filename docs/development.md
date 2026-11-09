@@ -26,7 +26,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `res/values*/strings.xml`、`res/xml/locales_config.xml` | 默认英文、简体中文资源与系统应用语言声明；可见文案从资源读取。 |
-| `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
+| `update/` | 按 build type 隔离的 `Wenswell/Woolbox` GitHub Releases 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
 | `tool/service/WindowSnapshotBuilder.kt` | Global Copy 节点遍历和文本快照。 |
@@ -80,8 +80,8 @@ adb shell am start -n com.wswensw.woolbox/.MainActivity
 任何 APK 内容或默认行为变更都必须递增 `app/build.gradle.kts` 的 `versionCode` 和 `versionName`，并同步 README。debug 和 release 使用独立更新通道：
 
 ```text
-https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json
-https://dl.1662803.xyz/d/woolbox/releases/release/latest.json
+https://github.com/Wenswell/Woolbox/releases/download/debug/latest.json
+https://github.com/Wenswell/Woolbox/releases/download/release/latest.json
 ```
 
 `latest.json` 与版本化 APK 由发布工具生成。发布 debug：
@@ -118,3 +118,7 @@ node --check tools/publish-update.mjs
 | Global Copy 没有会话 | 节点是否有效，或 `copy_history.db` 写入是否失败。 | 空快照直接结束；非空快照保存成功后才显示会话。 |
 | OLED 参数未恢复 | `profiles` 是否包含包名，profile 六个字段是否完整。 | 应用 profile 不存在时读取当前默认值。 |
 | 打开 Woolbox 后覆盖层关闭 | 本应用是否成为活动或焦点 `TYPE_APPLICATION` 窗口。 | 这是产品关闭规则；仅覆盖层事件不能触发关闭。 |
+
+### GitHub Releases
+
+发布仓库为 `Wenswell/Woolbox`。源码通过 SSH 推送；Release 和附件由 `gh` 使用 GitHub API 上传，首次执行 `gh auth login`。两个固定标签 `debug`、`release` 分别保存该通道的版本化 APK 和 `latest.json`。通道 Release 首次使用前创建，debug 标记为 prerelease。更新顺序为上传新 APK、覆盖 manifest、匿名验证下载；历史版本 APK 保留。同版本 APK 不覆盖。

@@ -41,6 +41,20 @@ class AppUpdateClientTest {
         }.isFailure)
     }
 
+    @Test
+    fun validateManifestAcceptsChannelAssetAndRejectsOtherRepositoryOrPath() {
+        val manifest = manifestFor("woolbox-update".toByteArray())
+        AppUpdateClient.validateManifest(manifest)
+        listOf(
+            manifest.apkUrl.replace("Wenswell/Woolbox", "other/Woolbox"),
+            manifest.apkUrl.replace("/debug/", "/release/"),
+            manifest.apkUrl + "?download=1",
+            manifest.apkUrl.replace("https:", "http:"),
+        ).forEach { url ->
+            assertTrue(runCatching { AppUpdateClient.validateManifest(manifest.copy(apkUrl = url)) }.isFailure)
+        }
+    }
+
     private fun manifestFor(bytes: ByteArray) = AppUpdateManifest(
         packageName = BuildConfig.APPLICATION_ID,
         buildType = BuildConfig.BUILD_TYPE,
@@ -53,7 +67,7 @@ class AppUpdateClientTest {
 
     private fun expectedApkUrl(versionName: String): String {
         val suffix = if (BuildConfig.BUILD_TYPE == "debug") "-debug" else ""
-        return "https://dl.1662803.xyz/d/woolbox/releases/${BuildConfig.BUILD_TYPE}/woolbox-$versionName$suffix.apk"
+        return "https://github.com/Wenswell/Woolbox/releases/download/${BuildConfig.BUILD_TYPE}/woolbox-$versionName$suffix.apk"
     }
 
     private fun temporaryApk(bytes: ByteArray): File =

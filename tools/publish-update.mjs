@@ -5,8 +5,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const downloaderProject = "/Users/wswensw/Documents/repos/debian-cloud-server";
-const downloadBaseUrl = "https://dl.1662803.xyz/d/woolbox/releases";
+const repository = "Wenswell/Woolbox";
+const downloadBaseUrl = "https://github.com/Wenswell/Woolbox/releases/download";
 const androidHome = join(homedir(), "Library", "Android", "sdk");
 const javaHome = "/Applications/Android Studio.app/Contents/jbr/Contents/Home";
 const androidBuildEnvironment = {
@@ -26,6 +26,8 @@ if (!["debug", "release"].includes(buildType)) {
 const variantDir = join(projectRoot, "app", "build", "outputs", "apk", buildType);
 const apksigner = await resolveApkSigner();
 await assertExecutable(join(javaHome, "bin", "java"), "Android Studio JBR");
+await run("gh", ["auth", "status"]);
+await run("gh", ["repo", "view", repository]);
 await buildVariant(buildType);
 
 const metadataPath = argumentsMap.get("metadata")
@@ -61,18 +63,20 @@ assertManifest(localManifest, buildType, apkElement.versionCode, apkElement.vers
 
 console.log(`${buildType}: APK ${sourceApk}`);
 console.log(`${buildType}: manifest ${stagedManifest}`);
-console.log(`${buildType}: upload ${stagingRoot}/woolbox`);
-await run("pnpm", ["--dir", downloaderProject, "downloads:upload", join(stagingRoot, "woolbox")]);
+// The channel release must exist before publishing. Keep versioned APKs intact.
+await run("gh", ["release", "view", buildType, "--repo", repository]);
+await run("gh", ["release", "upload", buildType, stagedApk, "--repo", repository]);
+await run("gh", ["release", "upload", buildType, stagedManifest, "--clobber", "--repo", repository]);
 
 const remoteManifestUrl = `${downloadBaseUrl}/${buildType}/latest.json`;
 const remoteManifest = await fetchJson(remoteManifestUrl);
 assertManifest(remoteManifest, buildType, apkElement.versionCode, apkElement.versionName);
-if (remoteManifest.apkUrl !== localManifest.apkUrl || remoteManifest.sha256 !== localManifest.sha256) {
+if (remoteManifest.apkUrl !== localManifest.apkUrl || remoteManifest.sha256 !== localManifest.sha256 || remoteManifest.sizeBytes !== localManifest.sizeBytes) {
   throw new Error("Remote manifest does not match the local manifest.");
 }
 
-const apkResponse = await fetch(remoteManifest.apkUrl, { method: "HEAD", redirect: "error" });
-if (!apkResponse.ok) throw new Error(`Remote APK HEAD failed: ${apkResponse.status}`);
+const apkResponse = await fetch(remoteManifest.apkUrl, { method: "HEAD", redirect: "follow" });
+if (apkResponse.status !== 200) throw new Error(`Remote APK HEAD failed: ${apkResponse.status}`);
 const contentLength = Number(apkResponse.headers.get("content-length"));
 if (!Number.isSafeInteger(contentLength) || contentLength !== remoteManifest.sizeBytes) {
   throw new Error(`Remote APK size mismatch: ${contentLength} != ${remoteManifest.sizeBytes}`);
@@ -137,7 +141,7 @@ function assertManifest(manifest, expectedBuildType, expectedVersionCode, expect
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, { redirect: "error" });
+  const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) throw new Error(`Fetch failed: ${url} ${response.status}`);
   return response.json();
 }

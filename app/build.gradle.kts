@@ -21,8 +21,8 @@ android {
         targetSdk {
             version = release(36)
         }
-        versionCode = 51
-        versionName = "0.1.50"
+        versionCode = 52
+        versionName = "0.1.51"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -36,14 +36,14 @@ android {
             buildConfigField(
                 "String",
                 "UPDATE_MANIFEST_URL",
-                "\"https://dl.1662803.xyz/d/woolbox/releases/debug/latest.json\"",
+                "\"https://github.com/Wenswell/Woolbox/releases/download/debug/latest.json\"",
             )
         }
         release {
             buildConfigField(
                 "String",
                 "UPDATE_MANIFEST_URL",
-                "\"https://dl.1662803.xyz/d/woolbox/releases/release/latest.json\"",
+                "\"https://github.com/Wenswell/Woolbox/releases/download/release/latest.json\"",
             )
             isMinifyEnabled = true
             isShrinkResources = true

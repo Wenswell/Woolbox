@@ -12,7 +12,7 @@ internal object AppUpdateClient {
     private const val ConnectTimeoutMillis = 15_000
     private const val ReadTimeoutMillis = 30_000
     private const val ProgressIntervalNanos = 250_000_000L
-    private const val DownloadHost = "dl.1662803.xyz"
+    private const val DownloadHost = "github.com"
     private const val MaximumApkBytes = 500L * 1024 * 1024
     private val Sha256Pattern = Regex("^[A-Fa-f0-9]{64}$")
 
@@ -150,18 +150,18 @@ internal object AppUpdateClient {
     private fun openConnection(url: String): HttpURLConnection =
         (URI.create(url).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            instanceFollowRedirects = false
+            instanceFollowRedirects = true
             useCaches = false
             connectTimeout = ConnectTimeoutMillis
             readTimeout = ReadTimeoutMillis
             setRequestProperty("Accept", "application/json, application/vnd.android.package-archive")
         }
 
-    private fun expectedManifestPath() = "/d/woolbox/releases/${BuildConfig.BUILD_TYPE}/latest.json"
+    private fun expectedManifestPath() = "/Wenswell/Woolbox/releases/download/${BuildConfig.BUILD_TYPE}/latest.json"
 
     private fun expectedApkPath(versionName: String): String {
         val debugSuffix = if (BuildConfig.BUILD_TYPE == "debug") "-debug" else ""
-        return "/d/woolbox/releases/${BuildConfig.BUILD_TYPE}/woolbox-$versionName$debugSuffix.apk"
+        return "/Wenswell/Woolbox/releases/download/${BuildConfig.BUILD_TYPE}/woolbox-$versionName$debugSuffix.apk"
     }
 
     private fun String.isTrustedUpdateUrl(expectedPath: String): Boolean {

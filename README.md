@@ -41,7 +41,7 @@ Android Compose 工具应用，提供扫一扫、Global Copy 和 OLED 遮罩。
 | `minSdk` | Android `31` |
 | `targetSdk` | Android `36` |
 | JVM | Java `17` |
-| 版本 | `0.1.50` (`versionCode 51`) |
+| 版本 | `0.1.51` (`versionCode 52`) |
 
 ## 目录
 

@@ -11,7 +11,7 @@ Woolbox 是 Android 12 及以上的工具应用。
 
 Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。
 
-当前不包含 Global Copy 搜索、批量管理、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
+当前不包含 Global Copy 搜索、批量管理、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `Wenswell/Woolbox` GitHub Releases 的更新包。
 
 ## 入口语义
 
@@ -140,7 +140,7 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 - OLED shield 的默认配置、按应用记录、应用图标、删除、定向启用、长按面板、实时调整、保存和关闭符合上述规则。
 - OLED 的无障碍覆盖层从完整显示区域左上角计算尺寸；顶部遮罩覆盖状态栏和显示刘海区域。
 
-- Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
+- Setting 打开后会检查 `Wenswell/Woolbox` GitHub Releases 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
 - Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。
 

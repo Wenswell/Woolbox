@@ -3,7 +3,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 const [apkPath, buildType, outputPath, metadataPathArgument] = process.argv.slice(2);
-const downloadBaseUrl = "https://dl.1662803.xyz/d/woolbox/releases";
+const downloadBaseUrl = "https://github.com/Wenswell/Woolbox/releases/download";
 const versionNamePattern = /^\d+\.\d+\.\d+$/;
 
 if (!apkPath || !outputPath || !["debug", "release"].includes(buildType)) {
