@@ -2,6 +2,8 @@ package com.wswensw.woolbox.tool.overlay
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.graphics.Rect
+import android.os.Build
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
@@ -71,7 +73,14 @@ class ComposeOverlayWindow(
     }
 
     fun displaySize(): OverlayDisplaySize {
-        val metrics = windowContext.resources.displayMetrics
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds: Rect = windowManager.currentWindowMetrics.bounds
+            return OverlayDisplaySize(bounds.width(), bounds.height())
+        }
+        @Suppress("DEPRECATION")
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
         return OverlayDisplaySize(metrics.widthPixels, metrics.heightPixels)
     }
 
