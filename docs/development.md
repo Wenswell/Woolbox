@@ -9,8 +9,7 @@
 | Compose BOM | `2026.05.01` |
 | Java | Android Studio JBR `17` |
 | Android SDK | `compileSdk 36.1`、`minSdk 31`、`targetSdk 36` |
-| Android 数据与测试 | OkHttp `4.12.0`、Room `2.8.4`、WorkManager `2.11.2`、KSP `2.3.10`、JUnit `4.13.2` |
-| Records server | Node `22+`、pnpm `11.11.0`、Fastify `5.10.0`、Drizzle ORM `0.45.2`、SQLite |
+| Android 数据与测试 | OkHttp `4.12.0`、Room `2.8.4`、KSP `2.3.10`、JUnit `4.13.2` |
 
 项目使用 Gradle Wrapper。标准 macOS 环境变量：
 
@@ -23,16 +22,11 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 | 路径 | 修改入口 |
 | --- | --- |
-| `MainActivity.kt` | 普通入口退到后台、指定应用启动、`onStop` 命令提交和整点打卡通知入口。 |
-| `ui/WoolboxApp.kt` | 三个底栏目的地、工具路由、Records Today/Templates/Goals/Accumulate/Measurement 和 Sheet 接线。 |
+| `MainActivity.kt` | 普通入口退到后台、指定应用启动、`onStop` 命令提交。 |
 | `ui/AppComponents.kt` | 应用页面的稳定通用组件。 |
 | `ui/ToolScreens.kt` | 两个工具详情页、历史入口与应用配置列表。 |
 | `res/values*/strings.xml`、`res/xml/locales_config.xml` | 默认英文、简体中文资源与系统应用语言声明；可见文案从资源读取。 |
-| `record/{model,data,ui}/` | TaskTemplate、TodayTask、DailyCheckin、Goal、量化记录、HTTPS Repository、Keystore 凭据、ViewModel、管理页、Sheet 和表单。 |
-| `record/reminder/` | 唯一 WorkManager 调度、服务端二次校验、通知 Channel 和整点打卡通知。 |
 | `update/` | 按 build type 隔离的 `dl.1662803.xyz` 更新 manifest、APK 校验缓存、`PackageInstaller` 与安装状态 Receiver。 |
-| `records-server/src/`、`drizzle/` | Fastify API、审计日志、服务端规则、SQLite schema 和迁移。 |
-| `records-server/web/`、`deploy/` | PC 管理页（`App` shell、`views/`、`components/`、`lib/`）、systemd、备份及恢复验证。 |
 | `tool/service/ToolAccessibilityService.kt` | 命令状态机、目标变化和工具生命周期。 |
 | `tool/service/ForegroundWindowResolver.kt` | 外部应用窗口候选和选择顺序。 |
 | `tool/service/WindowSnapshotBuilder.kt` | Global Copy 节点遍历和文本快照。 |
@@ -46,11 +40,9 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 ## 代码熵审计复盘
 
-2026-08-30 对 Android 客户端与 `records-server` 做消费者、动态入口、迁移和历史依据检查后，仅收敛了已证实的残留：服务端两个无消费者类型/辅助函数、Web 一个无效参数，以及 Android 工具页重复的状态文案实现。请求校验、服务端值域检查、Android Repository/ViewModel 分层、覆盖层生命周期和迁移文件均保留，因为它们分别承担信任边界、状态所有权或持久化契约。
+请求校验、服务端值域检查、Android Repository/ViewModel 分层、覆盖层生命周期和迁移文件均保留，因为它们分别承担信任边界、状态所有权或持久化契约。
 
 后续同类清理先运行 TypeScript `noUnusedLocals` 作为候选扫描，再对每个符号搜索生产消费者和动态入口；没有证据证明无负载时不删除。保留的验证命令与范围见[测试与设备验收](testing.md)。
-
-通用行为与架构分别查 [产品说明](product.md) 和 [系统架构](architecture.md)；Records 查 [产品规则](records-product.md) 与 [数据和接口](records-architecture.md)；验证场景查 [测试与设备验收](testing.md)。
 
 ## 常用命令
 
@@ -66,16 +58,6 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 git diff --check
 ```
-
-Records server 定向验证：
-
-```bash
-cd records-server
-node --check scripts/*.mjs
-pnpm typecheck && pnpm test && pnpm test:web && pnpm build
-```
-
-部署路径、`127.0.0.1:4320` 服务、备份与恢复检查见 [`records-server/deploy/README.md`](../records-server/deploy/README.md)。
 
 安装到已连接设备：
 
@@ -94,19 +76,10 @@ adb shell am start -n com.wswensw.woolbox/.MainActivity
 
 1. 开发并运行与改动相称的本地测试。
 2. 创建本地 commit；APK 内容变更已在该提交中递增版本并核对 `output-metadata.json`。
-3. 涉及服务端 schema 或 API 契约时，先部署服务端：
-
-   ```bash
-   cd records-server
-   pnpm deploy
-   ```
-
-   对不可逆数据迁移，先按 [`records-server/deploy/README.md`](../records-server/deploy/README.md) 创建并验证一份新的远端备份。该命令执行服务端测试、构建、远端同步、服务重启、迁移 schema 和 overview 契约校验。
 4. 发布与待测 APK 相同的通道：`pnpm run publish:debug` 或 `pnpm run publish:release`。发布脚本必须通过远端 manifest、APK `200` 与 `content-length` 校验。
 5. 将构建类型、版本、manifest URL 和 APK 大小校验结果写入 README，提交发布记录。
 6. 用户使用已发布 APK 完成[真机验收](testing.md#真机验收)。
 
-服务端契约变更必须在 APK 发布前完成第 3 步，防止客户端调用尚未上线的 API。
 
 ## 版本与发布
 

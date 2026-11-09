@@ -23,20 +23,19 @@ Quick Settings Tiles ───────────────────�
                                    ▼
                         ComposeOverlayWindow
 
-Records pages ──> RecordsViewModel ──> RecordRepository ── HTTPS API ──> Records server SQLite
 ```
 
 ## 系统权限
 
 Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取无障碍服务开关；`BatteryOptimizationMonitor` 使用 `PowerManager.isIgnoringBatteryOptimizations(packageName)` 读取电池优化豁免。用户点击未授权的电池优化行时，应用通过 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 和当前包名 URI 打开系统授权页，并在 Activity `ON_RESUME` 后重新读取状态；授权页返回后的刷新最多确认 5 次，间隔 `500ms`，不持久化该状态。
 
-一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。工具页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。Records 不提交工具命令，Android 与 PC 管理页共享服务端 SQLite。
+一个 `AccessibilityService` 统一拥有外部窗口读取、待执行命令、覆盖层和工具生命周期。工具页面与 Tile 只负责提交 `ExternalToolCommand`，不读取目标窗口、不持有覆盖层。
 
 ## 模块职责
 
 | 模块 | 职责 |
 | --- | --- |
-| `MainActivity` | 承载 Compose；普通入口退到后台，OLED 已保存应用入口启动指定应用，并在 `onStop` 提交命令；消费整点打卡通知入口。 |
+| `MainActivity` | 承载 Compose；普通入口退到后台，OLED 已保存应用入口启动指定应用，并在 `onStop` 提交命令。 |
 | `ToolServiceController` | 通过弱引用把页面与 Tile 命令交给当前服务实例。 |
 | `ToolAccessibilityService` | 管理连接、命令状态机、目标变化、控制器生命周期和 Tile 刷新。 |
 | `ForegroundWindowResolver` | 从无障碍窗口中选择当前外部 `TYPE_APPLICATION` 目标。 |
@@ -50,8 +49,6 @@ Tools 页读取两项独立系统权限。`AccessibilityServiceMonitor` 读取�
 | `CopyHistoryRepository` | 用 Room 保存完整采集历史及可编辑会话状态。 |
 | `CopyHistoryViewModel` / `AppDisplayInfo` | 把历史摘要与当前应用名称、图标组合为页面模型；应用不可用时使用通用展示，不把包名作为历史列表名称。 |
 | `OledShieldConfigRepository` | 保存默认配置与按包名唯一的应用配置。 |
-| `RecordsViewModel` / `RecordRepository` | 用进程级 `OkHttpClient` 读写服务端并原子发布 TaskTemplate、TodayTask、DailyCheckin、量化记录和候选组成的 overview 快照；凭据由 Keystore 加密保存。分钟时钟负责重算整点打卡入口并在跨日刷新。 |
-| `HourlyCheckinReminderScheduler` / `HourlyCheckinReminderWorker` | 以唯一一次性 WorkManager 任务从下一本地整点开始调度。Worker 联网重读 DailyCheckin；跨日、未起床或当前小时不可打卡时结束，否则通知后续排下一整点。 |
 
 ## 命令状态机
 
@@ -103,7 +100,7 @@ System UI 是否处于前台只检查 `rootInActiveWindow`，普通 System UI �
 
 ## 覆盖层窗口契约
 
-`ComposeOverlayWindow` 直接使用 `AccessibilityService` 作为 `ComposeView` Context，并从该服务获取 `WindowManager` 与 `resources.displayMetrics`。不要直接从无 Display 的服务 Context 调用 `createWindowContext()`；该调用会抛出 `UnsupportedOperationException`，终止无障碍服务并使页面停留在 `Waiting for service`。
+`ComposeOverlayWindow` 直接使用 `AccessibilityService` 作为 `ComposeView` Context，并从该服务获取 `WindowManager` 与 `currentWindowMetrics.bounds`。不要直接从无 Display 的服务 Context 调用 `createWindowContext()`；该调用会抛出 `UnsupportedOperationException`，终止无障碍服务并使页面停留在 `Waiting for service`。
 
 这项边界来自旧应用 `app0603` 已验证的实现：各覆盖层控制器直接通过服务 Context 获取 `Context.WINDOW_SERVICE` 和资源指标。当前应用在此基础上增加 Compose 所需的 `LifecycleOwner`、`SavedStateRegistryOwner` 与 composition 销毁流程。
 
@@ -133,10 +130,6 @@ OLED 遮罩窗口额外使用 `FLAG_LAYOUT_NO_LIMITS` 和 `LAYOUT_IN_DISPLAY_CUT
 `ClipboardManager.setPrimaryClip()` 写入后显示成功 Toast，再通过统一的 `close()` 销毁会话窗口并发布非活动状态。
 
 非空快照先写入 `copy_history.db`，成功后才显示会话。`copy_history_entries` 保存包名、捕获时间、两种草稿和当前顺序，`copy_history_blocks` 保存完整文本块与选择状态并随父记录级联删除。列表只查询最多 `240` 个字符的摘要；`CopyHistoryViewModel` 再通过 `AppDisplayInfo` 解析当前应用名称和图标，应用不可用时使用通用名称和图标，列表不显示包名；打开记录时才加载文本块。跨应用会话与应用内历史 Dialog 共用 `CopySessionUiState` 和编辑面板，窗口宿主分别由服务与 Activity 管理。
-
-## Records 数据
-
-Records 的表、Today task/整点打卡 API、事务协调、提醒和部署边界归 [Records 数据与接口](records-architecture.md)。
 
 ## App 更新
 

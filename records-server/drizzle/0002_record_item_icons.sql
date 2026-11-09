@@ -1,1 +1,0 @@
-ALTER TABLE `record_items` ADD COLUMN `icon_key` text NOT NULL DEFAULT 'CHECK_CIRCLE';

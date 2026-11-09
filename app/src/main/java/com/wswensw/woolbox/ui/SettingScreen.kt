@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.wswensw.woolbox.BuildConfig
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.ui.MotionMode
 import com.wswensw.woolbox.update.AppUpdatePhase
 import com.wswensw.woolbox.update.AppUpdateUiState
 import com.wswensw.woolbox.ui.UiText
@@ -30,10 +29,6 @@ fun SettingScreen(
     onLanguageModeChange: (LanguageMode) -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    motionMode: MotionMode,
-    onMotionModeChange: (MotionMode) -> Unit,
-    recordsConnection: String,
-    onOpenRecordsConnection: () -> Unit,
     updateState: AppUpdateUiState,
     onCheckForUpdate: () -> Unit,
     onDownloadAndInstall: () -> Unit,
@@ -50,15 +45,9 @@ fun SettingScreen(
         ThemeMode.LIGHT to stringResource(R.string.theme_light),
         ThemeMode.DARK to stringResource(R.string.theme_dark),
     )
-    val motionLabels = mapOf(
-        MotionMode.SYSTEM to stringResource(R.string.motion_follow_system),
-        MotionMode.ON to stringResource(R.string.motion_on),
-        MotionMode.OFF to stringResource(R.string.motion_off),
-    )
     val updateStatus = updateState.status.asString()
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
-    var showMotionDialog by rememberSaveable { mutableStateOf(false) }
     var showVersionDialog by rememberSaveable { mutableStateOf(false) }
     var showDownloadConfirmation by rememberSaveable { mutableStateOf(false) }
 
@@ -83,26 +72,6 @@ fun SettingScreen(
                     AppListLeadingIcon(imageVector = Icons.Outlined.Palette)
                 },
                 onClick = { showThemeDialog = true },
-            )
-            AppListItem(
-                title = stringResource(R.string.setting_motion),
-                subtitle = motionLabels.getValue(motionMode),
-                leadingContent = {
-                    AppListLeadingIcon(imageVector = Icons.Outlined.Info)
-                },
-                onClick = { showMotionDialog = true },
-            )
-        }
-
-        AppSection(title = stringResource(R.string.setting_records)) {
-            AppListItem(
-                title = stringResource(R.string.setting_connection),
-                subtitle = recordsConnection,
-                leadingContent = {
-                    AppListLeadingIcon(imageVector = Icons.Outlined.Link)
-                },
-                navigate = true,
-                onClick = onOpenRecordsConnection,
             )
         }
 
@@ -186,16 +155,6 @@ fun SettingScreen(
         )
     }
 
-    if (showMotionDialog) {
-        AppSingleChoiceDialog(
-            title = stringResource(R.string.setting_motion),
-            options = MotionMode.entries,
-            selected = motionMode,
-            label = motionLabels::getValue,
-            onSelected = onMotionModeChange,
-            onDismiss = { showMotionDialog = false },
-        )
-    }
 
     if (showVersionDialog) {
         AppInfoDialog(

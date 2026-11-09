@@ -6,16 +6,13 @@
 
 ## 项目定位
 
-本仓库是 Android Compose 工具应用，用 `Global Copy`、`OLED shield` 与 `Records` 沉淀页面样式、底栏结构、通用组件、持久化和无障碍覆盖层能力。底栏固定为 `Records`、`Tools` 与 `Setting`。
+Android Compose 工具应用。当前调整范围见 `docs/tools-plan.md`。
 
 ## 开始前
 
 按任务读取对应文档：
 
 1. 始终先读 `README.md`，确认项目基线和文档入口。
-2. Records 行为或状态变更：读 `docs/records-product.md`；其他产品行为读 `docs/product.md`。
-3. Records 服务、数据或存储变更：读 `docs/records-architecture.md`；其他架构变更读 `docs/architecture.md`。
-4. Records 页面变更：读 `docs/records-design.md`；通用组件、工具页面或样式变更读 `docs/design-system.md`。
 5. 环境、构建、交付或排障：读 `docs/development.md`；测试或设备验收读 `docs/testing.md`。
 6. 文档修改：读 `docs/documentation.md`。
 
@@ -26,7 +23,7 @@
 - 默认使用 Kotlin、Jetpack Compose 和 Material 3。
 - 保持工程轻量；新增依赖前先确认 Compose、AndroidX 或本地 vector 无法满足需求。
 - 应用页面通用组件归属 `app/src/main/java/com/wswensw/woolbox/ui/AppComponents.kt`。
-- Records 领域模型、网络数据层和页面归属 `app/src/main/java/com/wswensw/woolbox/record/`。
+
 - 无障碍覆盖层及其 Compose UI 归属 `app/src/main/java/com/wswensw/woolbox/tool/overlay/`。
 - 页面通过稳定组件组合，不在页面内重复样式细节。
 - 卡片只用于单个内容块或设置分组；页面 section 保持全宽布局。
@@ -38,7 +35,6 @@
 - 纯文档或不进入 APK 的本地辅助文件可保持版本不变。升版本时同步 README 当前版本，并重新构建对应 APK 核对 `output-metadata.json`。
 - 更新通道按 `debug` 和 `release` 隔离：debug 只检查、下载、安装、生成和发布 debug APK；release 只处理 release APK。每个通道发布版本化 APK 和固定 `latest.json`；发布成功必须校验远端 manifest、APK `200` 和 `content-length`。release 只允许发布已签名 APK。
 - 功能版本升级的完成条件包括对应构建类型的远端发布与校验；提交信息或 README 必须记录构建类型、版本、manifest URL 和 APK 大小校验结果。
-- 功能交付顺序固定为：开发、定向测试、提交；涉及服务端 schema 或 API 契约时先执行 `cd records-server && pnpm deploy` 完成远端迁移与健康校验；再执行 `pnpm run publish:<debug|release>` 发布对应 APK；发布记录提交后进入真机验收。不得让依赖新服务端契约的 APK 先于服务端部署。
 
 ## 文档同步
 
@@ -67,3 +63,5 @@ git diff --check
 
 - 每轮可验证修改完成后创建本地 commit。
 - 不自动 push，除非用户明确要求。
+
+产品行为读 `docs/product.md`，架构读 `docs/architecture.md`，页面样式读 `docs/design-system.md`。功能交付顺序为开发、定向测试、本地提交、对应通道 APK 发布、发布记录提交和真机验收。

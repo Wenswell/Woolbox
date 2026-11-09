@@ -21,8 +21,8 @@ android {
         targetSdk {
             version = release(36)
         }
-        versionCode = 49
-        versionName = "0.1.48"
+        versionCode = 50
+        versionName = "0.1.49"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -90,9 +90,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.vico.compose)
-    implementation(libs.vico.compose.m3)
 
     ksp(libs.androidx.room.compiler)
 

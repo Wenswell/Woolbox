@@ -2,17 +2,16 @@
 
 ## 定位与范围
 
-Woolbox 是 Android 12 及以上的工具应用。当前提供两项跨应用无障碍能力和一项单人在线 Records 能力，并用它们验证应用页面、底栏、持久化和通用 Compose 组件。
+Woolbox 是 Android 12 及以上的工具应用。
 
 | 能力 | 结果 | 页面入口 | 快捷入口 |
 | --- | --- | --- | --- |
 | `Global Copy` | 读取目标应用当前窗口中的可访问文本，选择并复制到剪贴板。 | `Start Global Copy` | `Global Copy` Quick Settings Tile |
 | `OLED shield` | 在目标应用上方显示可触摸的黑色遮罩。 | `Show shield` | `OLED shield` Quick Settings Tile |
-| `Records` | 管理 Today tasks、整点打卡与量化记录；量化记录可累计，也可按指定时间保存测量值。 | `Records` 底栏 | 分区与独立路由 |
 
-Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。`Records` 通过 HTTPS API 访问服务端 SQLite，不依赖无障碍服务，也不使用本地记录数据库。
+Global Copy 与 OLED 的跨应用模式共用 `Woolbox tools` 无障碍服务。服务未连接时，Global Copy 主操作不可用，OLED 主操作改为在 Woolbox 内显示遮罩；Tile 点击会打开应用。
 
-当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。Records 不提供离线队列、日历视图、每日以外的模板周期、标签、协作、多级步骤、精确闹钟或可配置图表。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
+当前不包含 Global Copy 滚动采集、搜索、批量管理、导出、上传、同步或自动清理，以及 OLED 多配置版本、后台自动启动和独立管理页。App 更新不静默安装、不跨 debug/release 更新，也不接受非 `dl.1662803.xyz` 的更新包。
 
 ## 入口语义
 
@@ -108,10 +107,6 @@ Setting 的 Language 提供 `Follow system`、`English` 和 `简体中文`。选
 
 每个包名只保留一条配置。再次显示遮罩会用实际参数更新配置和记录时间；控制面板 `Save` 更新参数但保留本次打开时间。列表读取当前应用名称和图标；应用不可用时禁用 `Enable`，仍可删除配置。
 
-## Records
-
-Today tasks、整点打卡、模板与量化记录的完整行为和验收归 [Records 产品规则](records-product.md)。本文件只保留整个应用共享的范围、入口和系统工具规则。
-
 ## 共同关闭规则
 
 以下任一事件会取消待执行命令并关闭活动覆盖层：
@@ -138,7 +133,7 @@ Today tasks、整点打卡、模板与量化记录的完整行为和验收归 [R
 - Copy History 每行显示目标应用图标和名称，不显示目标包名；应用不可用时使用不可用状态名称和通用图标。
 - OLED shield 的默认配置、按应用记录、应用图标、删除、定向启用、长按面板、实时调整、保存和关闭符合上述规则。
 - OLED 的无障碍覆盖层从完整显示区域左上角计算尺寸；顶部遮罩覆盖状态栏和显示刘海区域。
-- Records 行为按 [Records 产品规则](records-product.md#验收) 验收。
+
 - Setting 打开后会检查 `dl.1662803.xyz` 当前构建类型的更新；debug 只更新 debug，release 只更新 release。新版本下载前显示确认，大小与 SHA-256 校验通过后才进入 Android 安装器，安装始终需要系统确认。
 - Setting 可在跟随系统、English 和简体中文之间切换；重启应用后选择保持，系统语言变化只影响跟随系统模式。
 - 工具启动和关闭过程中无障碍服务保持绑定；目标切换和服务解绑不残留窗口。

@@ -7,11 +7,8 @@
 | `README.md` | 项目入口、能力概览、快速开始和文档导航。 |
 | `AGENTS.md` | 仓库内 Agent 的执行约束和必读顺序。 |
 | `docs/product.md` | 应用共享范围、工具规则、用户流程、状态和验收。 |
-| `docs/records-product.md` | Records 业务规则、状态语义和验收。 |
 | `docs/architecture.md` | 应用结构、工具流程、窗口、平台和存储边界。 |
-| `docs/records-architecture.md` | Records 数据表、API、事务、提醒和部署边界。 |
 | `docs/design-system.md` | 共享组件、工具页面、视觉和交互规则。 |
-| `docs/records-design.md` | Records 页面结构、状态呈现和管理端规则。 |
 | `docs/development.md` | 源码地图、环境、构建交付、发布和故障定位。 |
 | `docs/testing.md` | 自动测试覆盖、真机验收和设备诊断。 |
 | `docs/documentation.md` | 文档职责、同步规则和质量标准。 |
@@ -23,11 +20,8 @@
 | 变化 | 必须同步 |
 | --- | --- |
 | 共享功能范围、工具规则、入口、状态或用户流程 | `docs/product.md` |
-| Records 业务规则、状态或用户流程 | `docs/records-product.md` |
 | 工具服务、命令、窗口、存储或平台边界 | `docs/architecture.md` |
-| Records 表、API、事务、提醒或部署边界 | `docs/records-architecture.md` |
 | 共享组件、工具页面、样式或交互规范 | `docs/design-system.md` |
-| Records 页面、状态呈现或管理端交互 | `docs/records-design.md` |
 | 源码路径、依赖、构建、交付、发布或排障经验 | `docs/development.md` |
 | 自动测试覆盖、真机场景或设备诊断 | `docs/testing.md` |
 | 项目定位、技术基线或文档入口 | `README.md` |
@@ -46,12 +40,12 @@
 
 ## 当前基线
 
-仓库文档按上述长期结构维护。Records 按产品、数据/API 和界面独立维护；共享工具、开发交付和测试验收分别归入对应主题。
+仓库文档按上述长期结构维护。
 
 基线要求：
 
 - README 可在一次阅读内说明项目用途、运行前提和下一步入口。
 - 产品、架构、设计、开发和测试信息没有职责冲突或大段重复。
-- 页面入口与 Tile 入口、两项无障碍工具规则、Records 当前范围、目标窗口解析和覆盖层 Context 边界均有明确说明。
+
 - 所有相对链接有效，文档中的源码路径和状态名可在仓库中找到。
 - `git diff --check` 与项目默认验证命令成功。

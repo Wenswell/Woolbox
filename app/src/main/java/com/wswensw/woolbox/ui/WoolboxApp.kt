@@ -55,28 +55,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.wswensw.woolbox.R
-import com.wswensw.woolbox.record.ui.ManageTemplatesScreen
-import com.wswensw.woolbox.record.ui.ManageGoalsScreen
-import com.wswensw.woolbox.record.ui.ManageRecordsScreen
-import com.wswensw.woolbox.record.ui.MeasurementPreviewUiState
-import com.wswensw.woolbox.record.model.RecordItem
-import com.wswensw.woolbox.record.model.RecordMode
-import com.wswensw.woolbox.record.ui.AccumulateItemFormScreen
-import com.wswensw.woolbox.record.ui.AddTodayTaskSheet
-import com.wswensw.woolbox.record.ui.GoalEditorScreen
-import com.wswensw.woolbox.record.ui.GoalPoolSheet
-import com.wswensw.woolbox.record.ui.MeasurementItemFormScreen
-import com.wswensw.woolbox.record.ui.MeasurementPreviewSheet
-import com.wswensw.woolbox.record.ui.MotionMode
-import com.wswensw.woolbox.record.ui.RecordSheet
-import com.wswensw.woolbox.record.ui.crossedGoalThreshold
-import com.wswensw.woolbox.record.ui.displayRecordName
-import com.wswensw.woolbox.record.ui.RecordsConnectionScreen
-import com.wswensw.woolbox.record.ui.RecordsScreen
-import com.wswensw.woolbox.record.ui.RecordsViewModel
-import com.wswensw.woolbox.record.ui.TemplateEditorScreen
-import com.wswensw.woolbox.record.ui.HourlyCheckinSheet
-import com.wswensw.woolbox.record.ui.TodayTaskDetailsSheet
 import com.wswensw.woolbox.tool.service.ExternalToolCommand
 import com.wswensw.woolbox.tool.service.ToolLaunchResult
 import com.wswensw.woolbox.tool.overlay.InAppOledShield
@@ -95,20 +73,15 @@ private enum class MainTab(
     val labelRes: Int,
     val iconRes: Int,
 ) {
-    RECORDS(R.string.tab_records, R.drawable.ic_records_24),
     TOOLS(R.string.tab_tools, R.drawable.ic_tools_24),
     SETTING(R.string.tab_setting, R.drawable.ic_settings_24),
 }
 
 @Composable
 fun WoolboxApp(
-    hourlyCheckinRequest: Int,
     onLaunchTool: (ExternalToolCommand) -> ToolLaunchResult,
 ) {
     val context = LocalContext.current
-    val goalReachedTemplate = stringResource(R.string.goal_reached)
-    val recordedItemTemplate = stringResource(R.string.recorded_item)
-    val undoLabel = stringResource(R.string.action_undo)
     val accessibilityAlreadyEnabledMessage = stringResource(R.string.accessibility_already_enabled)
     val batteryOptimizationAlreadyIgnoredMessage = stringResource(
         R.string.battery_optimization_already_ignored,
@@ -119,94 +92,31 @@ fun WoolboxApp(
     val navController = rememberNavController()
     val toolViewModel: ToolViewModel = viewModel()
     val copyHistoryViewModel: CopyHistoryViewModel = viewModel()
-    val recordsViewModel: RecordsViewModel = viewModel(
-        factory = RecordsViewModel.Factory(LocalContext.current),
-    )
     val toolState by toolViewModel.serviceState.collectAsStateWithLifecycle()
     val batteryOptimizationIgnored by toolViewModel.batteryOptimizationIgnored.collectAsStateWithLifecycle()
     val defaultOledConfig by toolViewModel.defaultOledConfig.collectAsStateWithLifecycle()
     val oledProfiles by toolViewModel.oledProfiles.collectAsStateWithLifecycle()
     val copyHistory by copyHistoryViewModel.history.collectAsStateWithLifecycle()
     val selectedCopyHistory by copyHistoryViewModel.selectedHistory.collectAsStateWithLifecycle()
-    val recordsState by recordsViewModel.uiState.collectAsStateWithLifecycle()
-    val measurementPreviewState by recordsViewModel.measurementPreview.collectAsStateWithLifecycle()
     val updateState by AppUpdateManager.state.collectAsStateWithLifecycle()
-    var selectedTab by rememberSaveable { mutableStateOf(MainTab.RECORDS) }
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.TOOLS) }
     var languageMode by rememberSaveable { mutableStateOf(LanguageMode.current()) }
     var themeMode by rememberSaveable { mutableStateOf(ThemeMode.SYSTEM) }
-    var motionMode by rememberSaveable { mutableStateOf(MotionMode.SYSTEM) }
-    var recordSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var goalSheetId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var showHourlyCheckin by rememberSaveable { mutableStateOf(false) }
-    var showAddTodayTask by rememberSaveable { mutableStateOf(false) }
-    var taskDetailsId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var measurementSheetItemId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showInAppOledShield by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val hapticFeedback = LocalHapticFeedback.current
     val darkTheme = themeMode.resolvedDarkTheme(isSystemInDarkTheme())
     val lifecycleOwner = LocalLifecycleOwner.current
-    val recordsClock = recordsViewModel.clock.collectAsStateWithLifecycle()
-    // Shared record-write behavior keeps haptics, goal detection and undo consistent.
-    val recordValue: (RecordItem, Double, (String?) -> Unit) -> Unit = { item, value, onResult ->
-        val previous = recordsState.goalValues[item.id]
-            ?: recordsState.entries.filter { it.itemId == item.id }.sumOf { it.value }
-        recordsViewModel.createEntry(item, value) { entryId, error ->
-            onResult(error)
-            if (entryId != null) {
-                val goalJustReached = crossedGoalThreshold(
-                    previous = previous,
-                    current = previous + value,
-                    target = item.goalValue,
-                )
-                hapticFeedback.performHapticFeedback(
-                    if (goalJustReached) {
-                        HapticFeedbackType.LongPress
-                    } else {
-                        HapticFeedbackType.ContextClick
-                    },
-                )
-                recordSheetItemId = null
-                coroutineScope.launch {
-                    val label = displayRecordName(item.name)
-                    val result = snackbarHostState.showSnackbar(
-                        message = if (goalJustReached) {
-                            goalReachedTemplate.formatLocalized(label)
-                        } else {
-                            recordedItemTemplate.formatLocalized(label)
-                        },
-                        actionLabel = undoLabel,
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        recordsViewModel.deleteEntry(entryId)
-                    }
-                }
-            }
-        }
-    }
-
     LaunchedEffect(selectedTab) {
         if (selectedTab == MainTab.SETTING) AppUpdateManager.checkForUpdate()
     }
 
-    LaunchedEffect(hourlyCheckinRequest) {
-        if (hourlyCheckinRequest == 0) return@LaunchedEffect
-        selectedTab = MainTab.RECORDS
-        navController.navigate(AppRoutes.ROOT) {
-            popUpTo(AppRoutes.ROOT)
-            launchSingleTop = true
-        }
-        showHourlyCheckin = true
-    }
-
-    DisposableEffect(lifecycleOwner, toolViewModel, recordsViewModel, selectedTab) {
+    DisposableEffect(lifecycleOwner, toolViewModel, selectedTab) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 toolViewModel.refreshAccessibilityState()
                 AppUpdateManager.syncInstallPermission()
-                if (selectedTab == MainTab.RECORDS) recordsViewModel.refresh()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -218,7 +128,6 @@ fun WoolboxApp(
     AppTheme(
         themeMode = themeMode,
         darkTheme = darkTheme,
-        motionMode = motionMode,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
@@ -237,14 +146,6 @@ fun WoolboxApp(
                             selectedTab = selectedTab,
                             onSelectTab = { tab ->
                                 selectedTab = tab
-                                if (tab != MainTab.RECORDS) {
-                                    recordSheetItemId = null
-                                    goalSheetId = null
-                                    showHourlyCheckin = false
-                                    showAddTodayTask = false
-                                    taskDetailsId = null
-                                    measurementSheetItemId = null
-                                }
                             },
                         )
                     },
@@ -275,41 +176,6 @@ fun WoolboxApp(
                                 },
                             )
 
-                            MainTab.RECORDS -> RecordsScreen(
-                                state = recordsState,
-                                clock = recordsClock,
-                                onAddTask = { showAddTodayTask = true },
-                                onOpenTask = { taskDetailsId = it.id },
-                                onManageTemplates = {
-                                    navController.navigate(AppRoutes.MANAGE_TEMPLATES)
-                                },
-                                onManageGoals = {
-                                    goalSheetId = null
-                                    navController.navigate(AppRoutes.MANAGE_GOALS)
-                                },
-                                onManageAccumulates = {
-                                    recordSheetItemId = null
-                                    navController.navigate(AppRoutes.MANAGE_ACCUMULATES)
-                                },
-                                onManageMeasurements = {
-                                    measurementSheetItemId = null
-                                    navController.navigate(AppRoutes.MANAGE_MEASUREMENTS)
-                                },
-                                onConfigureConnection = {
-                                    navController.navigate(AppRoutes.RECORDS_CONNECTION)
-                                },
-                                onRetry = recordsViewModel::refresh,
-                                onRecordItem = { recordSheetItemId = it.id },
-                                onOpenGoal = { goalSheetId = it.id },
-                                onMarkAwake = recordsViewModel::markAwake,
-                                onOpenHourlyCheckin = { showHourlyCheckin = true },
-                                onOpenMeasurement = { item ->
-                                    measurementSheetItemId = item.id
-                                    recordsViewModel.loadMeasurementPreview(item.id)
-                                },
-                                modifier = Modifier.fillMaxSize(),
-                            )
-
                             MainTab.SETTING -> SettingScreen(
                                 languageMode = languageMode,
                                 onLanguageModeChange = {
@@ -318,14 +184,6 @@ fun WoolboxApp(
                                 },
                                 themeMode = themeMode,
                                 onThemeModeChange = { themeMode = it },
-                                motionMode = motionMode,
-                                onMotionModeChange = { motionMode = it },
-                                recordsConnection = recordsState.connection.username
-                                    .takeIf { recordsState.connection.isConfigured }
-                                    ?: stringResource(R.string.not_configured),
-                                onOpenRecordsConnection = {
-                                    navController.navigate(AppRoutes.RECORDS_CONNECTION)
-                                },
                                 updateState = updateState,
                                 onCheckForUpdate = AppUpdateManager::checkForUpdate,
                                 onDownloadAndInstall = AppUpdateManager::downloadAndInstall,
@@ -453,310 +311,6 @@ fun WoolboxApp(
                     },
                 )
             }
-            composable(AppRoutes.MANAGE_TEMPLATES) {
-                ManageTemplatesScreen(
-                    state = recordsState,
-                    onBack = { navController.popBackStack() },
-                    onCreate = { navController.navigate(AppRoutes.TEMPLATE_NEW) },
-                    onEdit = { templateId -> navController.navigate(AppRoutes.templateEdit(templateId)) },
-                )
-            }
-            composable(AppRoutes.MANAGE_GOALS) {
-                ManageGoalsScreen(
-                    state = recordsState,
-                    onBack = { navController.popBackStack() },
-                    onNew = { navController.navigate(AppRoutes.GOAL_NEW) },
-                    onEdit = { goalId -> navController.navigate(AppRoutes.goalEdit(goalId)) },
-                    onRetry = { goalId -> navController.navigate(AppRoutes.goalRetry(goalId)) },
-                )
-            }
-            composable(AppRoutes.MANAGE_ACCUMULATES) {
-                ManageRecordsScreen(
-                    state = recordsState,
-                    mode = RecordMode.ACCUMULATE,
-                    onBack = { navController.popBackStack() },
-                    onNew = {
-                        navController.navigate(AppRoutes.RECORD_ITEM_ACCUMULATE_NEW)
-                    },
-                    onEditItem = { itemId ->
-                        navController.navigate(AppRoutes.accumulateItemEdit(itemId))
-                    },
-                )
-            }
-            composable(AppRoutes.MANAGE_MEASUREMENTS) {
-                ManageRecordsScreen(
-                    state = recordsState,
-                    mode = RecordMode.MEASUREMENT,
-                    onBack = { navController.popBackStack() },
-                    onNew = {
-                        navController.navigate(AppRoutes.RECORD_ITEM_MEASUREMENT_NEW)
-                    },
-                    onEditItem = { itemId ->
-                        navController.navigate(AppRoutes.measurementItemEdit(itemId))
-                    },
-                )
-            }
-            composable(AppRoutes.RECORDS_CONNECTION) {
-                RecordsConnectionScreen(
-                    state = recordsState,
-                    onBack = { navController.popBackStack() },
-                    onSave = recordsViewModel::configureCredentials,
-                )
-            }
-            composable(AppRoutes.TEMPLATE_NEW) {
-                TemplateEditorScreen(
-                    template = null,
-                    editing = false,
-                    loading = false,
-                    onBack = { navController.popBackStack() },
-                    onSave = { title, cadence, steps, onResult ->
-                        recordsViewModel.saveTemplate(null, title, cadence, steps) { templateId, error ->
-                            onResult(error)
-                            if (templateId != null) navController.popBackStack()
-                        }
-                    },
-                    onArchive = null,
-                )
-            }
-            composable(
-                route = AppRoutes.TEMPLATE_EDIT,
-                arguments = listOf(navArgument(AppRoutes.TEMPLATE_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val templateId = entry.arguments?.getLong(AppRoutes.TEMPLATE_ID) ?: return@composable
-                TemplateEditorScreen(
-                    template = recordsState.findTemplate(templateId),
-                    editing = true,
-                    loading = recordsState.isLoading,
-                    onBack = { navController.popBackStack() },
-                    onSave = { title, cadence, steps, onResult ->
-                        recordsViewModel.saveTemplate(templateId, title, cadence, steps) { savedId, error ->
-                            onResult(error)
-                            if (savedId != null) navController.popBackStack()
-                        }
-                    },
-                    onArchive = { onResult -> recordsViewModel.archiveTemplate(templateId, onResult) },
-                )
-            }
-            composable(AppRoutes.GOAL_NEW) {
-                GoalEditorScreen(
-                    goal = null,
-                    editing = false,
-                    loading = false,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveGoal(null, draft) { error ->
-                            onResult(error)
-                            if (error == null) navController.popBackStack()
-                        }
-                    },
-                )
-            }
-            composable(
-                route = AppRoutes.GOAL_EDIT,
-                arguments = listOf(navArgument(AppRoutes.GOAL_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val goalId = entry.arguments?.getLong(AppRoutes.GOAL_ID) ?: return@composable
-                GoalEditorScreen(
-                    goal = recordsState.findGoal(goalId),
-                    editing = true,
-                    loading = recordsState.isLoading,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveGoal(goalId, draft) { error ->
-                            onResult(error)
-                            if (error == null) navController.popBackStack()
-                        }
-                    },
-                )
-            }
-            composable(
-                route = AppRoutes.GOAL_RETRY,
-                arguments = listOf(navArgument(AppRoutes.GOAL_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val sourceId = entry.arguments?.getLong(AppRoutes.GOAL_ID) ?: return@composable
-                GoalEditorScreen(
-                    goal = null,
-                    source = recordsState.findGoal(sourceId),
-                    editing = false,
-                    loading = recordsState.isLoading,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveGoal(null, draft) { error ->
-                            onResult(error)
-                            if (error == null) navController.popBackStack()
-                        }
-                    },
-                )
-            }
-            composable(AppRoutes.RECORD_ITEM_ACCUMULATE_NEW) {
-                AccumulateItemFormScreen(
-                    item = null,
-                    editing = false,
-                    loading = false,
-                    fieldsLocked = false,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveItem(itemId = null, draft = draft) { error ->
-                            onResult(error)
-                            if (error == null) {
-                                navController.popBackStack()
-                            }
-                        }
-                    },
-                )
-            }
-            composable(
-                route = AppRoutes.RECORD_ITEM_ACCUMULATE_EDIT,
-                arguments = listOf(navArgument(AppRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val itemId = entry.arguments?.getLong(AppRoutes.RECORD_ITEM_ID) ?: return@composable
-                AccumulateItemFormScreen(
-                    item = recordsState.findItem(itemId),
-                    editing = true,
-                    loading = recordsState.isLoading,
-                    fieldsLocked = true,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->
-                            onResult(error)
-                            if (error == null) {
-                                navController.popBackStack()
-                            }
-                        }
-                    },
-                )
-            }
-            composable(AppRoutes.RECORD_ITEM_MEASUREMENT_NEW) {
-                MeasurementItemFormScreen(
-                    item = null,
-                    editing = false,
-                    loading = false,
-                    fieldsLocked = false,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveItem(itemId = null, draft = draft) { error ->
-                            onResult(error)
-                            if (error == null) {
-                                navController.popBackStack()
-                            }
-                        }
-                    },
-                )
-            }
-            composable(
-                route = AppRoutes.RECORD_ITEM_MEASUREMENT_EDIT,
-                arguments = listOf(navArgument(AppRoutes.RECORD_ITEM_ID) { type = NavType.LongType }),
-            ) { entry ->
-                val itemId = entry.arguments?.getLong(AppRoutes.RECORD_ITEM_ID) ?: return@composable
-                MeasurementItemFormScreen(
-                    item = recordsState.findItem(itemId),
-                    editing = true,
-                    loading = recordsState.isLoading,
-                    fieldsLocked = true,
-                    onBack = { navController.popBackStack() },
-                    onSave = { draft, onResult ->
-                        recordsViewModel.saveItem(itemId = itemId, draft = draft) { error ->
-                            onResult(error)
-                            if (error == null) {
-                                navController.popBackStack()
-                            }
-                        }
-                    },
-                )
-            }
-            }
-
-            recordSheetItemId?.let { itemId ->
-                val item = recordsState.activeItems.firstOrNull { it.id == itemId }
-                if (item != null) {
-                    RecordSheet(
-                        item = item,
-                        entries = recordsState.entries.filter { it.itemId == itemId },
-                        cumulative = recordsState.goalValues[itemId]
-                            ?: recordsState.entries.filter { it.itemId == itemId }.sumOf { it.value },
-                        onDismiss = { recordSheetItemId = null },
-                        onRecord = recordValue,
-                    )
-                }
-            }
-
-            goalSheetId?.let { goalId ->
-                recordsState.findGoal(goalId)?.let { goal ->
-                    GoalPoolSheet(
-                        goal = goal,
-                        onDismiss = { goalSheetId = null },
-                        onRecord = { value, onResult -> recordsViewModel.createGoalEntry(goal, value, onResult) },
-                        onToggleSubgoal = recordsViewModel::setGoalSubgoalCompleted,
-                    )
-                }
-            }
-
-            if (showAddTodayTask) {
-                AddTodayTaskSheet(
-                    dailySuggestions = recordsState.dailySuggestions,
-                    unfinishedTasks = recordsState.unfinishedTasks,
-                    templates = recordsState.templates,
-                    onDismiss = { showAddTodayTask = false },
-                    onAddTemplate = recordsViewModel::createTodayTaskFromTemplate,
-                    onContinueTask = recordsViewModel::createTodayTaskFromTask,
-                    onCreateTask = recordsViewModel::createTodayTask,
-                )
-            }
-
-            if (showHourlyCheckin) {
-                recordsState.dailyCheckin?.let { checkin ->
-                    HourlyCheckinSheet(
-                        checkin = checkin,
-                        tasks = recordsState.todayTasks,
-                        onDismiss = { showHourlyCheckin = false },
-                        onToggleStep = { task, step, completed, onResult ->
-                            recordsViewModel.setTodayTaskStepCompleted(task, step.id, completed, onResult)
-                        },
-                        onCheckIn = recordsViewModel::markHourlyCheckin,
-                    )
-                }
-            }
-
-            taskDetailsId?.let { taskId ->
-                recordsState.todayTasks.firstOrNull { it.id == taskId }?.let { task ->
-                    TodayTaskDetailsSheet(
-                        task = task,
-                        onDismiss = { taskDetailsId = null },
-                        onToggleStep = { step, completed, onResult ->
-                            recordsViewModel.setTodayTaskStepCompleted(task, step.id, completed, onResult)
-                        },
-                    )
-                }
-            }
-
-            measurementSheetItemId?.let { itemId ->
-                recordsState.activeItems.firstOrNull { it.id == itemId }?.let { item ->
-                    MeasurementPreviewSheet(
-                        item = item,
-                        state = measurementPreviewState.takeIf { it.itemId == itemId }
-                            ?: MeasurementPreviewUiState(itemId = itemId, isLoading = true),
-                        onDismiss = { measurementSheetItemId = null },
-                        onRecord = { value, onResult ->
-                            recordsViewModel.createEntry(item, value) { entryId, error ->
-                                onResult(error)
-                                if (entryId != null) {
-                                    coroutineScope.launch {
-                                        val result = snackbarHostState.showSnackbar(
-                                            message = recordedItemTemplate.formatLocalized(
-                                                displayRecordName(item.name),
-                                            ),
-                                            actionLabel = undoLabel,
-                                            duration = SnackbarDuration.Short,
-                                        )
-                                        if (result == SnackbarResult.ActionPerformed) {
-                                            recordsViewModel.deleteEntry(entryId)
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                    )
-                }
             }
 
             if (showInAppOledShield) {
@@ -860,31 +414,6 @@ private object AppRoutes {
     const val OLED_SHIELD = "oled-shield"
 
     fun copyHistoryEdit(historyId: Long) = "global-copy/history/$historyId"
-    const val MANAGE_TEMPLATES = "manage-templates"
-    const val MANAGE_GOALS = "manage-goals"
-    const val MANAGE_ACCUMULATES = "manage-accumulates"
-    const val MANAGE_MEASUREMENTS = "manage-measurements"
-    const val RECORDS_CONNECTION = "records-connection"
-    const val TEMPLATE_NEW = "template/new"
-    const val GOAL_NEW = "goal/new"
-    const val GOAL_ID = "goalId"
-    const val GOAL_EDIT = "goal/{$GOAL_ID}"
-    const val GOAL_RETRY = "goal/retry/{$GOAL_ID}"
-    const val TEMPLATE_ID = "templateId"
-    const val TEMPLATE_EDIT = "template/{$TEMPLATE_ID}"
-    const val RECORD_ITEM_ID = "recordItemId"
-    const val RECORD_ITEM_ACCUMULATE_NEW = "record-item/accumulate/new"
-    const val RECORD_ITEM_ACCUMULATE_EDIT = "record-item/accumulate/{$RECORD_ITEM_ID}"
-    const val RECORD_ITEM_MEASUREMENT_NEW = "record-item/measurement/new"
-    const val RECORD_ITEM_MEASUREMENT_EDIT = "record-item/measurement/{$RECORD_ITEM_ID}"
-
-    fun accumulateItemNew() = RECORD_ITEM_ACCUMULATE_NEW
-    fun accumulateItemEdit(itemId: Long) = "record-item/accumulate/$itemId"
-    fun measurementItemNew() = RECORD_ITEM_MEASUREMENT_NEW
-    fun measurementItemEdit(itemId: Long) = "record-item/measurement/$itemId"
-    fun templateEdit(templateId: Long) = "template/$templateId"
-    fun goalEdit(goalId: Long) = "goal/$goalId"
-    fun goalRetry(goalId: Long) = "goal/retry/$goalId"
 }
 
 private const val PageTransitionMillis = 220

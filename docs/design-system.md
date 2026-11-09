@@ -13,11 +13,6 @@ AppTheme
 └─ NavHost
    ├─ root
    │  └─ AppSurface
-   │     ├─ Records
-   │     │  ├─ Today ──> Task details / Hourly check-in / Add task
-   │     │  ├─ Templates ──> Manage templates ──> New / Edit template
-   │     │  ├─ Accumulate ──> Record Sheet
-   │     │  └─ Measurement ──> Measurement preview Sheet
    │     ├─ Tools
    │     │  ├─ Access / Accessibility service entry
    │     │  └─ Available
@@ -26,10 +21,6 @@ AppTheme
    │     └─ Setting
    │        ├─ Language entry
    │        ├─ Theme entry
-   │        └─ Records connection ──> Credentials form
-   ├─ Manage templates ──> New / Edit template
-   ├─ Manage accumulates ──> New / Edit accumulate
-   └─ Manage measurements ──> New / Edit measurement
    ├─ Global Copy
    │  ├─ primary action
    │  ├─ accessibility state
@@ -43,7 +34,7 @@ AppTheme
       └─ saved apps
 ```
 
-根页面固定显示 `Records`、`Tools`、`Setting` 底栏；图标分别为列表、扳手（`ic_tools_24`）、设置。工具详情页和记录管理页不显示底栏，使用顶部返回栏和独立滚动内容。
+工具详情页和记录管理页不显示底栏，使用顶部返回栏和独立滚动内容。
 
 ## 页面骨架
 
@@ -82,14 +73,13 @@ AppTheme
 | 列表行最小高度 | `56dp` |
 | 列表分隔线 inset | 从左侧 `56dp`（对齐 leading 后文字列） |
 | 内容卡片圆角（`cardShape`） | `16dp` |
-| Records 根页卡片圆角 | `8dp` |
 | OLED 控制面板圆角 | `12dp` |
 | OLED 控制面板最大宽度 | `360dp` |
 | Global Copy 面板外边距 | 水平 `12dp`、垂直 `32dp` |
 | Global Copy 面板圆角 | `16dp` |
 
 - 页面背景使用 `surface`。
-- 设置/表单分组仅用标题分区，无外框；圆角仅用于内容卡（Records 项目卡、空态/流水中性块）与菜单。
+
 - OLED 控制面板使用 `surfaceContainerHigh` 和 `8dp` 阴影。
 - 分组标题使用 `primary`；正文使用 `onSurface`，说明和次要状态使用 `onSurfaceVariant`。
 - 应用主题支持 `Follow system`、`Light`、`Dark`；覆盖层关闭动态色，保证跨应用显示稳定。
@@ -108,15 +98,11 @@ Tools 根页的 `Access` 分区使用 `AppListItem` 展示 `Accessibility servic
 
 Quick Settings 行在 Android 13 及以上整行执行系统添加请求，不再显示右侧 `Add` 按钮；Android 12/12L 整行禁用，由系统快捷设置编辑页负责添加。OLED 默认配置使用带百分比值的 Slider，值变化即时更新页面草稿，只有 `Save default` 写入存储。
 
-Setting 的 `Appearance` 区域提供 Language、Theme 和 Motion。Language 使用单选 Dialog，选项为 `Follow system`、`English`、`简体中文`；语言名称使用自身语言显示。Motion 可选 `Follow system`、`On`、`Off`，统一控制 Records 的渐变、弹出和液面动画。`Updates` 区域使用标准 `AppListItem`：`Current version` 的副文案显示构建类型和版本号，并触发对应通道的检查；发现更新后显示一个包含构建类型和版本号的动作行，下载与安装阶段在副文案呈现状态。下载动作先用标准确认 Dialog 显示版本与文件大小；完成下载后同一动作行进入安装。等待来源安装授权时动作行进入系统设置。检查、下载和安装期间禁用重复操作。
+Setting 的 `Appearance` 区域提供 Language、Theme 和 Motion。Language 使用单选 Dialog，选项为 `Follow system`、`English`、`简体中文`；语言名称使用自身语言显示。`Updates` 区域使用标准 `AppListItem`：`Current version` 的副文案显示构建类型和版本号，并触发对应通道的检查；发现更新后显示一个包含构建类型和版本号的动作行，下载与安装阶段在副文案呈现状态。下载动作先用标准确认 Dialog 显示版本与文件大小；完成下载后同一动作行进入安装。等待来源安装授权时动作行进入系统设置。检查、下载和安装期间禁用重复操作。
 
 用户可见文案从 Android 资源读取，默认英文位于 `values/strings.xml`，简体中文位于 `values-zh-rCN/strings.xml`。数量使用 `plurals`，日期、时间和数值使用当前 Locale；用户输入与服务端返回正文不翻译。后台更新状态使用 `UiText.Resource` 保存资源与参数，切换语言后按新配置重新解析。
 
 Global Copy 的 `History` 位于 Tile 之后，显示采集数量并进入独立历史列表。OLED 的 `Saved apps` 位于默认配置之后，复用 `AppListItem`：40dp 应用图标、名称、状态/参数/时间副文案、Enable/Delete 图标操作；无服务时副文案提示 `Accessibility required`，应用不可用时提示 `Unavailable`。
-
-## Records 组合
-
-Records 的 Today tasks、整点打卡和管理页状态呈现归 [Records 界面规则](records-design.md)。
 
 ## 状态呈现
 
